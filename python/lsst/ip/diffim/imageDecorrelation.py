@@ -192,8 +192,8 @@ class DecorrelateALKernelTask(pipeBase.Task):
         # exposure
         if np.isnan(svar) or np.isnan(tvar):
             # Double check that one of the exposures is all NaNs
-            if (np.all(np.isnan(exposure.getMaskedImage().getImage().getArray())) or
-                    np.all(np.isnan(templateExposure.getMaskedImage().getImage().getArray()))):
+            if (np.all(np.isnan(exposure.getMaskedImage().getImage().getArray()))
+                    or np.all(np.isnan(templateExposure.getMaskedImage().getImage().getArray()))):
                 self.log.warn('Template or science image is entirely NaNs: skipping decorrelation.')
                 outExposure = subtractedExposure.clone()
                 return pipeBase.Struct(correctedExposure=outExposure, correctionKernel=None)
@@ -648,8 +648,8 @@ class DecorrelateALKernelSpatialTask(pipeBase.Task):
         tvar = self.computeVarianceMean(templateExposure)
         if np.isnan(svar) or np.isnan(tvar):  # Should not happen unless entire image has been masked.
             # Double check that one of the exposures is all NaNs
-            if (np.all(np.isnan(scienceExposure.getMaskedImage().getImage().getArray())) or
-                    np.all(np.isnan(templateExposure.getMaskedImage().getImage().getArray()))):
+            if (np.all(np.isnan(scienceExposure.getMaskedImage().getImage().getArray()))
+                    or np.all(np.isnan(templateExposure.getMaskedImage().getImage().getArray()))):
                 self.log.warn('Template or science image is entirely NaNs: skipping decorrelation.')
                 if np.isnan(svar):
                     svar = 1e-9

@@ -1083,9 +1083,9 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
 
         # Check if the footprint consists of a putative dipole - else don't fit it.
         if (
-                (len(pks) <= 1) or  # one peak in the footprint - not a dipole
-                (len(pks) > 1 and (np.sign(pks[0].getPeakValue()) ==
-                                   np.sign(pks[-1].getPeakValue())))  # peaks are same sign - not a dipole
+                (len(pks) <= 1)  # one peak in the footprint - not a dipole
+                or (len(pks) > 1 and (np.sign(pks[0].getPeakValue())
+                    == np.sign(pks[-1].getPeakValue())))  # peaks are same sign - not a dipole
         ):
             measRecord.set(self.classificationFlagKey, False)
             measRecord.set(self.classificationAttemptedFlagKey, False)
@@ -1132,8 +1132,8 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
         # Dia source flux: average of pos+neg
         measRecord[self.fluxKey] = (abs(result.posFlux) + abs(result.negFlux))/2.
         measRecord[self.orientationKey] = result.orientation
-        measRecord[self.separationKey] = np.sqrt((result.posCentroidX - result.negCentroidX)**2. +
-                                                 (result.posCentroidY - result.negCentroidY)**2.)
+        measRecord[self.separationKey] = np.sqrt((result.posCentroidX - result.negCentroidX)**2.
+                                                 + (result.posCentroidY - result.negCentroidY)**2.)
         measRecord[self.centroidKeyX] = result.centroidX
         measRecord[self.centroidKeyY] = result.centroidY
 
@@ -1167,11 +1167,11 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
 
         # Second, are the pos/neg fluxes greater than 1.0 and no more than 0.65 (param maxFluxRatio)
         # of the total flux? By default this will never happen since posFlux = negFlux.
-        passesFluxPos = (abs(measRecord[self.posFluxKey]) /
-                         (measRecord[self.fluxKey]*2.)) < self.config.maxFluxRatio
+        passesFluxPos = (abs(measRecord[self.posFluxKey])
+                         / (measRecord[self.fluxKey]*2.)) < self.config.maxFluxRatio
         passesFluxPos &= (abs(measRecord[self.posFluxKey]) >= 1.0)
-        passesFluxNeg = (abs(measRecord[self.negFluxKey]) /
-                         (measRecord[self.fluxKey]*2.)) < self.config.maxFluxRatio
+        passesFluxNeg = (abs(measRecord[self.negFluxKey])
+                         / (measRecord[self.fluxKey]*2.)) < self.config.maxFluxRatio
         passesFluxNeg &= (abs(measRecord[self.negFluxKey]) >= 1.0)
         allPass = (passesSn and passesFluxPos and passesFluxNeg)  # and passesChi2)
 

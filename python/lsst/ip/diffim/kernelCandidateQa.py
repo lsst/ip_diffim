@@ -93,7 +93,7 @@ class KernelCandidateQa(object):
             ("D from K-S test of diffim pixels relative to Normal", ),
             ("Prob from K-S test of diffim pixels relative to Normal", "likelihood"),
             ("Anderson-Darling test statistic of diffim pixels relative to Normal", ),
-            ("Critical values for the significance levels in KCDiffimADSig.  If A2 is greater " +
+            ("Critical values for the significance levels in KCDiffimADSig.  If A2 is greater "
              "than this number, hypothesis that the distributions are similar can be rejected.", 5),
             ("Anderson-Darling significance levels for the Normal distribution", 5),
             ("Reduced chi^2 of the residual.", "likelihood"),
