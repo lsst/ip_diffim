@@ -258,8 +258,8 @@ class ImageReducer(pipeBase.Task):
 
         for item in mapperResults:
             item = item.subExposure  # Expected named value in the pipeBase.Struct
-            if not (isinstance(item, afwImage.ExposureF) or isinstance(item, afwImage.ExposureI) or
-                    isinstance(item, afwImage.ExposureU) or isinstance(item, afwImage.ExposureD)):
+            if not (isinstance(item, afwImage.ExposureF) or isinstance(item, afwImage.ExposureI)
+                    or isinstance(item, afwImage.ExposureU) or isinstance(item, afwImage.ExposureD)):
                 raise TypeError("""Expecting an Exposure type, got %s.
                                    Consider using `reduceOperation="none".""" % str(type(item)))
             subExp = newExp.Factory(newExp, item.getBBox())
@@ -660,8 +660,8 @@ class ImageMapReduceTask(pipeBase.Task):
         if cellCentroidsX is None or len(cellCentroidsX) <= 0:
             # Not given centroids; construct them from cellSize/gridStep
 
-            psfFwhm = (exposure.getPsf().computeShape().getDeterminantRadius() *
-                       2.*np.sqrt(2.*np.log(2.)))
+            psfFwhm = (exposure.getPsf().computeShape().getDeterminantRadius()
+                       * 2.*np.sqrt(2.*np.log(2.)))
             if scaleByFwhm:
                 self.log.info("Scaling grid parameters by %f" % psfFwhm)
 

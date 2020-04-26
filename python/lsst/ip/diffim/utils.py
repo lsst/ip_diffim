@@ -698,15 +698,15 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
             tsdiffim = sdiffim.Factory(sdiffim, bbox)
 
             if origVariance:
-                candidateResids.append(np.ravel(tdiffim.getImage().getArray() /
-                                                np.sqrt(torig.getVariance().getArray())))
-                spatialResids.append(np.ravel(tsdiffim.getImage().getArray() /
-                                              np.sqrt(torig.getVariance().getArray())))
+                candidateResids.append(np.ravel(tdiffim.getImage().getArray()
+                                                / np.sqrt(torig.getVariance().getArray())))
+                spatialResids.append(np.ravel(tsdiffim.getImage().getArray()
+                                              / np.sqrt(torig.getVariance().getArray())))
             else:
-                candidateResids.append(np.ravel(tdiffim.getImage().getArray() /
-                                                np.sqrt(tdiffim.getVariance().getArray())))
-                spatialResids.append(np.ravel(tsdiffim.getImage().getArray() /
-                                              np.sqrt(tsdiffim.getVariance().getArray())))
+                candidateResids.append(np.ravel(tdiffim.getImage().getArray()
+                                                / np.sqrt(tdiffim.getVariance().getArray())))
+                spatialResids.append(np.ravel(tsdiffim.getImage().getArray()
+                                              / np.sqrt(tsdiffim.getVariance().getArray())))
 
     fullIm = diffExposure.getMaskedImage().getImage().getArray()
     fullMask = diffExposure.getMaskedImage().getMask().getArray()
@@ -1055,8 +1055,8 @@ class DipoleTestImage(object):
         detectConfig.reEstimateBackground = True  # if False, will fail often for faint sources on gradients?
         detectConfig.thresholdType = "pixel_stdev"
         # Test images are often quite small, so may need to adjust background binSize
-        while ((min(diffim.getWidth(), diffim.getHeight()))//detectConfig.background.binSize <
-               detectConfig.background.approxOrderX and detectConfig.background.binSize > minBinSize):
+        while ((min(diffim.getWidth(), diffim.getHeight()))//detectConfig.background.binSize
+               < detectConfig.background.approxOrderX and detectConfig.background.binSize > minBinSize):
             detectConfig.background.binSize = max(minBinSize, detectConfig.background.binSize//2)
 
         # Create the detection task. We pass the schema so the task can declare a few flag fields

@@ -848,9 +848,9 @@ class ImagePsfMatchTask(PsfMatchTask):
             try:
                 candidateList[0].getSource()
             except Exception as e:
-                raise RuntimeError("Candidate List is of type: %s. " % (type(candidateList[0])) +
-                                   "Can only make candidate list from list of afwTable.SourceRecords, " +
-                                   "measAlg.PsfCandidateF or other type with a getSource() method: %s" % (e))
+                raise RuntimeError(f"Candidate List is of type: {type(candidateList[0])} "
+                                   "Can only make candidate list from list of afwTable.SourceRecords, "
+                                   f"measAlg.PsfCandidateF or other type with a getSource() method: {e}")
             candidateList = [c.getSource() for c in candidateList]
 
         candidateList = diffimTools.sourceToFootprintList(candidateList,
@@ -953,9 +953,9 @@ class ImagePsfMatchTask(PsfMatchTask):
         if not (templateBBox.overlaps(scienceBBox)):
             raise RuntimeError("Input images do not overlap at all")
 
-        if ((templateOrigin != scienceOrigin) or
-            (templateLimit != scienceLimit) or
-                (templateExposure.getDimensions() != scienceExposure.getDimensions())):
+        if ((templateOrigin != scienceOrigin)
+            or (templateLimit != scienceLimit)
+                or (templateExposure.getDimensions() != scienceExposure.getDimensions())):
             return False
         return True
 

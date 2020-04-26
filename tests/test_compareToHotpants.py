@@ -137,10 +137,10 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             # Hotpants centroids go from -1 to 1
             # Only one passes
             if xC > 150 and yC > 150:
-                cand = ipDiffim.makeKernelCandidate((xC - 0.5 * self.smi.getWidth()) /
-                                                    (0.5 * self.smi.getWidth()),
-                                                    (yC - 0.5 * self.smi.getHeight()) /
-                                                    (0.5 * self.smi.getHeight()),
+                cand = ipDiffim.makeKernelCandidate((xC - 0.5 * self.smi.getWidth())
+                                                    / (0.5 * self.smi.getWidth()),
+                                                    (yC - 0.5 * self.smi.getHeight())
+                                                    / (0.5 * self.smi.getHeight()),
                                                     tsmi, ssmi, self.ps)
                 self.kernelCellSet.insertCandidate(cand)
 
@@ -200,10 +200,10 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
             # Hotpants centroids go from -1 to 1
             if xC > 90 and yC > 90:
-                cand = ipDiffim.makeKernelCandidate((xC - 0.5 * self.smi.getWidth()) /
-                                                    (0.5 * self.smi.getWidth()),
-                                                    (yC - 0.5 * self.smi.getHeight()) /
-                                                    (0.5 * self.smi.getHeight()),
+                cand = ipDiffim.makeKernelCandidate((xC - 0.5 * self.smi.getWidth())
+                                                    / (0.5 * self.smi.getWidth()),
+                                                    (yC - 0.5 * self.smi.getHeight())
+                                                    / (0.5 * self.smi.getHeight()),
                                                     tsmi, ssmi, self.ps)
 
                 self.kernelCellSet.insertCandidate(cand)
@@ -258,10 +258,10 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
             # Hotpants centroids go from -1 to 1
             if xC > 90 and yC > 90:
-                cand = ipDiffim.makeKernelCandidate((xC - 0.5 * self.smi.getWidth()) /
-                                                    (0.5 * self.smi.getWidth()),
-                                                    (yC - 0.5 * self.smi.getHeight()) /
-                                                    (0.5 * self.smi.getHeight()),
+                cand = ipDiffim.makeKernelCandidate((xC - 0.5 * self.smi.getWidth())
+                                                    / (0.5 * self.smi.getWidth()),
+                                                    (yC - 0.5 * self.smi.getHeight())
+                                                    / (0.5 * self.smi.getHeight()),
                                                     tsmi, ssmi, self.ps)
                 self.kernelCellSet.insertCandidate(cand)
 
@@ -356,10 +356,10 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
             # Hotpants centroids go from -1 to 1
             if xC > 90 and yC > 90:
-                cand = ipDiffim.makeKernelCandidate((xC - 0.5 * self.smi.getWidth()) /
-                                                    (0.5 * self.smi.getWidth()),
-                                                    (yC - 0.5 * self.smi.getHeight()) /
-                                                    (0.5 * self.smi.getHeight()),
+                cand = ipDiffim.makeKernelCandidate((xC - 0.5 * self.smi.getWidth())
+                                                    / (0.5 * self.smi.getWidth()),
+                                                    (yC - 0.5 * self.smi.getHeight())
+                                                    / (0.5 * self.smi.getHeight()),
                                                     tsmi, ssmi, self.ps)
                 # print 'OBJECT', cand.getId(), 'AT', xC, yC, cand.getXCenter(), cand.getYCenter()
                 self.kernelCellSet.insertCandidate(cand)
@@ -418,10 +418,10 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
             # Hotpants centroids go from -1 to 1
             if xC > 90 and yC > 90:
-                cand = ipDiffim.makeKernelCandidate((xC - 0.5 * self.smi.getWidth()) /
-                                                    (0.5 * self.smi.getWidth()),
-                                                    (yC - 0.5 * self.smi.getHeight()) /
-                                                    (0.5 * self.smi.getHeight()),
+                cand = ipDiffim.makeKernelCandidate((xC - 0.5 * self.smi.getWidth())
+                                                    / (0.5 * self.smi.getWidth()),
+                                                    (yC - 0.5 * self.smi.getHeight())
+                                                    / (0.5 * self.smi.getHeight()),
                                                     tsmi, ssmi, self.ps)
                 self.kernelCellSet.insertCandidate(cand)
 
@@ -506,10 +506,10 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             ssmi = afwImage.MaskedImageF(self.smi, bbox, origin=afwImage.LOCAL)
 
             # Hotpants centroids go from -1 to 1
-            cand = ipDiffim.makeKernelCandidate((xC - 0.5 * self.smi.getWidth()) /
-                                                (0.5 * self.smi.getWidth()),
-                                                (yC - 0.5 * self.smi.getHeight()) /
-                                                (0.5 * self.smi.getHeight()),
+            cand = ipDiffim.makeKernelCandidate((xC - 0.5 * self.smi.getWidth())
+                                                / (0.5 * self.smi.getWidth()),
+                                                (yC - 0.5 * self.smi.getHeight())
+                                                / (0.5 * self.smi.getHeight()),
                                                 tsmi, ssmi, self.ps)
             cands.append(cand)
 
@@ -577,10 +577,10 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             ssmi = afwImage.MaskedImageF(self.smi, bbox, origin=afwImage.LOCAL)
 
             # Hotpants centroids go from -1 to 1
-            cand = ipDiffim.makeKernelCandidate((xC - 0.5 * self.smi.getWidth()) /
-                                                (0.5 * self.smi.getWidth()),
-                                                (yC - 0.5 * self.smi.getHeight()) /
-                                                (0.5 * self.smi.getHeight()),
+            cand = ipDiffim.makeKernelCandidate((xC - 0.5 * self.smi.getWidth())
+                                                / (0.5 * self.smi.getWidth()),
+                                                (yC - 0.5 * self.smi.getHeight())
+                                                / (0.5 * self.smi.getHeight()),
                                                 tsmi, ssmi, self.ps)
             cands.append(cand)
 
@@ -692,10 +692,10 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             ssmi = afwImage.MaskedImageF(self.smi, bbox, origin=afwImage.LOCAL)
 
             # Hotpants centroids go from -1 to 1
-            cand = ipDiffim.makeKernelCandidate((xC - 0.5 * self.smi.getWidth()) /
-                                                (0.5 * self.smi.getWidth()),
-                                                (yC - 0.5 * self.smi.getHeight()) /
-                                                (0.5 * self.smi.getHeight()),
+            cand = ipDiffim.makeKernelCandidate((xC - 0.5 * self.smi.getWidth())
+                                                / (0.5 * self.smi.getWidth()),
+                                                (yC - 0.5 * self.smi.getHeight())
+                                                / (0.5 * self.smi.getHeight()),
                                                 tsmi, ssmi, self.ps)
             cands.append(cand)
 
