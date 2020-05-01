@@ -244,13 +244,13 @@ class DecorrelateALKernelTask(pipeBase.Task):
         psfNew = measAlg.KernelPsf(psfcK)
 
         correctedExposure = subtractedExposure.clone()
-        correctedExposure.image.array = diffExpArr
+        correctedExposure.image.array[...] = diffExpArr  # Allow for numpy type casting
         # The subtracted exposure variance plane is already correlated, we cannot propagate
         # it through another convolution; instead we need to use the uncorrelated originals
         # The whitening should scale it to svar + tvar on average
-        varImg = correctedExposure.variance
-        varImg.assign(exposure.variance)
-        varImg += templateExposure.variance
+        varImg = correctedExposure.variance.array
+        # Allow for numpy type casting
+        varImg[...] = exposure.variance.array + templateExposure.variance.array
         correctedExposure.setPsf(psfNew)
 
         newVarMean = self.computeVarianceMean(correctedExposure)
