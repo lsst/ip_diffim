@@ -74,8 +74,9 @@ def singleGaussian2d(x, y, xc, yc, sigma_x=1., sigma_y=1., theta=0., ampl=1.):
 def makeFakeImages(size=(256, 256), svar=0.04, tvar=0.04, psf1=3.3, psf2=2.2, offset=None,
                    psf_yvary_factor=0., varSourceChange=1/50., theta1=0., theta2=0.,
                    n_sources=500, seed=66, verbose=False):
-    """Make two exposures: science and template pair with flux sources and random noise.
-    In all cases below, index (1) is the science image, and (2) is the template.
+    """Deprecated. Use ``test_zogy : makeFakeImages``. DM-25115: This function is kept for
+    numerical compatibility with existing test cases only. It has x,y axes handling
+    and PSF centering bugs.
 
     Parameters
     ----------

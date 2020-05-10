@@ -25,14 +25,14 @@ import numpy as np
 import lsst.utils.tests
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
+import lsst.afw.geom as afwGeom
 import lsst.geom as geom
 import lsst.meas.algorithms as measAlg
+import lsst.daf.base as dafBase
 
-from test_imageDecorrelation import makeFakeImages
+from test_imageDecorrelation import singleGaussian2d
 
-from lsst.ip.diffim.zogy import ZogyTask, ZogyConfig, ZogyMapReduceConfig, \
-    ZogyImagePsfMatchConfig, ZogyImagePsfMatchTask
-from lsst.ip.diffim.imageMapReduce import ImageMapReduceTask
+from lsst.ip.diffim.zogy import ZogyTask, ZogyConfig
 
 try:
     type(verbose)
@@ -42,6 +42,171 @@ except NameError:
 
 def setup_module(module):
     lsst.utils.tests.init()
+
+
+def makeFakeImages(size=(256, 256), svar=0.04, tvar=0.04, psf1=3.3, psf2=2.2, offset=None,
+                   psf_yvary_factor=0., varSourceChange=1/50., theta1=0., theta2=0.,
+                   n_sources=50, seed=66, verbose=False):
+    """Make two exposures: science and template pair with flux sources and random noise.
+    In all cases below, index (1) is the science image, and (2) is the template.
+
+    Parameters
+    ----------
+    size : `tuple` of `int`
+        Image pixel size (x,y). Pixel coordinates are set to
+        (-size[0]//2:size[0]//2, -size[1]//2:size[1]//2)
+    svar, tvar : `float`, optional
+        Per pixel variance of the added noise.
+    psf1, psf2 : `float`, optional
+        std. dev. of (Gaussian) PSFs for the two images in x,y direction. Default is
+        [3.3, 3.3] and [2.2, 2.2] for im1 and im2 respectively.
+    offset : `float`, optional
+        add a constant (pixel) astrometric offset between the two images.
+    psf_yvary_factor : `float`, optional
+        psf_yvary_factor vary the y-width of the PSF across the x-axis of the science image (zero,
+        the default, means no variation)
+    varSourceChange : `float`, optional
+        varSourceChange add this amount of fractional flux to a single source closest to
+        the center of the science image.
+    theta1, theta2: `float`, optional
+        PSF Gaussian rotation angles in degrees.
+    n_sources : `int`, optional
+        The number of sources to add to the images. If zero, no sources are
+        generated just background noise.
+    seed : `int`, optional
+        Random number generator seed.
+    verbose : `bool`, optional
+        Print some actual values.
+
+    Returns
+    -------
+    im1, im2 : `lsst.afw.image.Exposure`
+        The science and template exposures.
+
+    Notes
+    -----
+    If ``n_sources > 0`` and ``varSourceChange > 0.`` exactly one source,
+    that is closest to the center, will have different fluxes in the two
+    generated images. The flux on the science image will be higher by
+    ``varSourceChange`` fraction.
+
+    Having sources near the edges really messes up the
+    fitting (probably because of the convolution). So we make sure no
+    sources are near the edge.
+
+    Also it seems that having the variable source with a large
+    flux increase also messes up the fitting (seems to lead to
+    overfitting -- perhaps to the source itself). This might be fixed by
+    adding more constant sources.
+    """
+    rng = np.random.default_rng(seed)
+
+    psf1 = [3.3, 3.3] if psf1 is None else psf1
+    if not hasattr(psf1, "__len__") and not isinstance(psf1, str):
+        psf1 = [psf1, psf1]
+    psf2 = [2.2, 2.2] if psf2 is None else psf2
+    if not hasattr(psf2, "__len__") and not isinstance(psf2, str):
+        psf2 = [psf2, psf2]
+    offset = [0., 0.] if offset is None else offset   # astrometric offset (pixels) between the two images
+    if verbose:
+        print('Science PSF:', psf1, theta1)
+        print('Template PSF:', psf2, theta2)
+        print(np.sqrt(psf1[0]**2 - psf2[0]**2))
+        print('Offset:', offset)
+
+    xim = np.arange(-size[0]//2, size[0]//2, 1)  # Beware that -N//2 != -1*(N//2) for odd numbers
+    yim = np.arange(-size[1]//2, size[1]//2, 1)
+    x0im, y0im = np.meshgrid(xim, yim)
+
+    im1 = rng.normal(scale=np.sqrt(svar), size=x0im.shape)  # variance of science image
+    im2 = rng.normal(scale=np.sqrt(tvar), size=x0im.shape)  # variance of template
+
+    if n_sources > 0:
+        fluxes = rng.uniform(50, 30000, n_sources)
+        xposns = rng.uniform(xim.min()+16, xim.max()-5, n_sources)
+        yposns = rng.uniform(yim.min()+16, yim.max()-5, n_sources)
+
+        # Make the source closest to the center of the image the one that increases in flux
+        ind = np.argmin(xposns**2. + yposns**2.)
+
+        # vary the y-width of psf across x-axis of science image (zero means no variation):
+        psf1_yvary = psf_yvary_factor * (yim.mean() - yposns) / yim.max()
+        if verbose:
+            print('PSF y spatial-variation:', psf1_yvary.min(), psf1_yvary.max())
+
+    for i in range(n_sources):
+        flux = fluxes[i]
+        tmp = flux * singleGaussian2d(x0im, y0im, xposns[i], yposns[i], psf2[0], psf2[1], theta=theta2)
+        im2 += tmp
+        if i == ind:
+            flux += flux * varSourceChange
+        tmp = flux * singleGaussian2d(x0im, y0im, xposns[i]+offset[0], yposns[i]+offset[1],
+                                      psf1[0], psf1[1]+psf1_yvary[i], theta=theta1)
+        im1 += tmp
+
+    im1_psf = singleGaussian2d(x0im, y0im, 0, 0, psf1[0], psf1[1], theta=theta1)
+    im2_psf = singleGaussian2d(x0im, y0im, offset[0], offset[1], psf2[0], psf2[1], theta=theta2)
+
+    def makeWcs(offset=0):
+        """ Make a fake Wcs
+
+        Parameters
+        ----------
+        offset : float
+          offset the Wcs by this many pixels.
+        """
+        # taken from $AFW_DIR/tests/testMakeWcs.py
+        metadata = dafBase.PropertySet()
+        metadata.set("SIMPLE", "T")
+        metadata.set("BITPIX", -32)
+        metadata.set("NAXIS", 2)
+        metadata.set("NAXIS1", 1024)
+        metadata.set("NAXIS2", 1153)
+        metadata.set("RADESYS", 'FK5')
+        metadata.set("EQUINOX", 2000.)
+        metadata.setDouble("CRVAL1", 215.604025685476)
+        metadata.setDouble("CRVAL2", 53.1595451514076)
+        metadata.setDouble("CRPIX1", 1109.99981456774 + offset)
+        metadata.setDouble("CRPIX2", 560.018167811613 + offset)
+        metadata.set("CTYPE1", 'RA---SIN')
+        metadata.set("CTYPE2", 'DEC--SIN')
+        metadata.setDouble("CD1_1", 5.10808596133527E-05)
+        metadata.setDouble("CD1_2", 1.85579539217196E-07)
+        metadata.setDouble("CD2_2", -5.10281493481982E-05)
+        metadata.setDouble("CD2_1", -8.27440751733828E-07)
+        return afwGeom.makeSkyWcs(metadata)
+
+    def makeExposure(imgArray, psfArray, imgVariance):
+        """! Convert an image numpy.array and corresponding PSF numpy.array into an exposure.
+
+        Add the (constant) variance plane equal to `imgVariance`.
+
+        @param imgArray 2-d numpy.array containing the image
+        @param psfArray 2-d numpy.array containing the PSF image
+        @param imgVariance variance of input image
+        @return a new exposure containing the image, PSF and desired variance plane
+        """
+        # All this code to convert the template image array/psf array into an exposure.
+        bbox = geom.Box2I(geom.Point2I(0, 0), geom.Point2I(imgArray.shape[1]-1, imgArray.shape[0]-1))
+        im1ex = afwImage.ExposureD(bbox)
+        im1ex.getMaskedImage().getImage().getArray()[:, :] = imgArray
+        im1ex.getMaskedImage().getVariance().getArray()[:, :] = imgVariance
+        psfBox = geom.Box2I(geom.Point2I(-12, -12), geom.Point2I(12, 12))  # a 25x25 pixel psf
+        psf = afwImage.ImageD(psfBox)
+        psfBox.shift(geom.Extent2I(-(-size[0]//2), -(-size[1]//2)))  # -N//2 != -(N//2) for odd numbers
+        im1_psf_sub = psfArray[psfBox.getMinY():psfBox.getMaxY()+1, psfBox.getMinX():psfBox.getMaxX()+1]
+        psf.getArray()[:, :] = im1_psf_sub
+        psfK = afwMath.FixedKernel(psf)
+        psfNew = measAlg.KernelPsf(psfK)
+        im1ex.setPsf(psfNew)
+        wcs = makeWcs()
+        im1ex.setWcs(wcs)
+        return im1ex
+
+    im1ex = makeExposure(im1, im1_psf, svar)  # Science image
+    im2ex = makeExposure(im2, im2_psf, tvar)  # Template
+
+    return im1ex, im2ex
 
 
 class ZogyTest(lsst.utils.tests.TestCase):
@@ -59,25 +224,6 @@ class ZogyTest(lsst.utils.tests.TestCase):
                                      .getPlaneBitMask(["INTRP", "EDGE", "SAT", "CR",
                                                        "DETECTED", "BAD",
                                                        "NO_DATA", "DETECTED_NEGATIVE"]))
-
-    def _setUpImages(self, svar=100., tvar=100., varyPsf=0.):
-        """Generate a fake aligned template and science image.
-        """
-        self.svar = svar  # variance of noise in science image
-        self.tvar = tvar  # variance of noise in template image
-
-        seed = 666
-        self.im1ex, self.im2ex \
-            = makeFakeImages(size=(255, 257), svar=self.svar, tvar=self.tvar,
-                             psf1=self.psf1_sigma, psf2=self.psf2_sigma,
-                             n_sources=10, psf_yvary_factor=varyPsf,
-                             seed=seed, verbose=False)
-        # Create an array corresponding to the "expected" subtraction (noise only)
-        np.random.seed(seed)
-        self.expectedSubtraction = np.random.normal(scale=np.sqrt(svar), size=self.im1ex.getDimensions())
-        self.expectedSubtraction -= np.random.normal(scale=np.sqrt(tvar), size=self.im2ex.getDimensions())
-        self.expectedVar = np.var(self.expectedSubtraction)
-        self.expectedMean = np.mean(self.expectedSubtraction)
 
     def _computeVarianceMean(self, maskedIm):
         statObj = afwMath.makeStatistics(maskedIm.getVariance(),
@@ -98,195 +244,59 @@ class ZogyTest(lsst.utils.tests.TestCase):
         var = statObj.getValue(afwMath.MEANCLIP)
         return var
 
-    def tearDown(self):
-        del self.im1ex
-        del self.im2ex
+    def testFourierTransformConvention(self):
+        """Test numpy FFT normalization factor convention matches our assumption."""
+        D = np.arange(16).reshape(4, 4)
+        fD = np.real(np.fft.fft2(D))
+        self.assertFloatsAlmostEqual(
+            fD[0, 0], 120., rtol=None,
+            msg="Numpy FFT does not use expected default normalization"
+            " convention (1 in forward, 1/Npix in inverse operation).")
 
-    def _compareExposures(self, D_F, D_R, Scorr=False, tol=0.02):
-        """Tests to compare the two images (diffim's or Scorr's).
+    def testZogyNewImplementation(self):
+        """DM-25115 implementation test.
 
-        See below.  Also compare the diffim pixels with the "expected"
-        pixels statistics.  Only do the latter if Scorr==False.
+        Notes
+        -----
+        See diffimTests: tickets/DM-25115_zogy_implementation/DM-25115_zogy_unit_test_development.ipynb
         """
-        D_F.getMaskedImage().getMask()[:, :] = D_R.getMaskedImage().getMask()
-        varMean_F = self._computeVarianceMean(D_F.getMaskedImage())
-        varMean_R = self._computeVarianceMean(D_R.getMaskedImage())
-        pixMean_F = self._computePixelMean(D_F.getMaskedImage())
-        pixMean_R = self._computePixelMean(D_R.getMaskedImage())
-        pixVar_F = self._computePixelVariance(D_F.getMaskedImage())
-        pixVar_R = self._computePixelVariance(D_R.getMaskedImage())
 
-        if not Scorr:
-            self.assertFloatsAlmostEqual(varMean_F, varMean_R, rtol=tol)
-            self.assertFloatsAlmostEqual(pixMean_F, self.expectedMean, atol=tol*2.)
-            self.assertFloatsAlmostEqual(pixMean_R, self.expectedMean, atol=tol*2.)
-            self.assertFloatsAlmostEqual(pixVar_F, pixVar_R, rtol=tol)
-            self.assertFloatsAlmostEqual(pixVar_F, self.expectedVar, rtol=tol*2.)
-            self.assertFloatsAlmostEqual(pixVar_R, self.expectedVar, rtol=tol*2.)
-        else:
-            self.assertFloatsAlmostEqual(varMean_F, varMean_R, atol=tol)  # nearly zero so need to use atol
-            self.assertFloatsAlmostEqual(pixVar_F, pixVar_R, atol=tol)
+        # self.svar = svar  # variance of noise in science image
+        # self.tvar = tvar  # variance of noise in template image
 
-        self.assertFloatsAlmostEqual(pixMean_F, pixMean_R, atol=tol*2.)  # nearly zero so need to use atol
-
-    def testZogyDiffim(self):
-        """Compute Zogy diffims using Fourier- and Real-space methods.
-
-        Compare the images.  They are not identical but should be
-        similar (within ~2%).
-        """
-        self._setUpImages()
-        config = ZogyConfig()
-        task = ZogyTask(templateExposure=self.im2ex, scienceExposure=self.im1ex, config=config)
-        D_F = task.computeDiffim(inImageSpace=False)
-        D_R = task.computeDiffim(inImageSpace=True)
-        # Fourier-space and image-space versions are not identical, so up the tolerance.
-        # This is a known issue with the image-space version.
-        self._compareExposures(D_F.D, D_R.D, tol=0.03)
-
-    def _testZogyScorr(self, varAst=0.):
-        """Compute Zogy likelihood images (Scorr) using Fourier- and Real-space methods.
-
-        Compare the images. They are not identical but should be similar (within ~2%).
-        """
-        config = ZogyConfig()
-        task = ZogyTask(templateExposure=self.im2ex, scienceExposure=self.im1ex, config=config)
-        D_F = task.computeScorr(inImageSpace=False, xVarAst=varAst, yVarAst=varAst)
-        D_R = task.computeScorr(inImageSpace=True, xVarAst=varAst, yVarAst=varAst)
-        self._compareExposures(D_F.S, D_R.S, Scorr=True)
-
-    def testZogyScorr(self):
-        """Compute Zogy likelihood images (Scorr) using Fourier- and Real-space methods.
-
-        Do the computation with "astrometric variance" both zero and non-zero.
-        Compare the images. They are not identical but should be similar (within ~2%).
-        """
-        self._setUpImages()
-        self._testZogyScorr()
-        self._testZogyScorr(varAst=0.1)
-
-    def _testZogyDiffimMapReduced(self, inImageSpace=False, doScorr=False, **kwargs):
-        """Test running Zogy using ImageMapReduceTask framework.
-
-        Compare map-reduced version with non-map-reduced version.
-        Do it for pure Fourier-based calc. and also for real-space.
-        Also for computing pure diffim D and corrected likelihood image Scorr.
-        """
-        config = ZogyMapReduceConfig()
-        config.gridStepX = config.gridStepY = 9
-        config.borderSizeX = config.borderSizeY = 3
-        if inImageSpace:
-            config.gridStepX = config.gridStepY = 8
-            config.borderSizeX = config.borderSizeY = 6  # need larger border size for image-space run
-        config.reducer.reduceOperation = 'average'
-        task = ImageMapReduceTask(config=config)
-        D_mapReduced = task.run(self.im1ex, template=self.im2ex, inImageSpace=inImageSpace,
-                                doScorr=doScorr, forceEvenSized=False, **kwargs).exposure
+        # Sourceless case
+        self.im1ex, self.im2ex \
+            = makeFakeImages(size=(256, 256), svar=100., tvar=100.,
+                             psf1=self.psf1_sigma, psf2=self.psf2_sigma,
+                             n_sources=0, psf_yvary_factor=0, varSourceChange=0.1,
+                             seed=1, verbose=False)
 
         config = ZogyConfig()
-        task = ZogyTask(templateExposure=self.im2ex, scienceExposure=self.im1ex, config=config)
-        if not doScorr:
-            D = task.computeDiffim(inImageSpace=inImageSpace, **kwargs).D
-        else:
-            D = task.computeScorr(inImageSpace=inImageSpace, **kwargs).S
+        config.scaleByCalibration = False
+        task = ZogyTask(config=config)
+        res = task.run(self.im1ex, self.im2ex)
 
-        self._compareExposures(D_mapReduced, D, tol=0.04, Scorr=doScorr)
+        bbox = res.diffExp.getBBox()
+        subBbox = bbox.erodedBy(lsst.geom.Extent2I(25, 25))
+        subExp = res.diffExp[subBbox]
+        pixvar = self._computePixelVariance(subExp.maskedImage)
+        varmean = self._computeVarianceMean(subExp.maskedImage)
+        # Due to 3 sigma clipping, this is not so precise
+        self.assertFloatsAlmostEqual(pixvar, 200, rtol=0.1, atol=None)
+        self.assertFloatsAlmostEqual(varmean, 200, rtol=0.05, atol=None)
+        S = res.scoreExp.image.array / np.sqrt(res.scoreExp.variance.array)
+        self.assertLess(np.amax(S), 5.)  # Source not detected
 
-    def testZogyDiffimMapReduced(self):
-        """Test running Zogy using ImageMapReduceTask framework.
-
-        Compare map-reduced version with non-map-reduced version.
-        Do it for pure Fourier-based calc. and also for real-space.
-        Do it for ZOGY diffim and corrected likelihood image Scorr.
-        For Scorr, do it for zero and non-zero astrometric variance.
-        """
-        self._setUpImages()
-        self._testZogyDiffimMapReduced(inImageSpace=False)
-        self._testZogyDiffimMapReduced(inImageSpace=True)
-        self._testZogyDiffimMapReduced(inImageSpace=False, doScorr=True)
-        self._testZogyDiffimMapReduced(inImageSpace=True, doScorr=True)
-        self._testZogyDiffimMapReduced(inImageSpace=False, doScorr=True, xVarAst=0.1, yVarAst=0.1)
-        self._testZogyDiffimMapReduced(inImageSpace=True, doScorr=True, xVarAst=0.1, yVarAst=0.1)
-
-    def _testZogyImagePsfMatchTask(self, spatiallyVarying=False, inImageSpace=False,
-                                   doScorr=False, **kwargs):
-        """Test running Zogy using ZogyImagePsfMatchTask framework.
-
-        Compare resulting diffim version with original, non-spatially-varying version.
-        """
-        config = ZogyImagePsfMatchConfig()
-        config.zogyMapReduceConfig.gridStepX = config.zogyMapReduceConfig.gridStepY = 9
-        config.zogyMapReduceConfig.borderSizeX = config.zogyMapReduceConfig.borderSizeY = 3
-        if inImageSpace:  # need larger border size for image-space run
-            config.zogyMapReduceConfig.gridStepX = config.zogyMapReduceConfig.gridStepY = 8
-            config.zogyMapReduceConfig.borderSizeX = config.zogyMapReduceConfig.borderSizeY = 6
-        task = ZogyImagePsfMatchTask(config=config)
-        result = task.subtractExposures(self.im2ex, self.im1ex, inImageSpace=inImageSpace,
-                                        doWarping=False, spatiallyVarying=spatiallyVarying)
-        D_fromTask = result.subtractedExposure
-
-        config = ZogyConfig()
-        task = ZogyTask(templateExposure=self.im2ex, scienceExposure=self.im1ex, config=config)
-        D = task.computeDiffim(inImageSpace=inImageSpace, **kwargs).D
-        self._compareExposures(D_fromTask, D, tol=0.04, Scorr=doScorr)
-
-    def testZogyImagePsfMatchTask(self):
-        """Test running ZogyTask both with and without the spatiallyVarying option.
-        """
-        self._setUpImages()
-        self._testZogyImagePsfMatchTask(inImageSpace=False)
-        self._testZogyImagePsfMatchTask(inImageSpace=True)
-        self._testZogyImagePsfMatchTask(inImageSpace=False, spatiallyVarying=True)
-        self._testZogyImagePsfMatchTask(inImageSpace=True, spatiallyVarying=True)
-
-    def testZogyImagePsfMatchTaskDifferentPsfSizes(self):
-        """Test running ZogyTask both with and without the spatiallyVarying option.
-
-        Here we artificially set the two images to have PSFs with different dimensions
-        to ensure this edge case passes. This also tests cases where one of the PSFs
-        is not square.
-        """
-
-        # All this to grow the PSF of im1ex by a few pixels:
-        def _growPsf(exp, extraPix=(2, 3)):
-            bbox = exp.getBBox()
-            center = ((bbox.getBeginX() + bbox.getEndX()) // 2., (bbox.getBeginY() + bbox.getEndY()) // 2.)
-            center = geom.Point2D(center[0], center[1])
-            kern = exp.getPsf().computeKernelImage(center).convertF()
-            kernSize = kern.getDimensions()
-            paddedKern = afwImage.ImageF(kernSize[0] + extraPix[0], kernSize[1] + extraPix[1])
-            bboxToPlace = geom.Box2I(geom.Point2I((kernSize[0] + extraPix[0] - kern.getWidth()) // 2,
-                                                  (kernSize[1] + extraPix[1] - kern.getHeight()) // 2),
-                                     kern.getDimensions())
-            paddedKern.assign(kern, bboxToPlace)
-            fixedKern = afwMath.FixedKernel(paddedKern.convertD())
-            psfNew = measAlg.KernelPsf(fixedKern, center)
-            exp.setPsf(psfNew)
-            return exp
-
-        def _runAllTests():
-            self._testZogyImagePsfMatchTask(inImageSpace=False)
-            self._testZogyImagePsfMatchTask(inImageSpace=True)
-            self._testZogyImagePsfMatchTask(inImageSpace=False, spatiallyVarying=True)
-            self._testZogyImagePsfMatchTask(inImageSpace=True, spatiallyVarying=True)
-
-        # Try a range of PSF size combinations...
-        self._setUpImages()
-        self.im1ex = _growPsf(self.im1ex, (2, 3))
-        _runAllTests()
-
-        self.im2ex = _growPsf(self.im2ex, (3, 2))
-        _runAllTests()
-
-        self._setUpImages()
-        self.im2ex = _growPsf(self.im2ex, (1, 0))
-        _runAllTests()
-
-        self.im2ex = _growPsf(self.im2ex, (3, 6))
-        _runAllTests()
-
-        self.im1ex = _growPsf(self.im1ex, (5, 6))
-        _runAllTests()
+        # ==========
+        self.im1ex, self.im2ex \
+            = makeFakeImages(size=(256, 256), svar=10., tvar=10.,
+                             psf1=self.psf1_sigma, psf2=self.psf2_sigma,
+                             n_sources=10, psf_yvary_factor=0, varSourceChange=0.1,
+                             seed=1, verbose=False)
+        task = ZogyTask(config=config)
+        res = task.run(self.im1ex, self.im2ex)
+        S = res.scoreExp.image.array / np.sqrt(res.scoreExp.variance.array)
+        self.assertGreater(np.amax(S), 5.)  # Source detected
 
 
 class MemoryTester(lsst.utils.tests.MemoryTestCase):
