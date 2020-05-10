@@ -923,6 +923,241 @@ class ZogyTask(pipeBase.Task):
 
         return pipeBase.Struct(S=S)
 
+    # DM-23855 modifications
+    @staticmethod
+    def padCenterOriginArray(A, newShape: tuple, useInverse=False, dtype=None) -> np.ndarray:
+        """Zero pad an image where the origin is at the center and replace the
+        origin to the corner as required by the periodic input of FFT. Implement also
+        the inverse operation, crop the padding and re-center data.
+
+        Parameters
+        ----------
+        A : `numpy.ndarray`
+            An array to copy from.
+        newShape : `tuple` of `int`
+            The dimensions of the resulting array. For padding, the resulting array
+            must be larger than A in each dimension. For the inverse operation this
+            must be the original, before padding size of the array.
+        useInverse : bool, optional
+            Selector of forward, add padding, operation (False)
+            or its inverse, crop padding, operation (True).
+        dtype: `numpy.dtype`, optional
+            Dtype of output array. Values must be implicitly castable to this type.
+            Use to get expected result type, e.g. single float (nympy.float32).
+            If not specified, dtype is inherited from ``A``.
+
+        Returns
+        -------
+        R : `numpy.ndarray`
+            The padded or unpadded array with shape of `newShape` and dtype of ``dtype``.
+
+        Notes
+        -----
+        For odd dimensions, the splitting is rounded to
+        put the center pixel into the new corner origin (0,0). This is to be consistent
+        e.g. for a dirac delta kernel that is originally located at the center pixel.
+        """
+
+        # The forward and inverse operations should round odd dimension halves at the opposite
+        # sides to get the pixels back to their original positions.
+        if not useInverse:
+            # Forward operation: First and second halves with respect to the axes of A.
+            firstHalves = [x//2 for x in A.shape]
+            secondHalves = [x-y for x, y in zip(A.shape, firstHalves)]
+        else:
+            # Inverse operation: Opposite rounding
+            secondHalves = [x//2 for x in newShape]
+            firstHalves = [x-y for x, y in zip(newShape, secondHalves)]
+        if dtype is None:
+            dtype = A.dtype
+
+        R = np.zeros(newShape, dtype=dtype)
+        R[-firstHalves[0]:, -firstHalves[1]:] = A[:firstHalves[0], :firstHalves[1]]
+        R[:secondHalves[0], -firstHalves[1]:] = A[-secondHalves[0]:, :firstHalves[1]]
+        R[:secondHalves[0], :secondHalves[1]] = A[-secondHalves[0]:, -secondHalves[1]:]
+        R[-firstHalves[0]:, :secondHalves[1]] = A[:firstHalves[0], -secondHalves[1]:]
+        return R
+
+    def computeCommonShape(self, *shapes):
+        """Calculate the common shape for FFT operations. Set `self.freqSpaceShape`
+        internally.
+
+        Parameters
+        ----------
+        shapes : one or more `tuple` of `int`
+            Shapes of the arrays. All must have the same dimensionality.
+            At least one shape must be provided.
+
+        Returns
+        -------
+        None.
+
+        Notes
+        -----
+        For each dimension, gets the smallest even number greater than or equal to
+        `N1+N2-1` where `N1` and `N2` are the two largest values.
+        In case of only one shape given, rounds up to even each dimension value.
+        """
+        S = np.array(shapes, dtype=int)
+        if len(shapes) > 2:
+            S.sort(axis=0)
+            S = S[-2:]
+        if len(shapes) > 1:
+            commonShape = np.sum(S, axis=0) - 1
+        else:
+            commonShape = S[0]
+        commonShape[commonShape % 2 != 0] += 1
+        self.freqSpaceShape = tuple(commonShape)
+        self.log.info(f"Common frequency space shape {self.freqSpaceShape}")
+
+    def prepareCalibration(self, exposure):
+        pass
+
+
+    def _padAndFftImage(self, imgOld):
+        """TBD Summary text.
+
+        Notes
+        -----
+
+        Set self.orig.... fields.
+
+        Parameters
+        ----------
+        imgOld : `numpy.ndarray`
+            Original array.
+
+        Returns
+        -------
+        resultName : `numpy.ndarray`
+            FFT of image.
+
+        Notes
+        -----
+        None
+        """
+        imgNew = np.copy(imgOld)
+        filtInf = np.isinf(imgNew)
+        filtNaN = np.isnan(imgNew)
+        imgNew[filtInf] = np.nan
+        imgNew[filtInf | filtNaN] = np.nanmean(imgNew)
+        self.origFiltNaN = filtNaN
+        self.origFiltInf = filtInf
+        imgNew = self.padCenterOriginArray(imgNew, self.freqSpaceShape)
+        imgNew = np.fft.fft2(imgNew)
+        return imgNew, filtInf, filtNaN
+
+    def _inverseFftAndCrop(self, imgArr, origSize, filtInf, filtNaN, dtype=None):
+        imgNew = np.fft.ifft2(imgArr)
+        imgNew = imgNew.real
+        imgNew = self.padCenterOriginArray(imgNew, origSize, dtype=dtype)
+        imgNew[filtInf] = np.inf
+        imgNew[filtNaN] = np.nan
+        return imgNew
+
+    @staticmethod
+    def computePsfAtCenter(exposure):
+        """Computes the PSF image at the bbox center point. This may be a fractional pixel position."""
+        bbox = exposure.getBBox()
+        xcen = (bbox.getBeginX() + bbox.getEndX()) / 2.
+        ycen = (bbox.getBeginY() + bbox.getEndY()) / 2.
+        psf = exposure.getPsf()
+        psfImg = psf.computeKernelImage(geom.Point2D(xcen, ycen))  # Centered and normed
+        return psfImg
+
+    @staticmethod
+    def _subtractImageMean(exposure, statsControl):
+        """Compute the sigma-clipped mean of the image of `exposure`."""
+        mi = exposure.getMaskedImage()
+        statObj = afwMath.makeStatistics(mi.image, mi.mask,
+                                         afwMath.MEANCLIP, statsControl)
+        mean = statObj.getValue(afwMath.MEANCLIP)
+        if not np.isnan(mean):
+            mi -= mean
+
+    def prepareOnce(self, exposure1, exposure2, sig1=None, sig2=None,
+                psf1=None, psf2=None, correctBackground=False):
+        """Set up the ZOGY task.
+
+        Parameters
+        ----------
+        templateExposure : `lsst.afw.image.Exposure`
+            Template exposure ("Reference image" in ZOGY (2016)).
+        scienceExposure : `lsst.afw.image.Exposure`
+            Science exposure ("New image" in ZOGY (2016)). Must have already been
+            registered and photometrically matched to template.
+        sig1 : `float`
+            TBD (Optional) sqrt(variance) of `templateExposure`. If `None`, it is
+            computed from the sqrt(mean) of the `templateExposure` variance image.
+        sig2 : `float`
+            TBD (Optional) sqrt(variance) of `scienceExposure`. If `None`, it is
+            computed from the sqrt(mean) of the `scienceExposure` variance image.
+        psf1 : 2D `numpy.array`
+            TBD (Optional) 2D array containing the PSF image for the template. If
+            `None`, it is extracted from the PSF taken at the center of `templateExposure`.
+        psf2 : 2D `numpy.array`
+            TBD (Optional) 2D array containing the PSF image for the science img. If
+            `None`, it is extracted from the PSF taken at the center of `scienceExposure`.
+        correctBackground : `bool`
+            TBD (Optional) subtract sigma-clipped mean of exposures. Zogy doesn't correct
+            nonzero backgrounds (unlike AL) so subtract them here.
+
+        template exposure is subtracted from the science, otherwise the role of the two
+        images are symmetric.
+        """
+
+        self.statsControl = afwMath.StatisticsControl()
+        self.statsControl.setNumSigmaClip(3.)
+        self.statsControl.setNumIter(3)
+        self.statsControl.setAndMask(afwImage.Mask.getPlaneBitMask(
+            self.config.ignoreMaskPlanes))
+
+        # If 'scaleByCalibration' is True then these norms are overwritten
+        if self.config.scaleByCalibration:
+            calibObj1 = exposure1.getPhotoCalib()
+            calibObj2 = exposure2.getPhotoCali
+            if calibObj1 is None or calibObj2 is None:
+                raise ValueError("Photometric calibrations are not available for both exposures.")
+            mImg1 = calibObj1.calibrateImage(exposure1.maskedImage)
+            mImg2 = calibObj2.calibrateImage(exposure2.maskedImage)
+            self.F1 = 1
+            self.F2 = 1
+        else:
+            self.F1 = self.config.templateFluxScaling  # default is 1
+            self.F2 = self.config.scienceFluxScaling  # default is 1
+            mImg1 = exposure1.maskedImage
+            mImg2 = exposure2.maskedImage
+
+        self.imArr1 = mImg1.image.array
+        self.imArr2 = mImg2.image.array
+        self.imVarArr1 = mImg1.variance.array
+        self.imVarArr2 = mImg2.variance.array
+
+        self.im1_psf = psf1
+        self.im2_psf = psf2
+
+        # sig1 and sig2 should not be set externally if we already recalibrated the images
+        # self.sig1 = np.sqrt(self._computeVarianceMean(exposure1)) if sig1 is None else sig1
+        # self.sig2 = np.sqrt(self._computeVarianceMean(exposure2)) if sig2 is None else sig2
+        # if sig1 or sig2 are NaN, then the entire region being Zogy-ed is masked.
+
+        # Zogy doesn't correct nonzero backgrounds (unlike AL) so subtract them here.
+        if correctBackground:
+            self._subtractImageMean(self.imArr1, self.statsControl)
+            self._subtractImageMean(self.imArr2, self.statsControl)
+
+        # Define the normalization of each image from the config
+
+    def prepareExposure(self, exposure1, exposure2, psf1=None, psf2=None):
+        if psf1 is None:
+            psf1 = self.computePsfAtCenter(exposure1)
+        if psf2 in None:
+            psf2 = self.computePsfAtCenter(exposure2)
+
+    def calculateFirstTimeTransformation(self):
+        pass
+        # prepareImage and common size, padding and FT
+
 
 class ZogyMapper(ZogyTask, ImageMapper):
     """Task to be used as an ImageMapper for performing
