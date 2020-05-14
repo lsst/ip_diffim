@@ -925,7 +925,7 @@ class ZogyTask(pipeBase.Task):
 
     # DM-23855 modifications
     @staticmethod
-    def padCenterOriginArray(A, newShape: tuple, useInverse=False, dtype=None) -> np.ndarray:
+    def padCenterOriginArray(A, newShape, useInverse=False, dtype=None):
         """Zero pad an image where the origin is at the center and replace the
         origin to the corner as required by the periodic input of FFT. Implement also
         the inverse operation, crop the padding and re-center data.
@@ -1013,9 +1013,8 @@ class ZogyTask(pipeBase.Task):
     def prepareCalibration(self, exposure):
         pass
 
-
-    def _padAndFftImage(self, imgOld):
-        """TBD Summary text.
+    def padAndFftImage(self, imgArr):
+        """TBD Summary text. In-place modification of input.
 
         Notes
         -----
@@ -1024,8 +1023,8 @@ class ZogyTask(pipeBase.Task):
 
         Parameters
         ----------
-        imgOld : `numpy.ndarray`
-            Original array.
+        imgArr : `numpy.ndarray`
+            Original array. In-place modified nan-s and inf-s replaced by mean.
 
         Returns
         -------
@@ -1036,18 +1035,17 @@ class ZogyTask(pipeBase.Task):
         -----
         None
         """
-        imgNew = np.copy(imgOld)
-        filtInf = np.isinf(imgNew)
-        filtNaN = np.isnan(imgNew)
-        imgNew[filtInf] = np.nan
-        imgNew[filtInf | filtNaN] = np.nanmean(imgNew)
+        filtInf = np.isinf(imgArr)
+        filtNaN = np.isnan(imgArr)
+        imgArr[filtInf] = np.nan
+        imgArr[filtInf | filtNaN] = np.nanmean(imgArr)
         self.origFiltNaN = filtNaN
         self.origFiltInf = filtInf
-        imgNew = self.padCenterOriginArray(imgNew, self.freqSpaceShape)
-        imgNew = np.fft.fft2(imgNew)
-        return imgNew, filtInf, filtNaN
+        imgArr = self.padCenterOriginArray(imgArr, self.freqSpaceShape)
+        imgArr = np.fft.fft2(imgArr)
+        return imgArr, filtInf, filtNaN
 
-    def _inverseFftAndCrop(self, imgArr, origSize, filtInf, filtNaN, dtype=None):
+    def inverseFftAndCropImage(self, imgArr, origSize, filtInf, filtNaN, dtype=None):
         imgNew = np.fft.ifft2(imgArr)
         imgNew = imgNew.real
         imgNew = self.padCenterOriginArray(imgNew, origSize, dtype=dtype)
@@ -1066,17 +1064,15 @@ class ZogyTask(pipeBase.Task):
         return psfImg
 
     @staticmethod
-    def _subtractImageMean(exposure, statsControl):
-        """Compute the sigma-clipped mean of the image of `exposure`."""
-        mi = exposure.getMaskedImage()
-        statObj = afwMath.makeStatistics(mi.image, mi.mask,
+    def subtractExposureMean(image, mask, statsControl):
+        """In-place subtraction of sigma-clipped mean of the image of `exposure`."""
+        statObj = afwMath.makeStatistics(image, mask,
                                          afwMath.MEANCLIP, statsControl)
         mean = statObj.getValue(afwMath.MEANCLIP)
         if not np.isnan(mean):
-            mi -= mean
+            image -= mean
 
-    def prepareOnce(self, exposure1, exposure2, sig1=None, sig2=None,
-                psf1=None, psf2=None, correctBackground=False):
+    def prepareFullExposure(self, exposure1, exposure2, correctBackground=False):
         """Set up the ZOGY task.
 
         Parameters
@@ -1115,48 +1111,73 @@ class ZogyTask(pipeBase.Task):
         # If 'scaleByCalibration' is True then these norms are overwritten
         if self.config.scaleByCalibration:
             calibObj1 = exposure1.getPhotoCalib()
-            calibObj2 = exposure2.getPhotoCali
+            calibObj2 = exposure2.getPhotoCalib()
             if calibObj1 is None or calibObj2 is None:
                 raise ValueError("Photometric calibrations are not available for both exposures.")
             mImg1 = calibObj1.calibrateImage(exposure1.maskedImage)
             mImg2 = calibObj2.calibrateImage(exposure2.maskedImage)
-            self.F1 = 1
-            self.F2 = 1
+            self.F1 = 1.
+            self.F2 = 1.
         else:
             self.F1 = self.config.templateFluxScaling  # default is 1
             self.F2 = self.config.scienceFluxScaling  # default is 1
-            mImg1 = exposure1.maskedImage
-            mImg2 = exposure2.maskedImage
+            mImg1 = exposure1.maskedImage.Factory(exposure1.maskedImage, True)
+            mImg2 = exposure2.maskedImage.Factory(exposure2.maskedImage, True)
 
-        self.imArr1 = mImg1.image.array
-        self.imArr2 = mImg2.image.array
-        self.imVarArr1 = mImg1.variance.array
-        self.imVarArr2 = mImg2.variance.array
-
-        self.im1_psf = psf1
-        self.im2_psf = psf2
-
-        # sig1 and sig2 should not be set externally if we already recalibrated the images
-        # self.sig1 = np.sqrt(self._computeVarianceMean(exposure1)) if sig1 is None else sig1
-        # self.sig2 = np.sqrt(self._computeVarianceMean(exposure2)) if sig2 is None else sig2
-        # if sig1 or sig2 are NaN, then the entire region being Zogy-ed is masked.
-
-        # Zogy doesn't correct nonzero backgrounds (unlike AL) so subtract them here.
+        # mImgs can be in-place modified
         if correctBackground:
-            self._subtractImageMean(self.imArr1, self.statsControl)
-            self._subtractImageMean(self.imArr2, self.statsControl)
+            self.subtractImageMean(mImg1.image, mImg1.mask, self.statsControl)
+            self.subtractImageMean(mImg2.image, mImg2.mask, self.statsControl)
 
-        # Define the normalization of each image from the config
+        psfBBox1 = exposure1.getPsf().computeBBox()
+        psfBBox2 = exposure2.getPsf().computeBBox()
+        self.psfShape1 = (psfBBox1.getHeight(), psfBBox1.getWidth())
+        self.psfShape2 = (psfBBox2.getHeight(), psfBBox2.getWidth())
+        self.imgShape = (mImg1.getHeight(), mImg1.getWidth())
+        self.computeCommonShape(self.imgShape, self.psfShape1, self.psfShape2)
 
-    def prepareExposure(self, exposure1, exposure2, psf1=None, psf2=None):
+        self.imFft1, self.imFiltInf1, self.imFiltNaN1 = self.padAndFftImage(mImg1.image.array)
+        self.imFft2, self.imFiltInf2, self.imFiltNaN2 = self.padAndFftImage(mImg2.image.array)
+
+    def prepareSubExposure(self, subexposure1, subexposure2, psf1=None, psf2=None, sig1=None, sig2=None):
+        """Summary text.
+
+        Parameters
+        ----------
+        sig1, sig2 : `float`, optional
+            For debug purposes only, consider that the image
+            may already be rescaled by the photometric calibration.
+
+        Returns
+        -------
+        None.
+
+        Notes
+        -----
+        Sets `self.subExpPsf1`, `self.subExpPsf2`, `self.subExpSig1`, `self.subExpSig2`
+        in the task instance.
+        """
         if psf1 is None:
-            psf1 = self.computePsfAtCenter(exposure1)
+            self.subExpPsf1 = self.computePsfAtCenter(subexposure1)
         if psf2 in None:
-            psf2 = self.computePsfAtCenter(exposure2)
+            self.subExpPsf2 = self.computePsfAtCenter(subexposure2)
+        # sig1 and sig2  should not be set externally, just for debug purpose
+        if sig1 is None:
+            self.subExpSig1 = np.sqrt(self._computeVarianceMean(subexposure1))
+        else:
+            self.subExpSig1 = sig1
+        if sig2 is None:
+            self.subExpSig2 = np.sqrt(self._computeVarianceMean(subexposure2))
+        else:
+            self.subExpSig2 = sig2
 
-    def calculateFirstTimeTransformation(self):
+        D = self.padCenterOriginArray(self.subExpPsf1.array, self.freqSpaceShape)
+        self.psfFft1 = np.fft.fft2(D)
+        D = self.padCenterOriginArray(self.subExpPsf2.array, self.freqSpaceShape)
+        self.psfFft2 = np.fft.fft2(D)
+
+    def calculateZogy(self):
         pass
-        # prepareImage and common size, padding and FT
 
 
 class ZogyMapper(ZogyTask, ImageMapper):
