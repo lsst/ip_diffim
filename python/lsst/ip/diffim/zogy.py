@@ -1176,9 +1176,112 @@ class ZogyTask(pipeBase.Task):
         D = self.padCenterOriginArray(self.subExpPsf2.array, self.freqSpaceShape)
         self.psfFft2 = np.fft.fft2(D)
 
-    def calculateZogy(self):
-        pass
+    @staticmethod
+    def calculateFourierDiffim(psf1, im1, F1, var1, psf2, im2, F2, var2):
+        """Summary text.
 
+        Parameters
+        ----------
+        psf1, psf2, im1, im2 : `np.ndarray` of `np.complex`, shape `self.freqSpaceShape`
+
+        var1, var2: `np.float` > 0.
+            Average per-pixel noise variance in im1, im2 respectively. Used as weighing
+            of input images. Must be greater than zero.
+
+        F1, F2 : `np.float` > 0.
+            Photometric scaling of the images. See eqs. (5)--(9)
+
+        Returns
+        -------
+        resultTuple : `tuple`
+            - ``Fd`` : `float`
+            - ``D`` : `np.ndarray` of `np.complex`
+            - ``Pd`` : `np.ndarray` of `np.complex`
+            - ``S`` : `np.ndarray` of `np.complex`
+
+        Notes
+        -----
+        All array inputs and outputs are Fourier-space images with size of
+        `self.freqSpaceShape` in this
+
+        Var1, var2 quantities are part of the noise model and not to be confused
+        with the variance of a frequency component that is corrected for in the zogy
+        subtraction.
+        """
+        psfAbsSq1 = np.conj(psf1)*psf1
+        psfAbsSq1 = psfAbsSq1.real  # view
+        psfAbsSq2 = np.conj(psf2)*psf2
+        psfAbsSq2 = psfAbsSq2.real
+        var1F2Sq = var1*F2*F2
+        var2F1Sq = var2*F1*F1
+        # real sqrt is faster
+        denom = np.sqrt(var1F2Sq*psfAbsSq2 + var2F1Sq*psfAbsSq1)
+        numer = F2*psf2*im1 - F1*psf1*im2
+        D = numer/denom  # Difference image eq. (13)
+        FdDenom = np.sqrt(var1F2Sq + var2F1Sq)
+        Pd = psf1*psf2*FdDenom/denom  # Psf of D eq. (14)
+        Fd = F1*F2/FdDenom  # Flux scaling of D eq. (15)
+        S = Fd*D*np.conj(Pd)  # Detection statistics image eq. (17)
+        return D, Pd, Fd, S
+
+    @staticmethod
+    def calculateVariancePlane(imVar1, varMean1, imVar2, varMean2):
+        """Calculate the variance plane of the difference image.
+
+        Parameters
+        ----------
+        imVar1, imVar2 : `np.ndarray` of float
+            variance plane of the two exposures
+
+        varMean1, varMean2: `np.float` > 0.
+            Average per-pixel noise variance in exposure1 and exposure2 respectively.
+            Must be greater than zero.
+
+        Returns
+        -------
+        diffVariance : `np.ndarray` of `float`
+            Variance plane of the difference image. It's scaled to a mean value of 1.
+        """
+        return (imVar1 + imVar2)/(varMean1 + varMean2)
+
+    @staticmethod
+    def calculateMaskPlane(mask1, mask2, effPsf1=None, effPsf2=None):
+        """Calculate the variance plane of the difference image.
+
+        Parameters
+        ----------
+        mask1, maks2 : `lsst.afw.image.Mask`
+            Mask planes of the two exposures.
+
+        varMean1, varMean2: `np.float` > 0.
+            Average per-pixel noise variance in exposure1 and exposure2 respectively.
+            Must be greater than zero.
+
+        Returns
+        -------
+        diffVariance : `np.ndarray` of `float`
+            Variance plane of the difference image. It's scaled to a mean value of 1.
+
+        Notes
+        -----
+        effPsf1, effPsf2: the effective psf for cross-blurring.
+        Actually this is not a good apprixomation of the result mask
+        The masks should be "cross-blurred" by the psfs then combined.
+        """
+
+        # mask1 x effPsf2 | mask2 x effPsf1
+        if effPsf1 is not None or effPsf2 is not None:
+            raise NotImplementedError("Mask plane only 'convolution' operation is not yet supported")
+        if effPsf1 is not None:
+            mask1 = mask1.clone()
+            afwMath.convolve(mask1, effPsf2)
+        if effPsf2 is not None:
+            mask2 = mask2.clone()
+            afwMath.convolve(mask2, effPsf1)
+
+        R = mask1.clone()
+        R |= mask2
+        return R
 
 class ZogyMapper(ZogyTask, ImageMapper):
     """Task to be used as an ImageMapper for performing
