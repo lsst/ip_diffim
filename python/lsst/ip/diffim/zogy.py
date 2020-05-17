@@ -344,7 +344,7 @@ class ZogyTask(pipeBase.Task):
         -------
         psf : 2D `numpy.array`
             The padded copy of the input `psf`.
-        """
+        """`
         newArr = np.zeros(size)
         # The center of the PSF sould be placed in the center-right.
         offset = [size[0]//2 - psf.shape[0]//2, size[1]//2 - psf.shape[1]//2]
@@ -1117,18 +1117,22 @@ class ZogyTask(pipeBase.Task):
         self.psfShape1 = (psfBBox1.getHeight(), psfBBox1.getWidth())
         self.psfShape2 = (psfBBox2.getHeight(), psfBBox2.getWidth())
         self.imgShape = (mImg1.getHeight(), mImg1.getWidth())
+        # We need the calibrated, full size original
+        # MaskedImages for the variance plane calculations
+        self.mImg1 = mImg1
+        self.mImg2 = mImg2
         self.computeCommonShape(self.imgShape, self.psfShape1, self.psfShape2)
 
         self.imFft1, self.imFiltInf1, self.imFiltNaN1 = self.padAndFftImage(mImg1.image.array)
         self.imFft2, self.imFiltInf2, self.imFiltNaN2 = self.padAndFftImage(mImg2.image.array)
 
-    def prepareSubExposure(self, subexposure1, subexposure2, psf1=None, psf2=None, sig1=None, sig2=None):
+    def prepareSubExposure(self, subExposure1, subExposure2, psf1=None, psf2=None, sig1=None, sig2=None):
         """Summary text.
 
         Parameters
         ----------
         sig1, sig2 : `float`, optional
-            For debug purposes only, consider that the image
+            For debug purposes only, copnsider that the image
             may already be rescaled by the photometric calibration.
 
         Returns
@@ -1141,16 +1145,16 @@ class ZogyTask(pipeBase.Task):
         in the task instance.
         """
         if psf1 is None:
-            self.subExpPsf1 = self.computePsfAtCenter(subexposure1)
+            self.subExpPsf1 = self.computePsfAtCenter(subExposure1)
         if psf2 in None:
-            self.subExpPsf2 = self.computePsfAtCenter(subexposure2)
+            self.subExpPsf2 = self.computePsfAtCenter(subExposure2)
         # sig1 and sig2  should not be set externally, just for debug purpose
         if sig1 is None:
-            self.subExpSig1 = np.sqrt(self._computeVarianceMean(subexposure1))
+            self.subExpSig1 = np.sqrt(self._computeVarianceMean(subExposure1))
         else:
             self.subExpSig1 = sig1
         if sig2 is None:
-            self.subExpSig2 = np.sqrt(self._computeVarianceMean(subexposure2))
+            self.subExpSig2 = np.sqrt(self._computeVarianceMean(subExposure2))
         else:
             self.subExpSig2 = sig2
 
@@ -1159,7 +1163,8 @@ class ZogyTask(pipeBase.Task):
         D = self.padCenterOriginArray(self.subExpPsf2.array, self.freqSpaceShape)
         self.psfFft2 = np.fft.fft2(D)
 
-        self.subExposure1 = subexposure1
+        self.subExposure1 = subExposure1
+        self.subExposure2 = subExposure2
 
     @staticmethod
     def calculateFourierDiffim(psf1, im1, F1, var1, psf2, im2, F2, var2, calculateS):
@@ -1292,6 +1297,8 @@ class ZogyTask(pipeBase.Task):
         calib = afwImage.PhotoCalib(1./Fd)
         diffExposure.setPhotoCalib(calib)
 
+        diffExposure.mask = self.calculateMaskPlane(self.subExposure1.mask, self.subExposure2.mask)
+
         psfImg = self.subExpPsf1.Factory(self.subExpPsf1.getDimensions())
         psfImg.array = Pd
         psfNew = measAlg.KernelPsf(afwMath.FixedKernel(psfImg))
@@ -1299,7 +1306,7 @@ class ZogyTask(pipeBase.Task):
         return diffExposure
 
 
-    def run(self, exposure1, exposure2, returnS=True):
+    def run(self, exposure1, exposure2):
         """Summary text.
 
         Parameters
@@ -1323,8 +1330,20 @@ class ZogyTask(pipeBase.Task):
         if exposure1.getDimensions() != exposure2.getDimensions():
             raise ValueError("Exposure dimensions do not match.")
 
-        self.exposure1 = exposure1
-        self.exposure2 = exposure2
+        self.prepareFullExposure(exposure1, exposure2, correctBackground=False)
+        # TODO: Add grid splitting here for spatially varying PSF support
+        # This won't be ok here -> not the exposures but the modified full maskedImages are necessary here
+        self.prepareSubExposure(exposure1, exposure2)
+        var1 = self.subExpSig1*self.subExpSig1
+        var2 = self.subExpSig2*self.subExpSig2
+        D, Pd, Fd, S, Sd = self.calculateFourierDiffim(
+            self.psfFft1, self.imFft1, var1,
+            self.psfFft2, self.imFft2, var2,
+            calculateS=True)
+        # Subexposure is not photom. scaled...
+        Dvar = self.calculateDVariancePlane(self.mImg1.variance.array, var1, 
+                                            self.mImg2.variance.array, var2)
+        
 
 
 class ZogyMapper(ZogyTask, ImageMapper):
