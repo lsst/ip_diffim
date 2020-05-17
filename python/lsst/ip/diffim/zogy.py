@@ -133,7 +133,7 @@ class ZogyTask(pipeBase.Task):
     """Task to perform ZOGY proper image subtraction. See module-level documentation for
     additional details.
 
-    In all methods, im1 is R (reference, or template) and im2 is N (new, or science).
+    (TBC) In all methods, im1 is R (reference, or template) and im2 is N (new, or science).
     """
     ConfigClass = ZogyConfig
     _DefaultName = "ip_diffim_Zogy"
@@ -1010,11 +1010,8 @@ class ZogyTask(pipeBase.Task):
         self.freqSpaceShape = tuple(commonShape)
         self.log.info(f"Common frequency space shape {self.freqSpaceShape}")
 
-    def prepareCalibration(self, exposure):
-        pass
-
     def padAndFftImage(self, imgArr):
-        """TBD Summary text. In-place modification of input.
+        """TBD Summary text. In-place modification of `imgArr` side-effect.
 
         Notes
         -----
@@ -1028,7 +1025,7 @@ class ZogyTask(pipeBase.Task):
 
         Returns
         -------
-        resultName : `numpy.ndarray`
+        resultName : `numpy.ndarray` of `np.complex`.
             FFT of image.
 
         Notes
@@ -1045,12 +1042,14 @@ class ZogyTask(pipeBase.Task):
         imgArr = np.fft.fft2(imgArr)
         return imgArr, filtInf, filtNaN
 
-    def inverseFftAndCropImage(self, imgArr, origSize, filtInf, filtNaN, dtype=None):
+    def inverseFftAndCropImage(self, imgArr, origSize, filtInf=None, filtNaN=None, dtype=None):
         imgNew = np.fft.ifft2(imgArr)
         imgNew = imgNew.real
-        imgNew = self.padCenterOriginArray(imgNew, origSize, dtype=dtype)
-        imgNew[filtInf] = np.inf
-        imgNew[filtNaN] = np.nan
+        imgNew = self.padCenterOriginArray(imgNew, origSize, useInverse=True, dtype=dtype)
+        if filtInf is not None:
+            imgNew[filtInf] = np.inf
+        if filtNaN is not None:
+            imgNew[filtNaN] = np.nan
         return imgNew
 
     @staticmethod
@@ -1077,23 +1076,7 @@ class ZogyTask(pipeBase.Task):
 
         Parameters
         ----------
-        templateExposure : `lsst.afw.image.Exposure`
-            Template exposure ("Reference image" in ZOGY (2016)).
-        scienceExposure : `lsst.afw.image.Exposure`
-            Science exposure ("New image" in ZOGY (2016)). Must have already been
-            registered and photometrically matched to template.
-        sig1 : `float`
-            TBD (Optional) sqrt(variance) of `templateExposure`. If `None`, it is
-            computed from the sqrt(mean) of the `templateExposure` variance image.
-        sig2 : `float`
-            TBD (Optional) sqrt(variance) of `scienceExposure`. If `None`, it is
-            computed from the sqrt(mean) of the `scienceExposure` variance image.
-        psf1 : 2D `numpy.array`
-            TBD (Optional) 2D array containing the PSF image for the template. If
-            `None`, it is extracted from the PSF taken at the center of `templateExposure`.
-        psf2 : 2D `numpy.array`
-            TBD (Optional) 2D array containing the PSF image for the science img. If
-            `None`, it is extracted from the PSF taken at the center of `scienceExposure`.
+
         correctBackground : `bool`
             TBD (Optional) subtract sigma-clipped mean of exposures. Zogy doesn't correct
             nonzero backgrounds (unlike AL) so subtract them here.
@@ -1121,8 +1104,8 @@ class ZogyTask(pipeBase.Task):
         else:
             self.F1 = self.config.templateFluxScaling  # default is 1
             self.F2 = self.config.scienceFluxScaling  # default is 1
-            mImg1 = exposure1.maskedImage.Factory(exposure1.maskedImage, True)
-            mImg2 = exposure2.maskedImage.Factory(exposure2.maskedImage, True)
+            mImg1 = exposure1.maskedImage.clone()
+            mImg2 = exposure2.maskedImage.clone()
 
         # mImgs can be in-place modified
         if correctBackground:
@@ -1176,9 +1159,11 @@ class ZogyTask(pipeBase.Task):
         D = self.padCenterOriginArray(self.subExpPsf2.array, self.freqSpaceShape)
         self.psfFft2 = np.fft.fft2(D)
 
+        self.subExposure1 = subexposure1
+
     @staticmethod
-    def calculateFourierDiffim(psf1, im1, F1, var1, psf2, im2, F2, var2):
-        """Summary text.
+    def calculateFourierDiffim(psf1, im1, F1, var1, psf2, im2, F2, var2, calculateS):
+        """Calculates the difference image, ``im1-im2``. All arguments in Fourier space.
 
         Parameters
         ----------
@@ -1191,13 +1176,16 @@ class ZogyTask(pipeBase.Task):
         F1, F2 : `np.float` > 0.
             Photometric scaling of the images. See eqs. (5)--(9)
 
+        calculateS : `bool`
+            If True, calculates and returns the detection significance image.
+
         Returns
         -------
         resultTuple : `tuple`
             - ``Fd`` : `float`
             - ``D`` : `np.ndarray` of `np.complex`
             - ``Pd`` : `np.ndarray` of `np.complex`
-            - ``S`` : `np.ndarray` of `np.complex`
+            - ``S`` : `np.ndarray` of `np.complex` or `None`
 
         Notes
         -----
@@ -1205,8 +1193,7 @@ class ZogyTask(pipeBase.Task):
         `self.freqSpaceShape` in this
 
         Var1, var2 quantities are part of the noise model and not to be confused
-        with the variance of a frequency component that is corrected for in the zogy
-        subtraction.
+        with the variance of frequency components.
         """
         psfAbsSq1 = np.conj(psf1)*psf1
         psfAbsSq1 = psfAbsSq1.real  # view
@@ -1215,17 +1202,23 @@ class ZogyTask(pipeBase.Task):
         var1F2Sq = var1*F2*F2
         var2F1Sq = var2*F1*F1
         # real sqrt is faster
-        denom = np.sqrt(var1F2Sq*psfAbsSq2 + var2F1Sq*psfAbsSq1)
+        denom = np.sqrt(var1F2Sq*psfAbsSq2 + var2F1Sq*psfAbsSq1)  # array
         numer = F2*psf2*im1 - F1*psf1*im2
         D = numer/denom  # Difference image eq. (13)
-        FdDenom = np.sqrt(var1F2Sq + var2F1Sq)
+        FdDenom = np.sqrt(var1F2Sq + var2F1Sq)  # one number
         Pd = psf1*psf2*FdDenom/denom  # Psf of D eq. (14)
         Fd = F1*F2/FdDenom  # Flux scaling of D eq. (15)
-        S = Fd*D*np.conj(Pd)  # Detection statistics image eq. (17)
-        return D, Pd, Fd, S
+        if calculateS:
+            Sd = np.conj(Pd)
+            S = Fd*D*Sd  # Detection statistics image eq. (17)
+            Sd *= Pd  # The psf of S = Pd * np.conj(Pd)
+        else:
+            S = None
+            Sd = None
+        return D, Pd, Fd, S, Sd
 
     @staticmethod
-    def calculateVariancePlane(imVar1, varMean1, imVar2, varMean2):
+    def calculateDVariancePlane(imVar1, varMean1, imVar2, varMean2):
         """Calculate the variance plane of the difference image.
 
         Parameters
@@ -1282,6 +1275,57 @@ class ZogyTask(pipeBase.Task):
         R = mask1.clone()
         R |= mask2
         return R
+
+    def setExposureCalibration(self, exposure, F):
+        calib = afwImage.PhotoCalib(1./F)
+        exposure.setPhotoCalib(calib)
+
+    def makeDiffimExposure(self, D, Pd, Fd):
+        D = self.inverseFftAndCropImage(
+            D, self.imgShape, np.logical_or(self.imFiltInf1, self.imFiltInf2),
+            np.logical_or(self.imFiltNaN1, self.imFiltNaN2), dtype=self.subexposure1.image.dtype)
+        Pd = self.inverseFftAndCropImage(
+            Pd, self.psfShape1, dtype=self.subExpPsf1.dtype)
+
+        diffExposure = self.exposure1.clone()
+        diffExposure.image.array = D
+        calib = afwImage.PhotoCalib(1./Fd)
+        diffExposure.setPhotoCalib(calib)
+
+        psfImg = self.subExpPsf1.Factory(self.subExpPsf1.getDimensions())
+        psfImg.array = Pd
+        psfNew = measAlg.KernelPsf(afwMath.FixedKernel(psfImg))
+        diffExposure.setPsf(psfNew)
+        return diffExposure
+
+
+    def run(self, exposure1, exposure2, returnS=True):
+        """Summary text.
+
+        Parameters
+        ----------
+         p1 : one or more `tuple` of `int`
+            Shapes of the arrays. All must have the same dimensionality.
+            At least one shape must be provided. `link` , ``cide literal for local``
+        returnS : `bool`, optional
+            Calculates the significance image ready for source detection.
+
+        Returns
+        -------
+        resultName : `lsst.pipe.base.Struct`
+            - ``key1`` : Blabla
+
+        Notes
+        -----
+        None
+        """
+        # We use the dimensions of the 1st image only in the code
+        if exposure1.getDimensions() != exposure2.getDimensions():
+            raise ValueError("Exposure dimensions do not match.")
+
+        self.exposure1 = exposure1
+        self.exposure2 = exposure2
+
 
 class ZogyMapper(ZogyTask, ImageMapper):
     """Task to be used as an ImageMapper for performing
