@@ -344,7 +344,7 @@ class ZogyTask(pipeBase.Task):
         -------
         psf : 2D `numpy.array`
             The padded copy of the input `psf`.
-        """`
+        """
         newArr = np.zeros(size)
         # The center of the PSF sould be placed in the center-right.
         offset = [size[0]//2 - psf.shape[0]//2, size[1]//2 - psf.shape[1]//2]
@@ -1150,17 +1150,20 @@ class ZogyTask(pipeBase.Task):
         in the task instance.
         """
         if bbox1 is None:
-            subExposure1 = self.exposure1
+            subExposure1 = self.fullExp1
         else:
-            subExposure1 = self.exposure1.Factory(self.exposure1, bbox1)
+            subExposure1 = self.fullExp1.Factory(self.exposure1, bbox1)
         if bbox2 is None:
-            subExposure2 = self.exposure2
+            subExposure2 = self.fullExp2
         else:
-            subExposure2 = self.exposure2.Factory(self.exposure2, bbox2)
+            subExposure2 = self.fullExp2.Factory(self.exposure2, bbox2)
+
+        if subExposure1.getDimensions() != subExposure2.getDimensions():
+            raise ValueError("Subexposure dimensions do not match.")
 
         if psf1 is None:
             self.subExpPsf1 = self.computePsfAtCenter(subExposure1)
-        if psf2 in None:
+        if psf2 is None:
             self.subExpPsf2 = self.computePsfAtCenter(subExposure2)
         # sig1 and sig2  should not be set externally, just for debug purpose
         if sig1 is None:
@@ -1220,6 +1223,7 @@ class ZogyTask(pipeBase.Task):
         var2F1Sq = var2*F1*F1
         # real sqrt is faster
         denom = np.sqrt(var1F2Sq*psfAbsSq2 + var2F1Sq*psfAbsSq1)  # array
+        print(type(F2), type(psf2), type(im1))
         numer = F2*psf2*im1 - F1*psf1*im2
         D = numer/denom  # Difference image eq. (13)
         FdDenom = np.sqrt(var1F2Sq + var2F1Sq)  # one number
@@ -1295,12 +1299,14 @@ class ZogyTask(pipeBase.Task):
 
     def makeDiffimSubExposure(self, ftDiff):
         D = self.inverseFftAndCropImage(
-            ftDiff.D, self.imgShape, np.logical_or(self.fftFullIm1.filtInf, self.fftFullIm2.imFiltInf),
+            ftDiff.D, self.imgShape, np.logical_or(self.fftFullIm1.filtInf, self.fftFullIm2.filtInf),
             np.logical_or(self.fftFullIm1.filtNaN, self.fftFullIm2.filtNaN),
             dtype=self.subExposure1.image.dtype)
         Pd = self.inverseFftAndCropImage(
             ftDiff.Pd, self.psfShape1, dtype=self.subExpPsf1.dtype)
-        Pd /= np.sum(Pd)
+        sPd = np.sum(Pd)
+        self.log.info(f"Pd sum before normalization: {sPd:.3f}")
+        Pd /= sPd
         # From the original, scaled sub-image
         Dvar = self.calculateDVariancePlane(self.subExposure1.variance.array, self.subExpVar1,
                                             self.subExposure2.variance.array, self.subExpVar2)
@@ -1308,16 +1314,19 @@ class ZogyTask(pipeBase.Task):
         diffSubExposure = self.subExposure1.clone()
         # Indices of the subexposure bbox in the full image array
         bbox = self.subExposure1.getBBox()
-        arrIndex = bbox - self.fullExp1.getXY0()
+        arrIndex = bbox.getMin() - self.fullExp1.getXY0()
         diffSubExposure.image.array = D[
             arrIndex.getY():arrIndex.getY() + bbox.getHeight(),
             arrIndex.getX():arrIndex.getX() + bbox.getWidth()]
         diffSubExposure.variance.array = Dvar
         diffSubExposure.mask = self.calculateMaskPlane(self.subExposure1.mask, self.subExposure2.mask)
 
-        calib = afwImage.PhotoCalib(1./ftDiff.Fd)
-        calibImg = calib.calibrateImage(diffSubExposure.maskedImage)
-        diffSubExposure.maskedImage = calibImg
+        # PhotoCalib does not support ImageD.
+        # calib = afwImage.PhotoCalib(1./ftDiff.Fd)
+        # calibImg = calib.calibrateImage(
+        #     afwImage.MaskedImage(diffSubExposure.maskedImage, deep=True, dtype=np.float32))
+        # diffSubExposure.maskedImage = calibImg
+        diffSubExposure.maskedImage /= ftDiff.Fd
 
         # Now the subExposure calibration is 1. everywhere
         calibOne = afwImage.PhotoCalib(1.)
@@ -1325,6 +1334,7 @@ class ZogyTask(pipeBase.Task):
 
         # Set the PSF of this subExposure
         psfImg = self.subExpPsf1.Factory(self.subExpPsf1.getDimensions())
+        print(psfImg.getBBox())
         psfImg.array = Pd
         psfNew = measAlg.KernelPsf(afwMath.FixedKernel(psfImg))
         diffSubExposure.setPsf(psfNew)
@@ -1361,11 +1371,11 @@ class ZogyTask(pipeBase.Task):
         # use the modified full maskedImages here, or wrap back into an exposure?
         self.prepareSubExposure()
         ftDiff = self.calculateFourierDiffim(
-            self.psfFft1, self.imFft1, self.subExpVar1,
-            self.psfFft2, self.imFft2, self.subExpVar2,
+            self.psfFft1, self.fftFullIm1.imFft, self.F1, self.subExpVar1,
+            self.psfFft2, self.fftFullIm2.imFft, self.F2, self.subExpVar2,
             calculateS=True)
         diffExp = self.makeDiffimSubExposure(ftDiff)
-        return pipeBase.Struct(diffExp=diffExp)
+        return pipeBase.Struct(diffExp=diffExp, ftDiff=ftDiff)
 
 
 class ZogyMapper(ZogyTask, ImageMapper):
