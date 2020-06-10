@@ -18,21 +18,18 @@
 # You should have received a copy of the LSST License Statement and
 # the GNU General Public License along with this program.  If not,
 # see <https://www.lsstcorp.org/LegalNotices/>.
+import numpy as np
 import unittest
 
-import numpy as np
-
-import lsst.utils.tests
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.afw.geom as afwGeom
-import lsst.geom as geom
-import lsst.meas.algorithms as measAlg
 import lsst.daf.base as dafBase
-
-from test_imageDecorrelation import singleGaussian2d
-
+import lsst.geom as geom
 from lsst.ip.diffim.zogy import ZogyTask, ZogyConfig
+import lsst.meas.algorithms as measAlg
+import lsst.utils.tests
+from test_imageDecorrelation import singleGaussian2d
 
 try:
     type(verbose)
@@ -102,10 +99,10 @@ def makeFakeImages(size=(256, 256), svar=0.04, tvar=0.04, psf1=3.3, psf2=2.2, of
     rng = np.random.default_rng(seed)
 
     psf1 = [3.3, 3.3] if psf1 is None else psf1
-    if not hasattr(psf1, "__len__") and not isinstance(psf1, str):
+    if not hasattr(psf1, "__len__"):
         psf1 = [psf1, psf1]
     psf2 = [2.2, 2.2] if psf2 is None else psf2
-    if not hasattr(psf2, "__len__") and not isinstance(psf2, str):
+    if not hasattr(psf2, "__len__"):
         psf2 = [psf2, psf2]
     offset = [0., 0.] if offset is None else offset   # astrometric offset (pixels) between the two images
     if verbose:
@@ -123,25 +120,25 @@ def makeFakeImages(size=(256, 256), svar=0.04, tvar=0.04, psf1=3.3, psf2=2.2, of
 
     if n_sources > 0:
         fluxes = rng.uniform(50, 30000, n_sources)
-        xposns = rng.uniform(xim.min()+16, xim.max()-5, n_sources)
-        yposns = rng.uniform(yim.min()+16, yim.max()-5, n_sources)
+        xposns = rng.uniform(xim.min() + 16, xim.max() - 5, n_sources)
+        yposns = rng.uniform(yim.min() + 16, yim.max() - 5, n_sources)
 
         # Make the source closest to the center of the image the one that increases in flux
         ind = np.argmin(xposns**2. + yposns**2.)
 
         # vary the y-width of psf across x-axis of science image (zero means no variation):
-        psf1_yvary = psf_yvary_factor * (yim.mean() - yposns) / yim.max()
+        psf1_yvary = psf_yvary_factor*(yim.mean() - yposns)/yim.max()
         if verbose:
             print('PSF y spatial-variation:', psf1_yvary.min(), psf1_yvary.max())
 
     for i in range(n_sources):
         flux = fluxes[i]
-        tmp = flux * singleGaussian2d(x0im, y0im, xposns[i], yposns[i], psf2[0], psf2[1], theta=theta2)
+        tmp = flux*singleGaussian2d(x0im, y0im, xposns[i], yposns[i], psf2[0], psf2[1], theta=theta2)
         im2 += tmp
         if i == ind:
-            flux += flux * varSourceChange
-        tmp = flux * singleGaussian2d(x0im, y0im, xposns[i]+offset[0], yposns[i]+offset[1],
-                                      psf1[0], psf1[1]+psf1_yvary[i], theta=theta1)
+            flux += flux*varSourceChange
+        tmp = flux*singleGaussian2d(x0im, y0im, xposns[i] + offset[0], yposns[i] + offset[1],
+                                    psf1[0], psf1[1] + psf1_yvary[i], theta=theta1)
         im1 += tmp
 
     im1_psf = singleGaussian2d(x0im, y0im, 0, 0, psf1[0], psf1[1], theta=theta1)
@@ -177,24 +174,33 @@ def makeFakeImages(size=(256, 256), svar=0.04, tvar=0.04, psf1=3.3, psf2=2.2, of
         return afwGeom.makeSkyWcs(metadata)
 
     def makeExposure(imgArray, psfArray, imgVariance):
-        """! Convert an image numpy.array and corresponding PSF numpy.array into an exposure.
+        """Convert an image and corresponding PSF into an exposure.
 
-        Add the (constant) variance plane equal to `imgVariance`.
+        Set the (constant) variance plane equal to ``imgVariance``.
 
-        @param imgArray 2-d numpy.array containing the image
-        @param psfArray 2-d numpy.array containing the PSF image
-        @param imgVariance variance of input image
-        @return a new exposure containing the image, PSF and desired variance plane
+        Parameters
+        ----------
+        imgArray : `numpy.ndarray`
+            2D array containing the image.
+        psfArray : `numpy.ndarray`
+            2D array containing the PSF image.
+        imgVariance : `float` or `numpy.ndarray`
+            Set the variance plane to this value. If an array, must be broadcastable to ``imgArray.shape``.
+
+        Returns
+        -------
+        im1ex : `lsst.afw.image.Exposure`
+            The new exposure.
         """
         # All this code to convert the template image array/psf array into an exposure.
-        bbox = geom.Box2I(geom.Point2I(0, 0), geom.Point2I(imgArray.shape[1]-1, imgArray.shape[0]-1))
+        bbox = geom.Box2I(geom.Point2I(0, 0), geom.Point2I(imgArray.shape[1] - 1, imgArray.shape[0] - 1))
         im1ex = afwImage.ExposureD(bbox)
-        im1ex.getMaskedImage().getImage().getArray()[:, :] = imgArray
-        im1ex.getMaskedImage().getVariance().getArray()[:, :] = imgVariance
+        im1ex.image.array[:, :] = imgArray
+        im1ex.variance.array[:, :] = imgVariance
         psfBox = geom.Box2I(geom.Point2I(-12, -12), geom.Point2I(12, 12))  # a 25x25 pixel psf
         psf = afwImage.ImageD(psfBox)
         psfBox.shift(geom.Extent2I(-(-size[0]//2), -(-size[1]//2)))  # -N//2 != -(N//2) for odd numbers
-        im1_psf_sub = psfArray[psfBox.getMinY():psfBox.getMaxY()+1, psfBox.getMinX():psfBox.getMaxX()+1]
+        im1_psf_sub = psfArray[psfBox.getMinY():psfBox.getMaxY() + 1, psfBox.getMinX():psfBox.getMaxX() + 1]
         psf.getArray()[:, :] = im1_psf_sub
         psfK = afwMath.FixedKernel(psf)
         psfNew = measAlg.KernelPsf(psfK)

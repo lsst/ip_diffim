@@ -47,10 +47,9 @@ class PixelOffsetTest(unittest.TestCase):
         """ Test whether the peak position is at [300][300].
         """
         self._setUpImages()
-        config = ZogyConfig()
-        config.scaleByCalibration = False
+        config = ZogyConfig(scaleByCalibration=False)
         task = ZogyTask(config=config)
-        D_F = task.run(self.imnex, self.imrex, calculateS=False)
+        D_F = task.run(self.imnex, self.imrex, calculateScore=False)
         max_loc = PixelOffsetTest._find_max(D_F.diffExp.image.array)
 
         self.assertEqual(max_loc, (300, 300))
