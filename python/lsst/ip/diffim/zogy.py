@@ -275,8 +275,7 @@ class ZogyTask(pipeBase.Task):
             imgNew[filtNaN] = np.nan
         return imgNew
 
-    @staticmethod
-    def computePsfAtCenter(exposure):
+    def computePsfAtCenter(self, exposure, assumeGaussianPsf=False):
         """Computes the PSF image at the bbox center point. This may be a fractional pixel position.
 
         Parameters
@@ -295,6 +294,18 @@ class ZogyTask(pipeBase.Task):
         ycen = (bbox.getBeginY() + bbox.getEndY()) / 2.
         psf = exposure.getPsf()
         psfImg = psf.computeKernelImage(geom.Point2D(xcen, ycen))  # Centered and normed
+        if assumeGaussianPsf:
+            psf_sig = psf.computeShape().getDeterminantRadius()
+            kWidth = (int(psf_sig * 30 + 0.5)//2)*2 + 1  # make sure it is odd
+            psf_bbox = psfImg.getBBox()
+            self.log.debug(f"PSF bbox {psf_bbox}.")
+            self.log.debug(f"Using Gaussian PSF width {psf_sig:.3f} and {kWidth} size.")
+            gaussFunc = afwMath.GaussianFunction1D(psf_sig)
+            gaussKernel = afwMath.SeparableKernel(kWidth, kWidth, gaussFunc, gaussFunc)
+            psfImg = afwImage.Image(geom.Box2I(geom.Point2I(0, 0), geom.Extent2I(kWidth, kWidth)),
+                                    dtype=psfImg.dtype)
+            gaussKernel.computeImage(psfImg, True)
+            self.log.debug(f"psfImg min {np.amin(psfImg.array):.3e}")
         return psfImg
 
     @staticmethod
@@ -599,8 +610,29 @@ class ZogyTask(pipeBase.Task):
         psfAbsSq2 = np.real(np.conj(psf2)*psf2)
         FdDenom = np.sqrt(var1F2Sq + var2F1Sq)  # one number
 
-        # Secure positive limit to avoid floating point operations resulting in exact zero
+        # PSF smoothing
         tiny = np.finfo(psf1.dtype).tiny * 100
+        epsSq = np.finfo(psf1.dtype).eps
+
+        self.log.debug(f"fPsf1 min {np.amin(np.abs(psf1))}")
+        fltZero1 = psfAbsSq1 < epsSq
+        self.log.debug(f"fPsf1 cut to zero {np.sum(fltZero1)}.")
+        psf1[fltZero1] = 0.
+        psfAbsSq1[fltZero1] = 0.
+
+        self.log.debug(f"fPsf2 min {np.amin(np.abs(psf2))}")
+        fltZero2 = psfAbsSq2 < epsSq
+        self.log.debug(f"fPsf2 cut to zero {np.sum(fltZero2)}.")
+        psf2[fltZero2] = 0.
+        psfAbsSq2[fltZero2] = 0.
+
+        fltZero = np.logical_and(fltZero1, fltZero2)
+        nZero = np.sum(fltZero)
+        fltZero1 = None
+        fltZero2 = None
+
+        # Secure positive limit to avoid floating point operations resulting in exact zero
+
         sDenom = var1F2Sq*psfAbsSq2 + var2F1Sq*psfAbsSq1  # array, eq. (12)
         # Frequencies where both psfs are too close to zero.
         # We expect this only in cases when psf1, psf2 are identical,
@@ -611,8 +643,6 @@ class ZogyTask(pipeBase.Task):
         # if we keep SDenom = tiny, denom ~ O(sqrt(tiny)), Pd ~ O(sqrt(tiny)), S ~ O(sqrt(tiny)*tiny) == 0
         # Where S = 0 then Pd = 0 and D should still yield the same variance ~ O(1)
         # For safety, we set S = 0 explicitly, too, though it should be unnecessary.
-        fltZero = sDenom < tiny
-        nZero = np.sum(fltZero)
         self.log.debug(f"Handling {nZero} both PSFs are zero points.")
         if nZero > 0:
             fltZero = np.nonzero(fltZero)  # We expect only a small fraction of such frequencies
@@ -629,15 +659,15 @@ class ZogyTask(pipeBase.Task):
 
         Pd = FdDenom*psf1*psf2/denom  # Psf of D eq. (14)
         if nZero > 0:
-            Pd[fltZero] = 0
+            Pd[fltZero] = 0.
 
         Fd = F1*F2/FdDenom  # Flux scaling of D eq. (15)
         if calculateS:
             c1 = F1*F2*F2*np.conj(psf1)*psfAbsSq2/sDenom
             c2 = F2*F1*F1*np.conj(psf2)*psfAbsSq1/sDenom
             if nZero > 0:
-                c1[fltZero] = 0
-                c2[fltZero] = 0
+                c1[fltZero] = 0.
+                c2[fltZero] = 0.
             S = c1*im1 - c2*im2  # eq. (12)
             varPlaneS = self.realSq(c1)*varPlane1 + self.realSq(c2)*varPlane2
             Ps = np.conj(Pd)*Pd  # eq. (17) Source detection expects a PSF
@@ -740,7 +770,10 @@ class ZogyTask(pipeBase.Task):
         diffSubExposure.setPhotoCalib(calibOne)
 
         # Set the PSF of this subExposure
-        psfImg = self.subExpPsf1.Factory(self.subExpPsf1.getDimensions())
+        self.log.debug(f"PSF dim {self.subExpPsf1.getDimensions()}")
+        self.log.debug(f"Pd shape {Pd.shape}")
+
+        psfImg = self.subExpPsf1.Factory(geom.Extent2I(Pd.shape[1], Pd.shape[0]))
         psfImg.array = Pd
         psfNew = measAlg.KernelPsf(afwMath.FixedKernel(psfImg))
         diffSubExposure.setPsf(psfNew)
@@ -781,7 +814,7 @@ class ZogyTask(pipeBase.Task):
             scoreSubExposure.setPhotoCalib(None)
 
             # Set the PSF of this subExposure
-            psfSImg = self.subExpPsf1.Factory(self.subExpPsf1.getDimensions())
+            psfSImg = self.subExpPsf1.Factory(geom.Extent2I(Ps.shape[1], Ps.shape[0]))
             psfSImg.array = Ps
             psfSNew = measAlg.KernelPsf(afwMath.FixedKernel(psfSImg))
             scoreSubExposure.setPsf(psfSNew)
