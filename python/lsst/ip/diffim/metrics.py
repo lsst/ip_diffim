@@ -26,6 +26,7 @@ __all__ = [
 ]
 
 
+import numpy as np
 import astropy.units as u
 
 from lsst.pipe.base import Struct, connectionTypes
@@ -57,13 +58,18 @@ class NumberSciSourcesMetricConfig(
 
 @register("numSciSources")
 class NumberSciSourcesMetricTask(MetricTask):
-    """Task that computes the number of cataloged science sources.
+    """Task that computes the number of cataloged non-sky science sources.
+
+    Notes
+    -----
+    The task excludes any sky sources in the catalog, but it does not require
+    that the catalog include a ``sky_sources`` column.
     """
     _DefaultName = "numSciSources"
     ConfigClass = NumberSciSourcesMetricConfig
 
     def run(self, sources):
-        """Count the number of science sources.
+        """Count the number of non-sky science sources.
 
         Parameters
         ----------
@@ -76,11 +82,11 @@ class NumberSciSourcesMetricTask(MetricTask):
             A `~lsst.pipe.base.Struct` containing the following component:
 
             ``measurement``
-                the total number of science sources (`lsst.verify.Measurement`
+                the total number of non-sky science sources (`lsst.verify.Measurement`
                 or `None`)
         """
         if sources is not None:
-            nSciSources = len(sources)
+            nSciSources = _countRealSources(sources)
             meas = Measurement(self.config.metricName, nSciSources * u.count)
         else:
             self.log.info("Nothing to do: no catalogs found.")
@@ -118,12 +124,17 @@ class FractionDiaSourcesToSciSourcesMetricConfig(
 class FractionDiaSourcesToSciSourcesMetricTask(MetricTask):
     """Task that computes the ratio of difference image sources to science
     sources in an image, visit, etc.
+
+    Notes
+    -----
+    The task excludes any sky sources in the direct source catalog, but it
+    does not require that either catalog include a ``sky_sources`` column.
     """
     _DefaultName = "fracDiaSourcesToSciSources"
     ConfigClass = FractionDiaSourcesToSciSourcesMetricConfig
 
     def run(self, sciSources, diaSources):
-        """Compute the ratio of DIASources to science sources.
+        """Compute the ratio of DIASources to non-sky science sources.
 
         Parameters
         ----------
@@ -142,8 +153,8 @@ class FractionDiaSourcesToSciSourcesMetricTask(MetricTask):
                 the ratio (`lsst.verify.Measurement` or `None`)
         """
         if diaSources is not None and sciSources is not None:
-            nSciSources = len(sciSources)
-            nDiaSources = len(diaSources)
+            nSciSources = _countRealSources(sciSources)
+            nDiaSources = _countRealSources(diaSources)
             metricName = self.config.metricName
             if nSciSources <= 0.0:
                 raise MetricComputationError(
@@ -154,3 +165,25 @@ class FractionDiaSourcesToSciSourcesMetricTask(MetricTask):
             self.log.info("Nothing to do: no catalogs found.")
             meas = None
         return Struct(measurement=meas)
+
+
+def _countRealSources(catalog):
+    """Return the number of valid sources in a catalog.
+
+    At present, this definition excludes sky sources. If a catalog does not
+    have a ``sky_source`` flag, all sources are assumed to be non-sky.
+
+    Parameters
+    ----------
+    `catalog` : `lsst.afw.table.SourceCatalog`
+        The catalog of sources to count.
+
+    Returns
+    -------
+    count : `int`
+        The number of sources that satisfy the criteria.
+    """
+    if "sky_source" in catalog.schema:
+        return np.count_nonzero(catalog["sky_source"] == False)  # noqa: E712
+    else:
+        return len(catalog)
