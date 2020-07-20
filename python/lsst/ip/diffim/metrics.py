@@ -40,13 +40,13 @@ class NumberSciSourcesMetricConnections(
         MetricConnections,
         defaultTemplates={"package": "ip_diffim",
                           "metric": "numSciSources"},
-        dimensions={"Instrument", "Exposure", "Detector"},
+        dimensions={"instrument", "visit", "detector"},
 ):
     sources = connectionTypes.Input(
         doc="The catalog of science sources.",
         name="src",
         storageClass="SourceCatalog",
-        dimensions={"Instrument", "Exposure", "Detector"},
+        dimensions={"instrument", "visit", "detector"},
     )
 
 
@@ -96,21 +96,22 @@ class NumberSciSourcesMetricTask(MetricTask):
 
 class FractionDiaSourcesToSciSourcesMetricConnections(
         MetricTask.ConfigClass.ConnectionsClass,
-        dimensions={"Instrument", "Exposure", "Detector"},
+        dimensions={"instrument", "visit", "detector"},
         defaultTemplates={"coaddName": "deep",
+                          "fakesType": "",
                           "package": "ip_diffim",
                           "metric": "fracDiaSourcesToSciSources"}):
     sciSources = connectionTypes.Input(
         doc="The catalog of science sources.",
         name="src",
         storageClass="SourceCatalog",
-        dimensions={"Instrument", "Exposure", "Detector"},
+        dimensions={"instrument", "visit", "detector"},
     )
     diaSources = connectionTypes.Input(
         doc="The catalog of DIASources.",
-        name="{coaddName}Diff_diaSrc",
+        name="{fakesType}{coaddName}Diff_diaSrc",
         storageClass="SourceCatalog",
-        dimensions={"Instrument", "Exposure", "Detector"},
+        dimensions={"instrument", "visit", "detector"},
     )
 
 
