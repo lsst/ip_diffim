@@ -268,7 +268,7 @@ class ZogyTask(pipeBase.Task):
         origSize : `tuple` of `int`
             Original unpadded shape tuple of the image to be cropped to.
 
-        filtInf, filtNan : `numpy.ndarray` of indices, optional
+        filtInf, filtNan : `numpy.ndarray` of bool or int, optional
             If specified, they are used as index arrays for ``result`` to set values to
             `numpy.inf` and `numpy.nan` respectively at these positions.
 
@@ -785,25 +785,29 @@ class ZogyTask(pipeBase.Task):
 
         if ftDiff.S is not None:
             S = self.inverseFftAndCropImage(
-                ftDiff.S, self.imgShape, np.logical_or(self.fftFullIm1.filtInf, self.fftFullIm2.filtInf),
-                np.logical_or(self.fftFullIm1.filtNaN, self.fftFullIm2.filtNaN),
-                dtype=self.subExposure1.image.dtype)
+                ftDiff.S, self.imgShape, dtype=self.subExposure1.image.dtype)
             varPlaneS = self.inverseFftAndCropImage(
-                ftDiff.varPlaneS, self.imgShape,
-                np.logical_or(self.fftVarPl1.filtInf, self.fftVarPl2.filtInf),
-                np.logical_or(self.fftVarPl1.filtNaN, self.fftVarPl2.filtNaN),
-                dtype=self.subExposure1.variance.dtype)
+                ftDiff.varPlaneS, self.imgShape, dtype=self.subExposure1.variance.dtype)
+
+            # There is no detection where the image or its variance was not finite
+            flt = (self.fftFullIm1.filtInf | self.fftFullIm2.filtInf
+                   | self.fftFullIm1.filtNaN | self.fftFullIm2.filtNaN
+                   | self.fftVarPl1.filtInf | self.fftVarPl2.filtInf
+                   | self.fftVarPl1.filtNaN | self.fftVarPl2.filtNaN)
+            # Ensure that no division by 0 occurs in S/sigma(S).
+            # S is set to be always finite, 0 where pixels non-finite
+            tiny = np.finfo(varPlaneS.dtype).tiny * 100
+            flt = np.logical_or(flt, varPlaneS < tiny)
+            # tiny is not safe, becomes 0 in case of conversion to single precision
+            # set variance to 1, indicating that zero is in units of "sigmas" already
+            varPlaneS[flt] = 1
+            S[flt] = 0
+
             imgS = afwImage.Image(S, deep=False, xy0=xy0, dtype=self.subExposure1.image.dtype)
             imgVarPlaneS = afwImage.Image(varPlaneS, deep=False, xy0=xy0,
                                           dtype=self.subExposure1.variance.dtype)
             imgS = imgS[bbox]
             imgVarPlaneS = imgVarPlaneS[bbox]
-
-            # Ensure that no 0/0 occur in S/sigma(S).
-            tiny = np.finfo(varPlaneS.dtype).tiny * 10
-            fltZero = imgVarPlaneS.array < tiny
-            imgVarPlaneS.array[fltZero] = tiny
-            imgS.array[fltZero] = 0
 
             # PSF of S
             Ps = self.inverseFftAndCropImage(ftDiff.Ps, self.psfShape1, dtype=self.subExpPsf1.dtype)
