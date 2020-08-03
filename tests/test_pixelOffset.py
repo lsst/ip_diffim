@@ -40,16 +40,16 @@ class PixelOffsetTest(unittest.TestCase):
     def _setUpImages(self):
         """ Setup test images.
         """
-        self.imrex = PixelOffsetTest._makeImage(2000, 4000, 17, 1, set_peak=False)
-        self.imnex = PixelOffsetTest._makeImage(2000, 4000, 17, 2, set_peak=True)
+        self.imrex = PixelOffsetTest._makeImage(1000, 2000, 17, 1, set_peak=False)
+        self.imnex = PixelOffsetTest._makeImage(1000, 2000, 17, 2, set_peak=True)
 
     def testPixelOffset(self):
         """ Test whether the peak position is at [300][300].
         """
         self._setUpImages()
-        config = ZogyConfig()
-        task = ZogyTask(templateExposure=self.imrex, scienceExposure=self.imnex, config=config)
-        D_F = task.computeDiffim(inImageSpace=False)
-        max_loc = PixelOffsetTest._find_max(D_F.D.image.array)
+        config = ZogyConfig(scaleByCalibration=False)
+        task = ZogyTask(config=config)
+        D_F = task.run(self.imnex, self.imrex, calculateScore=False)
+        max_loc = PixelOffsetTest._find_max(D_F.diffExp.image.array)
 
         self.assertEqual(max_loc, (300, 300))
