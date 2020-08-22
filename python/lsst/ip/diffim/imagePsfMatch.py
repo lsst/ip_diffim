@@ -271,17 +271,17 @@ class ImagePsfMatchTask(PsfMatchTask):
         # Run the requested method of the Task
         if args.template is not None and args.science is not None:
             if not os.path.isfile(args.template):
-                raise Exception("Template image %s does not exist" % (args.template))
+                raise FileNotFoundError("Template image %s does not exist" % (args.template))
             if not os.path.isfile(args.science):
-                raise Exception("Science image %s does not exist" % (args.science))
+                raise FileNotFoundError("Science image %s does not exist" % (args.science))
             try:
                 templateExp = afwImage.ExposureF(args.template)
             except Exception as e:
-                raise Exception("Cannot read template image %s" % (args.template))
+                raise RuntimeError("Cannot read template image %s" % (args.template))
             try:
                 scienceExp = afwImage.ExposureF(args.science)
             except Exception as e:
-                raise Exception("Cannot read science image %s" % (args.science))
+                raise RuntimeError("Cannot read science image %s" % (args.science))
         else:
             templateExp, scienceExp = generateFakeImages()
             config.kernel.active.sizeCellX = 128
