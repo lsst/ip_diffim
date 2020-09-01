@@ -108,6 +108,7 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
                 bbox=patchInfo.getOuterBBox(),
                 tract=tractInfo.getId(),
                 patch="%s,%s" % (patchInfo.getIndex()[0], patchInfo.getIndex()[1]),
+                subfilter=0,
                 numSubfilters=self.config.numSubfilters,
             )
 
