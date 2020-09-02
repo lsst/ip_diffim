@@ -108,6 +108,7 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
                 bbox=patchInfo.getOuterBBox(),
                 tract=tractInfo.getId(),
                 patch="%s,%s" % (patchInfo.getIndex()[0], patchInfo.getIndex()[1]),
+                subfilter=0,
                 numSubfilters=self.config.numSubfilters,
             )
 
@@ -226,10 +227,10 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
             indexed by their sequential patch number. In Gen3 mode, .get() is called,
             in Gen2 mode, sensorRef.get(**coaddef) is called to retrieve the coadd.
         sensorRef : `lsst.daf.persistence.ButlerDataRef`, Gen2 only
-            TODO DM-22952 Butler data reference to get coadd data.
+            Butler data reference to get coadd data.
             Must be `None` for Gen3.
         visitInfo : `lsst.afw.image.VisitInfo`, Gen2 only
-            TODO DM-22952 VisitInfo to make dcr model.
+            VisitInfo to make dcr model.
 
         Returns
         -------
@@ -255,37 +256,23 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
             patchNumber = tractInfo.getSequentialPatchIndex(patchInfo)
             patchSubBBox = patchInfo.getOuterBBox()
             patchSubBBox.clip(coaddBBox)
-            patchArgDict = dict(
-                datasetType=self.getCoaddDatasetName() + "_sub",
-                bbox=patchSubBBox,
-                tract=tractInfo.getId(),
-                patch="%s,%s" % (patchInfo.getIndex()[0], patchInfo.getIndex()[1]),
-                numSubfilters=self.config.numSubfilters,
-            )
             if patchSubBBox.isEmpty():
-                self.log.info(f"skip tract={patchArgDict['tract']}, "
+                self.log.info(f"skip tract={availableCoaddRefs[patchNumber]['tract']}, "
                               f"patch={patchNumber}; no overlapping pixels")
-                continue
-            if patchNumber not in availableCoaddRefs:
-                self.log.warn(f"{patchArgDict['datasetType']}, "
-                              f"tract={patchArgDict['tract']}, patch={patchNumber} does not exist")
                 continue
 
             if self.config.coaddName == 'dcr':
-                if sensorRef and not sensorRef.datasetExists(subfilter=0, **patchArgDict):
-                    self.log.warn("%(datasetType)s, tract=%(tract)s, patch=%(patch)s,"
-                                  " numSubfilters=%(numSubfilters)s, subfilter=0 does not exist"
-                                  % patchArgDict)
-                    continue
                 patchInnerBBox = patchInfo.getInnerBBox()
                 patchInnerBBox.clip(coaddBBox)
                 if np.min(patchInnerBBox.getDimensions()) <= 2*self.config.templateBorderSize:
-                    self.log.info("skip tract=%(tract)s, patch=%(patch)s; too few pixels." % patchArgDict)
+                    self.log.info("skip tract=%(tract)s, patch=%(patch)s; too few pixels."
+                                  % availableCoaddRefs[patchNumber])
                     continue
-                self.log.info("Constructing DCR-matched template for patch %s" % patchArgDict)
+                self.log.info("Constructing DCR-matched template for patch %s"
+                              % availableCoaddRefs[patchNumber])
 
                 if sensorRef:
-                    dcrModel = DcrModel.fromDataRef(sensorRef, **patchArgDict)
+                    dcrModel = DcrModel.fromDataRef(sensorRef, **availableCoaddRefs[patchNumber])
                 else:
                     dcrModel = DcrModel.fromQuantum(availableCoaddRefs[patchNumber])
                 # The edge pixels of the DcrCoadd may contain artifacts due to missing data.

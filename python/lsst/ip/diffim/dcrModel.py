@@ -134,6 +134,8 @@ class DcrModel:
         mask = None
         variance = None
         photoCalib = None
+        if "subfilter" in kwargs:
+            kwargs.pop("subfilter")
         for subfilter in range(numSubfilters):
             dcrCoadd = dataRef.get(datasetType, subfilter=subfilter,
                                    numSubfilters=numSubfilters, **kwargs)
