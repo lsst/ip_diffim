@@ -256,6 +256,9 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
             patchNumber = tractInfo.getSequentialPatchIndex(patchInfo)
             patchSubBBox = patchInfo.getOuterBBox()
             patchSubBBox.clip(coaddBBox)
+            if patchNumber not in availableCoaddRefs:
+                self.log.warn(f"skip patch={patchNumber}; patch does not exist for this coadd")
+                continue
             if patchSubBBox.isEmpty():
                 self.log.info(f"skip tract={availableCoaddRefs[patchNumber]['tract']}, "
                               f"patch={patchNumber}; no overlapping pixels")
