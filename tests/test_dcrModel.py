@@ -30,7 +30,6 @@ from astro_metadata_translator import makeObservationInfo
 from lsst.afw.coord.refraction import differentialRefraction
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
-import lsst.afw.image.utils as afwImageUtils
 import lsst.afw.math as afwMath
 import lsst.geom as geom
 from lsst.geom import arcseconds, degrees, radians, arcminutes
@@ -58,7 +57,7 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         to avoid placing test sources in the model images.
     dcrNumSubfilters : int
         Number of sub-filters used to model chromatic effects within a band.
-    lambdaEff : `float`
+    effectiveWavelength : `float`
         Effective wavelength of the full band.
     lambdaMax : `float`
         Maximum wavelength where the relative throughput
@@ -76,9 +75,8 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         self.rng = np.random.RandomState(5)
         self.nRandIter = 10  # Number of iterations to repeat each test with random numbers.
         self.dcrNumSubfilters = 3
-        self.lambdaEff = 476.31  # Use LSST g band values for the test.
-        self.lambdaMin = 405.
-        self.lambdaMax = 552.
+        self.effectiveWavelength = 476.31  # Use LSST g band values for the test.
+        self.bandwidth = 552. - 405.
         self.bufferSize = 5
         xSize = 40
         ySize = 42
@@ -259,21 +257,18 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
 
         The shift is compared to pre-computed values.
         """
-        dcrNumSubfilters = 3
-        afwImageUtils.defineFilter("gTest", self.lambdaEff,
-                                   lambdaMin=self.lambdaMin, lambdaMax=self.lambdaMax)
-        filterInfo = afwImage.Filter("gTest")
         rotAngle = 0.*degrees
         azimuth = 30.*degrees
         elevation = 65.*degrees
         pixelScale = 0.2*arcseconds
         visitInfo = self.makeDummyVisitInfo(azimuth, elevation)
         wcs = self.makeDummyWcs(rotAngle, pixelScale, crval=visitInfo.getBoresightRaDec())
-        dcrShift = calculateDcr(visitInfo, wcs, filterInfo, dcrNumSubfilters)
+        dcrShift = calculateDcr(visitInfo, wcs, self.effectiveWavelength,
+                                self.bandwidth, self.dcrNumSubfilters)
         # Compare to precomputed values.
-        refShift = [(-0.5575567724366292, -0.2704095599533037),
-                    (0.001961910992342903, 0.000951507567181944),
-                    (0.40402552599550073, 0.19594841296051665)]
+        refShift = [(-0.587550080368824, -0.28495575189083666),
+                    (-0.019158809951774006, -0.009291825969480522),
+                    (0.38855779160585996, 0.18844653649028056)]
         for shiftOld, shiftNew in zip(refShift, dcrShift):
             self.assertFloatsAlmostEqual(shiftOld[1], shiftNew[1], rtol=1e-6, atol=1e-8)
             self.assertFloatsAlmostEqual(shiftOld[0], shiftNew[0], rtol=1e-6, atol=1e-8)
@@ -286,9 +281,6 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         transform the pixel coordinates to altitude and azimuth, add the DCR
         amplitude to the altitude, and transform back to pixel coordinates.
         """
-        afwImageUtils.defineFilter("gTest", self.lambdaEff,
-                                   lambdaMin=self.lambdaMin, lambdaMax=self.lambdaMax)
-        filterInfo = afwImage.Filter("gTest")
         pixelScale = 0.2*arcseconds
         doFlip = [False, True]
 
@@ -300,8 +292,12 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
             for flip in doFlip:
                 # Repeat the calculation for both WCS orientations
                 wcs = self.makeDummyWcs(rotAngle, pixelScale, crval=visitInfo.getBoresightRaDec(), flipX=flip)
-                dcrShifts = calculateDcr(visitInfo, wcs, filterInfo, self.dcrNumSubfilters)
-                refShifts = calculateAstropyDcr(visitInfo, wcs, filterInfo, self.dcrNumSubfilters)
+                dcrShifts = calculateDcr(visitInfo, wcs,
+                                         self.effectiveWavelength, self.bandwidth,
+                                         self.dcrNumSubfilters)
+                refShifts = calculateAstropyDcr(visitInfo, wcs,
+                                                self.effectiveWavelength, self.bandwidth,
+                                                self.dcrNumSubfilters)
                 for refShift, dcrShift in zip(refShifts, dcrShifts):
                     # Use a fairly loose tolerance, since 1% of a pixel is good enough agreement.
                     self.assertFloatsAlmostEqual(refShift[1], dcrShift[1], rtol=1e-2, atol=1e-2)
@@ -310,10 +306,6 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
     def testDcrSubfilterOrder(self):
         """Test that the bluest subfilter always has the largest DCR amplitude.
         """
-        dcrNumSubfilters = 3
-        afwImageUtils.defineFilter("gTest", self.lambdaEff,
-                                   lambdaMin=self.lambdaMin, lambdaMax=self.lambdaMax)
-        filterInfo = afwImage.Filter("gTest")
         pixelScale = 0.2*arcseconds
         for testIter in range(self.nRandIter):
             rotAngle = 360.*self.rng.rand()*degrees
@@ -321,7 +313,8 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
             elevation = (45. + self.rng.rand()*40.)*degrees  # Restrict to 45 < elevation < 85 degrees
             visitInfo = self.makeDummyVisitInfo(azimuth, elevation)
             wcs = self.makeDummyWcs(rotAngle, pixelScale, crval=visitInfo.getBoresightRaDec())
-            dcrShift = calculateDcr(visitInfo, wcs, filterInfo, dcrNumSubfilters)
+            dcrShift = calculateDcr(visitInfo, wcs, self.effectiveWavelength, self.bandwidth,
+                                    self.dcrNumSubfilters)
             # First check that the blue subfilter amplitude is greater than the red subfilter
             rotation = calculateImageParallacticAngle(visitInfo, wcs).asRadians()
             ampShift = [dcr[1]*np.sin(rotation) + dcr[0]*np.cos(rotation) for dcr in dcrShift]
@@ -408,7 +401,8 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         """Conditioning should not change the model if it equals the reference.
         """
         modelImages = self.makeTestImages()
-        dcrModels = DcrModel(modelImages=modelImages, mask=self.mask)
+        dcrModels = DcrModel(modelImages=modelImages, mask=self.mask,
+                             effectiveWavelength=self.effectiveWavelength, bandwidth=self.bandwidth)
         newModels = [model.clone() for model in dcrModels]
         dcrModels.conditionDcrModel(newModels, self.bbox, gain=1.)
         for refModel, newModel in zip(dcrModels, newModels):
@@ -418,7 +412,8 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         """Conditioning should not change the model if it equals the reference.
         """
         modelImages = self.makeTestImages()
-        dcrModels = DcrModel(modelImages=modelImages, mask=self.mask)
+        dcrModels = DcrModel(modelImages=modelImages, mask=self.mask,
+                             effectiveWavelength=self.effectiveWavelength, bandwidth=self.bandwidth)
         newModels = [model.clone() for model in dcrModels]
         dcrModels.conditionDcrModel(newModels, self.bbox, gain=3.)
         for refModel, newModel in zip(dcrModels, newModels):
@@ -428,7 +423,8 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         """Verify conditioning when the model changes by a known amount.
         """
         modelImages = self.makeTestImages()
-        dcrModels = DcrModel(modelImages=modelImages, mask=self.mask)
+        dcrModels = DcrModel(modelImages=modelImages, mask=self.mask,
+                             effectiveWavelength=self.effectiveWavelength, bandwidth=self.bandwidth)
         newModels = [model.clone() for model in dcrModels]
         for model in newModels:
             model.array[:] *= 3.
@@ -446,7 +442,8 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         regularizationWidth = 2
         fluxRange = 10.
         modelImages = self.makeTestImages(fluxRange=fluxRange)
-        dcrModels = DcrModel(modelImages=modelImages, mask=self.mask)
+        dcrModels = DcrModel(modelImages=modelImages, mask=self.mask,
+                             effectiveWavelength=self.effectiveWavelength, bandwidth=self.bandwidth)
         newModels = [model.clone() for model in dcrModels]
         templateImage = dcrModels.getReferenceImage(self.bbox)
 
@@ -485,7 +482,8 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
             model.array += applyDcr(sidelobe.array, sidelobeShift, useInverse=False)
             model.array += applyDcr(sidelobe.array, sidelobeShift, useInverse=True)
 
-        dcrModels = DcrModel(modelImages=modelImages, mask=self.mask)
+        dcrModels = DcrModel(modelImages=modelImages, mask=self.mask,
+                             effectiveWavelength=self.effectiveWavelength, bandwidth=self.bandwidth)
         refModels = [dcrModels[subfilter].clone() for subfilter in range(self.dcrNumSubfilters)]
 
         dcrModels.regularizeModelFreq(modelImages, self.bbox, statsCtrl, clampFrequency,
@@ -503,7 +501,8 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         modelClampFactor = 2.
         regularizationWidth = 2
         subfilter = 0
-        dcrModels = DcrModel(modelImages=self.makeTestImages())
+        dcrModels = DcrModel(modelImages=self.makeTestImages(),
+                             effectiveWavelength=self.effectiveWavelength, bandwidth=self.bandwidth)
         oldModel = dcrModels[0]
         xSize, ySize = self.bbox.getDimensions()
         newModel = oldModel.clone()
@@ -530,14 +529,15 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         """
         testModels = self.makeTestImages()
         refVals = [np.sum(model.array) for model in testModels]
-        dcrModels = DcrModel(modelImages=testModels)
+        dcrModels = DcrModel(modelImages=testModels,
+                             effectiveWavelength=self.effectiveWavelength, bandwidth=self.bandwidth)
         for refVal, model in zip(refVals, dcrModels):
             self.assertFloatsEqual(refVal, np.sum(model.array))
         # Negative indices are allowed, so check that those return models from the end.
         self.assertFloatsEqual(refVals[-1], np.sum(dcrModels[-1].array))
 
 
-def calculateAstropyDcr(visitInfo, wcs, filterInfo, dcrNumSubfilters):
+def calculateAstropyDcr(visitInfo, wcs, effectiveWavelength, bandwidth, dcrNumSubfilters):
     """Calculate the DCR shift using astropy coordinate transformations.
 
     Parameters
@@ -548,6 +548,7 @@ def calculateAstropyDcr(visitInfo, wcs, filterInfo, dcrNumSubfilters):
         A wcs that matches the inputs.
     filterInfo : `lsst.afw.image.Filter`
         The filter definition, set in the current instruments' obs package.
+        Note: this object will be changed in DM-21333.
     dcrNumSubfilters : `int`
         Number of sub-filters used to model chromatic effects within a band.
 
@@ -559,7 +560,6 @@ def calculateAstropyDcr(visitInfo, wcs, filterInfo, dcrNumSubfilters):
     """
     elevation = visitInfo.getBoresightAzAlt().getLatitude()
     azimuth = visitInfo.getBoresightAzAlt().getLongitude()
-    lambdaEff = filterInfo.getFilterProperty().getLambdaEff()
     loc = EarthLocation(lat=visitInfo.getObservatory().getLatitude().asDegrees()*u.degree,
                         lon=visitInfo.getObservatory().getLongitude().asDegrees()*u.degree,
                         height=visitInfo.getObservatory().getElevation()*u.m)
@@ -574,14 +574,14 @@ def calculateAstropyDcr(visitInfo, wcs, filterInfo, dcrNumSubfilters):
     dcrShift = []
     # We divide the filter into "subfilters" with the full wavelength range
     # divided into equal sub-ranges.
-    for wl0, wl1 in wavelengthGenerator(filterInfo, dcrNumSubfilters):
+    for wl0, wl1 in wavelengthGenerator(effectiveWavelength, bandwidth, dcrNumSubfilters):
         # Note that diffRefractAmp can be negative,
         # since it is relative to the midpoint of the full band
-        diffRefractAmp0 = differentialRefraction(wavelength=wl0, wavelengthRef=lambdaEff,
+        diffRefractAmp0 = differentialRefraction(wavelength=wl0, wavelengthRef=effectiveWavelength,
                                                  elevation=elevation,
                                                  observatory=visitInfo.getObservatory(),
                                                  weather=visitInfo.getWeather())
-        diffRefractAmp1 = differentialRefraction(wavelength=wl1, wavelengthRef=lambdaEff,
+        diffRefractAmp1 = differentialRefraction(wavelength=wl1, wavelengthRef=effectiveWavelength,
                                                  elevation=elevation,
                                                  observatory=visitInfo.getObservatory(),
                                                  weather=visitInfo.getWeather())
