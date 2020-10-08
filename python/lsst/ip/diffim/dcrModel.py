@@ -129,11 +129,13 @@ class DcrModel:
         datasetType : `str`, optional
             Name of the DcrModel in the registry {"dcrCoadd", "dcrCoadd_sub"}
         numSubfilters : `int`
-            Number of sub-filters used to model chromatic effects within a band.
+            Number of sub-filters used to model chromatic effects within a
+            band.
         **kwargs
-            Additional keyword arguments to pass to look up the model in the data registry.
-            Common keywords and their types include: ``tract``:`str`, ``patch``:`str`,
-            ``bbox``:`lsst.afw.geom.Box2I`
+            Additional keyword arguments to pass to look up the model in the
+            data registry.
+            Common keywords and their types include: ``tract``:`str`,
+            ``patch``:`str`, ``bbox``:`lsst.afw.geom.Box2I`
 
         Returns
         -------
@@ -170,7 +172,8 @@ class DcrModel:
 
         Parameters
         ----------
-        availableCoaddRefs : `dict` of `int` : `lsst.daf.butler.DeferredDatasetHandle`
+        availableCoaddRefs : `dict` of
+                `int` : `lsst.daf.butler.DeferredDatasetHandle`
             Dictionary of spatially relevant retrieved coadd patches,
             indexed by their sequential patch number.
         effectiveWavelength : `float`
@@ -344,7 +347,8 @@ class DcrModel:
         return self._variance
 
     def getReferenceImage(self, bbox=None):
-        """Calculate a reference image from the average of the subfilter images.
+        """Calculate a reference image from the average of the subfilter
+        images.
 
         Parameters
         ----------
@@ -407,7 +411,8 @@ class DcrModel:
             Calculate DCR for two evenly-spaced wavelengths in each subfilter,
             instead of at the midpoint. Default: True
         splitThreshold : `float`, optional
-            Minimum DCR difference within a subfilter required to use ``splitSubfilters``
+            Minimum DCR difference within a subfilter required to use
+            ``splitSubfilters``
         amplifyModel : `float`, optional
             Multiplication factor to amplify differences between model planes.
             Used to speed convergence of iterative forward modeling.
@@ -420,9 +425,10 @@ class DcrModel:
         Raises
         ------
         ValueError
-            If neither ``exposure`` or all of ``visitInfo``, ``bbox``, and ``wcs`` are set.
+            If neither ``exposure`` or all of ``visitInfo``, ``bbox``, and
+            ``wcs`` are set.
         """
-        if self.effectiveWavelength is None or self.bandwidth is None::
+        if self.effectiveWavelength is None or self.bandwidth is None:
             raise ValueError("'effectiveWavelength' and 'bandwidth' must be set for the DcrModel in order "
                              "to calculate DCR.")
         if exposure is not None:
@@ -565,11 +571,13 @@ class DcrModel:
 
         Notes
         -----
-        This implementation of frequency regularization restricts each subfilter
-        image to be a smoothly-varying function times a reference image.
+        This implementation of frequency regularization restricts each
+        subfilter image to be a smoothly-varying function times a reference
+        image.
         """
-        # ``regularizationFactor`` is the maximum change between subfilter images, so the maximum difference
-        # between one subfilter image and the average will be the square root of that.
+        # ``regularizationFactor`` is the maximum change between subfilter
+        # images, so the maximum difference between one subfilter image and the
+        # average will be the square root of that.
         maxDiff = np.sqrt(regularizationFactor)
         noiseLevel = self.calculateNoiseCutoff(modelImages[0], statsCtrl, bufferSize=5, mask=mask, bbox=bbox)
         referenceImage = self.getReferenceImage(bbox)
@@ -580,11 +588,13 @@ class DcrModel:
         referenceImage[badPixels] = 0.
         filterWidth = regularizationWidth
         fwhm = 2.*filterWidth
-        # The noise should be lower in the smoothed image by sqrt(Nsmooth) ~ fwhm pixels
+        # The noise should be lower in the smoothed image by
+        # sqrt(Nsmooth) ~ fwhm pixels
         noiseLevel /= fwhm
         smoothRef = ndimage.filters.gaussian_filter(referenceImage, filterWidth, mode='constant')
-        # Add a three sigma offset to both the reference and model to prevent dividing by zero.
-        # Note that this will also slightly suppress faint variations in color.
+        # Add a three sigma offset to both the reference and model to prevent
+        # dividing by zero. Note that this will also slightly suppress faint
+        # variations in color.
         smoothRef += 3.*noiseLevel
 
         lowThreshold = smoothRef/maxDiff
@@ -644,12 +654,13 @@ class DcrModel:
         """Restrict image values to be between upper and lower limits.
 
         This method flags all pixels in an image that are outside of the given
-        threshold values. The threshold values are taken from a reference image,
-        so noisy pixels are likely to get flagged. In order to exclude those
-        noisy pixels, the array of flags is eroded and dilated, which removes
-        isolated pixels outside of the thresholds from the list of pixels to be
-        modified. Pixels that remain flagged after this operation have their
-        values set to the appropriate upper or lower threshold value.
+        threshold values. The threshold values are taken from a reference
+        image, so noisy pixels are likely to get flagged. In order to exclude
+        those noisy pixels, the array of flags is eroded and dilated, which
+        removes isolated pixels outside of the thresholds from the list of
+        pixels to be modified. Pixels that remain flagged after this operation
+        have their values set to the appropriate upper or lower threshold
+        value.
 
         Parameters
         ----------
@@ -663,9 +674,9 @@ class DcrModel:
         regularizationWidth : `int`, optional
             Minimum radius of a region to include in regularization, in pixels.
         """
-        # Generate the structure for binary erosion and dilation, which is used to remove noise-like pixels.
-        # Groups of pixels with a radius smaller than ``regularizationWidth``
-        # will be excluded from regularization.
+        # Generate the structure for binary erosion and dilation, which is used
+        # to remove noise-like pixels. Groups of pixels with a radius smaller
+        # than ``regularizationWidth`` will be excluded from regularization.
         filterStructure = ndimage.iterate_structure(ndimage.generate_binary_structure(2, 1),
                                                     regularizationWidth)
         if highThreshold is not None:
@@ -703,13 +714,14 @@ def applyDcr(image, dcr, useInverse=False, splitSubfilters=False, splitThreshold
         Calculate DCR for two evenly-spaced wavelengths in each subfilter,
         instead of at the midpoint. Default: False
     splitThreshold : `float`, optional
-        Minimum DCR difference within a subfilter required to use ``splitSubfilters``
+        Minimum DCR difference within a subfilter required to use
+        ``splitSubfilters``
     doPrefilter : `bool`, optional
         Spline filter the image before shifting, if set. Filtering is required,
         so only set to False if the image is already filtered.
         Filtering takes ~20% of the time of shifting, so if `applyDcr` will be
-        called repeatedly on the same image it is more efficient to precalculate
-        the filter.
+        called repeatedly on the same image it is more efficient to
+        precalculate the filter.
     order : `int`, optional
         The order of the spline interpolation, default is 3.
 
@@ -776,7 +788,8 @@ def calculateDcr(visitInfo, wcs, effectiveWavelength, bandwidth, dcrNumSubfilter
     dcrShift = []
     weight = [0.75, 0.25]
     for wl0, wl1 in wavelengthGenerator(effectiveWavelength, bandwidth, dcrNumSubfilters):
-        # Note that diffRefractAmp can be negative, since it's relative to the midpoint of the full band
+        # Note that diffRefractAmp can be negative, since it's relative to the
+        # midpoint of the full band
         diffRefractAmp0 = differentialRefraction(wavelength=wl0, wavelengthRef=effectiveWavelength,
                                                  elevation=visitInfo.getBoresightAzAlt().getLatitude(),
                                                  observatory=visitInfo.getObservatory(),
