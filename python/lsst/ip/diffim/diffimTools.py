@@ -204,7 +204,9 @@ def makeFakeKernelSet(sizeCell=128, nCell=3,
     gaussFunction = afwMath.GaussianFunction2D(tGaussianWidth, tGaussianWidth)
     gaussKernel = afwMath.AnalyticKernel(gaussKernelWidth, gaussKernelWidth, gaussFunction)
     cim = afwImage.ImageF(tim.getDimensions())
-    afwMath.convolve(cim, tim, gaussKernel, True)
+    convolutionControl = afwMath.ConvolutionControl()
+    convolutionControl.setDoNormalize(True)
+    afwMath.convolve(cim, tim, gaussKernel, convolutionControl)
     tim = cim
 
     # Trim off border pixels
@@ -221,7 +223,9 @@ def makeFakeKernelSet(sizeCell=128, nCell=3,
     sKernel = afwMath.LinearCombinationKernel(basisList[:nToUse], polyFunc)
     sKernel.setSpatialParameters(kCoeffs[:nToUse])
     sim = afwImage.ImageF(tim.getDimensions())
-    afwMath.convolve(sim, tim, sKernel, True)
+    convolutionControl = afwMath.ConvolutionControl()
+    convolutionControl.setDoNormalize(True)
+    afwMath.convolve(sim, tim, sKernel, convolutionControl)
 
     # Get the good subregion
     bbox = sKernel.shrinkBBox(sim.getBBox(afwImage.LOCAL))

@@ -890,7 +890,7 @@ def plotWhisker(results, newWcs):
     """Plot whisker diagram of astromeric offsets between results.matches.
     """
     refCoordKey = results.matches[0].first.getTable().getCoordKey()
-    inCentroidKey = results.matches[0].second.getTable().getCentroidKey()
+    inCentroidKey = results.matches[0].second.getTable().getCentroidSlot().getMeasKey()
     positions = [m.first.get(refCoordKey) for m in results.matches]
     residuals = [m.first.get(refCoordKey).getOffsetFrom(
         newWcs.pixelToSky(m.second.get(inCentroidKey))) for

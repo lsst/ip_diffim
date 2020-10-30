@@ -557,8 +557,9 @@ class ImagePsfMatchTask(PsfMatchTask):
         spatialSolution, psfMatchingKernel, backgroundModel = self._solve(kernelCellSet, basisList)
 
         psfMatchedMaskedImage = afwImage.MaskedImageF(templateMaskedImage.getBBox())
-        doNormalize = False
-        afwMath.convolve(psfMatchedMaskedImage, templateMaskedImage, psfMatchingKernel, doNormalize)
+        convolutionControl = afwMath.ConvolutionControl()
+        convolutionControl.setDoNormalize(False)
+        afwMath.convolve(psfMatchedMaskedImage, templateMaskedImage, psfMatchingKernel, convolutionControl)
         return pipeBase.Struct(
             matchedImage=psfMatchedMaskedImage,
             psfMatchingKernel=psfMatchingKernel,

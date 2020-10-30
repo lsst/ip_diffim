@@ -352,8 +352,10 @@ namespace diffim {
         /* Iterators over convolved image list and basis list */
         typename std::vector<Eigen::MatrixXd>::iterator eiter = convolvedEigenList.begin();
         /* Create C_i in the formalism of Alard & Lupton */
+        afwMath::ConvolutionControl convolutionControl;
+        convolutionControl.setDoNormalize(false);
         for (kiter = basisList.begin(); kiter != basisList.end(); ++kiter, ++eiter) {
-            afwMath::convolve(cimage, templateImage, **kiter, false); /* cimage stores convolved image */
+            afwMath::convolve(cimage, templateImage, **kiter, convolutionControl); /* cimage stores convolved image */
 
             Eigen::MatrixXd cMat = imageToEigenMatrix(cimage).block(startRow,
                                                                     startCol,
@@ -615,8 +617,10 @@ namespace diffim {
         typename std::vector<Eigen::VectorXd>::iterator eiter =  convolvedEigenList.begin();
 
         /* Create C_i in the formalism of Alard & Lupton */
+        afwMath::ConvolutionControl convolutionControl;
+        convolutionControl.setDoNormalize(false);
         for (kiter = basisList.begin(); kiter != basisList.end(); ++kiter, ++eiter) {
-            afwMath::convolve(cimage, templateImage, **kiter, false); /* cimage stores convolved image */
+            afwMath::convolve(cimage, templateImage, **kiter, convolutionControl); /* cimage stores convolved image */
 
             ndarray::Array<InputT, 1, 1> arrayC =
                 ndarray::allocate(ndarray::makeVector(fullFp->getArea()));
@@ -771,8 +775,10 @@ namespace diffim {
         /* Iterators over convolved image list and basis list */
         typename std::vector<Eigen::MatrixXd>::iterator eiter = convolvedEigenList.begin();
         /* Create C_i in the formalism of Alard & Lupton */
-        for (kiter = basisList.begin(); kiter != basisList.end(); ++kiter, ++eiter) {
-            afwMath::convolve(cimage, templateImage, **kiter, false); /* cimage stores convolved image */
+        afwMath::ConvolutionControl convolutionControl;
+        convolutionControl.setDoNormalize(false);
+       for (kiter = basisList.begin(); kiter != basisList.end(); ++kiter, ++eiter) {
+            afwMath::convolve(cimage, templateImage, **kiter, convolutionControl); /* cimage stores convolved image */
 
             Eigen::MatrixXd cMat = imageToEigenMatrix(cimage).block(startRow,
                                                                     startCol,
@@ -1003,8 +1009,10 @@ namespace diffim {
         std::vector<Eigen::MatrixXd> convolvedEigenList(nKernelParameters);
         typename std::vector<Eigen::MatrixXd>::iterator eiter = convolvedEigenList.begin();
         /* Create C_i in the formalism of Alard & Lupton */
+        afwMath::ConvolutionControl convolutionControl;
+        convolutionControl.setDoNormalize(false);
         for (kiter = basisList.begin(); kiter != basisList.end(); ++kiter, ++eiter) {
-            afwMath::convolve(cimage, templateImage, **kiter, false); /* cimage stores convolved image */
+            afwMath::convolve(cimage, templateImage, **kiter, convolutionControl); /* cimage stores convolved image */
             Eigen::MatrixXd cMat(totalSize, 1);
             cMat.setZero();
 

@@ -56,7 +56,9 @@ class DiffimTestCases(unittest.TestCase):
         ti[50, 50, afwImage.LOCAL] = (1., 0x0, 1.)
         sKernel = self.makeSpatialKernel(2)
         si = afwImage.MaskedImageF(ti.getDimensions())
-        afwMath.convolve(si, ti, sKernel, True)
+        convolutionControl = afwMath.ConvolutionControl()
+        convolutionControl.setDoNormalize(True)
+        afwMath.convolve(si, ti, sKernel, convolutionControl)
 
         bbox = geom.Box2I(geom.Point2I(25, 25),
                           geom.Point2I(75, 75))
@@ -86,7 +88,9 @@ class DiffimTestCases(unittest.TestCase):
         ti[50, 50, afwImage.LOCAL] = (1., 0x0, 1.)
         sKernel = self.makeSpatialKernel(2)
         si = afwImage.MaskedImageF(ti.getDimensions())
-        afwMath.convolve(si, ti, sKernel, True)
+        convolutionControl = afwMath.ConvolutionControl()
+        convolutionControl.setDoNormalize(True)
+        afwMath.convolve(si, ti, sKernel, convolutionControl)
 
         bbox = geom.Box2I(geom.Point2I(25, 25),
                           geom.Point2I(75, 75))
