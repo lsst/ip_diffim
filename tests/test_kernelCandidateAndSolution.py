@@ -191,8 +191,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
     def testSourceStats(self):
         source = self.ss.addNew()
         source.setId(1)
-        source.set(self.table.getCentroidKey().getX(), 276)
-        source.set(self.table.getCentroidKey().getY(), 717)
+        source.set(self.table.getCentroidSlot().getMeasKey().getX(), 276)
+        source.set(self.table.getCentroidSlot().getMeasKey().getY(), 717)
         source.set("slot_PsfFlux_instFlux", 1.)
 
         kc = ipDiffim.KernelCandidateF(source,
@@ -208,8 +208,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
     def testSourceConstructor(self):
         source = self.ss.addNew()
         source.setId(1)
-        source.set(self.table.getCentroidKey().getX(), 276)
-        source.set(self.table.getCentroidKey().getY(), 717)
+        source.set(self.table.getCentroidSlot().getMeasKey().getX(), 276)
+        source.set(self.table.getCentroidSlot().getMeasKey().getY(), 717)
         source.set("slot_PsfFlux_instFlux", 1.)
 
         kc = ipDiffim.KernelCandidateF(source,
