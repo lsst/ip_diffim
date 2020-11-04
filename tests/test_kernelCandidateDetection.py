@@ -40,7 +40,9 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             self.templateImage = afwImage.MaskedImageF(defImagePath)
             self.scienceImage = self.templateImage.Factory(self.templateImage.getDimensions())
 
-            afwMath.convolve(self.scienceImage, self.templateImage, self.gaussKernel, False)
+            convolutionControl = afwMath.ConvolutionControl()
+            convolutionControl.setDoNormalize(False)
+            afwMath.convolve(self.scienceImage, self.templateImage, self.gaussKernel, convolutionControl)
 
     def tearDown(self):
         del self.config

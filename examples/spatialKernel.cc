@@ -72,7 +72,9 @@ int main() {
     std::shared_ptr<afwImage::MaskedImage<PixelT>> mimg2(
         new afwImage::MaskedImage<PixelT>(mimg1->getDimensions())
         );
-    afwMath::convolve(*mimg2, *mimg1, *spatialKernel, false);
+    afwMath::ConvolutionControl convolutionControl;
+    convolutionControl.setDoNormalize(false);
+    afwMath::convolve(*mimg2, *mimg1, *spatialKernel, convolutionControl);
     mimg1->writeFits("mimg1");
     mimg2->writeFits("mimg2");
 

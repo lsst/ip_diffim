@@ -191,8 +191,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
     def testSourceStats(self):
         source = self.ss.addNew()
         source.setId(1)
-        source.set(self.table.getCentroidKey().getX(), 276)
-        source.set(self.table.getCentroidKey().getY(), 717)
+        source.set(self.table.getCentroidSlot().getMeasKey().getX(), 276)
+        source.set(self.table.getCentroidSlot().getMeasKey().getY(), 717)
         source.set("slot_PsfFlux_instFlux", 1.)
 
         kc = ipDiffim.KernelCandidateF(source,
@@ -208,8 +208,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
     def testSourceConstructor(self):
         source = self.ss.addNew()
         source.setId(1)
-        source.set(self.table.getCentroidKey().getX(), 276)
-        source.set(self.table.getCentroidKey().getY(), 717)
+        source.set(self.table.getCentroidSlot().getMeasKey().getX(), 276)
+        source.set(self.table.getCentroidSlot().getMeasKey().getY(), 717)
         source.set("slot_PsfFlux_instFlux", 1.)
 
         kc = ipDiffim.KernelCandidateF(source,
@@ -367,7 +367,10 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
         imX, imY = self.templateExposure2.getMaskedImage().getDimensions()
         smi = afwImage.MaskedImageF(geom.Extent2I(imX, imY))
-        afwMath.convolve(smi, self.templateExposure2.getMaskedImage(), gaussKernel, False)
+
+        convolutionControl = afwMath.ConvolutionControl()
+        convolutionControl.setDoNormalize(False)
+        afwMath.convolve(smi, self.templateExposure2.getMaskedImage(), gaussKernel, convolutionControl)
 
         bbox = gaussKernel.shrinkBBox(smi.getBBox(afwImage.LOCAL))
 
@@ -436,7 +439,9 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
         # science image
         smi = afwImage.MaskedImageF(tmi.getDimensions())
-        afwMath.convolve(smi, tmi, gaussKernel, False)
+        convolutionControl = afwMath.ConvolutionControl()
+        convolutionControl.setDoNormalize(False)
+        afwMath.convolve(smi, tmi, gaussKernel, convolutionControl)
 
         # get the actual kernel sum (since the image is not infinite)
         gscaling = afwMath.makeStatistics(smi, afwMath.SUM).getValue(afwMath.SUM)

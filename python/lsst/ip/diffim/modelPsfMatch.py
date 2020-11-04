@@ -360,8 +360,9 @@ class ModelPsfMatchTask(PsfMatchTask):
 
         # Normalize the psf-matching kernel while convolving since its magnitude is meaningless
         # when PSF-matching one model to another.
-        doNormalize = True
-        afwMath.convolve(psfMatchedMaskedImage, maskedImage, psfMatchingKernel, doNormalize)
+        convolutionControl = afwMath.ConvolutionControl()
+        convolutionControl.setDoNormalize(True)
+        afwMath.convolve(psfMatchedMaskedImage, maskedImage, psfMatchingKernel, convolutionControl)
 
         self.log.info("done")
         return pipeBase.Struct(psfMatchedExposure=psfMatchedExposure,

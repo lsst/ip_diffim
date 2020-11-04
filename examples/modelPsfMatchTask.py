@@ -48,7 +48,9 @@ def createImageAndKernel(sigma, psfSize, image):
     psf = measAlg.KernelPsf(kernel)
 
     cim = afwImage.ImageF(image.getDimensions())
-    afwMath.convolve(cim, image, kernel, True)
+    convolutionControl = afwMath.ConvolutionControl()
+    convolutionControl.setDoNormalize(True)
+    afwMath.convolve(cim, image, kernel, convolutionControl)
 
     # Trim off the border pixels
     bbox = kernel.shrinkBBox(cim.getBBox(afwImage.LOCAL))

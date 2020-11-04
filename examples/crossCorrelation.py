@@ -228,7 +228,9 @@ def testAutoCorrelation(orderMake, orderFit, inMi=None, display=False):
     spatialKernel.setSpatialParameters(kCoeffs)
 
     cMi = afwImage.MaskedImageF(inMi.getDimensions())
-    afwMath.convolve(cMi, inMi, spatialKernel, True)
+    convolutionControl = afwMath.ConvolutionControl()
+    convolutionControl.setDoNormalize(True)
+    afwMath.convolve(cMi, inMi, spatialKernel, convolutionControl)
 
     if display:
         afwDisplay.Display(frame=1).mtv(inMi.getImage())
