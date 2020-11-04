@@ -44,15 +44,32 @@ class GetCoaddAsTemplateConfig(pexConfig.Config):
         default="deep",
     )
     numSubfilters = pexConfig.Field(
-        doc="Number of subfilters in the DcrCoadd, used only if ``coaddName``='dcr'",
+        doc="Number of subfilters in the DcrCoadd. Used only if ``coaddName``='dcr'",
         dtype=int,
         default=3,
+    )
+    effectiveWavelength = pexConfig.Field(
+        doc="Effective wavelength of the filter. Used only if ``coaddName``='dcr'",
+        optional=True,
+        dtype=float,
+    )
+    bandwidth = pexConfig.Field(
+        doc="Bandwidth of the physical filter. Used only if ``coaddName``='dcr'",
+        optional=True,
+        dtype=float,
     )
     warpType = pexConfig.Field(
         doc="Warp type of the coadd template: one of 'direct' or 'psfMatched'",
         dtype=str,
         default="direct",
     )
+
+    def validate(self):
+        if self.coaddName == 'dcr':
+            if self.effectiveWavelength is None or self.bandwidth is None:
+                raise ValueError("The effective wavelength and bandwidth of the physical filter "
+                                 "must be set in the getTemplate config for DCR coadds. "
+                                 "Required until transmission curves are used in DM-13668.")
 
 
 class GetCoaddAsTemplateTask(pipeBase.Task):
@@ -275,9 +292,14 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
                               % availableCoaddRefs[patchNumber])
 
                 if sensorRef:
-                    dcrModel = DcrModel.fromDataRef(sensorRef, **availableCoaddRefs[patchNumber])
+                    dcrModel = DcrModel.fromDataRef(sensorRef,
+                                                    self.config.effectiveWavelength,
+                                                    self.config.bandwidth,
+                                                    **availableCoaddRefs[patchNumber])
                 else:
-                    dcrModel = DcrModel.fromQuantum(availableCoaddRefs[patchNumber])
+                    dcrModel = DcrModel.fromQuantum(availableCoaddRefs[patchNumber],
+                                                    self.config.effectiveWavelength,
+                                                    self.config.bandwidth)
                 # The edge pixels of the DcrCoadd may contain artifacts due to missing data.
                 # Each patch has significant overlap, and the contaminated edge pixels in
                 # a new patch will overwrite good pixels in the overlap region from

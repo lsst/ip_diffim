@@ -49,17 +49,21 @@ class DcrModel:
     iterations of forward modeling or between the subfilters of the model.
     """
 
-    def __init__(self, modelImages, filterInfo=None, psf=None, mask=None, variance=None, photoCalib=None):
+    def __init__(self, modelImages, effectiveWavelength, bandwidth, filterInfo=None, psf=None,
+                 mask=None, variance=None, photoCalib=None):
         self.dcrNumSubfilters = len(modelImages)
         self.modelImages = modelImages
-        self._filter = filterInfo
+        self._filterInfo = filterInfo
+        self._effectiveWavelength = effectiveWavelength
+        self._bandwidth = bandwidth
         self._psf = psf
         self._mask = mask
         self._variance = variance
         self.photoCalib = photoCalib
 
     @classmethod
-    def fromImage(cls, maskedImage, dcrNumSubfilters, filterInfo=None, psf=None, photoCalib=None):
+    def fromImage(cls, maskedImage, dcrNumSubfilters, effectiveWavelength, bandwidth,
+                  filterInfo=None, psf=None, photoCalib=None):
         """Initialize a DcrModel by dividing a coadd between the subfilters.
 
         Parameters
@@ -67,10 +71,17 @@ class DcrModel:
         maskedImage : `lsst.afw.image.MaskedImage`
             Input coadded image to divide equally between the subfilters.
         dcrNumSubfilters : `int`
-            Number of sub-filters used to model chromatic effects within a band.
+            Number of sub-filters used to model chromatic effects within a
+            band.
+        effectiveWavelength : `float`
+            The effective wavelengths of the current filter, in nanometers.
+        bandwidth : `float`
+            The bandwidth of the current filter, in nanometers.
         filterInfo : `lsst.afw.image.Filter`, optional
             The filter definition, set in the current instruments' obs package.
-            Required for any calculation of DCR, including making matched templates.
+            Note: this object will be changed in DM-21333.
+            Required for any calculation of DCR, including making matched
+            templates.
         psf : `lsst.afw.detection.Psf`, optional
             Point spread function (PSF) of the model.
             Required if the ``DcrModel`` will be persisted.
@@ -82,11 +93,6 @@ class DcrModel:
         -------
         dcrModel : `lsst.pipe.tasks.DcrModel`
             Best fit model of the true sky after correcting chromatic effects.
-
-        Raises
-        ------
-        ValueError
-            If there are any unmasked NAN values in ``maskedImage``.
         """
         # NANs will potentially contaminate the entire image,
         # depending on the shift or convolution type used.
@@ -103,10 +109,12 @@ class DcrModel:
         modelImages = [model, ]
         for subfilter in range(1, dcrNumSubfilters):
             modelImages.append(model.clone())
-        return cls(modelImages, filterInfo, psf, mask, variance, photoCalib=photoCalib)
+        return cls(modelImages, effectiveWavelength, bandwidth,
+                   filterInfo=filterInfo, psf=psf, mask=mask, variance=variance, photoCalib=photoCalib)
 
     @classmethod
-    def fromDataRef(cls, dataRef, datasetType="dcrCoadd", numSubfilters=None, **kwargs):
+    def fromDataRef(cls, dataRef, effectiveWavelength, bandwidth, datasetType="dcrCoadd", numSubfilters=None,
+                    **kwargs):
         """Load an existing DcrModel from a Gen 2 repository.
 
         Parameters
@@ -114,14 +122,20 @@ class DcrModel:
         dataRef : `lsst.daf.persistence.ButlerDataRef`
             Data reference defining the patch for coaddition and the
             reference Warp
+        effectiveWavelength : `float`
+            The effective wavelengths of the current filter, in nanometers.
+        bandwidth : `float`
+            The bandwidth of the current filter, in nanometers.
         datasetType : `str`, optional
             Name of the DcrModel in the registry {"dcrCoadd", "dcrCoadd_sub"}
         numSubfilters : `int`
-            Number of sub-filters used to model chromatic effects within a band.
+            Number of sub-filters used to model chromatic effects within a
+            band.
         **kwargs
-            Additional keyword arguments to pass to look up the model in the data registry.
-            Common keywords and their types include: ``tract``:`str`, ``patch``:`str`,
-            ``bbox``:`lsst.afw.geom.Box2I`
+            Additional keyword arguments to pass to look up the model in the
+            data registry.
+            Common keywords and their types include: ``tract``:`str`,
+            ``patch``:`str`, ``bbox``:`lsst.afw.geom.Box2I`
 
         Returns
         -------
@@ -150,17 +164,22 @@ class DcrModel:
             if photoCalib is None:
                 photoCalib = dcrCoadd.getPhotoCalib()
             modelImages.append(dcrCoadd.image)
-        return cls(modelImages, filterInfo, psf, mask, variance, photoCalib)
+        return cls(modelImages, effectiveWavelength, bandwidth, filterInfo, psf, mask, variance, photoCalib)
 
     @classmethod
-    def fromQuantum(cls, availableCoaddRefs):
+    def fromQuantum(cls, availableCoaddRefs, effectiveWavelength, bandwidth):
         """Load an existing DcrModel from a Gen 3 repository.
 
         Parameters
         ----------
-        availableCoaddRefs : `dict` of `int` : `lsst.daf.butler.DeferredDatasetHandle`
+        availableCoaddRefs : `dict` of
+                `int` : `lsst.daf.butler.DeferredDatasetHandle`
             Dictionary of spatially relevant retrieved coadd patches,
             indexed by their sequential patch number.
+        effectiveWavelength : `float`
+            The effective wavelengths of the current filter, in nanometers.
+        bandwidth : `float`
+            The bandwidth of the current filter, in nanometers.
 
         Returns
         -------
@@ -188,7 +207,7 @@ class DcrModel:
             if photoCalib is None:
                 photoCalib = dcrCoadd.getPhotoCalib()
             modelImages[subfilter] = dcrCoadd.image
-        return cls(modelImages, filterInfo, psf, mask, variance, photoCalib)
+        return cls(modelImages, effectiveWavelength, bandwidth, filterInfo, psf, mask, variance, photoCalib)
 
     def __len__(self):
         """Return the number of subfilters.
@@ -250,15 +269,38 @@ class DcrModel:
         self.modelImages[subfilter] = maskedImage
 
     @property
-    def filter(self):
-        """Return the filter of the model.
+    def effectiveWavelength(self):
+        """Return the effective wavelength of the model.
 
         Returns
         -------
-        filter : `lsst.afw.image.Filter`
-            The filter definition, set in the current instruments' obs package.
+        effectiveWavelength : `float`
+            The effective wavelength of the current filter, in nanometers.
         """
-        return self._filter
+        return self._effectiveWavelength
+
+    @property
+    def filter(self):
+        """Return the filter label for the model.
+
+        Returns
+        -------
+        filterInfo : `lsst.afw.image.Filter`
+            The name of the filter used for the input observations.
+            Note: this object will be changed in DM-21333.
+        """
+        return self._filterInfo
+
+    @property
+    def bandwidth(self):
+        """Return the bandwidth of the model.
+
+        Returns
+        -------
+        bandwidth : `float`
+            The bandwidth of the current filter, in nanometers.
+        """
+        return self._bandwidth
 
     @property
     def psf(self):
@@ -305,7 +347,8 @@ class DcrModel:
         return self._variance
 
     def getReferenceImage(self, bbox=None):
-        """Calculate a reference image from the average of the subfilter images.
+        """Calculate a reference image from the average of the subfilter
+        images.
 
         Parameters
         ----------
@@ -368,7 +411,8 @@ class DcrModel:
             Calculate DCR for two evenly-spaced wavelengths in each subfilter,
             instead of at the midpoint. Default: True
         splitThreshold : `float`, optional
-            Minimum DCR difference within a subfilter required to use ``splitSubfilters``
+            Minimum DCR difference within a subfilter required to use
+            ``splitSubfilters``
         amplifyModel : `float`, optional
             Multiplication factor to amplify differences between model planes.
             Used to speed convergence of iterative forward modeling.
@@ -381,17 +425,20 @@ class DcrModel:
         Raises
         ------
         ValueError
-            If neither ``exposure`` or all of ``visitInfo``, ``bbox``, and ``wcs`` are set.
+            If neither ``exposure`` or all of ``visitInfo``, ``bbox``, and
+            ``wcs`` are set.
         """
-        if self.filter is None:
-            raise ValueError("'filterInfo' must be set for the DcrModel in order to calculate DCR.")
+        if self.effectiveWavelength is None or self.bandwidth is None:
+            raise ValueError("'effectiveWavelength' and 'bandwidth' must be set for the DcrModel in order "
+                             "to calculate DCR.")
         if exposure is not None:
             visitInfo = exposure.getInfo().getVisitInfo()
             bbox = exposure.getBBox()
             wcs = exposure.getInfo().getWcs()
         elif visitInfo is None or bbox is None or wcs is None:
             raise ValueError("Either exposure or visitInfo, bbox, and wcs must be set.")
-        dcrShift = calculateDcr(visitInfo, wcs, self.filter, len(self), splitSubfilters=splitSubfilters)
+        dcrShift = calculateDcr(visitInfo, wcs, self.effectiveWavelength, self.bandwidth, len(self),
+                                splitSubfilters=splitSubfilters)
         templateImage = afwImage.ImageF(bbox)
         refModel = self.getReferenceImage(bbox)
         for subfilter, dcr in enumerate(dcrShift):
@@ -426,6 +473,11 @@ class DcrModel:
         -------
         templateExposure : `lsst.afw.image.exposureF`
             The DCR-matched template
+
+        Raises
+        ------
+        RuntimeError
+            If no `photcCalib` is set.
         """
         if bbox is None:
             bbox = exposure.getBBox()
@@ -441,7 +493,7 @@ class DcrModel:
         templateExposure = afwImage.ExposureF(bbox, wcs)
         templateExposure.setMaskedImage(maskedImage[bbox])
         templateExposure.setPsf(self.psf)
-        templateExposure.setFilter(self.filter)
+        templateExposure.setFilter(self.filterInfo)
         if self.photoCalib is None:
             raise RuntimeError("No PhotoCalib set for the DcrModel. "
                                "If the DcrModel was created from a masked image"
@@ -519,11 +571,13 @@ class DcrModel:
 
         Notes
         -----
-        This implementation of frequency regularization restricts each subfilter
-        image to be a smoothly-varying function times a reference image.
+        This implementation of frequency regularization restricts each
+        subfilter image to be a smoothly-varying function times a reference
+        image.
         """
-        # ``regularizationFactor`` is the maximum change between subfilter images, so the maximum difference
-        # between one subfilter image and the average will be the square root of that.
+        # ``regularizationFactor`` is the maximum change between subfilter
+        # images, so the maximum difference between one subfilter image and the
+        # average will be the square root of that.
         maxDiff = np.sqrt(regularizationFactor)
         noiseLevel = self.calculateNoiseCutoff(modelImages[0], statsCtrl, bufferSize=5, mask=mask, bbox=bbox)
         referenceImage = self.getReferenceImage(bbox)
@@ -534,11 +588,13 @@ class DcrModel:
         referenceImage[badPixels] = 0.
         filterWidth = regularizationWidth
         fwhm = 2.*filterWidth
-        # The noise should be lower in the smoothed image by sqrt(Nsmooth) ~ fwhm pixels
+        # The noise should be lower in the smoothed image by
+        # sqrt(Nsmooth) ~ fwhm pixels
         noiseLevel /= fwhm
         smoothRef = ndimage.filters.gaussian_filter(referenceImage, filterWidth, mode='constant')
-        # Add a three sigma offset to both the reference and model to prevent dividing by zero.
-        # Note that this will also slightly suppress faint variations in color.
+        # Add a three sigma offset to both the reference and model to prevent
+        # dividing by zero. Note that this will also slightly suppress faint
+        # variations in color.
         smoothRef += 3.*noiseLevel
 
         lowThreshold = smoothRef/maxDiff
@@ -598,12 +654,13 @@ class DcrModel:
         """Restrict image values to be between upper and lower limits.
 
         This method flags all pixels in an image that are outside of the given
-        threshold values. The threshold values are taken from a reference image,
-        so noisy pixels are likely to get flagged. In order to exclude those
-        noisy pixels, the array of flags is eroded and dilated, which removes
-        isolated pixels outside of the thresholds from the list of pixels to be
-        modified. Pixels that remain flagged after this operation have their
-        values set to the appropriate upper or lower threshold value.
+        threshold values. The threshold values are taken from a reference
+        image, so noisy pixels are likely to get flagged. In order to exclude
+        those noisy pixels, the array of flags is eroded and dilated, which
+        removes isolated pixels outside of the thresholds from the list of
+        pixels to be modified. Pixels that remain flagged after this operation
+        have their values set to the appropriate upper or lower threshold
+        value.
 
         Parameters
         ----------
@@ -617,9 +674,9 @@ class DcrModel:
         regularizationWidth : `int`, optional
             Minimum radius of a region to include in regularization, in pixels.
         """
-        # Generate the structure for binary erosion and dilation, which is used to remove noise-like pixels.
-        # Groups of pixels with a radius smaller than ``regularizationWidth``
-        # will be excluded from regularization.
+        # Generate the structure for binary erosion and dilation, which is used
+        # to remove noise-like pixels. Groups of pixels with a radius smaller
+        # than ``regularizationWidth`` will be excluded from regularization.
         filterStructure = ndimage.iterate_structure(ndimage.generate_binary_structure(2, 1),
                                                     regularizationWidth)
         if highThreshold is not None:
@@ -657,13 +714,14 @@ def applyDcr(image, dcr, useInverse=False, splitSubfilters=False, splitThreshold
         Calculate DCR for two evenly-spaced wavelengths in each subfilter,
         instead of at the midpoint. Default: False
     splitThreshold : `float`, optional
-        Minimum DCR difference within a subfilter required to use ``splitSubfilters``
+        Minimum DCR difference within a subfilter required to use
+        ``splitSubfilters``
     doPrefilter : `bool`, optional
         Spline filter the image before shifting, if set. Filtering is required,
         so only set to False if the image is already filtered.
         Filtering takes ~20% of the time of shifting, so if `applyDcr` will be
-        called repeatedly on the same image it is more efficient to precalculate
-        the filter.
+        called repeatedly on the same image it is more efficient to
+        precalculate the filter.
     order : `int`, optional
         The order of the spline interpolation, default is 3.
 
@@ -701,7 +759,7 @@ def applyDcr(image, dcr, useInverse=False, splitSubfilters=False, splitThreshold
     return shiftedImage
 
 
-def calculateDcr(visitInfo, wcs, filterInfo, dcrNumSubfilters, splitSubfilters=False):
+def calculateDcr(visitInfo, wcs, effectiveWavelength, bandwidth, dcrNumSubfilters, splitSubfilters=False):
     """Calculate the shift in pixels of an exposure due to DCR.
 
     Parameters
@@ -710,8 +768,10 @@ def calculateDcr(visitInfo, wcs, filterInfo, dcrNumSubfilters, splitSubfilters=F
         Metadata for the exposure.
     wcs : `lsst.afw.geom.SkyWcs`
         Coordinate system definition (wcs) for the exposure.
-    filterInfo : `lsst.afw.image.Filter`
-        The filter definition, set in the current instruments' obs package.
+    effectiveWavelength : `float`
+        The effective wavelengths of the current filter, in nanometers.
+    bandwidth : `float`
+        The bandwidth of the current filter, in nanometers.
     dcrNumSubfilters : `int`
         Number of sub-filters used to model chromatic effects within a band.
     splitSubfilters : `bool`, optional
@@ -727,14 +787,14 @@ def calculateDcr(visitInfo, wcs, filterInfo, dcrNumSubfilters, splitSubfilters=F
     rotation = calculateImageParallacticAngle(visitInfo, wcs)
     dcrShift = []
     weight = [0.75, 0.25]
-    lambdaEff = filterInfo.getFilterProperty().getLambdaEff()
-    for wl0, wl1 in wavelengthGenerator(filterInfo, dcrNumSubfilters):
-        # Note that diffRefractAmp can be negative, since it's relative to the midpoint of the full band
-        diffRefractAmp0 = differentialRefraction(wavelength=wl0, wavelengthRef=lambdaEff,
+    for wl0, wl1 in wavelengthGenerator(effectiveWavelength, bandwidth, dcrNumSubfilters):
+        # Note that diffRefractAmp can be negative, since it's relative to the
+        # midpoint of the full band
+        diffRefractAmp0 = differentialRefraction(wavelength=wl0, wavelengthRef=effectiveWavelength,
                                                  elevation=visitInfo.getBoresightAzAlt().getLatitude(),
                                                  observatory=visitInfo.getObservatory(),
                                                  weather=visitInfo.getWeather())
-        diffRefractAmp1 = differentialRefraction(wavelength=wl1, wavelengthRef=lambdaEff,
+        diffRefractAmp1 = differentialRefraction(wavelength=wl1, wavelengthRef=effectiveWavelength,
                                                  elevation=visitInfo.getBoresightAzAlt().getLatitude(),
                                                  observatory=visitInfo.getObservatory(),
                                                  weather=visitInfo.getWeather())
@@ -787,23 +847,25 @@ def calculateImageParallacticAngle(visitInfo, wcs):
     return rotAngle
 
 
-def wavelengthGenerator(filterInfo, dcrNumSubfilters):
+def wavelengthGenerator(effectiveWavelength, bandwidth, dcrNumSubfilters):
     """Iterate over the wavelength endpoints of subfilters.
 
     Parameters
     ----------
-    filterInfo : `lsst.afw.image.Filter`
-        The filter definition, set in the current instruments' obs package.
+    effectiveWavelength : `float`
+        The effective wavelength of the current filter, in nanometers.
+    bandwidth : `float`
+        The bandwidth of the current filter, in nanometers.
     dcrNumSubfilters : `int`
         Number of sub-filters used to model chromatic effects within a band.
 
     Yields
     ------
     `tuple` of two `float`
-        The next set of wavelength endpoints for a subfilter, in nm.
+        The next set of wavelength endpoints for a subfilter, in nanometers.
     """
-    lambdaMin = filterInfo.getFilterProperty().getLambdaMin()
-    lambdaMax = filterInfo.getFilterProperty().getLambdaMax()
-    wlStep = (lambdaMax - lambdaMin)/dcrNumSubfilters
+    lambdaMin = effectiveWavelength - bandwidth/2
+    lambdaMax = effectiveWavelength + bandwidth/2
+    wlStep = bandwidth/dcrNumSubfilters
     for wl in np.linspace(lambdaMin, lambdaMax, dcrNumSubfilters, endpoint=False):
         yield (wl, wl + wlStep)
