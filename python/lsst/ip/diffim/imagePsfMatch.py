@@ -448,7 +448,7 @@ class ImagePsfMatchTask(PsfMatchTask):
                 templateFwhmPix=scienceFwhmPix, scienceFwhmPix=templateFwhmPix)
 
         psfMatchedExposure = afwImage.makeExposure(results.matchedImage, scienceExposure.getWcs())
-        psfMatchedExposure.setFilter(templateExposure.getFilter())
+        psfMatchedExposure.setFilterLabel(templateExposure.getFilterLabel())
         psfMatchedExposure.setPhotoCalib(scienceExposure.getPhotoCalib())
         results.warpedExposure = templateExposure
         results.matchedExposure = psfMatchedExposure
