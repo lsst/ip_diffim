@@ -367,17 +367,35 @@ class DecorrelateALKernelTask(pipeBase.Task):
         The maximum correction factor converges to `sqrt(tvar/svar)` towards high frequencies.
         This should be a plausible value.
         """
+        kSum = np.sum(kappa)
         kappa = self.padCenterOriginArray(kappa, self.freqSpaceShape)
         kft = np.fft.fft2(kappa)
-        kft2 = np.real(np.conj(kft) * kft)
+        kftAbsSq = np.real(np.conj(kft) * kft)
+        # If there is no pre-convolution kernel, use placeholder scalars
         if preConvArr is None:
-            denom = svar + tvar * kft2
+            preSum = 1.
+            preAbsSq = 1.
         else:
+            preSum = np.sum(preConvArr)
             preConvArr = self.padCenterOriginArray(preConvArr, self.freqSpaceShape)
-            mk = np.fft.fft2(preConvArr)
-            mk2 = np.real(np.conj(mk) * mk)
-            denom = svar * mk2 + tvar * kft2
-        kft = np.sqrt((svar + tvar) / denom)
+            preK = np.fft.fft2(preConvArr)
+            preAbsSq = np.real(np.conj(preK)*preK)
+
+        denom = svar * preAbsSq + tvar * kftAbsSq
+        # Division by zero protection, though we don't expect to hit it
+        # (rather we'll have numerical noise)
+        tiny = np.finfo(kftAbsSq.dtype).tiny * 1000.
+        flt = denom < tiny
+        sumFlt = np.sum(flt)
+        if sumFlt > 0:
+            self.log.warnf("Avoid zero division. Skip decorrelation "
+                           "at {} divergent frequencies.", sumFlt)
+            denom[flt] = 1.
+        kft = np.sqrt((svar * preSum*preSum + tvar * kSum*kSum) / denom)
+        # Don't do any correction at these frequencies
+        # the difference image should be close to zero anyway, so can't be decorrelated
+        if sumFlt > 0:
+            kft[flt] = 1.
         return kft
 
     def computeCorrectedDiffimPsf(self, corrft, psfOld):
