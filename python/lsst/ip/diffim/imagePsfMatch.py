@@ -637,6 +637,10 @@ class ImagePsfMatchTask(PsfMatchTask):
         )
 
         subtractedExposure = afwImage.ExposureF(scienceExposure, True)
+        # Note, the decorrelation afterburner re-calculates the variance plane
+        # from the variance planes of the original exposures.
+        # That recalculation code must be in accordance with the
+        # photometric level set here in ``subtractedMaskedImage``.
         if convolveTemplate:
             subtractedMaskedImage = subtractedExposure.getMaskedImage()
             subtractedMaskedImage -= results.matchedExposure.getMaskedImage()
