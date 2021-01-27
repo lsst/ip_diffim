@@ -843,7 +843,7 @@ class ImagePsfMatchTask(PsfMatchTask):
 
         listTypes = set(type(x) for x in candidateList)
         if len(listTypes) > 1:
-            raise RuntimeError("Candidate list contains mixed types: %s" % [l for l in listTypes])
+            raise RuntimeError("Candidate list contains mixed types: %s" % [t for t in listTypes])
 
         if not isinstance(candidateList[0], afwTable.SourceRecord):
             try:
