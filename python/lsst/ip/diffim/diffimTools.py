@@ -35,7 +35,7 @@ import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.table as afwTable
 import lsst.afw.detection as afwDetect
-import lsst.afw.math.mathLib as afwMath
+import lsst.afw.math as afwMath
 import lsst.geom as geom
 from lsst.log import Log
 import lsst.pex.config as pexConfig
