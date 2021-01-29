@@ -352,7 +352,7 @@ class ModelPsfMatchTask(PsfMatchTask):
 
         self.log.info("Psf-match science exposure to reference")
         psfMatchedExposure = afwImage.ExposureF(exposure.getBBox(), exposure.getWcs())
-        psfMatchedExposure.setFilter(exposure.getFilter())
+        psfMatchedExposure.setFilterLabel(exposure.getFilterLabel())
         psfMatchedExposure.setPhotoCalib(exposure.getPhotoCalib())
         psfMatchedExposure.getInfo().setVisitInfo(exposure.getInfo().getVisitInfo())
         psfMatchedExposure.setPsf(referencePsfModel)

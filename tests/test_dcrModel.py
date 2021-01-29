@@ -546,9 +546,6 @@ def calculateAstropyDcr(visitInfo, wcs, effectiveWavelength, bandwidth, dcrNumSu
         VisitInfo for the exposure.
     wcs : `lsst.afw.geom.skyWcs.SkyWcs`
         A wcs that matches the inputs.
-    filterInfo : `lsst.afw.image.Filter`
-        The filter definition, set in the current instruments' obs package.
-        Note: this object will be changed in DM-21333.
     dcrNumSubfilters : `int`
         Number of sub-filters used to model chromatic effects within a band.
 

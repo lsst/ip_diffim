@@ -266,7 +266,7 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
         coaddExposure = afwImage.ExposureF(coaddBBox, coaddWcs)
         coaddExposure.maskedImage.set(np.nan, afwImage.Mask.getPlaneBitMask("NO_DATA"), np.nan)
         nPatchesFound = 0
-        coaddFilter = None
+        coaddFilterLabel = None
         coaddPsf = None
         coaddPhotoCalib = None
         for patchInfo in patchList:
@@ -327,8 +327,8 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
             overlapBox.clip(coaddBBox)
             coaddExposure.maskedImage.assign(coaddPatch.maskedImage[overlapBox], overlapBox)
 
-            if coaddFilter is None:
-                coaddFilter = coaddPatch.getFilter()
+            if coaddFilterLabel is None:
+                coaddFilterLabel = coaddPatch.getFilterLabel()
 
             # Retrieve the PSF for this coadd tract, if not already retrieved
             if coaddPsf is None and coaddPatch.hasPsf():
@@ -347,7 +347,7 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
 
         coaddExposure.setPhotoCalib(coaddPhotoCalib)
         coaddExposure.setPsf(coaddPsf)
-        coaddExposure.setFilter(coaddFilter)
+        coaddExposure.setFilterLabel(coaddFilterLabel)
         return coaddExposure
 
     def getCoaddDatasetName(self):

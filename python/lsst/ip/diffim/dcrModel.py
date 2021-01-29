@@ -49,11 +49,11 @@ class DcrModel:
     iterations of forward modeling or between the subfilters of the model.
     """
 
-    def __init__(self, modelImages, effectiveWavelength, bandwidth, filterInfo=None, psf=None,
+    def __init__(self, modelImages, effectiveWavelength, bandwidth, filterLabel=None, psf=None,
                  mask=None, variance=None, photoCalib=None):
         self.dcrNumSubfilters = len(modelImages)
         self.modelImages = modelImages
-        self._filterInfo = filterInfo
+        self._filterLabel = filterLabel
         self._effectiveWavelength = effectiveWavelength
         self._bandwidth = bandwidth
         self._psf = psf
@@ -63,7 +63,7 @@ class DcrModel:
 
     @classmethod
     def fromImage(cls, maskedImage, dcrNumSubfilters, effectiveWavelength, bandwidth,
-                  filterInfo=None, psf=None, photoCalib=None):
+                  filterLabel=None, psf=None, photoCalib=None):
         """Initialize a DcrModel by dividing a coadd between the subfilters.
 
         Parameters
@@ -77,9 +77,8 @@ class DcrModel:
             The effective wavelengths of the current filter, in nanometers.
         bandwidth : `float`
             The bandwidth of the current filter, in nanometers.
-        filterInfo : `lsst.afw.image.Filter`, optional
-            The filter definition, set in the current instruments' obs package.
-            Note: this object will be changed in DM-21333.
+        filterLabel : `lsst.afw.image.FilterLabel`, optional
+            The filter label, set in the current instruments' obs package.
             Required for any calculation of DCR, including making matched
             templates.
         psf : `lsst.afw.detection.Psf`, optional
@@ -110,7 +109,7 @@ class DcrModel:
         for subfilter in range(1, dcrNumSubfilters):
             modelImages.append(model.clone())
         return cls(modelImages, effectiveWavelength, bandwidth,
-                   filterInfo=filterInfo, psf=psf, mask=mask, variance=variance, photoCalib=photoCalib)
+                   filterLabel=filterLabel, psf=psf, mask=mask, variance=variance, photoCalib=photoCalib)
 
     @classmethod
     def fromDataRef(cls, dataRef, effectiveWavelength, bandwidth, datasetType="dcrCoadd", numSubfilters=None,
@@ -143,7 +142,7 @@ class DcrModel:
             Best fit model of the true sky after correcting chromatic effects.
         """
         modelImages = []
-        filterInfo = None
+        filterLabel = None
         psf = None
         mask = None
         variance = None
@@ -153,8 +152,8 @@ class DcrModel:
         for subfilter in range(numSubfilters):
             dcrCoadd = dataRef.get(datasetType, subfilter=subfilter,
                                    numSubfilters=numSubfilters, **kwargs)
-            if filterInfo is None:
-                filterInfo = dcrCoadd.getFilter()
+            if filterLabel is None:
+                filterLabel = dcrCoadd.getFilterLabel()
             if psf is None:
                 psf = dcrCoadd.getPsf()
             if mask is None:
@@ -164,7 +163,7 @@ class DcrModel:
             if photoCalib is None:
                 photoCalib = dcrCoadd.getPhotoCalib()
             modelImages.append(dcrCoadd.image)
-        return cls(modelImages, effectiveWavelength, bandwidth, filterInfo, psf, mask, variance, photoCalib)
+        return cls(modelImages, effectiveWavelength, bandwidth, filterLabel, psf, mask, variance, photoCalib)
 
     @classmethod
     def fromQuantum(cls, availableCoaddRefs, effectiveWavelength, bandwidth):
@@ -186,7 +185,7 @@ class DcrModel:
         dcrModel : `lsst.pipe.tasks.DcrModel`
             Best fit model of the true sky after correcting chromatic effects.
         """
-        filterInfo = None
+        filterLabel = None
         psf = None
         mask = None
         variance = None
@@ -196,8 +195,8 @@ class DcrModel:
         for coaddRef in availableCoaddRefs:
             subfilter = coaddRef.dataId["subfilter"]
             dcrCoadd = coaddRef.get()
-            if filterInfo is None:
-                filterInfo = dcrCoadd.getFilter()
+            if filterLabel is None:
+                filterLabel = dcrCoadd.getFilterLabel()
             if psf is None:
                 psf = dcrCoadd.getPsf()
             if mask is None:
@@ -207,7 +206,7 @@ class DcrModel:
             if photoCalib is None:
                 photoCalib = dcrCoadd.getPhotoCalib()
             modelImages[subfilter] = dcrCoadd.image
-        return cls(modelImages, effectiveWavelength, bandwidth, filterInfo, psf, mask, variance, photoCalib)
+        return cls(modelImages, effectiveWavelength, bandwidth, filterLabel, psf, mask, variance, photoCalib)
 
     def __len__(self):
         """Return the number of subfilters.
@@ -285,11 +284,10 @@ class DcrModel:
 
         Returns
         -------
-        filterInfo : `lsst.afw.image.Filter`
-            The name of the filter used for the input observations.
-            Note: this object will be changed in DM-21333.
+        filterLabel : `lsst.afw.image.FilterLabel`
+            The filter used for the input observations.
         """
-        return self._filterInfo
+        return self._filterLabel
 
     @property
     def bandwidth(self):
@@ -493,7 +491,7 @@ class DcrModel:
         templateExposure = afwImage.ExposureF(bbox, wcs)
         templateExposure.setMaskedImage(maskedImage[bbox])
         templateExposure.setPsf(self.psf)
-        templateExposure.setFilter(self.filterInfo)
+        templateExposure.setFilterLabel(self.filterLabel)
         if self.photoCalib is None:
             raise RuntimeError("No PhotoCalib set for the DcrModel. "
                                "If the DcrModel was created from a masked image"
