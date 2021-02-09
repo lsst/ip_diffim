@@ -125,7 +125,7 @@ class PsfMatchConfig(pexConfig.Config):
     and background modeling subTasks."""
 
     warpingConfig = pexConfig.ConfigField("Config for warping exposures to a common alignment",
-                                          afwMath.warper.WarperConfig)
+                                          afwMath.WarperConfig)
     detectionConfig = pexConfig.ConfigField("Controlling the detection of sources for kernel building",
                                             DetectionConfig)
     afwBackgroundConfig = pexConfig.ConfigField("Controlling the Afw background fitting",
