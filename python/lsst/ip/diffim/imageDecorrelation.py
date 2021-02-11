@@ -109,8 +109,8 @@ class DecorrelateALKernelTask(pipeBase.Task):
         return var
 
     @pipeBase.timeMethod
-    def run(self, exposure, templateExposure, subtractedExposure, psfMatchingKernel,
-            preConvKernel=None, xcen=None, ycen=None, svar=None, tvar=None):
+    def run(self, scienceExposure, templateExposure, subtractedExposure, psfMatchingKernel,
+            preConvKernel=None, xcen=None, ycen=None, svar=None, tvar=None, templateMatched=True):
         """Perform decorrelation of an image difference exposure.
 
         Decorrelates the diffim due to the convolution of the templateExposure with the
@@ -123,21 +123,20 @@ class DecorrelateALKernelTask(pipeBase.Task):
 
         Parameters
         ----------
-        exposure : `lsst.afw.image.Exposure`
-            The original science exposure (before `preConvKernel` applied) used for PSF matching.
+        scienceExposure : `lsst.afw.image.Exposure`
+            The original science exposure (before `preConvKernel` applied).
         templateExposure : `lsst.afw.image.Exposure`
-            The original template exposure (before matched to the science exposure
-            by `psfMatchingKernel`) warped into the science exposure dimensions. Always the PSF of the
-            `templateExposure` should be matched to the PSF of `exposure`, see notes below.
-        subtractedExposure :
+            The original template exposure warped into the science exposure dimensions.
+        subtractedExposure : `lsst.afw.iamge.Exposure`
             the subtracted exposure produced by
             `ip_diffim.ImagePsfMatchTask.subtractExposures()`. The `subtractedExposure` must
             inherit its PSF from `exposure`, see notes below.
-        psfMatchingKernel :
+        psfMatchingKernel : `lsst.afw.detection.Psf`
             An (optionally spatially-varying) PSF matching kernel produced
-            by `ip_diffim.ImagePsfMatchTask.subtractExposures()`
-        preConvKernel :
-            if not None, then the `exposure` was pre-convolved with this kernel
+            by `ip_diffim.ImagePsfMatchTask.subtractExposures()`.
+        preConvKernel : `lsst.afw.math.Kernel`, optional
+            if not None, then the `scienceExposure` was pre-convolved with this kernel.
+            Allowed only if ``templateMatched==True``.
         xcen : `float`, optional
             X-pixel coordinate to use for computing constant matching kernel to use
             If `None` (default), then use the center of the image.
@@ -150,6 +149,9 @@ class DecorrelateALKernelTask(pipeBase.Task):
         tvar : `float`, optional
             Image variance for template image
             If `None` (default) then compute the variance over the entire input template image.
+        templateMatched : `bool`, optional
+            If True, the template exposure was matched (convolved) to the science exposure.
+            See also notes below.
 
         Returns
         -------
@@ -162,11 +164,16 @@ class DecorrelateALKernelTask(pipeBase.Task):
         spatially fixed PSF. It is calculated as the center of image PSF corrected by the center of
         image matching kernel.
 
-        In this task, it is _always_ the `templateExposure` that was matched to the `exposure`
-        by `psfMatchingKernel`. Swap arguments accordingly if actually the science exposure was matched
-        to a co-added template. In this case, tvar > svar typically occurs.
+        If ``templateMatched==True``, the templateExposure was matched (convolved)
+        to the ``scienceExposure`` by ``psfMatchingKernel``. Otherwise the ``scienceExposure``
+        was matched (convolved) by ``psfMatchingKernel``.
 
-        The `templateExposure` and `exposure` image dimensions must be the same.
+        This task discards the variance plane of ``subtractedExposure`` and re-computes
+        it from the variance planes of ``scienceExposure`` and ``templateExposure``.
+        The image plane of ``subtractedExposure`` must be at the photometric level
+        set by the AL PSF matching in `ImagePsfMatchTask.subtractExposures`.
+        The assumptions about the photometric level are controlled by the
+        `templateMatched` option in this task.
 
         Here we currently convert a spatially-varying matching kernel into a constant kernel,
         just by computing it at the center of the image (tickets DM-6243, DM-6244).
@@ -177,6 +184,10 @@ class DecorrelateALKernelTask(pipeBase.Task):
         TODO DM-23857 As part of the spatially varying correction implementation
         consider whether returning a Struct is still necessary.
         """
+        if preConvKernel is not None and not templateMatched:
+            raise ValueError("Pre-convolution and the matching of the "
+                             "science exposure is not supported.")
+
         spatialKernel = psfMatchingKernel
         kimg = afwImage.ImageD(spatialKernel.getDimensions())
         bbox = subtractedExposure.getBBox()
@@ -185,31 +196,47 @@ class DecorrelateALKernelTask(pipeBase.Task):
         if ycen is None:
             ycen = (bbox.getBeginY() + bbox.getEndY()) / 2.
         self.log.info("Using matching kernel computed at (%d, %d)", xcen, ycen)
-        spatialKernel.computeImage(kimg, True, xcen, ycen)
+        spatialKernel.computeImage(kimg, False, xcen, ycen)
 
         if svar is None:
-            svar = self.computeVarianceMean(exposure)
+            svar = self.computeVarianceMean(scienceExposure)
         if tvar is None:
             tvar = self.computeVarianceMean(templateExposure)
-        self.log.info("Variance (science, template): (%f, %f)", svar, tvar)
+        self.log.infof("Variance (science, template): ({:.5e}, {:.5e})", svar, tvar)
+
+        if templateMatched:
+            # Regular subtraction, we convolved the template
+            self.log.info("Decorrelation after template image convolution")
+            expVar = svar
+            matchedVar = tvar
+            exposure = scienceExposure
+            matchedExposure = templateExposure
+        else:
+            # We convolved the science image
+            self.log.info("Decorrelation after science image convolution")
+            expVar = tvar
+            matchedVar = svar
+            exposure = templateExposure
+            matchedExposure = scienceExposure
 
         # Should not happen unless entire image has been masked, which could happen
         # if this is a small subimage of the main exposure. In this case, just return a full NaN
         # exposure
-        if np.isnan(svar) or np.isnan(tvar):
+        if np.isnan(expVar) or np.isnan(matchedVar):
             # Double check that one of the exposures is all NaNs
             if (np.all(np.isnan(exposure.image.array))
-                    or np.all(np.isnan(templateExposure.image.array))):
+                    or np.all(np.isnan(matchedExposure.image.array))):
                 self.log.warn('Template or science image is entirely NaNs: skipping decorrelation.')
                 outExposure = subtractedExposure.clone()
                 return pipeBase.Struct(correctedExposure=outExposure, )
 
-        # The maximal correction value converges to sqrt(tvar/svar).
+        # The maximal correction value converges to sqrt(matchedVar/expVar).
         # Correction divergence warning if the correction exceeds 4 orders of magnitude.
-        tOverSVar = tvar/svar
-        if tOverSVar > 1e8:
-            self.log.warn("Diverging correction: science image variance is much smaller than template"
-                          f", tvar/svar:{tOverSVar:.2e}")
+        mOverExpVar = matchedVar/expVar
+        if mOverExpVar > 1e8:
+            self.log.warn("Diverging correction: matched image variance is "
+                          " much larger than the unconvolved one's"
+                          f", matchedVar/expVar:{mOverExpVar:.2e}")
 
         oldVarMean = self.computeVarianceMean(subtractedExposure)
         self.log.info("Variance (uncorrected diffim): %f", oldVarMean)
@@ -227,13 +254,19 @@ class DecorrelateALKernelTask(pipeBase.Task):
         psfArr = psfImg.array
 
         # Determine the common shape
+        kSum = np.sum(kArr)
+        kSumSq = kSum*kSum
+        self.log.debugf("Matching kernel sum: {:.2e}", kSum)
+        preSum = 1.
         if preConvKernel is None:
             self.computeCommonShape(kArr.shape, psfArr.shape, diffExpArr.shape)
-            corrft = self.computeCorrection(kArr, svar, tvar)
+            corrft = self.computeCorrection(kArr, expVar, matchedVar)
         else:
+            preSum = np.sum(pckArr)
+            self.log.debugf("pre-convolution kernel sum: {:.2e}", preSum)
             self.computeCommonShape(pckArr.shape, kArr.shape,
                                     psfArr.shape, diffExpArr.shape)
-            corrft = self.computeCorrection(kArr, svar, tvar, preConvArr=pckArr)
+            corrft = self.computeCorrection(kArr, expVar, matchedVar, preConvArr=pckArr)
 
         diffExpArr = self.computeCorrectedImage(corrft, diffExpArr)
         corrPsfArr = self.computeCorrectedDiffimPsf(corrft, psfArr)
@@ -247,14 +280,18 @@ class DecorrelateALKernelTask(pipeBase.Task):
         correctedExposure.image.array[...] = diffExpArr  # Allow for numpy type casting
         # The subtracted exposure variance plane is already correlated, we cannot propagate
         # it through another convolution; instead we need to use the uncorrelated originals
-        # The whitening should scale it to svar + tvar on average
+        # The whitening should scale it to expVar + matchedVar on average
         varImg = correctedExposure.variance.array
         # Allow for numpy type casting
-        varImg[...] = exposure.variance.array + templateExposure.variance.array
+        varImg[...] = preSum*preSum*exposure.variance.array + kSumSq*matchedExposure.variance.array
+        if not templateMatched:
+            # ImagePsfMatch.subtractExposures re-scales the difference in
+            # the science image convolution mode
+            varImg /= kSumSq
         correctedExposure.setPsf(psfNew)
 
         newVarMean = self.computeVarianceMean(correctedExposure)
-        self.log.info(f"Variance (corrected diffim): {newVarMean:.2e}")
+        self.log.infof("Variance (corrected diffim): {:.5e}", newVarMean)
 
         # TODO DM-23857 As part of the spatially varying correction implementation
         # consider whether returning a Struct is still necessary.
@@ -644,7 +681,7 @@ class DecorrelateALKernelSpatialTask(pipeBase.Task):
         return var
 
     def run(self, scienceExposure, templateExposure, subtractedExposure, psfMatchingKernel,
-            spatiallyVarying=True, preConvKernel=None):
+            spatiallyVarying=True, preConvKernel=None, templateMatched=True):
         """Perform decorrelation of an image difference exposure.
 
         Decorrelates the diffim due to the convolution of the
@@ -669,6 +706,8 @@ class DecorrelateALKernelSpatialTask(pipeBase.Task):
         preConvKernel : `lsst.meas.algorithms.Psf`
            if not none, the scienceExposure has been pre-filtered with this kernel. (Currently
            this option is experimental.)
+        templateMatched : `bool`, optional
+           If True, the template exposure was matched (convolved) to the science exposure.
 
         Returns
         -------
@@ -701,7 +740,8 @@ class DecorrelateALKernelSpatialTask(pipeBase.Task):
             task = ImageMapReduceTask(config=config)
             results = task.run(subtractedExposure, science=scienceExposure,
                                template=templateExposure, psfMatchingKernel=psfMatchingKernel,
-                               preConvKernel=preConvKernel, forceEvenSized=True)
+                               preConvKernel=preConvKernel, forceEvenSized=True,
+                               templateMatched=templateMatched)
             results.correctedExposure = results.exposure
 
             # Make sure masks of input image are propagated to diffim
@@ -716,6 +756,7 @@ class DecorrelateALKernelSpatialTask(pipeBase.Task):
             config = self.config.decorrelateConfig
             task = DecorrelateALKernelTask(config=config)
             results = task.run(scienceExposure, templateExposure,
-                               subtractedExposure, psfMatchingKernel, preConvKernel=preConvKernel)
+                               subtractedExposure, psfMatchingKernel, preConvKernel=preConvKernel,
+                               templateMatched=templateMatched)
 
         return results
