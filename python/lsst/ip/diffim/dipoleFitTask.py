@@ -995,7 +995,7 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
             setattr(self, ''.join((pos_neg, 'FluxKey')), key)
 
             key = schema.addField(
-                schema.join(name, pos_neg, "instFluxErr"), type=float, units="pixel",
+                schema.join(name, pos_neg, "instFluxErr"), type=float, units="count",
                 doc="1-sigma uncertainty for {0} dipole flux".format(pos_neg))
             setattr(self, ''.join((pos_neg, 'FluxErrKey')), key)
 
