@@ -27,7 +27,7 @@ from scipy import ndimage
 import unittest
 
 from astro_metadata_translator import makeObservationInfo
-from lsst.afw.coord.refraction import differentialRefraction
+from lsst.afw.coord import differentialRefraction
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
