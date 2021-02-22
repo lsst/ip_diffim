@@ -127,9 +127,7 @@ namespace diffim {
                     (void)kernel.computeImage(image, true);
                     for (int y = 0, v = -halfWidth; y < image.getHeight(); y++, v++) {
                         int u = -halfWidth;
-                        for (Image::xy_locator ptr = image.xy_at(0, y),
-                                 end = image.xy_at(image.getWidth(), y);
-                             ptr != end; ++ptr.x(), u++) {
+                        for (auto ptr = image.row_begin(y), end = image.row_end(y); ptr != end; ++ptr, ++u) {
                             /* Evaluate from -1 to 1 */
                             *ptr  = *ptr * polynomial(u/static_cast<double>(halfWidth),
                                                       v/static_cast<double>(halfWidth));
@@ -466,8 +464,7 @@ namespace diffim {
             /* Check the kernel sum; if its close to zero don't do anything */
             kSum = 0.;
             for (int y = 0; y < image.getHeight(); y++) {
-                for (Image::xy_locator ptr = image.xy_at(0, y), end = image.xy_at(image.getWidth(), y);
-                     ptr != end; ++ptr.x()) {
+                for (auto ptr = image.row_begin(y), end = image.row_end(y); ptr != end; ++ptr) {
                     kSum += *ptr;
                 }
             }
@@ -486,8 +483,7 @@ namespace diffim {
             /* Finally, rescale such that the inner product is 1 */
             kSum = 0.;
             for (int y = 0; y < image.getHeight(); y++) {
-                for (Image::xy_locator ptr = image.xy_at(0, y), end = image.xy_at(image.getWidth(), y);
-                     ptr != end; ++ptr.x()) {
+                for (auto ptr = image.row_begin(y), end = image.row_end(y); ptr != end; ++ptr) {
                     kSum += *ptr * *ptr;
                 }
             }
