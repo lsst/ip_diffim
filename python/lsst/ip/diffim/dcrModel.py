@@ -22,7 +22,7 @@
 
 import numpy as np
 from scipy import ndimage
-from lsst.afw.coord.refraction import differentialRefraction
+from lsst.afw.coord import differentialRefraction
 import lsst.afw.image as afwImage
 import lsst.geom as geom
 
