@@ -25,7 +25,6 @@
  */
 #include <iostream>     // std::cout
 #include <algorithm>    // std::sort
-#include <functional>   // std::binary_function
 #include <limits>       // std::numeric_limits
 #include <cmath>        // std::sqrt
 
