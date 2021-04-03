@@ -215,6 +215,15 @@ def makeFakeImages(size=(256, 256), svar=0.04, tvar=0.04, psf1=3.3, psf2=2.2, of
     return im1ex, im2ex
 
 
+def isPowerOfTwo(x):
+    """Returns True if x is a power of 2"""
+    while x > 1:
+        if x & 1 != 0:
+            return False
+        x >>= 1
+    return True
+
+
 class ZogyTest(lsst.utils.tests.TestCase):
     """A test case for the Zogy task.
     """
@@ -258,6 +267,49 @@ class ZogyTest(lsst.utils.tests.TestCase):
             fD[0, 0], 120., rtol=None,
             msg="Numpy FFT does not use expected default normalization"
             " convention (1 in forward, 1/Npix in inverse operation).")
+
+    def testSplitBorder(self):
+        """Test outer border box splitting around an inner box"""
+        config = ZogyConfig()
+        task = ZogyTask(config=config)
+
+        bb = geom.Box2I(geom.Point2I(5, 10), geom.Extent2I(20, 30))
+        D = afwImage.ImageI(bb)
+        innerbox = bb.erodedBy(geom.Extent2I(3, 4))
+        D[innerbox] = 1
+
+        borderboxes = task.splitBorder(innerbox, bb)
+        for x in borderboxes:
+            D[x] += 1
+        # The splitting should cover all border pixels exactly once
+        self.assertTrue(np.all(D.array == 1), "Border does not cover all pixels exactly once.")
+
+    def testGenerateGrid(self):
+        """Test that the generated grid covers the whole image"""
+        config = ZogyConfig()
+        task = ZogyTask(config=config)
+        bb = geom.Box2I(geom.Point2I(5, 10), geom.Extent2I(200, 300))
+        D = afwImage.ImageI(bb)
+        grid = task.generateGrid(bb, geom.Extent2I(15, 15), geom.Extent2I(20, 30), powerOfTwo=True)
+        for x in grid:
+            h = x.outerBox.getHeight()
+            w = x.outerBox.getWidth()
+            self.assertTrue(isPowerOfTwo(h), "Box height is not power of two")
+            self.assertTrue(isPowerOfTwo(w), "Box width is not power of two")
+            D[x.innerBox] += 1
+        self.assertTrue(np.all(D.array == 1), "Grid inner boxes do not cover all pixels exactly once.")
+
+    def testWholeImageGrid(self):
+        """Test that a 1-cell `grid` is actually the whole image"""
+        config = ZogyConfig()
+        task = ZogyTask(config=config)
+        bb = geom.Box2I(geom.Point2I(5, 10), geom.Extent2I(200, 300))
+        D = afwImage.ImageI(bb)
+        grid = task.generateGrid(bb, geom.Extent2I(15, 15), bb.getDimensions())
+        self.assertTrue(len(grid) == 1, "Grid length is not 1")
+        x = grid[0]
+        D[x.innerBox] += 1
+        self.assertTrue(np.all(D.array == 1), "Single cell does not cover the original image.")
 
     def testZogyNewImplementation(self):
         """DM-25115 implementation test.
