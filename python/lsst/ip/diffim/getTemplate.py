@@ -24,6 +24,7 @@ import numpy as np
 
 import lsst.afw.image as afwImage
 import lsst.geom as geom
+import lsst.sphgeom as sphgeom
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 from lsst.ip.diffim.dcrModel import DcrModel
@@ -162,26 +163,37 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
             - ``sources`` :  `None` for this subtask
         """
         skyMap = butlerQC.get(skyMapRef)
-        tractInfo, patchList, skyCorners = self.getOverlapPatchList(exposure, skyMap)
-        patchNumFilter = frozenset(tractInfo.getSequentialPatchIndex(p) for p in patchList)
+        coaddExposureRefs = butlerQC.get(coaddExposureRefs)
+        tracts = [ref.dataId['tract'] for ref in coaddExposureRefs]
+        if tracts.count(tracts[0]) == len(tracts):
+            tractInfo = skyMap[tracts[0]]
+        else:
+            raise RuntimeError("Templates constructed from multiple Tracts not yet supported")
+
+        detectorBBox = exposure.getBBox()
+        detectorWcs = exposure.getWcs()
+        detectorCorners = detectorWcs.pixelToSky(geom.Box2D(detectorBBox).getCorners())
 
         availableCoaddRefs = dict()
         for coaddRef in coaddExposureRefs:
-            dataId = coaddRef.datasetRef.dataId
-            if dataId['tract'] == tractInfo.getId() and dataId['patch'] in patchNumFilter:
+            dataId = coaddRef.dataId
+            patchWcs = skyMap[dataId['tract']].getWcs()
+            patchBBox = skyMap[dataId['tract']][dataId['patch']].getOuterBBox()
+            if self.bboxIntersectsCorners(patchBBox, patchWcs, detectorCorners):
                 if self.config.coaddName == 'dcr':
                     self.log.info("Using template input tract=%s, patch=%s, subfilter=%s" %
-                                  (tractInfo.getId(), dataId['patch'], dataId['subfilter']))
+                                  (dataId['tract'], dataId['patch'], dataId['subfilter']))
                     if dataId['patch'] in availableCoaddRefs:
-                        availableCoaddRefs[dataId['patch']].append(butlerQC.get(coaddRef))
+                        availableCoaddRefs[dataId['patch']].append(coaddRef)
                     else:
-                        availableCoaddRefs[dataId['patch']] = [butlerQC.get(coaddRef), ]
+                        availableCoaddRefs[dataId['patch']] = [coaddRef, ]
                 else:
                     self.log.info("Using template input tract=%s, patch=%s" %
-                                  (tractInfo.getId(), dataId['patch']))
-                    availableCoaddRefs[dataId['patch']] = butlerQC.get(coaddRef)
+                                  (dataId['tract'], dataId['patch']))
+                    availableCoaddRefs[dataId['patch']] = coaddRef
 
-        templateExposure = self.run(tractInfo, patchList, skyCorners, availableCoaddRefs,
+        patchList = [tractInfo[patch] for patch in availableCoaddRefs.keys()]
+        templateExposure = self.run(tractInfo, patchList, detectorCorners, availableCoaddRefs,
                                     visitInfo=exposure.getInfo().getVisitInfo())
         return pipeBase.Struct(exposure=templateExposure, sources=None)
 
@@ -362,6 +374,28 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
         warpType = self.config.warpType
         suffix = "" if warpType == "direct" else warpType[0].upper() + warpType[1:]
         return self.config.coaddName + "Coadd" + suffix
+
+    def bboxIntersectsCorners(self, bbox, wcs, cornersOther):
+        """Returns true if the bbox with wcs intersects cornersOther
+
+        Parameters:
+        -----------
+        bbox : `lsst.geom.Box2I`
+            specifying the bounding box of test region
+        wcs : lsst.afw.geom.SkyWcs`
+            specifying the WCS of test region
+        cornersOther : `list` of `lsst.geom.SpherePoint`
+            ICRS coordinates specifying boundary of the other sky region
+
+        Returns:
+        --------
+        result: `bool`
+           Does bbox/wcs intersect other corners?
+        """
+        bboxCorners = wcs.pixelToSky(geom.Box2D(bbox).getCorners())
+        bboxPolygon = sphgeom.ConvexPolygon.convexHull([coord.getVector() for coord in bboxCorners])
+        otherPolygon = sphgeom.ConvexPolygon.convexHull([coord.getVector() for coord in cornersOther])
+        return otherPolygon.intersects(bboxPolygon)
 
 
 class GetCalexpAsTemplateConfig(pexConfig.Config):
