@@ -62,8 +62,9 @@ class NumberSciSourcesMetricTask(MetricTask):
 
     Notes
     -----
-    The task excludes any sky sources in the catalog, but it does not require
-    that the catalog include a ``sky_sources`` column.
+    The task excludes any non-primary sources in the catalog, but it does
+    not require that the catalog include a ``detect_isPrimary`` or
+    ``sky_sources`` column.
     """
     _DefaultName = "numSciSources"
     ConfigClass = NumberSciSourcesMetricConfig
@@ -128,8 +129,9 @@ class FractionDiaSourcesToSciSourcesMetricTask(MetricTask):
 
     Notes
     -----
-    The task excludes any sky sources in the direct source catalog, but it
-    does not require that either catalog include a ``sky_sources`` column.
+    The task excludes any non-primary sources in the catalog, but it does
+    not require that the catalog include a ``detect_isPrimary`` or
+    ``sky_sources`` column.
     """
     _DefaultName = "fracDiaSourcesToSciSources"
     ConfigClass = FractionDiaSourcesToSciSourcesMetricConfig
@@ -171,8 +173,10 @@ class FractionDiaSourcesToSciSourcesMetricTask(MetricTask):
 def _countRealSources(catalog):
     """Return the number of valid sources in a catalog.
 
-    At present, this definition excludes sky sources. If a catalog does not
-    have a ``sky_source`` flag, all sources are assumed to be non-sky.
+    At present, this definition includes only primary sources. If a catalog
+    does not have a ``detect_isPrimary`` flag, this function counts non-sky
+    sources. If it does not have a ``sky_source`` flag, either, all sources
+    are counted.
 
     Parameters
     ----------
@@ -184,7 +188,11 @@ def _countRealSources(catalog):
     count : `int`
         The number of sources that satisfy the criteria.
     """
-    if "sky_source" in catalog.schema:
+    # E712 is not applicable, because afw.table.SourceRecord.ColumnView
+    # is not a bool.
+    if "detect_isPrimary" in catalog.schema:
+        return np.count_nonzero(catalog["detect_isPrimary"] == True)  # noqa: E712
+    elif "sky_source" in catalog.schema:
         return np.count_nonzero(catalog["sky_source"] == False)  # noqa: E712
     else:
         return len(catalog)

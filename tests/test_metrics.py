@@ -36,7 +36,7 @@ from lsst.ip.diffim.metrics import \
     FractionDiaSourcesToSciSourcesMetricTask
 
 
-def _makeDummyCatalog(size, skyFlag=False):
+def _makeDummyCatalog(size, skyFlag=False, priFlag=False):
     """Create a trivial catalog for testing source counts.
 
     Parameters
@@ -47,6 +47,8 @@ def _makeDummyCatalog(size, skyFlag=False):
         If set, the schema is guaranteed to have the ``sky_source`` flag, and
         one row has it set to `True`. If not set, the ``sky_source`` flag is
         not present.
+    priFlag : `bool`
+        As ``skyFlag``, but for a ``detect_isPrimary`` flag.
 
     Returns
     -------
@@ -55,10 +57,14 @@ def _makeDummyCatalog(size, skyFlag=False):
     """
     schema = SourceCatalog.Table.makeMinimalSchema()
     if skyFlag:
-        schema.addField("sky_source", type="Flag", doc="Sky objects.")
+        schema.addField("sky_source", type="Flag", doc="Sky source.")
+    if priFlag:
+        schema.addField("detect_isPrimary", type="Flag", doc="Primary source.")
     catalog = SourceCatalog(schema)
     for i in range(size):
         record = catalog.addNew()
+    if priFlag and size > 0:
+        record["detect_isPrimary"] = True
     if skyFlag and size > 0:
         record["sky_source"] = True
     return catalog
@@ -96,6 +102,15 @@ class TestNumSciSources(MetricTaskTestCase):
 
         self.assertEqual(meas.metric_name, Name(metric="ip_diffim.numSciSources"))
         assert_quantity_allclose(meas.quantity, (len(catalog) - 1) * u.count)
+
+    def testPrimarySources(self):
+        catalog = _makeDummyCatalog(3, priFlag=True)
+        result = self.task.run(catalog)
+        lsst.pipe.base.testUtils.assertValidOutput(self.task, result)
+        meas = result.measurement
+
+        self.assertEqual(meas.metric_name, Name(metric="ip_diffim.numSciSources"))
+        assert_quantity_allclose(meas.quantity, 1 * u.count)
 
     def testMissingData(self):
         result = self.task.run(None)
@@ -164,6 +179,16 @@ class TestFractionDiaSources(MetricTaskTestCase):
         self.assertEqual(meas.metric_name, Name(metric="ip_diffim.fracDiaSourcesToSciSources"))
         assert_quantity_allclose(meas.quantity,
                                  len(diaCatalog) / (len(sciCatalog) - 1) * u.dimensionless_unscaled)
+
+    def testPrimarySources(self):
+        sciCatalog = _makeDummyCatalog(5, skyFlag=True, priFlag=True)
+        diaCatalog = _makeDummyCatalog(3)
+        result = self.task.run(sciCatalog, diaCatalog)
+        lsst.pipe.base.testUtils.assertValidOutput(self.task, result)
+        meas = result.measurement
+
+        self.assertEqual(meas.metric_name, Name(metric="ip_diffim.fracDiaSourcesToSciSources"))
+        assert_quantity_allclose(meas.quantity, len(diaCatalog) * u.dimensionless_unscaled)
 
 
 # Hack around unittest's hacky test setup system
