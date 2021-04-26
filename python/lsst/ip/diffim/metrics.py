@@ -157,7 +157,7 @@ class FractionDiaSourcesToSciSourcesMetricTask(MetricTask):
             nSciSources = _countRealSources(sciSources)
             nDiaSources = _countRealSources(diaSources)
             metricName = self.config.metricName
-            if nSciSources <= 0.0:
+            if nSciSources <= 0:
                 raise MetricComputationError(
                     "No science sources found; ratio of DIASources to science sources ill-defined.")
             else:
