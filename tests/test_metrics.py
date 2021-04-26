@@ -22,6 +22,7 @@
 import unittest
 
 import astropy.units as u
+from astropy.tests.helper import assert_quantity_allclose
 
 from lsst.afw.table import SourceCatalog
 import lsst.utils.tests
@@ -76,7 +77,7 @@ class TestNumSciSources(MetricTaskTestCase):
         meas = result.measurement
 
         self.assertEqual(meas.metric_name, Name(metric="ip_diffim.numSciSources"))
-        self.assertEqual(meas.quantity, len(catalog) * u.count)
+        assert_quantity_allclose(meas.quantity, len(catalog) * u.count)
 
     def testEmptyCatalog(self):
         catalog = _makeDummyCatalog(0)
@@ -85,7 +86,7 @@ class TestNumSciSources(MetricTaskTestCase):
         meas = result.measurement
 
         self.assertEqual(meas.metric_name, Name(metric="ip_diffim.numSciSources"))
-        self.assertEqual(meas.quantity, 0 * u.count)
+        assert_quantity_allclose(meas.quantity, 0 * u.count)
 
     def testSkySources(self):
         catalog = _makeDummyCatalog(3, skyFlag=True)
@@ -94,7 +95,7 @@ class TestNumSciSources(MetricTaskTestCase):
         meas = result.measurement
 
         self.assertEqual(meas.metric_name, Name(metric="ip_diffim.numSciSources"))
-        self.assertEqual(meas.quantity, (len(catalog) - 1) * u.count)
+        assert_quantity_allclose(meas.quantity, (len(catalog) - 1) * u.count)
 
     def testMissingData(self):
         result = self.task.run(None)
@@ -117,7 +118,7 @@ class TestFractionDiaSources(MetricTaskTestCase):
         meas = result.measurement
 
         self.assertEqual(meas.metric_name, Name(metric="ip_diffim.fracDiaSourcesToSciSources"))
-        self.assertEqual(meas.quantity, len(diaCatalog) / len(sciCatalog) * u.dimensionless_unscaled)
+        assert_quantity_allclose(meas.quantity, len(diaCatalog) / len(sciCatalog) * u.dimensionless_unscaled)
 
     def testEmptyDiaCatalog(self):
         sciCatalog = _makeDummyCatalog(5)
@@ -127,7 +128,7 @@ class TestFractionDiaSources(MetricTaskTestCase):
         meas = result.measurement
 
         self.assertEqual(meas.metric_name, Name(metric="ip_diffim.fracDiaSourcesToSciSources"))
-        self.assertEqual(meas.quantity, 0.0 * u.dimensionless_unscaled)
+        assert_quantity_allclose(meas.quantity, 0.0 * u.dimensionless_unscaled)
 
     def testEmptySciCatalog(self):
         sciCatalog = _makeDummyCatalog(0)
@@ -161,7 +162,8 @@ class TestFractionDiaSources(MetricTaskTestCase):
         meas = result.measurement
 
         self.assertEqual(meas.metric_name, Name(metric="ip_diffim.fracDiaSourcesToSciSources"))
-        self.assertEqual(meas.quantity, len(diaCatalog) / (len(sciCatalog) - 1) * u.dimensionless_unscaled)
+        assert_quantity_allclose(meas.quantity,
+                                 len(diaCatalog) / (len(sciCatalog) - 1) * u.dimensionless_unscaled)
 
 
 # Hack around unittest's hacky test setup system
