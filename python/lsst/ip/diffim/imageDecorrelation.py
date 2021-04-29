@@ -202,7 +202,8 @@ class DecorrelateALKernelTask(pipeBase.Task):
             svar = self.computeVarianceMean(scienceExposure)
         if tvar is None:
             tvar = self.computeVarianceMean(templateExposure)
-        self.log.infof("Variance (science, template): ({:.5e}, {:.5e})", svar, tvar)
+        self.log.infof("Original variance plane means. Science:{:.5e}, warped template:{:.5e})",
+                       svar, tvar)
 
         if templateMatched:
             # Regular subtraction, we convolved the template
@@ -239,7 +240,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
                           f", matchedVar/expVar:{mOverExpVar:.2e}")
 
         oldVarMean = self.computeVarianceMean(subtractedExposure)
-        self.log.info("Variance (uncorrected diffim): %f", oldVarMean)
+        self.log.info("Variance plane mean of uncorrected diffim: %f", oldVarMean)
 
         if preConvKernel is not None:
             self.log.info('Using a pre-convolution kernel as part of decorrelation correction.')
@@ -256,14 +257,14 @@ class DecorrelateALKernelTask(pipeBase.Task):
         # Determine the common shape
         kSum = np.sum(kArr)
         kSumSq = kSum*kSum
-        self.log.debugf("Matching kernel sum: {:.2e}", kSum)
+        self.log.debugf("Matching kernel sum: {:.3e}", kSum)
         preSum = 1.
         if preConvKernel is None:
             self.computeCommonShape(kArr.shape, psfArr.shape, diffExpArr.shape)
             corrft = self.computeCorrection(kArr, expVar, matchedVar)
         else:
             preSum = np.sum(pckArr)
-            self.log.debugf("pre-convolution kernel sum: {:.2e}", preSum)
+            self.log.debugf("Pre-convolution kernel sum: {:.3e}", preSum)
             self.computeCommonShape(pckArr.shape, kArr.shape,
                                     psfArr.shape, diffExpArr.shape)
             corrft = self.computeCorrection(kArr, expVar, matchedVar, preConvArr=pckArr)
@@ -291,7 +292,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
         correctedExposure.setPsf(psfNew)
 
         newVarMean = self.computeVarianceMean(correctedExposure)
-        self.log.infof("Variance (corrected diffim): {:.5e}", newVarMean)
+        self.log.infof("Variance plane mean of corrected diffim: {:.5e}", newVarMean)
 
         # TODO DM-23857 As part of the spatially varying correction implementation
         # consider whether returning a Struct is still necessary.

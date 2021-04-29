@@ -583,9 +583,9 @@ class ImagePsfMatchTask(PsfMatchTask):
 
         Parameters
         ----------
-        templateExposure : `lsst.afw.image.Exposure`
+        templateExposure : `lsst.afw.image.ExposureF`
             Exposure to PSF-match to scienceExposure
-        scienceExposure : `lsst.afw.image.Exposure`
+        scienceExposure : `lsst.afw.image.ExposureF`
             Reference Exposure
         templateFwhmPix : `float`
             FWHM (in pixels) of the Psf in the template image (image to convolve)
@@ -635,20 +635,20 @@ class ImagePsfMatchTask(PsfMatchTask):
             doWarping=doWarping,
             convolveTemplate=convolveTemplate
         )
-
-        subtractedExposure = afwImage.ExposureF(scienceExposure, True)
+        # Always inherit WCS and photocalib from science exposure
+        subtractedExposure = afwImage.ExposureF(scienceExposure, deep=True)
         # Note, the decorrelation afterburner re-calculates the variance plane
         # from the variance planes of the original exposures.
         # That recalculation code must be in accordance with the
         # photometric level set here in ``subtractedMaskedImage``.
         if convolveTemplate:
-            subtractedMaskedImage = subtractedExposure.getMaskedImage()
-            subtractedMaskedImage -= results.matchedExposure.getMaskedImage()
+            subtractedMaskedImage = subtractedExposure.maskedImage
+            subtractedMaskedImage -= results.matchedExposure.maskedImage
             subtractedMaskedImage -= results.backgroundModel
         else:
-            subtractedExposure.setMaskedImage(results.warpedExposure.getMaskedImage())
-            subtractedMaskedImage = subtractedExposure.getMaskedImage()
-            subtractedMaskedImage -= results.matchedExposure.getMaskedImage()
+            subtractedMaskedImage = subtractedExposure.maskedImage
+            subtractedMaskedImage[:, :] = results.warpedExposure.maskedImage
+            subtractedMaskedImage -= results.matchedExposure.maskedImage
             subtractedMaskedImage -= results.backgroundModel
 
             # Preserve polarity of differences
@@ -657,6 +657,8 @@ class ImagePsfMatchTask(PsfMatchTask):
             # Place back on native photometric scale
             subtractedMaskedImage /= results.psfMatchingKernel.computeImage(
                 afwImage.ImageD(results.psfMatchingKernel.getDimensions()), False)
+            # We matched to the warped template
+            subtractedExposure.setPsf(results.warpedExposure.getPsf())
 
         import lsstDebug
         display = lsstDebug.Info(__name__).display
