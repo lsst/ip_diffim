@@ -5,14 +5,14 @@ NumberSciSourcesMetricTask
 ##########################
 
 ``NumberSciSourcesMetricTask`` computes the number of science sources created when processing data through image differencing (as the ``ip_diffim.numSciSources`` metric).
-It requires source catalogs (a ``src`` dataset) as input, and can operate at image-level or coarser granularity.
+It requires source catalogs (a ``src`` dataset) as input, and can operate at image-level granularity.
 
 .. _lsst.ip.diffim.metrics.NumberSciSourcesMetricTask-summary:
 
 Processing summary
 ==================
 
-``FractionDiaSourcesToSciSourcesMetricTask`` reads source catalogs (``src`` datasets) and adds up the number of sources in those catalogs.
+``NumberSciSourcesToSciSourcesMetricTask`` reads source catalogs (``src`` datasets) and adds up the number of primary sources in those catalogs.
 
 .. _lsst.ip.diffim.metrics.NumberSciSourcesMetricTask-api:
 

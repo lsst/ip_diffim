@@ -5,7 +5,7 @@ FractionDiaSourcesToSciSourcesMetricTask
 ########################################
 
 ``FractionDiaSourcesToSciSourcesMetricTask`` computes the fraction of science sources that become DIASources when processed through image differencing (as the ``ip_diffim.fracDiaSourcesToSciSources`` metric).
-It requires source catalogs as input, and can operate at image-level or coarser granularity.
+It requires source catalogs as input, and can operate at image-level granularity.
 
 .. _lsst.ip.diffim.metrics.FractionDiaSourcesToSciSourcesMetricTask-summary:
 
@@ -14,6 +14,7 @@ Processing summary
 
 ``FractionDiaSourcesToSciSourcesMetricTask`` reads source catalogs (``src`` and ``deepDiff_diaSrc`` datasets, by default) and counts the number of sources.
 It then computes the ratio of DIASources to science sources for those catalogs.
+Non-primary sources are excluded from computations.
 
 .. _lsst.ip.diffim.metrics.FractionDiaSourcesToSciSourcesMetricTask-api:
 
