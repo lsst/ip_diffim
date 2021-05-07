@@ -537,8 +537,7 @@ class PsfMatchTask(pipeBase.Task):
     also performs background matching and returns the differential background model as an
     `lsst.afw.math.Kernel.SpatialFunction`.
 
-    Invoking the Task
-    -----------------
+    **Invoking the Task**
 
     As a base class, this Task is not directly invoked.  However, ``run()`` methods that are
     implemented on derived classes will make use of the core ``_solve()`` functionality,
@@ -588,8 +587,7 @@ class PsfMatchTask(pipeBase.Task):
          - Standard deviation of substamp diffim quality metrics across all KernelCandidates,
            for both the per-candidate (LOCAL) and SPATIAL residuals
 
-    Debug variables
-    ---------------
+    **Debug variables**
 
     The `lsst.pipe.base.cmdLineTask.CmdLineTask` command line task interface supports a
     flag -d/--debug to import @b debug.py from your PYTHONPATH.  The relevant contents of debug.py
