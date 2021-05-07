@@ -228,10 +228,6 @@ class ZogyTask(pipeBase.Task):
             If True, generate white noise for non-overlapping region. Otherwise,
             zero padding will be used in the non-overlapping region.
 
-        Notes
-        -----
-        ``innerBox``, ``outerBox`` must be in the PARENT system of ``fullExp``.
-
         Returns
         -------
         result : `lsst.pipe.base.Struct`
@@ -240,6 +236,8 @@ class ZogyTask(pipeBase.Task):
 
         Notes
         -----
+        ``innerBox``, ``outerBox`` must be in the PARENT system of ``fullExp``.
+
         Supports the non-grid option when ``innerBox`` equals to the
         bounding box of ``fullExp``.
         """
