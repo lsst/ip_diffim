@@ -452,7 +452,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
             The corrected psf, same shape as `psfOld`, sum normed to 1.
 
         Notes
-        ----
+        -----
         There is no algorithmic guarantee that the corrected psf can
         meaningfully fit to the same size as the original one.
         """

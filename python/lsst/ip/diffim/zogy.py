@@ -228,10 +228,6 @@ class ZogyTask(pipeBase.Task):
             If True, generate white noise for non-overlapping region. Otherwise,
             zero padding will be used in the non-overlapping region.
 
-        Notes
-        -----
-        ``innerBox``, ``outerBox`` must be in the PARENT system of ``fullExp``.
-
         Returns
         -------
         result : `lsst.pipe.base.Struct`
@@ -240,6 +236,8 @@ class ZogyTask(pipeBase.Task):
 
         Notes
         -----
+        ``innerBox``, ``outerBox`` must be in the PARENT system of ``fullExp``.
+
         Supports the non-grid option when ``innerBox`` equals to the
         bounding box of ``fullExp``.
         """
@@ -865,18 +863,17 @@ class ZogyTask(pipeBase.Task):
 
         Parameters
         ----------
-        psf1, psf2, im1, im2, varPlane1, varPlane2 : `numpy.ndarray` of `numpy.complex`,
-        shape ``self.freqSpaceShape``
-            Psf, image and variance plane arrays respectively.
-            All arrays must be already in Fourier space.
-
-        varMean1, varMean2: `numpy.float` > 0.
+        psf1, psf2 : `numpy.ndarray`, (``self.freqSpaceShape``,)
+            Psf arrays. Must be already in Fourier space.
+        im1, im2 : `numpy.ndarray`, (``self.freqSpaceShape``,)
+            Image arrays. Must be already in Fourier space.
+        varPlane1, varPlane2 : `numpy.ndarray`, (``self.freqSpaceShape``,)
+            Variance plane arrays respectively. Must be already in Fourier space.
+        varMean1, varMean2 : `numpy.float` > 0.
             Average per-pixel noise variance in im1, im2 respectively. Used as weighing
             of input images. Must be greater than zero.
-
         F1, F2 : `numpy.float` > 0.
             Photometric scaling of the images. See eqs. (5)--(9)
-
         calculateScore : `bool`, optional
             If True (default), calculate and return the detection significance (score) image.
             Otherwise, these return fields are `None`.
@@ -885,20 +882,21 @@ class ZogyTask(pipeBase.Task):
         -------
         result : `pipe.base.Struct`
             All arrays are in Fourier space and have shape ``self.freqSpaceShape``.
-            - ``Fd`` : `float`
-                Photometric level of ``D``.
-            - ``D`` : `numpy.ndarray` of `numpy.complex`
-                The difference image.
-            - ``varplaneD`` : `numpy.ndarray` of `numpy.complex`
-                Variance plane of ``D``.
-            - ``Pd`` : `numpy.ndarray` of `numpy.complex`
-                PSF of ``D``.
-            - ``S`` : `numpy.ndarray` of `numpy.complex` or `None`
-                Significance (score) image.
-            - ``varplaneS`` : `numpy.ndarray` of `numpy.complex` or `None`
-                Variance plane of ``S``.
-            - ``Ps`` : `numpy.ndarray` of `numpy.complex`
-                PSF of ``S``.
+
+            ``Fd``
+                Photometric level of ``D`` (`float`).
+            ``D``
+                The difference image (`numpy.ndarray` [`numpy.complex`]).
+            ``varplaneD``
+                Variance plane of ``D`` (`numpy.ndarray` [`numpy.complex`]).
+            ``Pd``
+                PSF of ``D`` (`numpy.ndarray` [`numpy.complex`]).
+            ``S``
+                Significance (score) image (`numpy.ndarray` [`numpy.complex`] or `None`).
+            ``varplaneS``
+                Variance plane of ``S`` ((`numpy.ndarray` [`numpy.complex`] or `None`).
+            ``Ps``
+                PSF of ``S`` (`numpy.ndarray` [`numpy.complex`]).
 
         Notes
         -----
@@ -1195,7 +1193,7 @@ class ZogyTask(pipeBase.Task):
         variance (though it is not scaled to 1). In Section 3.3 of the paper,
         there are "corrections" defined to the score image to correct the
         significance values for some deviations from the image model. The first
-        of these corrections is the calculation of the _variance plane_ of ``S``
+        of these corrections is the calculation of the *variance plane* of ``S``
         allowing for different per pixel variance values by following the
         overall convolution operation on the pixels of the input images. ``S``
         scaled (divided) by its corrected per pixel noise is referred as

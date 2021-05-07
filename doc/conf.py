@@ -3,11 +3,11 @@
 This configuration only affects single-package Sphinx documenation builds.
 """
 
-from documenteer.sphinxconfig.stackconf import build_package_configs
-import lsst.ip.diffim
+from documenteer.conf.pipelinespkg import *
 
 
-_g = globals()
-_g.update(build_package_configs(
-    project_name='ip_diffim',
-    version=lsst.ip.diffim.version.__version__))
+project = "ip_diffim"
+html_theme_options["logotext"] = project
+html_title = project
+html_short_title = project
+doxylink = {}

@@ -29,7 +29,7 @@ Butler datasets
 Input datasets
 --------------
 
-:lsst-config-field:`~_lsst.ip.diffim.metrics.NumberSciSourcesMetricConfig.sources`
+``sources``
     The catalog type for science sources (default: ``src``).
 
 .. _lsst.ip.diffim.metrics.NumberSciSourcesMetricTask-subtasks:

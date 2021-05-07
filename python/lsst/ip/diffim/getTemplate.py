@@ -250,11 +250,11 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
             Patches to consider for making the template exposure.
         skyCorners : list of `lsst.geom.SpherePoint`
             Sky corner coordinates to be covered by the template exposure.
-        availableCoaddRefs : `dict` of `int` : `lsst.daf.butler.DeferredDatasetHandle` (Gen3)
-        `dict` (Gen2)
+        availableCoaddRefs : `dict` [`int`]
             Dictionary of spatially relevant retrieved coadd patches,
-            indexed by their sequential patch number. In Gen3 mode, .get() is called,
-            in Gen2 mode, sensorRef.get(**coaddef) is called to retrieve the coadd.
+            indexed by their sequential patch number. In Gen3 mode, values are
+            `lsst.daf.butler.DeferredDatasetHandle` and ``.get()`` is called,
+            in Gen2 mode, ``sensorRef.get(**coaddef)`` is called to retrieve the coadd.
         sensorRef : `lsst.daf.persistence.ButlerDataRef`, Gen2 only
             Butler data reference to get coadd data.
             Must be `None` for Gen3.
@@ -378,8 +378,8 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
     def bboxIntersectsCorners(self, bbox, wcs, otherCorners):
         """Returns true if the bbox with wcs intersects otherCorners
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         bbox : `lsst.geom.Box2I`
             specifying the bounding box of test region
         wcs : `lsst.afw.geom.SkyWcs`
@@ -387,8 +387,8 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
         otherCorners : `list` of `lsst.geom.SpherePoint`
             ICRS coordinates specifying boundary of the other sky region
 
-        Returns:
-        --------
+        Returns
+        -------
         result: `bool`
            Does bbox/wcs intersect other corners?
         """

@@ -30,10 +30,10 @@ Butler datasets
 Input datasets
 --------------
 
-:lsst-config-field:`~_lsst.ip.diffim.metrics.FractionDiaSourcesToSciSourcesMetricConfig.sciSources`
+``sciSources``
     The catalog type for science sources (default: ``src``).
 
-:lsst-config-field:`~_lsst.ip.diffim.metrics.FractionDiaSourcesToSciSourcesMetricConfig.diaSources`
+``diaSources``
     The catalog type for DIASources (default: ``deepDiff_diaSrc``).
 
 .. _lsst.ip.diffim.metrics.FractionDiaSourcesToSciSourcesMetricTask-subtasks:

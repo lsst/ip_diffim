@@ -171,8 +171,7 @@ class DcrModel:
 
         Parameters
         ----------
-        availableCoaddRefs : `dict` of
-                `int` : `lsst.daf.butler.DeferredDatasetHandle`
+        availableCoaddRefs : `dict` [`int`, `lsst.daf.butler.DeferredDatasetHandle`]
             Dictionary of spatially relevant retrieved coadd patches,
             indexed by their sequential patch number.
         effectiveWavelength : `float`

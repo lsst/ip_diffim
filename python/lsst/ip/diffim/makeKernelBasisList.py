@@ -105,6 +105,17 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
         are generated and appended to the list in the order of the polynomial parameter number.
         See `lsst.afw.math.polynomialFunction2D` documentation for more details.
 
+    Raises
+    ------
+    RuntimeError
+        - if ``config.kernelBasisSet`` is not equal to "alard-lupton"
+    ValueError
+        - if ``config.kernelSize`` is even
+        - if the number of Gaussians and the number of given
+          sigma values are not equal or
+        - if the number of Gaussians and the number of given
+          polynomial degree values are not equal
+
     Notes
     -----
     The polynomial functions (``f``) are always evaluated in the -1.0, +1.0 range in both x, y directions,
@@ -124,8 +135,8 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
           convolution counterpart. [1]_ Only use 3 since the algorithm
           assumes 3 components.
 
-    Metadata fields
-    ---------------
+    **Metadata fields**
+
     ALBasisNGauss : `int`
         The number of base Gaussians in the AL basis functions.
     ALBasisDegGauss : `list` of `int`
@@ -140,21 +151,9 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
 
     References
     ----------
-
     .. [1] Ulmer, W.: Inverse problem of linear combinations of Gaussian convolution kernels
        (deconvolution) and some applications to proton/photon dosimetry and image
        processing. http://iopscience.iop.org/0266-5611/26/8/085002  Equation 40
-
-    Raises
-    ------
-    RuntimeError
-        - if ``config.kernelBasisSet`` is not equal to "alard-lupton"
-    ValueError
-        - if ``config.kernelSize`` is even
-        - if the number of Gaussians and the number of given
-          sigma values are not equal or
-        - if the number of Gaussians and the number of given
-          polynomial degree values are not equal
     """
 
     if config.kernelBasisSet != "alard-lupton":
