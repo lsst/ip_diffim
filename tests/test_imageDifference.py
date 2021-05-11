@@ -21,6 +21,7 @@
 #
 
 import numpy as np
+import unittest
 
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
@@ -215,15 +216,12 @@ class ImageDifferenceTestCase(lsst.utils.tests.TestCase):
         config.scaleByCalibration = False
         zogyTask = ZogyTask(config=config)
 
-        # Run source detection on the model to set up the mask plane.
-        # self.getSelectSources(model)
         result = zogyTask.run(sciExposure, refExposure)
         return result.diffExp
 
     @staticmethod
     def wrapAlDiffim(config, templateExposure, scienceExposure, convolveTemplate=True, returnKernel=False):
         alTask = ImagePsfMatchTask(config=config)
-        # kernelSize = config.kernel['AL'].kernelSize
         templateFwhmPix = templateExposure.getPsf().getSigma()
         scienceFwhmPix = scienceExposure.getPsf().getSigma()
         result = alTask.subtractExposures(templateExposure, scienceExposure,
@@ -264,11 +262,127 @@ class ImageDifferenceTestCase(lsst.utils.tests.TestCase):
         self.assertGreater(residualPeak, np.max(abs(diffIm.image.array)))
 
         # It should be possible to compute the diffim metric from the science and reference images
-
         refMetric = self.diffimMetric1(refIm, src)
         sciMetric = self.diffimMetric1(sciIm, src)
         self.assertGreaterEqual(refMetric, -1)
         self.assertGreaterEqual(sciMetric, -1)
+
+    def testSimAlSciNotModified(self):
+        "Running AL and convolving the template should not change the science image."
+        refPsf = 2.
+        sciPsfBase = 2.
+        sciNoise = 5.
+        refNoise = 1.5
+        seed = 37
+        rng = np.random.RandomState(seed)
+        alConfig = ImagePsfMatchConfig()
+
+        sciPsf = sciPsfBase + rng.random()*2.
+        ref, _ = self.makeTestImages(seed=seed, nSrc=20, psfSize=refPsf,
+                                     noiseLevel=refNoise, fluxLevel=500)
+        sci, src = self.makeTestImages(seed=seed, nSrc=20, psfSize=sciPsf,
+                                       noiseLevel=sciNoise, fluxLevel=500)
+        # Make a deep copy of the images first
+        sci2 = sci.clone()
+
+        # Basic AL, but we don't care about the result.
+        self.wrapAlDiffim(alConfig, ref, sci, convolveTemplate=True)
+        self.assertMaskedImagesEqual(sci.maskedImage, sci2.maskedImage)
+
+    @unittest.expectedFailure
+    def testSimAlSciModified2(self):
+        "Running AL and convolving science image should change it."
+        refPsf = 2.
+        sciPsfBase = 2.
+        sciNoise = 5.
+        refNoise = 1.5
+        seed = 37
+        rng = np.random.RandomState(seed)
+        alConfig = ImagePsfMatchConfig()
+
+        sciPsf = sciPsfBase + rng.random()*2.
+        ref, _ = self.makeTestImages(seed=seed, nSrc=20, psfSize=refPsf,
+                                     noiseLevel=refNoise, fluxLevel=500)
+        sci, src = self.makeTestImages(seed=seed, nSrc=20, psfSize=sciPsf,
+                                       noiseLevel=sciNoise, fluxLevel=500)
+        # Make a deep copy of the images first
+        sci2 = sci.clone()
+
+        # Basic AL, but we don't care about the result.
+        self.wrapAlDiffim(alConfig, ref, sci, convolveTemplate=False)
+        self.assertMaskedImagesEqual(sci.maskedImage, sci2.maskedImage)
+
+    @unittest.expectedFailure
+    def testSimAlSciModified3(self):
+        "The science image should be different if the template is convolved vs the science image."
+        refPsf = 2.
+        sciPsfBase = 2.
+        sciNoise = 5.
+        refNoise = 1.5
+        seed = 37
+        rng = np.random.RandomState(seed)
+        alConfig = ImagePsfMatchConfig()
+
+        sciPsf = sciPsfBase + rng.random()*2.
+        ref1, _ = self.makeTestImages(seed=seed, nSrc=20, psfSize=refPsf,
+                                      noiseLevel=refNoise, fluxLevel=500)
+        sci, src = self.makeTestImages(seed=seed, nSrc=20, psfSize=sciPsf,
+                                       noiseLevel=sciNoise, fluxLevel=500)
+        # Make a deep copy of the images first
+        sci2 = sci.clone()
+        sci1B = sci.clone()
+        sci2B = sci2.clone()
+        ref1B = ref1.clone()
+
+        # Basic AL, but we don't care about the result.
+        self.wrapAlDiffim(alConfig, ref1B, sci1B, convolveTemplate=True)
+        self.wrapAlDiffim(alConfig, ref1, sci, convolveTemplate=False)
+        self.assertMaskedImagesEqual(sci2.maskedImage, sci2B.maskedImage)
+
+    @unittest.expectedFailure
+    def testSimAlRefModified(self):
+        "If we convolve the template, it should be changed."
+        refPsf = 2.
+        sciPsfBase = 2.
+        sciNoise = 5.
+        refNoise = 1.5
+        seed = 37
+        rng = np.random.RandomState(seed)
+        alConfig = ImagePsfMatchConfig()
+
+        sciPsf = sciPsfBase + rng.random()*2.
+        ref, _ = self.makeTestImages(seed=seed, nSrc=20, psfSize=refPsf,
+                                     noiseLevel=refNoise, fluxLevel=500)
+        sci, src = self.makeTestImages(seed=seed, nSrc=20, psfSize=sciPsf,
+                                       noiseLevel=sciNoise, fluxLevel=500)
+        # Make a deep copy of the images first
+        ref2 = ref.clone()
+
+        # Basic AL, but we don't care about the result.
+        self.wrapAlDiffim(alConfig, ref, sci, convolveTemplate=True)
+        self.assertMaskedImagesEqual(ref.maskedImage, ref2.maskedImage)
+
+    def testSimAlRefNotModified(self):
+        "If we don't convolve the template, it should not be changed."
+        refPsf = 2.
+        sciPsfBase = 2.
+        sciNoise = 5.
+        refNoise = 1.5
+        seed = 37
+        rng = np.random.RandomState(seed)
+        alConfig = ImagePsfMatchConfig()
+
+        sciPsf = sciPsfBase + rng.random()*2.
+        ref, _ = self.makeTestImages(seed=seed, nSrc=20, psfSize=refPsf,
+                                     noiseLevel=refNoise, fluxLevel=500)
+        sci, src = self.makeTestImages(seed=seed, nSrc=20, psfSize=sciPsf,
+                                       noiseLevel=sciNoise, fluxLevel=500)
+        # Make a deep copy of the images first
+        ref2 = ref.clone()
+
+        # Basic AL, but we don't care about the result.
+        self.wrapAlDiffim(alConfig, ref, sci, convolveTemplate=False)
+        self.assertMaskedImagesEqual(ref.maskedImage, ref2.maskedImage)
 
     def testSimDiffim(self):
         nIter = 5
@@ -307,6 +421,7 @@ class ImageDifferenceTestCase(lsst.utils.tests.TestCase):
             self.assertGreaterEqual(metricZogy, -1)
             self.assertGreaterEqual(metricAl, -1)
             self.assertGreaterEqual(metricDecorr, -1)
+            print(f"Metrics: {metricAl} (AL), {metricDecorr} (AL-D), {metricZogy} (ZOGY)\n")
 
     def testSimReverseZogy(self):
         nIter = 5
@@ -346,7 +461,6 @@ class ImageDifferenceTestCase(lsst.utils.tests.TestCase):
 
         for s in range(nIter):
             sciPsf = sciPsfBase + rng.random()*2.
-            print(f"\nIteration {s} with PSF {sciPsf}\n")
             ref, _ = self.makeTestImages(seed=seed + s, nSrc=20, psfSize=refPsf,
                                          noiseLevel=refNoise, fluxLevel=500)
             sci, src = self.makeTestImages(seed=seed + s, nSrc=20, psfSize=sciPsf,
@@ -359,7 +473,6 @@ class ImageDifferenceTestCase(lsst.utils.tests.TestCase):
             resR = self.wrapAlDiffim(alConfig, sci2, ref2, convolveTemplate=False)
             metric = self.diffimMetric1(res, src)
             metricR = self.diffimMetric1(resR, src)
-            print(f"Metric: {metric} reversed: {metricR}\n")
             # Alard&Lupton is not fully reversable, but the answers should be close.
             # Partly this needs the decorrelation afterburner
             # It might also be a difference in background subtraction
@@ -377,7 +490,6 @@ class ImageDifferenceTestCase(lsst.utils.tests.TestCase):
 
         for s in range(nIter):
             sciPsf = sciPsfBase + rng.random()*2.
-            print(f"\nIteration {s} with PSF {sciPsf}\n")
             ref, _ = self.makeTestImages(seed=seed + s, nSrc=20, psfSize=refPsf,
                                          noiseLevel=refNoise, fluxLevel=500)
             sci, src = self.makeTestImages(seed=seed + s, nSrc=20, psfSize=sciPsf,
@@ -390,7 +502,6 @@ class ImageDifferenceTestCase(lsst.utils.tests.TestCase):
             resR = self.wrapAlDiffim(alConfig, sci2, ref2, convolveTemplate=False)
             metric = self.diffimMetric1(res, src)
             metricR = self.diffimMetric1(resR, src)
-            print(f"Metric: {metric} reversed: {metricR}\n")
             # Alard&Lupton is not fully reversable, but the answers should be close.
             # Partly this needs the decorrelation afterburner
             # It might also be a difference in background subtraction
@@ -410,7 +521,6 @@ class ImageDifferenceTestCase(lsst.utils.tests.TestCase):
 
         for s in range(nIter):
             sciPsf = sciPsfBase + rng.random()*2.
-            print(f"\nIteration {s} with PSF {sciPsf}\n")
             ref, _ = self.makeTestImages(seed=seed + s, nSrc=20, psfSize=refPsf,
                                          noiseLevel=refNoise, fluxLevel=500)
             sci, src = self.makeTestImages(seed=seed + s, nSrc=20, psfSize=sciPsf,
@@ -421,7 +531,6 @@ class ImageDifferenceTestCase(lsst.utils.tests.TestCase):
 
             # Basic AL
             res = self.wrapAlDiffim(alConfig, ref, sci, convolveTemplate=True)
-            metric = self.diffimMetric1(res, src)
 
             # Decorrelated AL
             mKernel = self.wrapAlDiffim(alConfig, ref, sci, convolveTemplate=True, returnKernel=True)
@@ -431,13 +540,10 @@ class ImageDifferenceTestCase(lsst.utils.tests.TestCase):
             # Swap the "science" and "reference" images, and alse swap which image is convolved.
             # The result is that the same image should be convolved as above
             resR = self.wrapAlDiffim(alConfig, sci2, ref2, convolveTemplate=False)
-            metricR = self.diffimMetric1(resR, src)
 
             # Swap the images as above, and also decorrelate.
             mKernelR = self.wrapAlDiffim(alConfig, sci2, ref2, convolveTemplate=False, returnKernel=True)
             resDR = decorrelate.run(ref2, sci2, resR, mKernelR).correctedExposure
             metricDR = self.diffimMetric1(resDR, src)
 
-            print(f"Decorrelated metric: {metricD}, original: {metric}\n")
-            print(f"Decorrelated reversed metric: {metricDR}, original: {metricR}\n")
             self.assertFloatsAlmostEqual(metricD, -metricDR, atol=.01, rtol=0.05)
