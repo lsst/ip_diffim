@@ -435,7 +435,7 @@ class ImagePsfMatchTask(PsfMatchTask):
         if convolveTemplate:
             kernelSize = makeKernelBasisList(self.kConfig, templateFwhmPix, scienceFwhmPix)[0].getWidth()
             candidateList = self.makeCandidateList(
-                templateExposure, scienceExposure, kernelSize, candidateList)
+                templateExposure, scienceExposure.clone(), kernelSize, candidateList)
             results = self.matchMaskedImages(
                 templateExposure.getMaskedImage(), scienceExposure.getMaskedImage(), candidateList,
                 templateFwhmPix=templateFwhmPix, scienceFwhmPix=scienceFwhmPix)
@@ -646,7 +646,7 @@ class ImagePsfMatchTask(PsfMatchTask):
             subtractedMaskedImage -= results.matchedExposure.getMaskedImage()
             subtractedMaskedImage -= results.backgroundModel
         else:
-            subtractedExposure.setMaskedImage(results.warpedExposure.getMaskedImage())
+            subtractedExposure.setMaskedImage(results.warpedExposure.getMaskedImage().clone())
             subtractedMaskedImage = subtractedExposure.getMaskedImage()
             subtractedMaskedImage -= results.matchedExposure.getMaskedImage()
             subtractedMaskedImage -= results.backgroundModel
