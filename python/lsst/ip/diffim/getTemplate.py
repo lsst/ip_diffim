@@ -27,7 +27,10 @@ import lsst.geom as geom
 import lsst.sphgeom as sphgeom
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
+import lsst.afw.table as afwTable
+import lsst.afw.math as afwMath
 from lsst.ip.diffim.dcrModel import DcrModel
+from lsst.meas.algorithms import CoaddPsf, WarpedPsf, CoaddPsfConfig
 
 __all__ = ["GetCoaddAsTemplateTask", "GetCoaddAsTemplateConfig",
            "GetCalexpAsTemplateTask", "GetCalexpAsTemplateConfig"]
@@ -63,6 +66,10 @@ class GetCoaddAsTemplateConfig(pexConfig.Config):
         doc="Warp type of the coadd template: one of 'direct' or 'psfMatched'",
         dtype=str,
         default="direct",
+    )
+    coaddPsf = pexConfig.ConfigField(
+        doc="Configuration for CoaddPsf",
+        dtype=CoaddPsfConfig,
     )
 
     def validate(self):
@@ -193,8 +200,9 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
                     availableCoaddRefs[dataId['patch']] = coaddRef
 
         patchList = [tractInfo[patch] for patch in availableCoaddRefs.keys()]
-        templateExposure = self.run(tractInfo, patchList, detectorCorners, availableCoaddRefs,
-                                    visitInfo=exposure.getInfo().getVisitInfo())
+        #templateExposure = self.run(tractInfo, patchList, detectorCorners, availableCoaddRefs,
+        #                            visitInfo=exposure.getInfo().getVisitInfo(), wcs=detectorWcs)
+        templateExposure = self.runBob(exposure, availableCoaddRefs, skyMap, templateIdList=None).exposure
         return pipeBase.Struct(exposure=templateExposure, sources=None)
 
     def getOverlapPatchList(self, exposure, skyMap):
@@ -236,7 +244,7 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
         return (tractInfo, patchList, skyCorners)
 
     def run(self, tractInfo, patchList, skyCorners, availableCoaddRefs,
-            sensorRef=None, visitInfo=None):
+            sensorRef=None, visitInfo=None, wcs=None):
         """Gen2 and gen3 shared code: determination of exposure dimensions and
         copying of pixels from overlapping patch regions.
 
@@ -275,6 +283,13 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
         coaddBBox = geom.Box2I(coaddBBox)
         self.log.info("coadd dimensions=%s" % coaddBBox.getDimensions())
 
+        # Table for CoaddPSF
+        tractsSchema = afwTable.ExposureTable.makeMinimalSchema()
+        tractKey = tractsSchema.addField('tract', type=np.int32, doc='Which tract')
+        patchKey = tractsSchema.addField('patch', type=np.int32, doc='Which patch')
+        weightKey = tractsSchema.addField('weight', type=float, doc='Weight for each tract, should be 1')
+        tractsCatalog = afwTable.ExposureCatalog(tractsSchema)
+
         coaddExposure = afwImage.ExposureF(coaddBBox, coaddWcs)
         coaddExposure.maskedImage.set(np.nan, afwImage.Mask.getPlaneBitMask("NO_DATA"), np.nan)
         nPatchesFound = 0
@@ -283,7 +298,7 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
         coaddPhotoCalib = None
         for patchInfo in patchList:
             patchNumber = tractInfo.getSequentialPatchIndex(patchInfo)
-            patchSubBBox = patchInfo.getOuterBBox()
+            patchSubBBox = patchInfo.getInnerBBox()
             patchSubBBox.clip(coaddBBox)
             if patchNumber not in availableCoaddRefs:
                 self.log.warn(f"skip patch={patchNumber}; patch does not exist for this coadd")
@@ -343,24 +358,227 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
                 coaddFilterLabel = coaddPatch.getFilterLabel()
 
             # Retrieve the PSF for this coadd tract, if not already retrieved
-            if coaddPsf is None and coaddPatch.hasPsf():
-                coaddPsf = coaddPatch.getPsf()
+            # if coaddPsf is None and coaddPatch.hasPsf():
+            record = tractsCatalog.addNew()
+            record.setPsf(coaddPatch.getPsf())
+            record.setWcs(coaddPatch.getWcs())
+            record.setPhotoCalib(coaddPatch.getPhotoCalib())
+            record.setBBox(patchSubBBox)
+            record.set(tractKey, tractInfo.getId())
+            record.set(patchKey, int(patchNumber))
+            record.set(weightKey, 1.)
 
             # Retrieve the calibration for this coadd tract, if not already retrieved
             if coaddPhotoCalib is None:
                 coaddPhotoCalib = coaddPatch.getPhotoCalib()
 
+        import pdb; pdb.set_trace()
         if coaddPhotoCalib is None:
             raise RuntimeError("No coadd PhotoCalib found!")
         if nPatchesFound == 0:
             raise RuntimeError("No patches found!")
+
+        coaddExposure.setPhotoCalib(coaddPhotoCalib)
+        coaddPsf = CoaddPsf(tractsCatalog, coaddWcs, self.config.coaddPsf.makeControl())
+        coaddExposure.setPsf(coaddPsf)
+        coaddExposure.setFilterLabel(coaddFilterLabel)
+
+        return coaddExposure
+
+    def runBob(self, exposure, availableCoaddRefs, skyMap, templateIdList=None):
+        """Retrieve and mosaic a template coadd that overlaps the exposure where
+        the template spans multiple tracts.
+        The resulting template image will be an average of all the input templates from
+        the separate tracts.
+        The PSF on the template is created by combining the CoaddPsf on each template image
+        into a meta-CoaddPsf.
+        Parameters
+        ----------
+        exposure: `lsst.afw.image.Exposure`
+            an exposure for which to generate an overlapping template
+        sensorRef : TYPE
+            a Butler data reference that can be used to obtain coadd data
+        templateIdList : TYPE, optional
+            list of data ids (unused)
+        Returns
+        -------
+        result : `struct`
+            return a pipeBase.Struct:
+            - ``exposure`` : a template coadd exposure assembled out of patches
+            - ``sources`` :  None for this subtask
+        """
+
+        # Table for CoaddPSF
+        tractsSchema = afwTable.ExposureTable.makeMinimalSchema()
+        tractKey = tractsSchema.addField('tract', type=np.int32, doc='Which tract')
+        patchKey = tractsSchema.addField('patch', type=np.int32, doc='Which patch')
+        weightKey = tractsSchema.addField('weight', type=float, doc='Weight for each tract, should be 1')
+        tractsCatalog = afwTable.ExposureCatalog(tractsSchema)
+
+        expWcs = exposure.getWcs()
+        expBoxD = geom.Box2D(exposure.getBBox())
+        expBoxD.grow(self.config.templateBorderSize)
+        ctrSkyPos = expWcs.pixelToSky(expBoxD.getCenter())
+
+        centralTractInfo = skyMap.findTract(ctrSkyPos)
+        if not centralTractInfo:
+            raise RuntimeError("No suitable tract found for central point")
+
+        self.log.info("Central skyMap tract %s" % (centralTractInfo.getId(),))
+
+        skyCorners = [expWcs.pixelToSky(pixPos) for pixPos in expBoxD.getCorners()]
+        tractPatchList = skyMap.findTractPatchList(skyCorners)
+        if not tractPatchList:
+            raise RuntimeError("No suitable tract found")
+
+        self.log.info("All overlapping skyMap tracts %s" % ([a[0].getId() for a in tractPatchList]))
+
+        # Move central tract to front of the list and use as the reference
+        tracts = [tract[0].getId() for tract in tractPatchList]
+        centralIndex = tracts.index(centralTractInfo.getId())
+        tracts.insert(0, tracts.pop(centralIndex))
+        tractPatchList.insert(0, tractPatchList.pop(centralIndex))
+
+        coaddPsf = None
+        coaddFilter = None
+        nPatchesFound = 0
+
+        maskedImageList = []
+        weightList = []
+
+        for itract, tract in enumerate([tracts[0],]):
+            tractInfo = tractPatchList[itract][0]
+
+            coaddWcs = tractInfo.getWcs()
+            coaddBBox = geom.Box2D()
+            for skyPos in skyCorners:
+                coaddBBox.include(coaddWcs.skyToPixel(skyPos))
+            coaddBBox = geom.Box2I(coaddBBox)
+
+            if itract == 0:
+                # Define final wcs and bounding box from the reference tract
+                finalWcs = coaddWcs
+                finalBBox = coaddBBox
+
+            patchList = tractPatchList[itract][1]
+            #import pdb; pdb.set_trace()
+            for patchInfo in patchList:
+                self.log.info('Adding patch %s from tract %s' % (patchInfo.getIndex(),tract))
+
+                # Local patch information
+                patchSubBBox = geom.Box2I(patchInfo.getInnerBBox())
+                patchSubBBox.clip(coaddBBox)
+                patchNumber = tractInfo.getSequentialPatchIndex(patchInfo)
+                patchInt = int(f"{patchInfo.getIndex()[0]}{patchInfo.getIndex()[1]}")
+                innerBBox = geom.Box2I(tractInfo._minimumBoundingBox(finalWcs))
+
+                if itract == 0:
+                    # clip to image and tract boundaries
+                    patchSubBBox.clip(finalBBox)
+                    patchSubBBox.clip(innerBBox)
+                    if patchSubBBox.getArea() == 0:
+                        self.log.debug("No ovlerap for patch %s" % patchInfo)
+                        continue
+
+                    coaddPatch = availableCoaddRefs[patchNumber].get()
+                    if coaddFilter is None:
+                        coaddFilter = coaddPatch.getFilter()
+
+                    # create full image from final bounding box
+                    exp = afwImage.ExposureF(finalBBox, finalWcs)
+                    exp.maskedImage.set(np.nan, afwImage.Mask.getPlaneBitMask("NO_DATA"), np.nan)
+                    overlapBox = coaddPatch.getBBox()
+                    overlapBox.clip(coaddBBox)
+                    exp.maskedImage.assign(coaddPatch.maskedImage[overlapBox], overlapBox)
+                    maskedImageList.append(exp.maskedImage)
+                    weightList.append(1)
+
+                    record = tractsCatalog.addNew()
+                    record.setPsf(coaddPatch.getPsf())
+                    record.setWcs(coaddPatch.getWcs())
+                    record.setPhotoCalib(coaddPatch.getPhotoCalib())
+                    record.setBBox(patchSubBBox)
+                    record.set(tractKey, tract)
+                    record.set(patchKey, patchInt)
+                    record.set(weightKey, 1.)
+                    nPatchesFound += 1
+                else:
+                    # compute the exposure bounding box in a tract that is not the reference tract
+                    localBox = geom.Box2I()
+                    for skyPos in skyCorners:
+                        localBox.include(geom.Point2I(tractInfo.getWcs().skyToPixel(skyPos)))
+
+                    # clip to patch bounding box
+                    localBox.clip(patchSubBBox)
+
+                    # grow border to deal with warping at edges
+                    localBox.grow(self.config.templateBorderSize)
+
+                    # clip to tract inner bounding box
+                    localInnerBBox = geom.Box2I(tractInfo._minimumBoundingBox(tractInfo.getWcs()))
+                    localBox.clip(localInnerBBox)
+
+                    coaddPatch = availableCoaddRefs[patchNumber].get()
+
+                    # warp to reference tract wcs
+                    xyTransform = geom.makeWcsPairTransform(coaddPatch.getWcs(), finalWcs)
+                    psfWarped = WarpedPsf(coaddPatch.getPsf(), xyTransform)
+                    warped = self.warper.warpExposure(finalWcs, coaddPatch, maxBBox=finalBBox)
+
+                    # check if warpped image is viable
+                    if warped.getBBox().getArea() == 0:
+                        self.log.info("No ovlerap for warped patch %s. Skipping" % patchInfo)
+                        continue
+
+                    warped.setPsf(psfWarped)
+
+                    exp = afwImage.ExposureF(finalBBox, finalWcs)
+                    exp.maskedImage.set(np.nan, afwImage.Mask.getPlaneBitMask("NO_DATA"), np.nan)
+                    exp.maskedImage.assign(warped.maskedImage, warped.getBBox())
+
+                    maskedImageList.append(exp.maskedImage)
+                    weightList.append(1)
+                    record = tractsCatalog.addNew()
+                    record.setPsf(psfWarped)
+                    record.setWcs(finalWcs)
+                    record.setPhotoCalib(coaddPatch.getPhotoCalib())
+                    record.setBBox(warped.getBBox())
+                    record.set(tractKey, tract)
+                    record.set(patchKey, patchInt)
+                    record.set(weightKey, 1.)
+                    nPatchesFound += 1
+
+        if nPatchesFound == 0:
+            raise RuntimeError("No patches found!")
+
+        # Combine images from individual patches together
+        #  import pdb; pdb.set_trace()
+        # Do not mask any values
+        statsFlags = afwMath.stringToStatisticsProperty('MEAN')
+        maskMap = []
+        statsCtrl = afwMath.StatisticsControl()
+        statsCtrl.setNanSafe(True)
+        statsCtrl.setWeighted(True)
+        statsCtrl.setCalcErrorFromInputVariance(True)
+
+        coaddExposure = afwImage.ExposureF(finalBBox, finalWcs)
+        coaddExposure.maskedImage.set(np.nan, afwImage.Mask.getPlaneBitMask("NO_DATA"), np.nan)
+        xy0 = coaddExposure.getXY0()
+        coaddExposure.maskedImage = afwMath.statisticsStack(maskedImageList,
+                                                            statsFlags, statsCtrl, weightList, 0, maskMap)
+        coaddExposure.maskedImage.setXY0(xy0)
+        center = exposure.getBBox().getCenter()
+        centerCoord = finalWcs.skyToPixel(expWcs.pixelToSky(center))
+        ctrl = self.config.coaddPsf.makeControl()
+
+        coaddPsf = CoaddPsf(tractsCatalog, finalWcs, centerCoord, ctrl.warpingKernelName, ctrl.cacheSize)
         if coaddPsf is None:
             raise RuntimeError("No coadd Psf found!")
 
-        coaddExposure.setPhotoCalib(coaddPhotoCalib)
         coaddExposure.setPsf(coaddPsf)
-        coaddExposure.setFilterLabel(coaddFilterLabel)
-        return coaddExposure
+        coaddExposure.setFilter(coaddFilter)
+        return pipeBase.Struct(exposure=coaddExposure, sources=None)
+
 
     def getCoaddDatasetName(self):
         """Return coadd name for given task config
