@@ -744,9 +744,10 @@ class ZogyTask(pipeBase.Task):
         else:
             self.subExpVar2 = self.fullExpVar2
         # Initialize random number generator to a deterministic state
-        self.rng = np.random.default_rng(seed=np.array([self.subExpVar1]).view(int))
+        # self.rng = np.random.default_rng(seed=np.array([self.subExpVar1]).view(int))
+        self.rng = np.random.default_rng()
         self.freqSpaceShape = (localCutout.outerBox.getHeight(), localCutout.outerBox.getWidth())
-
+        self.log.debugf("Noise padding variances: {:.4e} {:.4e}", self.subExpVar1, self.subExpVar2)
         self.subImg1 = self.initializeSubImage(
             self.fullExp1, self.cutBoxes1.innerBox, self.cutBoxes1.outerBox,
             self.subExpVar1, useNoise=True)

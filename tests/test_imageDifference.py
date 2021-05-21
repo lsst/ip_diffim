@@ -216,6 +216,7 @@ class ImageDifferenceTestBase(lsst.utils.tests.TestCase):
         config.scaleByCalibration = False
         zogyTask = ZogyTask(config=config)
 
+        zogyTask.log.setLevel(zogyTask.log.DEBUG)
         result = zogyTask.run(sciExposure, refExposure)
         return result.diffExp
 
@@ -496,7 +497,7 @@ class ImageDifferenceTestAlardLupton(ImageDifferenceTestBase):
 class ImageDifferenceTestZogy(ImageDifferenceTestBase):
 
     def testSimReverseZogy(self):
-        nIter = 5
+        nIter = 1
         refPsf = 2.
         sciPsfBase = 2.
         sciNoise = 5.
@@ -516,9 +517,12 @@ class ImageDifferenceTestZogy(ImageDifferenceTestBase):
             ref2 = ref.clone()
 
             res = self.wrapZogyDiffim(zogyConfig, ref, sci)
+            # resR = self.wrapZogyDiffim(zogyConfig, ref2, sci2)
             resR = self.wrapZogyDiffim(zogyConfig, sci2, ref2)
             metric = self.diffimMetric1(res, src)
             metricR = self.diffimMetric1(resR, src)
+            # metricR = self.diffimMetric1(resR, src)
+            # self.assertFloatsAlmostEqual(metric, metricR)
             self.assertFloatsAlmostEqual(metric, -metricR)
 
 
