@@ -247,11 +247,13 @@ class ZogyTask(pipeBase.Task):
         borderBoxes = self.splitBorder(innerBox, outerBox)
         # Initialize the border region that are not fully within the exposure
         if useNoise:
+            rng = np.random.Generator(
+                np.random.PCG64(seed=np.array([noiseMeanVar]).view(int)))
             noiseSig = np.sqrt(noiseMeanVar)
             for box in borderBoxes:
                 if not fullBox.contains(box):
                     R = subImg[box].array
-                    R[...] = self.rng.normal(scale=noiseSig, size=R.shape)
+                    R[...] = rng.normal(scale=noiseSig, size=R.shape)
         # Copy data to the fully contained inner region, allowing type conversion
         subImg[innerBox].array[...] = fullExp.image[innerBox].array
         subVarImg[innerBox].array[...] = fullExp.variance[innerBox].array
@@ -743,8 +745,6 @@ class ZogyTask(pipeBase.Task):
             self.subExpVar2 = sig2*sig2
         else:
             self.subExpVar2 = self.fullExpVar2
-        # Initialize random number generator to a deterministic state
-        self.rng = np.random.default_rng(seed=np.array([self.subExpVar1]).view(int))
         self.freqSpaceShape = (localCutout.outerBox.getHeight(), localCutout.outerBox.getWidth())
 
         self.subImg1 = self.initializeSubImage(
