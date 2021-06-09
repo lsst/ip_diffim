@@ -27,10 +27,6 @@ import lsst.ip.diffim as ipDiffim
 
 class DiffimTestCases(lsst.utils.tests.TestCase):
 
-    def testDiaSourceAnalystConfig(self):
-        config = ipDiffim.DiaSourceAnalystConfig()
-        config.validate()
-
     def testImagePsfMatchConfig(self):
         config = ipDiffim.ImagePsfMatchConfig()
         config.validate()
