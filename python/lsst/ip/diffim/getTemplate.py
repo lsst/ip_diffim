@@ -24,9 +24,10 @@ import numpy as np
 
 import lsst.afw.image as afwImage
 import lsst.geom as geom
-import lsst.sphgeom as sphgeom
+import lsst.afw.geom as afwGeom
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
+from lsst.daf.butler import DeferredDatasetHandle
 from lsst.ip.diffim.dcrModel import DcrModel
 
 __all__ = ["GetCoaddAsTemplateTask", "GetCoaddAsTemplateConfig",
@@ -173,13 +174,19 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
         detectorBBox = exposure.getBBox()
         detectorWcs = exposure.getWcs()
         detectorCorners = detectorWcs.pixelToSky(geom.Box2D(detectorBBox).getCorners())
+        validPolygon = exposure.getInfo().getValidPolygon()
+        detectorPolygon = validPolygon if validPolygon else geom.Box2D(detectorBBox)
 
         availableCoaddRefs = dict()
+        overlappingArea = 0
         for coaddRef in coaddExposureRefs:
             dataId = coaddRef.dataId
             patchWcs = skyMap[dataId['tract']].getWcs()
             patchBBox = skyMap[dataId['tract']][dataId['patch']].getOuterBBox()
-            if self.bboxIntersectsCorners(patchBBox, patchWcs, detectorCorners):
+            patchCorners = patchWcs.pixelToSky(geom.Box2D(patchBBox).getCorners())
+            patchPolygon = afwGeom.Polygon(detectorWcs.skyToPixel(patchCorners))
+            if patchPolygon.intersection(detectorPolygon):
+                overlappingArea += patchPolygon.intersectionSingle(detectorPolygon).calculateArea()
                 if self.config.coaddName == 'dcr':
                     self.log.info("Using template input tract=%s, patch=%s, subfilter=%s" %
                                   (dataId['tract'], dataId['patch'], dataId['subfilter']))
@@ -192,10 +199,22 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
                                   (dataId['tract'], dataId['patch']))
                     availableCoaddRefs[dataId['patch']] = coaddRef
 
-        patchList = [tractInfo[patch] for patch in availableCoaddRefs.keys()]
-        templateExposure = self.run(tractInfo, patchList, detectorCorners, availableCoaddRefs,
-                                    visitInfo=exposure.getInfo().getVisitInfo())
-        return pipeBase.Struct(exposure=templateExposure, sources=None)
+        if overlappingArea == 0:
+            templateExposure = None
+            pixGood = 0
+            self.log.warn("No overlapping template patches found")
+        else:
+            patchList = [tractInfo[patch] for patch in availableCoaddRefs.keys()]
+            templateExposure = self.run(tractInfo, patchList, detectorCorners, availableCoaddRefs,
+                                        visitInfo=exposure.getInfo().getVisitInfo())
+            # Count the number of pixels with the NO_DATA mask bit set
+            # counting NaN pixels is insufficient because pixels without data are often intepolated over)
+            pixNoData = np.count_nonzero(templateExposure.mask.array
+                                         & templateExposure.mask.getPlaneBitMask('NO_DATA'))
+            pixGood = templateExposure.getBBox().getArea() - pixNoData
+            self.log.info("template has %d good pixels (%.1f%%)", pixGood,
+                          100*pixGood/templateExposure.getBBox().getArea())
+        return pipeBase.Struct(exposure=templateExposure, sources=None, area=pixGood)
 
     def getOverlapPatchList(self, exposure, skyMap):
         """Select the relevant tract and its patches that overlap with the science exposure.
@@ -289,8 +308,11 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
                 self.log.warn(f"skip patch={patchNumber}; patch does not exist for this coadd")
                 continue
             if patchSubBBox.isEmpty():
-                self.log.info(f"skip tract={availableCoaddRefs[patchNumber]['tract']}, "
-                              f"patch={patchNumber}; no overlapping pixels")
+                if isinstance(availableCoaddRefs[patchNumber], DeferredDatasetHandle):
+                    tract = availableCoaddRefs[patchNumber].dataId['tract']
+                else:
+                    tract = availableCoaddRefs[patchNumber]['tract']
+                self.log.info(f"skip tract={tract} patch={patchNumber}; no overlapping pixels")
                 continue
 
             if self.config.coaddName == 'dcr':
@@ -374,28 +396,6 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
         warpType = self.config.warpType
         suffix = "" if warpType == "direct" else warpType[0].upper() + warpType[1:]
         return self.config.coaddName + "Coadd" + suffix
-
-    def bboxIntersectsCorners(self, bbox, wcs, otherCorners):
-        """Returns true if the bbox with wcs intersects otherCorners
-
-        Parameters
-        ----------
-        bbox : `lsst.geom.Box2I`
-            specifying the bounding box of test region
-        wcs : `lsst.afw.geom.SkyWcs`
-            specifying the WCS of test region
-        otherCorners : `list` of `lsst.geom.SpherePoint`
-            ICRS coordinates specifying boundary of the other sky region
-
-        Returns
-        -------
-        result: `bool`
-           Does bbox/wcs intersect other corners?
-        """
-        bboxCorners = wcs.pixelToSky(geom.Box2D(bbox).getCorners())
-        bboxPolygon = sphgeom.ConvexPolygon.convexHull([coord.getVector() for coord in bboxCorners])
-        otherPolygon = sphgeom.ConvexPolygon.convexHull([coord.getVector() for coord in otherCorners])
-        return otherPolygon.intersects(bboxPolygon)
 
 
 class GetCalexpAsTemplateConfig(pexConfig.Config):
