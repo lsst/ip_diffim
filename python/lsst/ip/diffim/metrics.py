@@ -58,7 +58,7 @@ class NumberSciSourcesMetricConfig(
 
 @register("numSciSources")
 class NumberSciSourcesMetricTask(MetricTask):
-    """Task that computes the number of cataloged non-sky science sources.
+    """Task that computes the number of cataloged non-primary science sources.
 
     Notes
     -----
@@ -70,7 +70,7 @@ class NumberSciSourcesMetricTask(MetricTask):
     ConfigClass = NumberSciSourcesMetricConfig
 
     def run(self, sources):
-        """Count the number of non-sky science sources.
+        """Count the number of non-primary science sources.
 
         Parameters
         ----------
@@ -83,8 +83,8 @@ class NumberSciSourcesMetricTask(MetricTask):
             A `~lsst.pipe.base.Struct` containing the following component:
 
             ``measurement``
-                the total number of non-sky science sources (`lsst.verify.Measurement`
-                or `None`)
+                the total number of non-primary science sources
+                (`lsst.verify.Measurement` or `None`)
         """
         if sources is not None:
             nSciSources = _countRealSources(sources)
@@ -137,7 +137,7 @@ class FractionDiaSourcesToSciSourcesMetricTask(MetricTask):
     ConfigClass = FractionDiaSourcesToSciSourcesMetricConfig
 
     def run(self, sciSources, diaSources):
-        """Compute the ratio of DIASources to non-sky science sources.
+        """Compute the ratio of DIASources to non-primary science sources.
 
         Parameters
         ----------
