@@ -30,7 +30,7 @@ sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
 
 
 def makeKernelBasisList(config, targetFwhmPix=None, referenceFwhmPix=None,
-                        basisDegGauss=None, metadata=None):
+                        basisDegGauss=None, basisSigmaGauss=None, metadata=None):
     """Generate the delta function or Alard-Lupton kernel bases depending on the Config.
     Wrapper to call either `lsst.ip.diffim.makeDeltaFunctionBasisList` or
     `lsst.ip.diffim.generateAlardLuptonBasisList`.
@@ -46,6 +46,9 @@ def makeKernelBasisList(config, targetFwhmPix=None, referenceFwhmPix=None,
         Passed on to `lsst.ip.diffim.generateAlardLuptonBasisList`.
         Not used for delta function basis sets.
     basisDegGauss : `list` of `int`, optional
+        Passed on to `lsst.ip.diffim.generateAlardLuptonBasisList`.
+        Not used for delta function basis sets.
+    basisSigmaGauss : `list` of `int`, optional
         Passed on to `lsst.ip.diffim.generateAlardLuptonBasisList`.
         Not used for delta function basis sets.
     metadata : `lsst.daf.base.PropertySet`, optional
@@ -71,6 +74,7 @@ def makeKernelBasisList(config, targetFwhmPix=None, referenceFwhmPix=None,
         return generateAlardLuptonBasisList(config, targetFwhmPix=targetFwhmPix,
                                             referenceFwhmPix=referenceFwhmPix,
                                             basisDegGauss=basisDegGauss,
+                                            basisSigmaGauss=basisSigmaGauss,
                                             metadata=metadata)
     elif config.kernelBasisSet == "delta-function":
         kernelSize = config.kernelSize
@@ -80,7 +84,7 @@ def makeKernelBasisList(config, targetFwhmPix=None, referenceFwhmPix=None,
 
 
 def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=None,
-                                 basisDegGauss=None, metadata=None):
+                                 basisDegGauss=None, basisSigmaGauss=None, metadata=None):
     """Generate an Alard-Lupton kernel basis list based upon the Config and
     the input FWHM of the science and template images.
 
@@ -95,6 +99,8 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
         Fwhm width (pixel) of the science exposure characteristic psf.
     basisDegGauss : `list` of `int`, optional
         Polynomial degree of each Gaussian (sigma) basis. If None, defaults to `config.alardDegGauss`.
+    basisSigmaGauss : `list` of `int`, optional
+        Sigmas of each Gaussian basis. If None, defaults to `config.alardSigGauss`.
     metadata : `lsst.daf.base.PropertySet`, optional
         If specified, object to collect metadata fields about the kernel basis list.
 
@@ -124,7 +130,9 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
 
     Base Gaussian widths (sigmas in pixels) of the kernels are determined as:
         - If not all fwhm parameters are provided or ``config.scaleByFwhm==False``
-          then ``config.alardNGauss`` and  ``config.alardSigGauss`` are used.
+          then ``basisSigmaGauss`` is used. If ``basisSigmaGauss`` is not
+          provided, then ``config.alardSigGauss`` is used. In both cases, the
+          length of sigmas must be equal to ``config.alardNGauss``.
         - If ``targetFwhmPix<referenceFwhmPix`` (normal convolution):
           First sigma ``Sig_K`` is determined to satisfy: ``Sig_reference**2 = Sig_target**2 + Sig_K**2``.
           If it's larger than ``config.alardMinSig * config.alardGaussBeta``, make it the
@@ -163,11 +171,12 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
     kernelSize = config.kernelSize
     fwhmScaling = config.kernelSizeFwhmScaling
     basisNGauss = config.alardNGauss
-    basisSigmaGauss = config.alardSigGauss
     basisGaussBeta = config.alardGaussBeta
     basisMinSigma = config.alardMinSig
     if basisDegGauss is None:
         basisDegGauss = config.alardDegGauss
+    if basisSigmaGauss is None:
+        basisSigmaGauss = config.alardSigGauss
 
     if len(basisDegGauss) != basisNGauss:
         raise ValueError("len(basisDegGauss) != basisNGauss : %d vs %d" % (len(basisDegGauss), basisNGauss))
