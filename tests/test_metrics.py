@@ -19,11 +19,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import math
 import unittest
 
 import astropy.units as u
 from astropy.tests.helper import assert_quantity_allclose
+import numpy as np
 
+from lsst.geom import SpherePoint
 from lsst.afw.table import SourceCatalog
 import lsst.utils.tests
 import lsst.pipe.base.testUtils
@@ -61,8 +64,13 @@ def _makeDummyCatalog(size, skyFlag=False, priFlag=False):
     if priFlag:
         schema.addField("detect_isPrimary", type="Flag", doc="Primary source.")
     catalog = SourceCatalog(schema)
+    rng = np.random.Generator(np.random.PCG64(42))
     for i in range(size):
         record = catalog.addNew()
+        record[SourceCatalog.Table.getIdKey()] = i
+        record[SourceCatalog.Table.getCoordKey()] = SpherePoint(rng.random() * 2 * math.pi,
+                                                                (rng.random() - 0.5) * math.pi,
+                                                                lsst.geom.radians)
     if priFlag and size > 0:
         record["detect_isPrimary"] = True
     if skyFlag and size > 0:
