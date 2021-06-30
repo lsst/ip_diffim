@@ -21,10 +21,12 @@
 
 import math
 import unittest
+import uuid
 
 import astropy.units as u
 from astropy.tests.helper import assert_quantity_allclose
 import numpy as np
+import pandas
 
 from lsst.geom import SpherePoint
 from lsst.afw.table import SourceCatalog
@@ -67,7 +69,7 @@ def _makeDummyCatalog(size, skyFlag=False, priFlag=False):
     rng = np.random.Generator(np.random.PCG64(42))
     for i in range(size):
         record = catalog.addNew()
-        record[SourceCatalog.Table.getIdKey()] = i
+        record[SourceCatalog.Table.getIdKey()] = i + 1  # source ID 0 not allowed
         record[SourceCatalog.Table.getCoordKey()] = SpherePoint(rng.random() * 2 * math.pi,
                                                                 (rng.random() - 0.5) * math.pi,
                                                                 lsst.geom.radians)
@@ -76,6 +78,30 @@ def _makeDummyCatalog(size, skyFlag=False, priFlag=False):
     if skyFlag and size > 0:
         record["sky_source"] = True
     return catalog
+
+
+def _makeDummyFakes(size):
+    """Create a trivial fakes catalog for testing fakes exclusion.
+
+    Parameters
+    ----------
+    size : `int`
+        The number of entries in the catalog.
+
+    Returns
+    -------
+    fakes : `pandas.DataFrame`
+        A cross-matched fakes catalog containing at least an ``id`` column,
+        with values consistent with the output of ``_makeDummyCatalog``.
+    """
+    rng = np.random.Generator(np.random.PCG64(43))
+    data = {
+        "fakeId": [uuid.uuid4().int & (1 << 64) - 1 for n in range(size)],
+        "raJ2000": rng.random(size) * 2 * math.pi,
+        "decJ2000": (rng.random(size) - 0.5) * math.pi,
+        "id": range(1, size + 1),  # source ID 0 not allowed
+    }
+    return pandas.DataFrame(data)
 
 
 class TestNumSciSources(MetricTaskTestCase):
@@ -125,6 +151,19 @@ class TestNumSciSources(MetricTaskTestCase):
         lsst.pipe.base.testUtils.assertValidOutput(self.task, result)
         meas = result.measurement
         self.assertIsNone(meas)
+
+    def testFakesRemoval(self):
+        catalog = _makeDummyCatalog(3)
+        config = NumberSciSourcesMetricTask.ConfigClass()
+        config.removeFakes = True
+        config.fakesSourceIdColumn = "id"
+        task = NumberSciSourcesMetricTask(config=config)
+
+        result1 = task.run(catalog, _makeDummyFakes(1))
+        assert_quantity_allclose(result1.measurement.quantity, (len(catalog) - 1) * u.count)
+
+        resultAll = task.run(catalog, _makeDummyFakes(len(catalog)))
+        assert_quantity_allclose(resultAll.measurement.quantity, 0 * u.count)
 
 
 class TestFractionDiaSources(MetricTaskTestCase):
@@ -197,6 +236,21 @@ class TestFractionDiaSources(MetricTaskTestCase):
 
         self.assertEqual(meas.metric_name, Name(metric="ip_diffim.fracDiaSourcesToSciSources"))
         assert_quantity_allclose(meas.quantity, len(diaCatalog) * u.dimensionless_unscaled)
+
+    def testFakesRemoval(self):
+        sciCatalog = _makeDummyCatalog(5)
+        diaCatalog = _makeDummyCatalog(3)
+        config = FractionDiaSourcesToSciSourcesMetricTask.ConfigClass()
+        config.removeFakes = True
+        config.fakesSourceIdColumn = "id"
+        task = FractionDiaSourcesToSciSourcesMetricTask(config=config)
+
+        result1 = task.run(sciCatalog, diaCatalog, _makeDummyFakes(1))
+        assert_quantity_allclose(result1.measurement.quantity,
+                                 (len(diaCatalog) - 1) / (len(sciCatalog) - 1) * u.dimensionless_unscaled)
+
+        resultAll = task.run(sciCatalog, diaCatalog, _makeDummyFakes(len(diaCatalog)))
+        assert_quantity_allclose(resultAll.measurement.quantity, 0.0 * u.dimensionless_unscaled)
 
 
 # Hack around unittest's hacky test setup system
