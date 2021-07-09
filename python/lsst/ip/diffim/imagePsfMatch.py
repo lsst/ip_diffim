@@ -433,14 +433,14 @@ class ImagePsfMatchTask(PsfMatchTask):
                 self.log.info("scienceFwhmPix: {}".format(scienceFwhmPix))
 
         if convolveTemplate:
-            kernelSize = makeKernelBasisList(self.kConfig, templateFwhmPix, scienceFwhmPix)[0].getWidth()
+            kernelSize = self.makeKernelBasisList(templateFwhmPix, scienceFwhmPix)[0].getWidth()
             candidateList = self.makeCandidateList(
                 templateExposure, scienceExposure, kernelSize, candidateList)
             results = self.matchMaskedImages(
                 templateExposure.getMaskedImage(), scienceExposure.getMaskedImage(), candidateList,
                 templateFwhmPix=templateFwhmPix, scienceFwhmPix=scienceFwhmPix)
         else:
-            kernelSize = makeKernelBasisList(self.kConfig, scienceFwhmPix, templateFwhmPix)[0].getWidth()
+            kernelSize = self.makeKernelBasisList(scienceFwhmPix, templateFwhmPix)[0].getWidth()
             candidateList = self.makeCandidateList(
                 templateExposure, scienceExposure, kernelSize, candidateList)
             results = self.matchMaskedImages(
@@ -547,12 +547,12 @@ class ImagePsfMatchTask(PsfMatchTask):
                                                   candidateList)
             nbe = diffimTools.NbasisEvaluator(self.kConfig, templateFwhmPix, scienceFwhmPix)
             bicDegrees = nbe(tmpKernelCellSet, self.log)
-            basisList = makeKernelBasisList(self.kConfig, templateFwhmPix, scienceFwhmPix,
-                                            alardDegGauss=bicDegrees[0], metadata=self.metadata)
+            basisList = self.makeKernelBasisList(templateFwhmPix, scienceFwhmPix,
+                                                 basisDegGauss=bicDegrees[0], metadata=self.metadata)
             del tmpKernelCellSet
         else:
-            basisList = makeKernelBasisList(self.kConfig, templateFwhmPix, scienceFwhmPix,
-                                            metadata=self.metadata)
+            basisList = self.makeKernelBasisList(templateFwhmPix, scienceFwhmPix,
+                                                 metadata=self.metadata)
 
         spatialSolution, psfMatchingKernel, backgroundModel = self._solve(kernelCellSet, basisList)
 
@@ -869,6 +869,49 @@ class ImagePsfMatchTask(PsfMatchTask):
             raise RuntimeError("Cannot find any objects suitable for KernelCandidacy")
 
         return candidateList
+
+    def makeKernelBasisList(self, targetFwhmPix=None, referenceFwhmPix=None,
+                            basisDegGauss=None, basisSigmaGauss=None, metadata=None):
+        """Wrapper to set log messages for
+        `lsst.ip.diffim.makeKernelBasisList`.
+
+        Parameters
+        ----------
+        targetFwhmPix : `float`, optional
+            Passed on to `lsst.ip.diffim.generateAlardLuptonBasisList`.
+            Not used for delta function basis sets.
+        referenceFwhmPix : `float`, optional
+            Passed on to `lsst.ip.diffim.generateAlardLuptonBasisList`.
+            Not used for delta function basis sets.
+        basisDegGauss : `list` of `int`, optional
+            Passed on to `lsst.ip.diffim.generateAlardLuptonBasisList`.
+            Not used for delta function basis sets.
+        basisSigmaGauss : `list` of `int`, optional
+            Passed on to `lsst.ip.diffim.generateAlardLuptonBasisList`.
+            Not used for delta function basis sets.
+        metadata : `lsst.daf.base.PropertySet`, optional
+            Passed on to `lsst.ip.diffim.generateAlardLuptonBasisList`.
+            Not used for delta function basis sets.
+
+        Returns
+        -------
+        basisList: `list` of `lsst.afw.math.kernel.FixedKernel`
+            List of basis kernels.
+        """
+        basisList = makeKernelBasisList(self.kConfig,
+                                        targetFwhmPix=targetFwhmPix,
+                                        referenceFwhmPix=referenceFwhmPix,
+                                        basisDegGauss=basisDegGauss,
+                                        basisSigmaGauss=basisSigmaGauss,
+                                        metadata=metadata)
+        if targetFwhmPix == referenceFwhmPix:
+            self.log.info("Target and reference psf fwhms are equal, falling back to config values")
+        elif referenceFwhmPix > targetFwhmPix:
+            self.log.info("Reference psf fwhm is the greater, normal convolution mode")
+        else:
+            self.log.info("Target psf fwhm is the greater, deconvolution mode")
+
+        return basisList
 
     def _adaptCellSize(self, candidateList):
         """NOT IMPLEMENTED YET.
