@@ -423,14 +423,14 @@ class ImagePsfMatchTask(PsfMatchTask):
                 self.log.warning("No estimate of Psf FWHM for template image")
             else:
                 templateFwhmPix = self.getFwhmPix(templateExposure.getPsf())
-                self.log.info("templateFwhmPix: {}".format(templateFwhmPix))
+                self.log.info("templateFwhmPix: %s", templateFwhmPix)
 
         if scienceFwhmPix is None:
             if not scienceExposure.hasPsf():
                 self.log.warning("No estimate of Psf FWHM for science image")
             else:
                 scienceFwhmPix = self.getFwhmPix(scienceExposure.getPsf())
-                self.log.info("scienceFwhmPix: {}".format(scienceFwhmPix))
+                self.log.info("scienceFwhmPix: %s", scienceFwhmPix)
 
         if convolveTemplate:
             kernelSize = self.makeKernelBasisList(templateFwhmPix, scienceFwhmPix)[0].getWidth()

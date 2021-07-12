@@ -237,7 +237,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
         if mOverExpVar > 1e8:
             self.log.warning("Diverging correction: matched image variance is "
                              " much larger than the unconvolved one's"
-                             f", matchedVar/expVar:{mOverExpVar:.2e}")
+                             ", matchedVar/expVar:%.2e", mOverExpVar)
 
         oldVarMean = self.computeVarianceMean(subtractedExposure)
         self.log.info("Variance plane mean of uncorrected diffim: %f", oldVarMean)
@@ -328,7 +328,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
             commonShape = S[0]
         commonShape[commonShape % 2 != 0] += 1
         self.freqSpaceShape = tuple(commonShape)
-        self.log.info(f"Common frequency space shape {self.freqSpaceShape}")
+        self.log.info("Common frequency space shape %s", self.freqSpaceShape)
 
     @staticmethod
     def padCenterOriginArray(A, newShape: tuple, useInverse=False):
@@ -718,7 +718,7 @@ class DecorrelateALKernelSpatialTask(pipeBase.Task):
             - ``correctedExposure`` : the decorrelated diffim
 
         """
-        self.log.info('Running A&L decorrelation: spatiallyVarying=%r' % spatiallyVarying)
+        self.log.info('Running A&L decorrelation: spatiallyVarying=%r', spatiallyVarying)
 
         svar = self.computeVarianceMean(scienceExposure)
         tvar = self.computeVarianceMean(templateExposure)
