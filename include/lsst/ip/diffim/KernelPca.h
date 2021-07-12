@@ -48,10 +48,10 @@ namespace detail {
         lsst::afw::math::KernelList getEigenKernels();
         void processCandidate(lsst::afw::math::SpatialCellCandidate *candidate);
         void subtractMean();
-        PTR(ImageT) returnMean() {return _mean;}
+        std::shared_ptr<ImageT> returnMean() {return _mean;}
     private:
         std::shared_ptr<KernelPca<ImageT> > _imagePca;  ///< Structure to fill with images
-        PTR(ImageT) _mean;                                ///< Mean image calculated before Pca
+        std::shared_ptr<ImageT> _mean;                                ///< Mean image calculated before Pca
     };
 
     template<typename PixelT>

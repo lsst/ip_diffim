@@ -358,14 +358,14 @@ std::pair<double,int> PsfDipoleFlux::chi2(
     geom::Point2D negCenter(negCenterX, negCenterY);
     geom::Point2D posCenter(posCenterX, posCenterY);
 
-    CONST_PTR(afw::detection::Footprint) footprint = source.getFootprint();
+    std::shared_ptr<afw::detection::Footprint const> footprint = source.getFootprint();
 
     /*
      * Fit for the superposition of Psfs at the two centroids.
      */
-    CONST_PTR(afwDet::Psf) psf = exposure.getPsf();
-    PTR(afwImage::Image<afwMath::Kernel::Pixel>) negPsf = psf->computeImage(negCenter);
-    PTR(afwImage::Image<afwMath::Kernel::Pixel>) posPsf = psf->computeImage(posCenter);
+    std::shared_ptr<afwDet::Psf const> psf = exposure.getPsf();
+    std::shared_ptr<afwImage::Image<afwMath::Kernel::Pixel>> negPsf = psf->computeImage(negCenter);
+    std::shared_ptr<afwImage::Image<afwMath::Kernel::Pixel>> posPsf = psf->computeImage(posCenter);
 
     afwImage::Image<double> negModel(footprint->getBBox());
     afwImage::Image<double> posModel(footprint->getBBox());
@@ -420,7 +420,7 @@ void PsfDipoleFlux::measure(
 
     typedef afw::image::Exposure<float>::MaskedImageT MaskedImageT;
 
-    CONST_PTR(afw::detection::Footprint) footprint = source.getFootprint();
+    std::shared_ptr<afw::detection::Footprint const> footprint = source.getFootprint();
     if (!footprint) {
         throw LSST_EXCEPT(pex::exceptions::RuntimeError,
                           (boost::format("No footprint for source %d") % source.getId()).str());
@@ -488,12 +488,12 @@ void PsfDipoleFlux::measure(
         double evalChi2 = fit.first;
         int nPix = fit.second;
 
-        PTR(geom::Point2D) minNegCentroid(new geom::Point2D(min.UserState().Value(NEGCENTXPAR),
+        std::shared_ptr<geom::Point2D> minNegCentroid(new geom::Point2D(min.UserState().Value(NEGCENTXPAR),
                                                             min.UserState().Value(NEGCENTYPAR)));
         source.set(getNegativeKeys().getInstFlux(), min.UserState().Value(NEGFLUXPAR));
         source.set(getNegativeKeys().getInstFluxErr(), min.UserState().Error(NEGFLUXPAR));
 
-        PTR(geom::Point2D) minPosCentroid(new geom::Point2D(min.UserState().Value(POSCENTXPAR),
+        std::shared_ptr<geom::Point2D> minPosCentroid(new geom::Point2D(min.UserState().Value(POSCENTXPAR),
                                                             min.UserState().Value(POSCENTYPAR)));
         source.set(getPositiveKeys().getInstFlux(), min.UserState().Value(POSFLUXPAR));
         source.set(getPositiveKeys().getInstFluxErr(), min.UserState().Error(POSFLUXPAR));
