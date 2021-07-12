@@ -202,8 +202,8 @@ class DecorrelateALKernelTask(pipeBase.Task):
             svar = self.computeVarianceMean(scienceExposure)
         if tvar is None:
             tvar = self.computeVarianceMean(templateExposure)
-        self.log.infof("Original variance plane means. Science:{:.5e}, warped template:{:.5e})",
-                       svar, tvar)
+        self.log.info("Original variance plane means. Science:%.5e, warped template:%.5e)",
+                      svar, tvar)
 
         if templateMatched:
             # Regular subtraction, we convolved the template
@@ -257,14 +257,14 @@ class DecorrelateALKernelTask(pipeBase.Task):
         # Determine the common shape
         kSum = np.sum(kArr)
         kSumSq = kSum*kSum
-        self.log.debugf("Matching kernel sum: {:.3e}", kSum)
+        self.log.debug("Matching kernel sum: %.3e", kSum)
         preSum = 1.
         if preConvKernel is None:
             self.computeCommonShape(kArr.shape, psfArr.shape, diffExpArr.shape)
             corrft = self.computeCorrection(kArr, expVar, matchedVar)
         else:
             preSum = np.sum(pckArr)
-            self.log.debugf("Pre-convolution kernel sum: {:.3e}", preSum)
+            self.log.debug("Pre-convolution kernel sum: %.3e", preSum)
             self.computeCommonShape(pckArr.shape, kArr.shape,
                                     psfArr.shape, diffExpArr.shape)
             corrft = self.computeCorrection(kArr, expVar, matchedVar, preConvArr=pckArr)
@@ -292,7 +292,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
         correctedExposure.setPsf(psfNew)
 
         newVarMean = self.computeVarianceMean(correctedExposure)
-        self.log.infof("Variance plane mean of corrected diffim: {:.5e}", newVarMean)
+        self.log.info("Variance plane mean of corrected diffim: %.5e", newVarMean)
 
         # TODO DM-23857 As part of the spatially varying correction implementation
         # consider whether returning a Struct is still necessary.
@@ -426,8 +426,8 @@ class DecorrelateALKernelTask(pipeBase.Task):
         flt = denom < tiny
         sumFlt = np.sum(flt)
         if sumFlt > 0:
-            self.log.warnf("Avoid zero division. Skip decorrelation "
-                           "at {} divergent frequencies.", sumFlt)
+            self.log.warning("Avoid zero division. Skip decorrelation "
+                             "at %f divergent frequencies.", sumFlt)
             denom[flt] = 1.
         kft = np.sqrt((svar * preSum*preSum + tvar * kSum*kSum) / denom)
         # Don't do any correction at these frequencies

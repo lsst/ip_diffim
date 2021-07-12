@@ -521,8 +521,8 @@ class ZogyTask(pipeBase.Task):
         # in the future
         imgArr[filtInf] = np.nan
         imgArr[filtInf | filtNaN] = np.nanmean(imgArr)
-        self.log.debugf("Replacing {} Inf and {} NaN values.",
-                        np.sum(filtInf), np.sum(filtNaN))
+        self.log.debug("Replacing %s Inf and %s NaN values.",
+                       np.sum(filtInf), np.sum(filtNaN))
         return pipeBase.Struct(filtInf=filtInf, filtNaN=filtNaN)
 
     def inverseFftAndCropImage(self, imgArr, origSize, filtInf=None, filtNaN=None, dtype=None):
@@ -1055,7 +1055,7 @@ class ZogyTask(pipeBase.Task):
             ftDiff.Pd, self.psfShape1, dtype=self.subExpPsf1.dtype)
         sumPd = np.sum(Pd)
         # If this is smaller than 1. it is an indicator that it does not fit its original dimensions
-        self.log.infof("Pd sum before normalization: {:.3f}", sumPd)
+        self.log.info("Pd sum before normalization: %.3f", sumPd)
         Pd /= sumPd
         # Convert Pd into a Psf object
         Pd = self.makeKernelPsfFromArray(Pd)
@@ -1090,7 +1090,7 @@ class ZogyTask(pipeBase.Task):
             # PSF of S
             Ps = self.inverseFftAndCropImage(ftDiff.Ps, self.psfShape1, dtype=self.subExpPsf1.dtype)
             sumPs = np.sum(Ps)
-            self.log.infof("Ps sum before normalization: {:.3f}", sumPs)
+            self.log.info("Ps sum before normalization: %.3f", sumPs)
             Ps /= sumPs
 
             # TODO DM-23855 : Additional score image corrections may be done here
