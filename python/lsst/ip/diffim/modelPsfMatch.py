@@ -451,8 +451,8 @@ class ModelPsfMatchTask(PsfMatchTask):
             paddingPix = self.config.padPsfBy
 
         if paddingPix > 0:
-            self.log.info("Padding Science PSF from (%s, %s) to (%s, %s) pixels" %
-                          (psfSize, psfSize, paddingPix + psfSize, paddingPix + psfSize))
+            self.log.debug("Padding Science PSF from (%d, %d) to (%d, %d) pixels",
+                           psfSize, psfSize, paddingPix + psfSize, paddingPix + psfSize)
             psfSize += paddingPix
 
         # Check that PSF is larger than the matching kernel
