@@ -202,7 +202,7 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
         if overlappingArea == 0:
             templateExposure = None
             pixGood = 0
-            self.log.warn("No overlapping template patches found")
+            self.log.warning("No overlapping template patches found")
         else:
             patchList = [tractInfo[patch] for patch in availableCoaddRefs.keys()]
             templateExposure = self.run(tractInfo, patchList, detectorCorners, availableCoaddRefs,
@@ -305,7 +305,7 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
             patchSubBBox = patchInfo.getOuterBBox()
             patchSubBBox.clip(coaddBBox)
             if patchNumber not in availableCoaddRefs:
-                self.log.warn(f"skip patch={patchNumber}; patch does not exist for this coadd")
+                self.log.warning(f"skip patch={patchNumber}; patch does not exist for this coadd")
                 continue
             if patchSubBBox.isEmpty():
                 if isinstance(availableCoaddRefs[patchNumber], DeferredDatasetHandle):
@@ -448,7 +448,7 @@ class GetCalexpAsTemplateTask(pipeBase.Task):
         if len(templateIdList) == 0:
             raise RuntimeError("No template data reference supplied.")
         if len(templateIdList) > 1:
-            self.log.warn("Multiple template data references supplied. Using the first one only.")
+            self.log.warning("Multiple template data references supplied. Using the first one only.")
 
         templateId = sensorRef.dataId.copy()
         templateId.update(templateIdList[0])

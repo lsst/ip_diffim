@@ -227,7 +227,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
             # Double check that one of the exposures is all NaNs
             if (np.all(np.isnan(exposure.image.array))
                     or np.all(np.isnan(matchedExposure.image.array))):
-                self.log.warn('Template or science image is entirely NaNs: skipping decorrelation.')
+                self.log.warning('Template or science image is entirely NaNs: skipping decorrelation.')
                 outExposure = subtractedExposure.clone()
                 return pipeBase.Struct(correctedExposure=outExposure, )
 
@@ -235,9 +235,9 @@ class DecorrelateALKernelTask(pipeBase.Task):
         # Correction divergence warning if the correction exceeds 4 orders of magnitude.
         mOverExpVar = matchedVar/expVar
         if mOverExpVar > 1e8:
-            self.log.warn("Diverging correction: matched image variance is "
-                          " much larger than the unconvolved one's"
-                          f", matchedVar/expVar:{mOverExpVar:.2e}")
+            self.log.warning("Diverging correction: matched image variance is "
+                             " much larger than the unconvolved one's"
+                             f", matchedVar/expVar:{mOverExpVar:.2e}")
 
         oldVarMean = self.computeVarianceMean(subtractedExposure)
         self.log.info("Variance plane mean of uncorrected diffim: %f", oldVarMean)
@@ -726,7 +726,7 @@ class DecorrelateALKernelSpatialTask(pipeBase.Task):
             # Double check that one of the exposures is all NaNs
             if (np.all(np.isnan(scienceExposure.image.array))
                     or np.all(np.isnan(templateExposure.image.array))):
-                self.log.warn('Template or science image is entirely NaNs: skipping decorrelation.')
+                self.log.warning('Template or science image is entirely NaNs: skipping decorrelation.')
                 if np.isnan(svar):
                     svar = 1e-9
                 if np.isnan(tvar):

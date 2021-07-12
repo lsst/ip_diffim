@@ -206,7 +206,7 @@ class DiaCatalogSourceSelectorTask(measAlg.BaseSourceSelectorTask):
                         gMag = -2.5 * np.log10(ref.get(gRefFluxField))
                         rMag = -2.5 * np.log10(ref.get(rRefFluxField))
                     except KeyError:
-                        self.log.warn("Cannot cut on color info; fields 'g' and 'r' do not exist")
+                        self.log.warning("Cannot cut on color info; fields 'g' and 'r' do not exist")
                         doColorCut = False
                         isRightColor = True
                     else:

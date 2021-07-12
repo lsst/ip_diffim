@@ -684,9 +684,9 @@ class PsfMatchTask(pipeBase.Task):
         self.log.info("Spatial model condition number %.3e" % (conditionNum))
 
         if conditionNum < 0.0:
-            self.log.warn("Condition number is negative (%.3e)" % (conditionNum))
+            self.log.warning("Condition number is negative (%.3e)" % (conditionNum))
         if conditionNum > self.kConfig.maxSpatialConditionNumber:
-            self.log.warn("Spatial solution exceeds max condition number (%.3e > %.3e)" % (
+            self.log.warning("Spatial solution exceeds max condition number (%.3e > %.3e)" % (
                 conditionNum, self.kConfig.maxSpatialConditionNumber))
 
         self.metadata.set("spatialConditionNum", conditionNum)
@@ -719,32 +719,32 @@ class PsfMatchTask(pipeBase.Task):
 
         # Counting statistics
         if nBad > 2*nGood:
-            self.log.warn("Many more candidates rejected than accepted; %d total, %d rejected, %d used" % (
-                          nTot, nBad, nGood))
+            self.log.warning("Many more candidates rejected than accepted; %d total, %d rejected, %d used" % (
+                nTot, nBad, nGood))
         else:
             self.log.info("%d candidates total, %d rejected, %d used" % (nTot, nBad, nGood))
 
         # Some judgements on the quality of the spatial models
         if nGood < nKernelTerms:
-            self.log.warn("Spatial kernel model underconstrained; %d candidates, %d terms, %d bases" % (
+            self.log.warning("Spatial kernel model underconstrained; %d candidates, %d terms, %d bases" % (
                 nGood, nKernelTerms, nBasisKernels))
-            self.log.warn("Consider lowering the spatial order")
+            self.log.warning("Consider lowering the spatial order")
         elif nGood <= 2*nKernelTerms:
-            self.log.warn("Spatial kernel model poorly constrained; %d candidates, %d terms, %d bases" % (
+            self.log.warning("Spatial kernel model poorly constrained; %d candidates, %d terms, %d bases" % (
                 nGood, nKernelTerms, nBasisKernels))
-            self.log.warn("Consider lowering the spatial order")
+            self.log.warning("Consider lowering the spatial order")
         else:
             self.log.info("Spatial kernel model well constrained; %d candidates, %d terms, %d bases" % (
                 nGood, nKernelTerms, nBasisKernels))
 
         if nGood < nBgTerms:
-            self.log.warn("Spatial background model underconstrained; %d candidates, %d terms" % (
+            self.log.warning("Spatial background model underconstrained; %d candidates, %d terms" % (
                 nGood, nBgTerms))
-            self.log.warn("Consider lowering the spatial order")
+            self.log.warning("Consider lowering the spatial order")
         elif nGood <= 2*nBgTerms:
-            self.log.warn("Spatial background model poorly constrained; %d candidates, %d terms" % (
+            self.log.warning("Spatial background model poorly constrained; %d candidates, %d terms" % (
                 nGood, nBgTerms))
-            self.log.warn("Consider lowering the spatial order")
+            self.log.warning("Consider lowering the spatial order")
         else:
             self.log.info("Spatial background model appears well constrained; %d candidates, %d terms" % (
                 nGood, nBgTerms))
