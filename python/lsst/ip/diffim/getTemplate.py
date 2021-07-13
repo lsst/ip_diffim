@@ -132,7 +132,7 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
             )
 
             if sensorRef.datasetExists(**patchArgDict):
-                self.log.info("Reading patch %s" % patchArgDict)
+                self.log.info("Reading patch %s", patchArgDict)
                 availableCoaddRefs[patchNumber] = patchArgDict
 
         templateExposure = self.run(
@@ -188,21 +188,21 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
             if patchPolygon.intersection(detectorPolygon):
                 overlappingArea += patchPolygon.intersectionSingle(detectorPolygon).calculateArea()
                 if self.config.coaddName == 'dcr':
-                    self.log.info("Using template input tract=%s, patch=%s, subfilter=%s" %
-                                  (dataId['tract'], dataId['patch'], dataId['subfilter']))
+                    self.log.info("Using template input tract=%s, patch=%s, subfilter=%s",
+                                  dataId['tract'], dataId['patch'], dataId['subfilter'])
                     if dataId['patch'] in availableCoaddRefs:
                         availableCoaddRefs[dataId['patch']].append(coaddRef)
                     else:
                         availableCoaddRefs[dataId['patch']] = [coaddRef, ]
                 else:
-                    self.log.info("Using template input tract=%s, patch=%s" %
-                                  (dataId['tract'], dataId['patch']))
+                    self.log.info("Using template input tract=%s, patch=%s",
+                                  dataId['tract'], dataId['patch'])
                     availableCoaddRefs[dataId['patch']] = coaddRef
 
         if overlappingArea == 0:
             templateExposure = None
             pixGood = 0
-            self.log.warn("No overlapping template patches found")
+            self.log.warning("No overlapping template patches found")
         else:
             patchList = [tractInfo[patch] for patch in availableCoaddRefs.keys()]
             templateExposure = self.run(tractInfo, patchList, detectorCorners, availableCoaddRefs,
@@ -242,15 +242,15 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
         expBoxD.grow(self.config.templateBorderSize)
         ctrSkyPos = expWcs.pixelToSky(expBoxD.getCenter())
         tractInfo = skyMap.findTract(ctrSkyPos)
-        self.log.info("Using skyMap tract %s" % (tractInfo.getId(),))
+        self.log.info("Using skyMap tract %s", tractInfo.getId())
         skyCorners = [expWcs.pixelToSky(pixPos) for pixPos in expBoxD.getCorners()]
         patchList = tractInfo.findPatchList(skyCorners)
 
         if not patchList:
             raise RuntimeError("No suitable tract found")
 
-        self.log.info("Assembling %s coadd patches" % (len(patchList),))
-        self.log.info("exposure dimensions=%s" % exposure.getDimensions())
+        self.log.info("Assembling %d coadd patches", len(patchList))
+        self.log.info("exposure dimensions=%s", exposure.getDimensions())
 
         return (tractInfo, patchList, skyCorners)
 
@@ -292,7 +292,7 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
         for skyPos in skyCorners:
             coaddBBox.include(coaddWcs.skyToPixel(skyPos))
         coaddBBox = geom.Box2I(coaddBBox)
-        self.log.info("coadd dimensions=%s" % coaddBBox.getDimensions())
+        self.log.info("coadd dimensions=%s", coaddBBox.getDimensions())
 
         coaddExposure = afwImage.ExposureF(coaddBBox, coaddWcs)
         coaddExposure.maskedImage.set(np.nan, afwImage.Mask.getPlaneBitMask("NO_DATA"), np.nan)
@@ -305,25 +305,25 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
             patchSubBBox = patchInfo.getOuterBBox()
             patchSubBBox.clip(coaddBBox)
             if patchNumber not in availableCoaddRefs:
-                self.log.warn(f"skip patch={patchNumber}; patch does not exist for this coadd")
+                self.log.warning("skip patch=%d; patch does not exist for this coadd", patchNumber)
                 continue
             if patchSubBBox.isEmpty():
                 if isinstance(availableCoaddRefs[patchNumber], DeferredDatasetHandle):
                     tract = availableCoaddRefs[patchNumber].dataId['tract']
                 else:
                     tract = availableCoaddRefs[patchNumber]['tract']
-                self.log.info(f"skip tract={tract} patch={patchNumber}; no overlapping pixels")
+                self.log.info("skip tract=%d patch=%d; no overlapping pixels", tract, patchNumber)
                 continue
 
             if self.config.coaddName == 'dcr':
                 patchInnerBBox = patchInfo.getInnerBBox()
                 patchInnerBBox.clip(coaddBBox)
                 if np.min(patchInnerBBox.getDimensions()) <= 2*self.config.templateBorderSize:
-                    self.log.info("skip tract=%(tract)s, patch=%(patch)s; too few pixels."
-                                  % availableCoaddRefs[patchNumber])
+                    self.log.info("skip tract=%(tract)s, patch=%(patch)s; too few pixels.",
+                                  availableCoaddRefs[patchNumber])
                     continue
-                self.log.info("Constructing DCR-matched template for patch %s"
-                              % availableCoaddRefs[patchNumber])
+                self.log.info("Constructing DCR-matched template for patch %s",
+                              availableCoaddRefs[patchNumber])
 
                 if sensorRef:
                     dcrModel = DcrModel.fromDataRef(sensorRef,
@@ -448,12 +448,12 @@ class GetCalexpAsTemplateTask(pipeBase.Task):
         if len(templateIdList) == 0:
             raise RuntimeError("No template data reference supplied.")
         if len(templateIdList) > 1:
-            self.log.warn("Multiple template data references supplied. Using the first one only.")
+            self.log.warning("Multiple template data references supplied. Using the first one only.")
 
         templateId = sensorRef.dataId.copy()
         templateId.update(templateIdList[0])
 
-        self.log.info("Fetching calexp (%s) as template." % (templateId))
+        self.log.info("Fetching calexp (%s) as template.", templateId)
 
         butler = sensorRef.getButler()
         template = butler.get(datasetType="calexp", dataId=templateId)

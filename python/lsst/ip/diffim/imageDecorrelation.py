@@ -202,8 +202,8 @@ class DecorrelateALKernelTask(pipeBase.Task):
             svar = self.computeVarianceMean(scienceExposure)
         if tvar is None:
             tvar = self.computeVarianceMean(templateExposure)
-        self.log.infof("Original variance plane means. Science:{:.5e}, warped template:{:.5e})",
-                       svar, tvar)
+        self.log.info("Original variance plane means. Science:%.5e, warped template:%.5e)",
+                      svar, tvar)
 
         if templateMatched:
             # Regular subtraction, we convolved the template
@@ -227,7 +227,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
             # Double check that one of the exposures is all NaNs
             if (np.all(np.isnan(exposure.image.array))
                     or np.all(np.isnan(matchedExposure.image.array))):
-                self.log.warn('Template or science image is entirely NaNs: skipping decorrelation.')
+                self.log.warning('Template or science image is entirely NaNs: skipping decorrelation.')
                 outExposure = subtractedExposure.clone()
                 return pipeBase.Struct(correctedExposure=outExposure, )
 
@@ -235,9 +235,9 @@ class DecorrelateALKernelTask(pipeBase.Task):
         # Correction divergence warning if the correction exceeds 4 orders of magnitude.
         mOverExpVar = matchedVar/expVar
         if mOverExpVar > 1e8:
-            self.log.warn("Diverging correction: matched image variance is "
-                          " much larger than the unconvolved one's"
-                          f", matchedVar/expVar:{mOverExpVar:.2e}")
+            self.log.warning("Diverging correction: matched image variance is "
+                             " much larger than the unconvolved one's"
+                             ", matchedVar/expVar:%.2e", mOverExpVar)
 
         oldVarMean = self.computeVarianceMean(subtractedExposure)
         self.log.info("Variance plane mean of uncorrected diffim: %f", oldVarMean)
@@ -257,14 +257,14 @@ class DecorrelateALKernelTask(pipeBase.Task):
         # Determine the common shape
         kSum = np.sum(kArr)
         kSumSq = kSum*kSum
-        self.log.debugf("Matching kernel sum: {:.3e}", kSum)
+        self.log.debug("Matching kernel sum: %.3e", kSum)
         preSum = 1.
         if preConvKernel is None:
             self.computeCommonShape(kArr.shape, psfArr.shape, diffExpArr.shape)
             corrft = self.computeCorrection(kArr, expVar, matchedVar)
         else:
             preSum = np.sum(pckArr)
-            self.log.debugf("Pre-convolution kernel sum: {:.3e}", preSum)
+            self.log.debug("Pre-convolution kernel sum: %.3e", preSum)
             self.computeCommonShape(pckArr.shape, kArr.shape,
                                     psfArr.shape, diffExpArr.shape)
             corrft = self.computeCorrection(kArr, expVar, matchedVar, preConvArr=pckArr)
@@ -292,7 +292,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
         correctedExposure.setPsf(psfNew)
 
         newVarMean = self.computeVarianceMean(correctedExposure)
-        self.log.infof("Variance plane mean of corrected diffim: {:.5e}", newVarMean)
+        self.log.info("Variance plane mean of corrected diffim: %.5e", newVarMean)
 
         # TODO DM-23857 As part of the spatially varying correction implementation
         # consider whether returning a Struct is still necessary.
@@ -328,7 +328,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
             commonShape = S[0]
         commonShape[commonShape % 2 != 0] += 1
         self.freqSpaceShape = tuple(commonShape)
-        self.log.info(f"Common frequency space shape {self.freqSpaceShape}")
+        self.log.info("Common frequency space shape %s", self.freqSpaceShape)
 
     @staticmethod
     def padCenterOriginArray(A, newShape: tuple, useInverse=False):
@@ -426,8 +426,8 @@ class DecorrelateALKernelTask(pipeBase.Task):
         flt = denom < tiny
         sumFlt = np.sum(flt)
         if sumFlt > 0:
-            self.log.warnf("Avoid zero division. Skip decorrelation "
-                           "at {} divergent frequencies.", sumFlt)
+            self.log.warning("Avoid zero division. Skip decorrelation "
+                             "at %f divergent frequencies.", sumFlt)
             denom[flt] = 1.
         kft = np.sqrt((svar * preSum*preSum + tvar * kSum*kSum) / denom)
         # Don't do any correction at these frequencies
@@ -718,7 +718,7 @@ class DecorrelateALKernelSpatialTask(pipeBase.Task):
             - ``correctedExposure`` : the decorrelated diffim
 
         """
-        self.log.info('Running A&L decorrelation: spatiallyVarying=%r' % spatiallyVarying)
+        self.log.info('Running A&L decorrelation: spatiallyVarying=%r', spatiallyVarying)
 
         svar = self.computeVarianceMean(scienceExposure)
         tvar = self.computeVarianceMean(templateExposure)
@@ -726,7 +726,7 @@ class DecorrelateALKernelSpatialTask(pipeBase.Task):
             # Double check that one of the exposures is all NaNs
             if (np.all(np.isnan(scienceExposure.image.array))
                     or np.all(np.isnan(templateExposure.image.array))):
-                self.log.warn('Template or science image is entirely NaNs: skipping decorrelation.')
+                self.log.warning('Template or science image is entirely NaNs: skipping decorrelation.')
                 if np.isnan(svar):
                     svar = 1e-9
                 if np.isnan(tvar):

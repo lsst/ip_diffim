@@ -420,17 +420,17 @@ class ImagePsfMatchTask(PsfMatchTask):
 
         if templateFwhmPix is None:
             if not templateExposure.hasPsf():
-                self.log.warn("No estimate of Psf FWHM for template image")
+                self.log.warning("No estimate of Psf FWHM for template image")
             else:
                 templateFwhmPix = self.getFwhmPix(templateExposure.getPsf())
-                self.log.info("templateFwhmPix: {}".format(templateFwhmPix))
+                self.log.info("templateFwhmPix: %s", templateFwhmPix)
 
         if scienceFwhmPix is None:
             if not scienceExposure.hasPsf():
-                self.log.warn("No estimate of Psf FWHM for science image")
+                self.log.warning("No estimate of Psf FWHM for science image")
             else:
                 scienceFwhmPix = self.getFwhmPix(scienceExposure.getPsf())
-                self.log.info("scienceFwhmPix: {}".format(scienceFwhmPix))
+                self.log.info("scienceFwhmPix: %s", scienceFwhmPix)
 
         if convolveTemplate:
             kernelSize = self.makeKernelBasisList(templateFwhmPix, scienceFwhmPix)[0].getWidth()
@@ -793,7 +793,7 @@ class ImagePsfMatchTask(PsfMatchTask):
             bkgd = fitBg.getImageF(self.background.config.algorithm,
                                    self.background.config.undersampleStyle)
         except Exception:
-            self.log.warn("Failed to get background model.  Falling back to median background estimation")
+            self.log.warning("Failed to get background model.  Falling back to median background estimation")
             bkgd = np.ma.extras.median(miArr)
 
         # Take off background for detection

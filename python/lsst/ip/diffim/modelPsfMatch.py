@@ -475,11 +475,11 @@ class ModelPsfMatchTask(PsfMatchTask):
         if (dimenR != dimenS):
             try:
                 referencePsfModel = referencePsfModel.resized(psfSize, psfSize)
-                self.log.info("Adjusted dimensions of reference PSF model from %s to %s" % (dimenR, dimenS))
+                self.log.info("Adjusted dimensions of reference PSF model from %s to %s", dimenR, dimenS)
             except Exception as e:
-                self.log.warn("Zero padding or clipping the reference PSF model of type %s and dimensions %s"
-                              " to the science Psf dimensions %s because: %s",
-                              referencePsfModel.__class__.__name__, dimenR, dimenS, e)
+                self.log.warning("Zero padding or clipping the reference PSF model of type %s and dimensions"
+                                 " %s to the science Psf dimensions %s because: %s",
+                                 referencePsfModel.__class__.__name__, dimenR, dimenS, e)
             dimenR = dimenS
 
         ps = pexConfig.makePropertySet(self.kConfig)

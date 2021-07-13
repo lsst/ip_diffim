@@ -492,8 +492,8 @@ class ZogyTask(pipeBase.Task):
         filtNaN = np.isnan(imgArr)
         imgArr[filtInf] = np.nan
         imgArr[filtInf | filtNaN] = np.nanmean(imgArr)
-        self.log.debug("Replacing {} Inf and {} NaN values.".format(
-                       np.sum(filtInf), np.sum(filtNaN)))
+        self.log.debug("Replacing %s Inf and %s NaN values.",
+                       np.sum(filtInf), np.sum(filtNaN))
         imgArr = self.padCenterOriginArray(imgArr, self.freqSpaceShape)
         imgArr = np.fft.fft2(imgArr)
         return pipeBase.Struct(imFft=imgArr, filtInf=filtInf, filtNaN=filtNaN)
@@ -521,8 +521,8 @@ class ZogyTask(pipeBase.Task):
         # in the future
         imgArr[filtInf] = np.nan
         imgArr[filtInf | filtNaN] = np.nanmean(imgArr)
-        self.log.debugf("Replacing {} Inf and {} NaN values.",
-                        np.sum(filtInf), np.sum(filtNaN))
+        self.log.debug("Replacing %s Inf and %s NaN values.",
+                       np.sum(filtInf), np.sum(filtNaN))
         return pipeBase.Struct(filtInf=filtInf, filtNaN=filtNaN)
 
     def inverseFftAndCropImage(self, imgArr, origSize, filtInf=None, filtNaN=None, dtype=None):
@@ -674,7 +674,7 @@ class ZogyTask(pipeBase.Task):
 
         # Determine border size
         self.borderSize = self.estimateMatchingKernelSize(exposure1.getPsf(), exposure2.getPsf())
-        self.log.debugf("Minimum padding border size: {} pixels", self.borderSize)
+        self.log.debug("Minimum padding border size: %s pixels", self.borderSize)
         # Remove non-finite values from the images in-place
         self.filtsImg1 = self.removeNonFinitePixels(mImg1.image.array)
         self.filtsImg2 = self.removeNonFinitePixels(mImg2.image.array)
@@ -707,8 +707,8 @@ class ZogyTask(pipeBase.Task):
         None
 
         """
-        self.log.debugf("Processing LOCAL cell w/ inner box:{}, outer box:{}",
-                        localCutout.innerBox, localCutout.outerBox)
+        self.log.debug("Processing LOCAL cell w/ inner box:%s, outer box:%s",
+                       localCutout.innerBox, localCutout.outerBox)
         # The PARENT origin cutout boxes for the two exposures
         self.cutBoxes1 = pipeBase.Struct(
             innerBox=localCutout.innerBox.shiftedBy(Extent2I(self.fullExp1.getXY0())),
@@ -928,7 +928,7 @@ class ZogyTask(pipeBase.Task):
         # For safety, we set S = 0 explicitly, too, though it should be unnecessary.
         fltZero = sDenom < tiny
         nZero = np.sum(fltZero)
-        self.log.debug(f"There are {nZero} frequencies where both FFTd PSFs are close to zero.")
+        self.log.debug("There are %s frequencies where both FFTd PSFs are close to zero.", nZero)
         if nZero > 0:
             # We expect only a small fraction of such frequencies
             fltZero = np.nonzero(fltZero)  # Tuple of index arrays
@@ -1055,7 +1055,7 @@ class ZogyTask(pipeBase.Task):
             ftDiff.Pd, self.psfShape1, dtype=self.subExpPsf1.dtype)
         sumPd = np.sum(Pd)
         # If this is smaller than 1. it is an indicator that it does not fit its original dimensions
-        self.log.infof("Pd sum before normalization: {:.3f}", sumPd)
+        self.log.info("Pd sum before normalization: %.3f", sumPd)
         Pd /= sumPd
         # Convert Pd into a Psf object
         Pd = self.makeKernelPsfFromArray(Pd)
@@ -1090,7 +1090,7 @@ class ZogyTask(pipeBase.Task):
             # PSF of S
             Ps = self.inverseFftAndCropImage(ftDiff.Ps, self.psfShape1, dtype=self.subExpPsf1.dtype)
             sumPs = np.sum(Ps)
-            self.log.infof("Ps sum before normalization: {:.3f}", sumPs)
+            self.log.info("Ps sum before normalization: %.3f", sumPs)
             Ps /= sumPs
 
             # TODO DM-23855 : Additional score image corrections may be done here

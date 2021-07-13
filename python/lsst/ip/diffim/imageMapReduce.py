@@ -663,7 +663,7 @@ class ImageMapReduceTask(pipeBase.Task):
             psfFwhm = (exposure.getPsf().computeShape().getDeterminantRadius()
                        * 2.*np.sqrt(2.*np.log(2.)))
             if scaleByFwhm:
-                self.log.info("Scaling grid parameters by %f" % psfFwhm)
+                self.log.info("Scaling grid parameters by %f", psfFwhm)
 
             def rescaleValue(val):
                 if scaleByFwhm:

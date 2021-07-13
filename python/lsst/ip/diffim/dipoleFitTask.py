@@ -898,7 +898,7 @@ class DipoleFitAlgorithm(object):
         try:
             import matplotlib.pyplot as plt
         except ImportError as err:
-            self.log.warn('Unable to import matplotlib: %s', err)
+            self.log.warning('Unable to import matplotlib: %s', err)
             raise err
 
         def display2dArray(arr, title='Data', extent=None):
@@ -1201,10 +1201,10 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
         measRecord.set(self.flagKey, True)
         if error is not None:
             if error.getFlagBit() == self.FAILURE_EDGE:
-                self.log.warn('DipoleFitPlugin not run on record %d: %s', measRecord.getId(), str(error))
+                self.log.warning('DipoleFitPlugin not run on record %d: %s', measRecord.getId(), str(error))
                 measRecord.set(self.edgeFlagKey, True)
             if error.getFlagBit() == self.FAILURE_FIT:
-                self.log.warn('DipoleFitPlugin failed on record %d: %s', measRecord.getId(), str(error))
+                self.log.warning('DipoleFitPlugin failed on record %d: %s', measRecord.getId(), str(error))
                 measRecord.set(self.flagKey, True)
             if error.getFlagBit() == self.FAILURE_NOT_DIPOLE:
                 self.log.debug('DipoleFitPlugin not run on record %d: %s',
@@ -1212,4 +1212,4 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
                 measRecord.set(self.classificationAttemptedFlagKey, False)
                 measRecord.set(self.flagKey, True)
         else:
-            self.log.warn('DipoleFitPlugin failed on record %d', measRecord.getId())
+            self.log.warning('DipoleFitPlugin failed on record %d', measRecord.getId())
