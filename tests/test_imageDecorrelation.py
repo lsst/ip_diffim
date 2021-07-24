@@ -23,6 +23,7 @@ import unittest
 import numpy as np
 
 import lsst.utils.tests
+from lsst.utils.tests import methodParameters
 import lsst.afw.image as afwImage
 import lsst.afw.geom as afwGeom
 import lsst.afw.math as afwMath
@@ -31,6 +32,7 @@ import lsst.meas.algorithms as measAlg
 import lsst.daf.base as dafBase
 
 from lsst.ip.diffim.imageDecorrelation import (DecorrelateALKernelTask,
+                                               DecorrelateALKernelConfig,
                                                DecorrelateALKernelMapReduceConfig,
                                                DecorrelateALKernelSpatialConfig,
                                                DecorrelateALKernelSpatialTask)
@@ -383,10 +385,10 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
 
         return diffExp, mKernel, expected_var
 
-    def _runDecorrelationTask(self, diffExp, mKernel):
+    def _runDecorrelationTask(self, diffExp, mKernel, config=None):
         """ Run the decorrelation task on the given diffim with the given matching kernel
         """
-        task = DecorrelateALKernelTask()
+        task = DecorrelateALKernelTask(config=config)
         decorrResult = task.run(self.im1ex, self.im2ex, diffExp, mKernel)
         corrected_diffExp = decorrResult.correctedExposure
         return corrected_diffExp
@@ -407,23 +409,26 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
         self.assertFloatsAlmostEqual(var, mn, rtol=0.05)
         return var, mn
 
-    def _testDiffimCorrection(self, svar, tvar):
+    def _testDiffimCorrection(self, svar, tvar, config):
         """ Run decorrelation and check the variance of the corrected diffim.
         """
         self._setUpImages(svar=svar, tvar=tvar)
         diffExp, mKernel, expected_var = self._makeAndTestUncorrectedDiffim()
-        corrected_diffExp = self._runDecorrelationTask(diffExp, mKernel)
+        corrected_diffExp = self._runDecorrelationTask(diffExp, mKernel, config)
         self._testDecorrelation(expected_var, corrected_diffExp)
 
-    def testDiffimCorrection(self):
+    @methodParameters(completeVarPlanePropagation=[False, True])
+    def testDiffimCorrection(self, completeVarPlanePropagation):
         """Test decorrelated diffim from images with different combinations of variances.
         """
+        config = DecorrelateALKernelConfig()
+        config.completeVarPlanePropagation = completeVarPlanePropagation
         # Same variance
-        self._testDiffimCorrection(svar=0.04, tvar=0.04)
+        self._testDiffimCorrection(svar=0.04, tvar=0.04, config=config)
         # Science image variance is higher than that of the template.
-        self._testDiffimCorrection(svar=0.08, tvar=0.04)
+        self._testDiffimCorrection(svar=0.08, tvar=0.04, config=config)
         # Template variance is higher than that of the science img.
-        self._testDiffimCorrection(svar=0.04, tvar=0.08)
+        self._testDiffimCorrection(svar=0.04, tvar=0.08, config=config)
 
     def testNoiseDiffimCorrection(self):
         """Test correction by estimating correlation directly on a noise difference image.
