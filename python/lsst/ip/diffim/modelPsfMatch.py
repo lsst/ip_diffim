@@ -491,7 +491,7 @@ class ModelPsfMatchTask(PsfMatchTask):
                 # place at center of cell
                 posX = sizeCellX*col + sizeCellX//2 + scienceX0
 
-                log.log("TRACE4." + self.log.getName(), log.DEBUG,
+                log.log("TRACE4." + self.log.name, log.DEBUG,
                         "Creating Psf candidate at %.1f %.1f", posX, posY)
 
                 # reference kernel image, at location of science subimage
