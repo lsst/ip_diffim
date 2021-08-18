@@ -225,7 +225,8 @@ class ImageDifferenceTestBase(lsst.utils.tests.TestCase):
         return result.diffExp
 
     @staticmethod
-    def wrapAlDiffim(config, templateExposure, scienceExposure, convolveTemplate=True, returnKernel=False):
+    def wrapAlDiffim(config, templateExposure, scienceExposure, convolveTemplate=True, returnKernel=False,
+                     precomputeKernelCandidates=False):
         """Prepare and run Alard&Lupton-style image differencing.
 
         Parameters
@@ -247,6 +248,12 @@ class ImageDifferenceTestBase(lsst.utils.tests.TestCase):
             The image difference, or the PSF matching kernel.
         """
         alTask = ImagePsfMatchTask(config=config)
+        candidateList = None
+        if precomputeKernelCandidates:
+            if convolveTemplate:
+                candidateList = alTask.getSelectSources(scienceExposure.clone())
+            else:
+                candidateList = alTask.getSelectSources(templateExposure.clone())
         templateFwhmPix = templateExposure.getPsf().getSigma()
         scienceFwhmPix = scienceExposure.getPsf().getSigma()
         result = alTask.subtractExposures(templateExposure, scienceExposure,
@@ -254,6 +261,7 @@ class ImageDifferenceTestBase(lsst.utils.tests.TestCase):
                                           scienceFwhmPix=scienceFwhmPix,
                                           doWarping=False,
                                           convolveTemplate=convolveTemplate,
+                                          candidateList=candidateList,
                                           )
         if returnKernel:
             return result.psfMatchingKernel
@@ -381,11 +389,21 @@ class ImageDifferenceTestAlardLupton(ImageDifferenceTestBase):
         refTest1 = refOriginal.clone()
 
         # Basic AL, but we don't care about the result.
-        self.wrapAlDiffim(alConfig, refTest1, sciTest1, convolveTemplate=True)
+        # Note that selecting KernelCandidates *does* change the science image slightly
+        # because a background is subtracted before detection, then added back in.
+        # For this test, we separate out that known modification by precomputing the
+        # kernel candidates in wrapAlDiffim and using a deep copy of the science image.
+        # This test is therefore checking that there are no other, unknown, modifications
+        # of the science image.
+        self.wrapAlDiffim(alConfig, refTest1, sciTest1, convolveTemplate=True,
+                          precomputeKernelCandidates=True)
+
         self.assertMaskedImagesEqual(sciOriginal.maskedImage, sciTest1.maskedImage)
 
         # Basic AL, but we don't care about the result.
-        self.wrapAlDiffim(alConfig, refTest1, sciTest1, convolveTemplate=False)
+        self.wrapAlDiffim(alConfig, refTest1, sciTest1, convolveTemplate=False,
+                          precomputeKernelCandidates=True)
+
         self.assertMaskedImagesEqual(sciOriginal.maskedImage, sciTest1.maskedImage)
 
     def testSimReverseAlNoDecorrEqualNoise(self):
