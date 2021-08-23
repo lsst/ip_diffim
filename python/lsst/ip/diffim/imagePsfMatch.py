@@ -794,7 +794,7 @@ class ImagePsfMatchTask(PsfMatchTask):
                                    self.background.config.undersampleStyle)
         except Exception:
             self.log.warning("Failed to get background model.  Falling back to median background estimation")
-            bkgd = np.ma.extras.median(miArr)
+            bkgd = np.ma.median(miArr)
 
         # Take off background for detection
         mi -= bkgd
