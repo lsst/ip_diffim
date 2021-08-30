@@ -98,7 +98,7 @@ namespace detail {
 
         try {
             /* Normalize to unit sum */
-            PTR(ImageT) kImage = kCandidate->getKernelSolution(
+            std::shared_ptr<ImageT> kImage = kCandidate->getKernelSolution(
                 KernelCandidate<PixelT>::ORIG)->makeKernelImage();
             *kImage           /= kCandidate->getKernelSolution(
                 KernelCandidate<PixelT>::ORIG)->getKsum();
@@ -167,7 +167,7 @@ namespace detail {
         typename Super::ImageList const &eImageList = this->getEigenImages();
         typename Super::ImageList::const_iterator iter = eImageList.begin(), end = eImageList.end();
         for (size_t i = 0; iter != end; ++i, ++iter) {
-            PTR(ImageT) eImage = *iter;
+            std::shared_ptr<ImageT> eImage = *iter;
 
             /*
              * Normalise eigenImages to have a maximum of 1.0.  For n > 0 they
