@@ -48,6 +48,12 @@ class DecorrelateALKernelConfig(pexConfig.Config):
         doc="""Mask planes to ignore for sigma-clipped statistics""",
         default=("INTRP", "EDGE", "DETECTED", "SAT", "CR", "BAD", "NO_DATA", "DETECTED_NEGATIVE")
     )
+    completeVarPlanePropagation = pexConfig.Field(
+        dtype=bool,
+        default=True,
+        doc="Compute the full effect of the decorrelated matching kernel on the variance plane."
+            " Otherwise use a model weighed sum of the input variances."
+    )
 
 
 class DecorrelateALKernelTask(pipeBase.Task):
@@ -110,24 +116,22 @@ class DecorrelateALKernelTask(pipeBase.Task):
 
     @pipeBase.timeMethod
     def run(self, scienceExposure, templateExposure, subtractedExposure, psfMatchingKernel,
-            preConvKernel=None, xcen=None, ycen=None, svar=None, tvar=None, templateMatched=True):
-        """Perform decorrelation of an image difference exposure.
+            preConvKernel=None, xcen=None, ycen=None, svar=None, tvar=None,
+            templateMatched=True, preConvMode=False, **kwargs):
+        """Perform decorrelation of an image difference or of a score difference exposure.
 
-        Decorrelates the diffim due to the convolution of the templateExposure with the
-        A&L PSF matching kernel. Currently can accept a spatially varying matching kernel but in
-        this case it simply uses a static kernel from the center of the exposure. The decorrelation
-        is described in [DMTN-021, Equation 1](http://dmtn-021.lsst.io/#equation-1), where
-        `exposure` is I_1; templateExposure is I_2; `subtractedExposure` is D(k);
-        `psfMatchingKernel` is kappa; and svar and tvar are their respective
-        variances (see below).
+        Corrects the difference or score image due to the convolution of the
+        templateExposure with the A&L PSF matching kernel.
+        See [DMTN-021, Equation 1](http://dmtn-021.lsst.io/#equation-1) and
+        [DMTN-179](http://dmtn-179.lsst.io/) for details.
 
         Parameters
         ----------
         scienceExposure : `lsst.afw.image.Exposure`
-            The original science exposure (before `preConvKernel` applied).
+            The original science exposure (before pre-convolution, if ``preConvMode==True``).
         templateExposure : `lsst.afw.image.Exposure`
             The original template exposure warped into the science exposure dimensions.
-        subtractedExposure : `lsst.afw.iamge.Exposure`
+        subtractedExposure : `lsst.afw.image.Exposure`
             the subtracted exposure produced by
             `ip_diffim.ImagePsfMatchTask.subtractExposures()`. The `subtractedExposure` must
             inherit its PSF from `exposure`, see notes below.
@@ -135,8 +139,10 @@ class DecorrelateALKernelTask(pipeBase.Task):
             An (optionally spatially-varying) PSF matching kernel produced
             by `ip_diffim.ImagePsfMatchTask.subtractExposures()`.
         preConvKernel : `lsst.afw.math.Kernel`, optional
-            if not None, then the `scienceExposure` was pre-convolved with this kernel.
-            Allowed only if ``templateMatched==True``.
+            If not `None`, then the `scienceExposure` was pre-convolved with (the reflection of)
+            this kernel. Must be normalized to sum to 1.
+            Allowed only if ``templateMatched==True`` and ``preConvMode==True``.
+            Defaults to the PSF of the science exposure at the image center.
         xcen : `float`, optional
             X-pixel coordinate to use for computing constant matching kernel to use
             If `None` (default), then use the center of the image.
@@ -152,6 +158,11 @@ class DecorrelateALKernelTask(pipeBase.Task):
         templateMatched : `bool`, optional
             If True, the template exposure was matched (convolved) to the science exposure.
             See also notes below.
+        preConvMode : `bool`, optional
+            If True, ``subtractedExposure`` is assumed to be a likelihood difference image
+            and will be noise corrected as a likelihood image.
+        **kwargs
+            Additional keyword arguments propagated from DecorrelateALKernelSpatialTask.
 
         Returns
         -------
@@ -160,9 +171,15 @@ class DecorrelateALKernelTask(pipeBase.Task):
 
         Notes
         -----
-        The `subtractedExposure` is NOT updated. The returned `correctedExposure` has an updated but
-        spatially fixed PSF. It is calculated as the center of image PSF corrected by the center of
-        image matching kernel.
+        If ``preConvMode==True``, ``subtractedExposure`` is assumed to be a
+        score image and the noise correction for likelihood images
+        is applied. The resulting image is an optimal detection likelihood image
+        when the templateExposure has noise. (See DMTN-179) If ``preConvKernel`` is
+        not specified, the PSF of ``scienceExposure`` is assumed as pre-convolution kernel.
+
+        The ``subtractedExposure`` is NOT updated. The returned ``correctedExposure``
+        has an updated but spatially fixed PSF. It is calculated as the center of
+        image PSF corrected by the center of image matching kernel.
 
         If ``templateMatched==True``, the templateExposure was matched (convolved)
         to the ``scienceExposure`` by ``psfMatchingKernel``. Otherwise the ``scienceExposure``
@@ -184,9 +201,9 @@ class DecorrelateALKernelTask(pipeBase.Task):
         TODO DM-23857 As part of the spatially varying correction implementation
         consider whether returning a Struct is still necessary.
         """
-        if preConvKernel is not None and not templateMatched:
-            raise ValueError("Pre-convolution and the matching of the "
-                             "science exposure is not supported.")
+        if preConvKernel is not None and not (templateMatched and preConvMode):
+            raise ValueError("Pre-convolution kernel is allowed only if "
+                             "preConvMode==True and templateMatched==True.")
 
         spatialKernel = psfMatchingKernel
         kimg = afwImage.ImageD(spatialKernel.getDimensions())
@@ -197,6 +214,13 @@ class DecorrelateALKernelTask(pipeBase.Task):
             ycen = (bbox.getBeginY() + bbox.getEndY()) / 2.
         self.log.info("Using matching kernel computed at (%d, %d)", xcen, ycen)
         spatialKernel.computeImage(kimg, False, xcen, ycen)
+
+        preConvImg = None
+        if preConvMode:
+            if preConvKernel is None:
+                preConvKernel = scienceExposure.getPsf().getLocalKernel()  # at average position
+            preConvImg = afwImage.ImageD(preConvKernel.getDimensions())
+            preConvKernel.computeImage(preConvImg, True)
 
         if svar is None:
             svar = self.computeVarianceMean(scienceExposure)
@@ -242,12 +266,6 @@ class DecorrelateALKernelTask(pipeBase.Task):
         oldVarMean = self.computeVarianceMean(subtractedExposure)
         self.log.info("Variance plane mean of uncorrected diffim: %f", oldVarMean)
 
-        if preConvKernel is not None:
-            self.log.info('Using a pre-convolution kernel as part of decorrelation correction.')
-            kimg2 = afwImage.ImageD(preConvKernel.getDimensions())
-            preConvKernel.computeImage(kimg2, False)
-            pckArr = kimg2.array
-
         kArr = kimg.array
         diffExpArr = subtractedExposure.image.array
         psfImg = subtractedExposure.getPsf().computeKernelImage(geom.Point2D(xcen, ycen))
@@ -258,20 +276,20 @@ class DecorrelateALKernelTask(pipeBase.Task):
         kSum = np.sum(kArr)
         kSumSq = kSum*kSum
         self.log.debug("Matching kernel sum: %.3e", kSum)
-        preSum = 1.
-        if preConvKernel is None:
-            self.computeCommonShape(kArr.shape, psfArr.shape, diffExpArr.shape)
-            corrft = self.computeCorrection(kArr, expVar, matchedVar)
-        else:
-            preSum = np.sum(pckArr)
-            self.log.debug("Pre-convolution kernel sum: %.3e", preSum)
-            self.computeCommonShape(pckArr.shape, kArr.shape,
+
+        if preConvMode:
+            self.log.info("Decorrelation of likelihood image")
+            self.computeCommonShape(preConvImg.array.shape, kArr.shape,
                                     psfArr.shape, diffExpArr.shape)
-            corrft = self.computeCorrection(kArr, expVar, matchedVar, preConvArr=pckArr)
+            corr = self.computeScoreCorrection(kArr, expVar, matchedVar, preConvImg.array)
+        else:
+            self.log.info("Decorrelation of difference image")
+            self.computeCommonShape(kArr.shape, psfArr.shape, diffExpArr.shape)
+            corr = self.computeDiffimCorrection(kArr, expVar, matchedVar)
 
-        diffExpArr = self.computeCorrectedImage(corrft, diffExpArr)
-        corrPsfArr = self.computeCorrectedDiffimPsf(corrft, psfArr)
+        diffExpArr = self.computeCorrectedImage(corr.corrft, diffExpArr)
 
+        corrPsfArr = self.computeCorrectedDiffimPsf(corr.corrft, psfArr)
         psfcI = afwImage.ImageD(psfDim)
         psfcI.array = corrPsfArr
         psfcK = afwMath.FixedKernel(psfcI)
@@ -282,13 +300,24 @@ class DecorrelateALKernelTask(pipeBase.Task):
         # The subtracted exposure variance plane is already correlated, we cannot propagate
         # it through another convolution; instead we need to use the uncorrelated originals
         # The whitening should scale it to expVar + matchedVar on average
-        varImg = correctedExposure.variance.array
-        # Allow for numpy type casting
-        varImg[...] = preSum*preSum*exposure.variance.array + kSumSq*matchedExposure.variance.array
+        if self.config.completeVarPlanePropagation:
+            self.log.debug("Using full variance plane calculation in decorrelation")
+            newVarArr = self.calculateVariancePlane(
+                exposure.variance.array, matchedExposure.variance.array,
+                expVar, matchedVar, corr.cnft, corr.crft)
+        else:
+            self.log.debug("Using estimated variance plane calculation in decorrelation")
+            newVarArr = self.estimateVariancePlane(
+                exposure.variance.array, matchedExposure.variance.array,
+                corr.cnft, corr.crft)
+
+        corrExpVarArr = correctedExposure.variance.array
+        corrExpVarArr[...] = newVarArr  # Allow for numpy type casting
+
         if not templateMatched:
             # ImagePsfMatch.subtractExposures re-scales the difference in
             # the science image convolution mode
-            varImg /= kSumSq
+            corrExpVarArr /= kSumSq
         correctedExposure.setPsf(psfNew)
 
         newVarMean = self.computeVarianceMean(correctedExposure)
@@ -378,21 +407,18 @@ class DecorrelateALKernelTask(pipeBase.Task):
         R[-firstHalves[0]:, :secondHalves[1]] = A[:firstHalves[0], -secondHalves[1]:]
         return R
 
-    def computeCorrection(self, kappa, svar, tvar, preConvArr=None):
+    def computeDiffimCorrection(self, kappa, svar, tvar):
         """Compute the Lupton decorrelation post-convolution kernel for decorrelating an
         image difference, based on the PSF-matching kernel.
 
         Parameters
         ----------
-        kappa : `numpy.ndarray`
+        kappa : `numpy.ndarray` of `float`
             A matching kernel 2-d numpy.array derived from Alard & Lupton PSF matching.
-        svar : `float`
+        svar : `float` > 0.
             Average variance of science image used for PSF matching.
-        tvar : `float`
+        tvar : `float` > 0.
             Average variance of the template (matched) image used for PSF matching.
-        preConvArr : `numpy.ndarray`, optional
-            If not None, then pre-filtering was applied
-            to science exposure, and this is the pre-convolution kernel.
 
         Returns
         -------
@@ -400,41 +426,174 @@ class DecorrelateALKernelTask(pipeBase.Task):
             The frequency space representation of the correction. The array is real (dtype float).
             Shape is `self.freqSpaceShape`.
 
+        cnft, crft : `numpy.ndarray` of `complex`
+            The overall convolution (pre-conv, PSF matching, noise correction) kernel
+            for the science and template images, respectively for the variance plane
+            calculations. These are intermediate results in frequency space.
+
         Notes
         -----
         The maximum correction factor converges to `sqrt(tvar/svar)` towards high frequencies.
         This should be a plausible value.
         """
-        kSum = np.sum(kappa)
+        kSum = np.sum(kappa)  # We scale the decorrelation to preserve fluxes
         kappa = self.padCenterOriginArray(kappa, self.freqSpaceShape)
         kft = np.fft.fft2(kappa)
         kftAbsSq = np.real(np.conj(kft) * kft)
-        # If there is no pre-convolution kernel, use placeholder scalars
-        if preConvArr is None:
-            preSum = 1.
-            preAbsSq = 1.
-        else:
-            preSum = np.sum(preConvArr)
-            preConvArr = self.padCenterOriginArray(preConvArr, self.freqSpaceShape)
-            preK = np.fft.fft2(preConvArr)
-            preAbsSq = np.real(np.conj(preK)*preK)
 
-        denom = svar * preAbsSq + tvar * kftAbsSq
-        # Division by zero protection, though we don't expect to hit it
-        # (rather we'll have numerical noise)
-        tiny = np.finfo(kftAbsSq.dtype).tiny * 1000.
-        flt = denom < tiny
-        sumFlt = np.sum(flt)
-        if sumFlt > 0:
-            self.log.warning("Avoid zero division. Skip decorrelation "
-                             "at %f divergent frequencies.", sumFlt)
-            denom[flt] = 1.
-        kft = np.sqrt((svar * preSum*preSum + tvar * kSum*kSum) / denom)
-        # Don't do any correction at these frequencies
-        # the difference image should be close to zero anyway, so can't be decorrelated
-        if sumFlt > 0:
-            kft[flt] = 1.
-        return kft
+        denom = svar + tvar * kftAbsSq
+        corrft = np.sqrt((svar + tvar * kSum*kSum) / denom)
+        cnft = corrft
+        crft = kft*corrft
+        return pipeBase.Struct(corrft=corrft, cnft=cnft, crft=crft)
+
+    def computeScoreCorrection(self, kappa, svar, tvar, preConvArr):
+        """Compute the correction kernel for a score image.
+
+        Parameters
+        ----------
+        kappa : `numpy.ndarray`
+            A matching kernel 2-d numpy.array derived from Alard & Lupton PSF matching.
+        svar : `float`
+            Average variance of science image used for PSF matching (before pre-convolution).
+        tvar : `float`
+            Average variance of the template (matched) image used for PSF matching.
+        preConvArr : `numpy.ndarray`
+            The pre-convolution kernel of the science image. It should be the PSF
+            of the science image or an approximation of it. It must be normed to sum 1.
+
+        Returns
+        -------
+        corrft : `numpy.ndarray` of `float`
+            The frequency space representation of the correction. The array is real (dtype float).
+            Shape is `self.freqSpaceShape`.
+        cnft, crft : `numpy.ndarray` of `complex`
+            The overall convolution (pre-conv, PSF matching, noise correction) kernel
+            for the science and template images, respectively for the variance plane
+            calculations. These are intermediate results in frequency space.
+
+        Notes
+        -----
+        To be precise, the science image should be _correlated_ by ``preConvArray`` but this
+        does not matter for this calculation.
+
+        ``cnft``, ``crft`` contain the scaling factor as well.
+
+        """
+        kSum = np.sum(kappa)
+        kappa = self.padCenterOriginArray(kappa, self.freqSpaceShape)
+        kft = np.fft.fft2(kappa)
+        preConvArr = self.padCenterOriginArray(preConvArr, self.freqSpaceShape)
+        preFt = np.fft.fft2(preConvArr)
+        preFtAbsSq = np.real(np.conj(preFt) * preFt)
+        kftAbsSq = np.real(np.conj(kft) * kft)
+        # Avoid zero division, though we don't normally approach `tiny`.
+        # We have numerical noise instead.
+        tiny = np.finfo(preFtAbsSq.dtype).tiny * 1000.
+        flt = preFtAbsSq < tiny
+        # If we pre-convolve to avoid deconvolution in AL, then kftAbsSq / preFtAbsSq
+        # theoretically expected to diverge to +inf. But we don't care about the convergence
+        # properties here, S goes to 0 at these frequencies anyway.
+        preFtAbsSq[flt] = tiny
+        denom = svar + tvar * kftAbsSq / preFtAbsSq
+        corrft = (svar + tvar * kSum*kSum) / denom
+        cnft = np.conj(preFt)*corrft
+        crft = kft*corrft
+        return pipeBase.Struct(corrft=corrft, cnft=cnft, crft=crft)
+
+    @staticmethod
+    def estimateVariancePlane(vplane1, vplane2, c1ft, c2ft):
+        """Estimate the variance planes.
+
+        The estimation assumes that around each pixel the surrounding
+        pixels' sigmas within the convolution kernel are the same.
+
+        Parameters
+        ----------
+        vplane1, vplane2 : `numpy.ndarray` of `float`
+            Variance planes of the original (before pre-convolution or matching)
+            exposures.
+        c1ft, c2ft : `numpy.ndarray` of `complex`
+            The overall convolution that includes the matching and the
+            afterburner in frequency space. The result of either
+            ``computeScoreCorrection`` or ``computeDiffimCorrection``.
+
+        Returns
+        -------
+        vplaneD : `numpy.ndarray` of `float`
+          The estimated variance plane of the difference/score image
+          as a weighted sum of the input variances.
+
+        Notes
+        ------
+        See DMTN-179 Section 5 about the variance plane calculations.
+        """
+        w1 = np.sum(np.real(np.conj(c1ft)*c1ft)) / c1ft.size
+        w2 = np.sum(np.real(np.conj(c2ft)*c2ft)) / c2ft.size
+        # w1, w2: the frequency space sum of abs(c1)^2 is the same as in image
+        # space.
+        return vplane1*w1 + vplane2*w2
+
+    def calculateVariancePlane(self, vplane1, vplane2, varMean1, varMean2, c1ft, c2ft):
+        """Full propagation of the variance planes of the original exposures.
+
+        The original variance planes of independent pixels are convolved with the
+        image space square of the overall kernels.
+
+        Parameters
+        ----------
+        vplane1, vplane2 : `numpy.ndarray` of `float`
+            Variance planes of the original (before pre-convolution or matching)
+            exposures.
+        varMean1, varMean2 : `float`
+            Replacement average values for non-finite ``vplane1`` and ``vplane2`` values respectively.
+
+        c1ft, c2ft : `numpy.ndarray` of `complex`
+            The overall convolution that includes the matching and the
+            afterburner in frequency space. The result of either
+            ``computeScoreCorrection`` or ``computeDiffimCorrection``.
+
+        Returns
+        -------
+        vplaneD : `numpy.ndarray` of `float`
+          The variance plane of the difference/score images.
+
+        Notes
+        ------
+        See DMTN-179 Section 5 about the variance plane calculations.
+
+        Infs and NaNs are allowed and kept in the returned array.
+        """
+        D = np.real(np.fft.ifft2(c1ft))
+        c1SqFt = np.fft.fft2(D*D)
+
+        v1shape = vplane1.shape
+        filtInf = np.isinf(vplane1)
+        filtNan = np.isnan(vplane1)
+        # This copy could be eliminated if inf/nan handling were go into padCenterOriginArray
+        vplane1 = np.copy(vplane1)
+        vplane1[filtInf | filtNan] = varMean1
+        D = self.padCenterOriginArray(vplane1, self.freqSpaceShape)
+        v1 = np.real(np.fft.ifft2(np.fft.fft2(D) * c1SqFt))
+        v1 = self.padCenterOriginArray(v1, v1shape, useInverse=True)
+        v1[filtNan] = np.nan
+        v1[filtInf] = np.inf
+
+        D = np.real(np.fft.ifft2(c2ft))
+        c2ft = np.fft.fft2(D*D)
+
+        v2shape = vplane2.shape
+        filtInf = np.isinf(vplane2)
+        filtNan = np.isnan(vplane2)
+        vplane2 = np.copy(vplane2)
+        vplane2[filtInf | filtNan] = varMean2
+        D = self.padCenterOriginArray(vplane2, self.freqSpaceShape)
+        v2 = np.real(np.fft.ifft2(np.fft.fft2(D) * c2ft))
+        v2 = self.padCenterOriginArray(v2, v2shape, useInverse=True)
+        v2[filtNan] = np.nan
+        v2[filtInf] = np.inf
+
+        return v1 + v2
 
     def computeCorrectedDiffimPsf(self, corrft, psfOld):
         """Compute the (decorrelated) difference image's new PSF.
@@ -582,7 +741,7 @@ class DecorrelateALKernelMapper(DecorrelateALKernelTask, ImageMapper):
         logLevel = self.log.getLevel()
         self.log.setLevel(lsst.log.WARN)
         res = DecorrelateALKernelTask.run(self, subExp2, subExp1, expandedSubExposure,
-                                          psfMatchingKernel, preConvKernel)
+                                          psfMatchingKernel, preConvKernel, **kwargs)
         self.log.setLevel(logLevel)  # reset the log level
 
         diffim = res.correctedExposure.Factory(res.correctedExposure, subExposure.getBBox())
@@ -682,7 +841,7 @@ class DecorrelateALKernelSpatialTask(pipeBase.Task):
         return var
 
     def run(self, scienceExposure, templateExposure, subtractedExposure, psfMatchingKernel,
-            spatiallyVarying=True, preConvKernel=None, templateMatched=True):
+            spatiallyVarying=True, preConvKernel=None, templateMatched=True, preConvMode=False):
         """Perform decorrelation of an image difference exposure.
 
         Decorrelates the diffim due to the convolution of the
@@ -699,8 +858,7 @@ class DecorrelateALKernelSpatialTask(pipeBase.Task):
            the template Exposure used for PSF matching
         subtractedExposure : `lsst.afw.image.Exposure`
            the subtracted Exposure produced by `ip_diffim.ImagePsfMatchTask.subtractExposures()`
-        psfMatchingKernel :
-           an (optionally spatially-varying) PSF matching kernel produced
+        psfMatchingKernel : an (optionally spatially-varying) PSF matching kernel produced
            by `ip_diffim.ImagePsfMatchTask.subtractExposures()`
         spatiallyVarying : `bool`
            if True, perform the spatially-varying operation
@@ -709,14 +867,15 @@ class DecorrelateALKernelSpatialTask(pipeBase.Task):
            this option is experimental.)
         templateMatched : `bool`, optional
            If True, the template exposure was matched (convolved) to the science exposure.
+        preConvMode : `bool`, optional
+            If True, ``subtractedExposure`` is assumed to be a likelihood difference image
+            and will be noise corrected as a likelihood image.
 
         Returns
         -------
         results : `lsst.pipe.base.Struct`
             a structure containing:
-
             - ``correctedExposure`` : the decorrelated diffim
-
         """
         self.log.info('Running A&L decorrelation: spatiallyVarying=%r', spatiallyVarying)
 
@@ -742,7 +901,7 @@ class DecorrelateALKernelSpatialTask(pipeBase.Task):
             results = task.run(subtractedExposure, science=scienceExposure,
                                template=templateExposure, psfMatchingKernel=psfMatchingKernel,
                                preConvKernel=preConvKernel, forceEvenSized=True,
-                               templateMatched=templateMatched)
+                               templateMatched=templateMatched, preConvMode=preConvMode)
             results.correctedExposure = results.exposure
 
             # Make sure masks of input image are propagated to diffim
@@ -758,6 +917,6 @@ class DecorrelateALKernelSpatialTask(pipeBase.Task):
             task = DecorrelateALKernelTask(config=config)
             results = task.run(scienceExposure, templateExposure,
                                subtractedExposure, psfMatchingKernel, preConvKernel=preConvKernel,
-                               templateMatched=templateMatched)
+                               templateMatched=templateMatched, preConvMode=preConvMode)
 
         return results
