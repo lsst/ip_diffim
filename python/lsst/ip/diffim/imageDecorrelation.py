@@ -50,7 +50,7 @@ class DecorrelateALKernelConfig(pexConfig.Config):
     )
     completeVarPlanePropagation = pexConfig.Field(
         dtype=bool,
-        default=True,
+        default=False,
         doc="Compute the full effect of the decorrelated matching kernel on the variance plane."
             " Otherwise use a model weighed sum of the input variances."
     )
