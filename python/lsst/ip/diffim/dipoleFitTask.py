@@ -31,7 +31,8 @@ import lsst.geom as geom
 from lsst.log import Log
 import lsst.pex.exceptions as pexExcept
 import lsst.pex.config as pexConfig
-from lsst.pipe.base import Struct, timeMethod
+from lsst.pipe.base import Struct
+from lsst.utils.timer import timeMethod
 
 __all__ = ("DipoleFitTask", "DipoleFitPlugin", "DipoleFitTaskConfig", "DipoleFitPluginConfig",
            "DipoleFitAlgorithm")

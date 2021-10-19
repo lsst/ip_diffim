@@ -32,6 +32,7 @@ import lsst.afw.display as afwDisplay
 import lsst.log as log
 import lsst.pipe.base as pipeBase
 from lsst.meas.algorithms import SubtractBackgroundConfig
+from lsst.utils.timer import timeMethod
 from . import utils as diutils
 from . import diffimLib
 
@@ -874,7 +875,7 @@ class PsfMatchTask(pipeBase.Task):
         override in derived classes"""
         return
 
-    @pipeBase.timeMethod
+    @timeMethod
     def _solve(self, kernelCellSet, basisList, returnOnExcept=False):
         """Solve for the PSF matching kernel
 

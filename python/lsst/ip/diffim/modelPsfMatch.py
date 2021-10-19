@@ -29,6 +29,7 @@ import lsst.geom as geom
 import lsst.log as log
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
+from lsst.utils.timer import timeMethod
 from .makeKernelBasisList import makeKernelBasisList
 from .psfMatch import PsfMatchTask, PsfMatchConfigAL
 from . import utils as dituils
@@ -295,7 +296,7 @@ class ModelPsfMatchTask(PsfMatchTask):
         PsfMatchTask.__init__(self, *args, **kwargs)
         self.kConfig = self.config.kernel.active
 
-    @pipeBase.timeMethod
+    @timeMethod
     def run(self, exposure, referencePsfModel, kernelSum=1.0):
         """Psf-match an exposure to a model Psf
 

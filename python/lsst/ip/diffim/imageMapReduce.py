@@ -29,6 +29,7 @@ import lsst.geom as geom
 import lsst.meas.algorithms as measAlg
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
+from lsst.utils.timer import timeMethod
 
 __all__ = ("ImageMapReduceTask", "ImageMapReduceConfig",
            "ImageMapper", "ImageMapperConfig",
@@ -523,7 +524,7 @@ class ImageMapReduceTask(pipeBase.Task):
         self.makeSubtask("mapper")
         self.makeSubtask("reducer")
 
-    @pipeBase.timeMethod
+    @timeMethod
     def run(self, exposure, **kwargs):
         """Perform a map-reduce operation on the given exposure.
 
