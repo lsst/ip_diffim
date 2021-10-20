@@ -29,7 +29,7 @@ import lsst.log
 import lsst.meas.algorithms as measAlg
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
-
+from lsst.utils.timer import timeMethod
 
 from .imageMapReduce import (ImageMapReduceConfig, ImageMapReduceTask,
                              ImageMapper)
@@ -114,7 +114,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
         var = statObj.getValue(afwMath.MEANCLIP)
         return var
 
-    @pipeBase.timeMethod
+    @timeMethod
     def run(self, scienceExposure, templateExposure, subtractedExposure, psfMatchingKernel,
             preConvKernel=None, xcen=None, ycen=None, svar=None, tvar=None,
             templateMatched=True, preConvMode=False, **kwargs):

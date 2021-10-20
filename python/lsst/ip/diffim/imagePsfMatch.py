@@ -38,6 +38,7 @@ from . import utils as diffimUtils
 from . import diffimLib
 from . import diffimTools
 import lsst.afw.display as afwDisplay
+from lsst.utils.timer import timeMethod
 
 __all__ = ["ImagePsfMatchConfig", "ImagePsfMatchTask", "subtractAlgorithmRegistry"]
 
@@ -336,7 +337,7 @@ class ImagePsfMatchTask(PsfMatchTask):
         sigPix = psf.computeShape().getDeterminantRadius()
         return sigPix*sigma2fwhm
 
-    @pipeBase.timeMethod
+    @timeMethod
     def matchExposures(self, templateExposure, scienceExposure,
                        templateFwhmPix=None, scienceFwhmPix=None,
                        candidateList=None, doWarping=True, convolveTemplate=True):
@@ -454,7 +455,7 @@ class ImagePsfMatchTask(PsfMatchTask):
         results.matchedExposure = psfMatchedExposure
         return results
 
-    @pipeBase.timeMethod
+    @timeMethod
     def matchMaskedImages(self, templateMaskedImage, scienceMaskedImage, candidateList,
                           templateFwhmPix=None, scienceFwhmPix=None):
         """PSF-match a MaskedImage (templateMaskedImage) to a reference MaskedImage (scienceMaskedImage).
@@ -567,7 +568,7 @@ class ImagePsfMatchTask(PsfMatchTask):
             kernelCellSet=kernelCellSet,
         )
 
-    @pipeBase.timeMethod
+    @timeMethod
     def subtractExposures(self, templateExposure, scienceExposure,
                           templateFwhmPix=None, scienceFwhmPix=None,
                           candidateList=None, doWarping=True, convolveTemplate=True):
@@ -685,7 +686,7 @@ class ImagePsfMatchTask(PsfMatchTask):
         results.subtractedExposure = subtractedExposure
         return results
 
-    @pipeBase.timeMethod
+    @timeMethod
     def subtractMaskedImages(self, templateMaskedImage, scienceMaskedImage, candidateList,
                              templateFwhmPix=None, scienceFwhmPix=None):
         """Psf-match and subtract two MaskedImages.
