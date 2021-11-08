@@ -30,7 +30,7 @@ import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.daf.base as dafBase
 import lsst.log.utils as logUtils
 
-logUtils.traceSetAt("ip.diffim", 4)
+logUtils.traceSetAt("lsst.ip.diffim", 4)
 
 
 class PsfMatchTestCases(lsst.utils.tests.TestCase):

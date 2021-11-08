@@ -8,7 +8,7 @@ import lsst.ip.diffim as ipDiffim
 import lsst.log.utils as logUtils
 import lsst.pex.config as pexConfig
 
-logUtils.traceSetAt("ip.diffim", 4)
+logUtils.traceSetAt("lsst.ip.diffim", 4)
 
 # This tests the basics of the BuildSpatialKernelVisitor.  E.g. that
 # it makes the right size solution.  For more complex behaviors such

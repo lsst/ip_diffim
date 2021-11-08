@@ -36,7 +36,7 @@ import lsst.ip.diffim as ipDiffim
 
 
 verbosity = 4
-logUtils.traceSetAt("ip.diffim", verbosity)
+logUtils.traceSetAt("lsst.ip.diffim", verbosity)
 
 display = True
 writefits = False

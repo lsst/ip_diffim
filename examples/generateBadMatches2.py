@@ -30,7 +30,7 @@ import lsst.log.utils as logUtils
 import lsst.pex.config as pexConfig
 
 verbosity = 4
-logUtils.traceSetAt("ip.diffim", verbosity)
+logUtils.traceSetAt("lsst.ip.diffim", verbosity)
 
 imSize = 2**7
 kSize = 2**5 + 1

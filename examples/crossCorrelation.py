@@ -28,7 +28,7 @@ import lsst.log.utils as logUtils
 import numpy as num
 
 verbosity = 4
-logUtils.traceSetAt("ip.diffim", verbosity)
+logUtils.traceSetAt("lsst.ip.diffim", verbosity)
 
 # Define the diagnostic functions on the goodness of fit of the
 # spatial model (k_s) to each individual kernel (k)

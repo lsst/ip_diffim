@@ -28,7 +28,7 @@ import lsst.ip.diffim as ipDiffim
 import lsst.log.utils as logUtils
 
 verbosity = 0
-logUtils.traceSetAt("ip.diffim", verbosity)
+logUtils.traceSetAt("lsst.ip.diffim", verbosity)
 
 
 class DiffimTestCases(unittest.TestCase):

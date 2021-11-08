@@ -32,7 +32,7 @@ import lsst.ip.diffim as ipDiffim
 import lsst.log.utils as logUtils
 
 verbosity = 3
-logUtils.traceSetAt("ip.diffim", verbosity)
+logUtils.traceSetAt("lsst.ip.diffim", verbosity)
 
 # known input images
 try:

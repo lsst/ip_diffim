@@ -32,7 +32,7 @@ import lsst.pex.config as pexConfig
 import lsst.log.utils as logUtils
 import lsst.afw.table as afwTable
 
-logUtils.traceSetAt("ip.diffim", 4)
+logUtils.traceSetAt("lsst.ip.diffim", 4)
 
 # known input images
 try:

@@ -37,8 +37,8 @@ from lsst.log import Log
 import lsst.log.utils as logUtils
 import lsst.pex.config as pexConfig
 
-logUtils.traceSetAt("ip.diffim", 6)
-logger = Log.getLogger("ip.diffim.compareLambdaTypes")
+logUtils.traceSetAt("lsst.ip.diffim", 6)
+logger = Log.getLogger("lsst.ip.diffim.compareLambdaTypes")
 logger.setLevel(Log.DEBUG)
 
 display = True
