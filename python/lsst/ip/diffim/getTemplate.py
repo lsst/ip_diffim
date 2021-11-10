@@ -32,7 +32,7 @@ import lsst.pipe.base as pipeBase
 from lsst.skymap import BaseSkyMap
 from lsst.daf.butler import DeferredDatasetHandle
 from lsst.ip.diffim.dcrModel import DcrModel
-from lsst.meas.algorithms import CoaddPsf, WarpedPsf, CoaddPsfConfig
+from lsst.meas.algorithms import CoaddPsf, CoaddPsfConfig
 
 __all__ = ["GetCoaddAsTemplateTask", "GetCoaddAsTemplateConfig",
            "GetCalexpAsTemplateTask", "GetCalexpAsTemplateConfig",
@@ -649,16 +649,12 @@ class GetMultiTractCoaddTemplateTask(pipeBase.PipelineTask):
             coaddPatch = coaddExposure.get()
 
             # warp to detector WCS
-            xyTransform = afwGeom.makeWcsPairTransform(coaddPatch.getWcs(), finalWcs)
-            psfWarped = WarpedPsf(coaddPatch.getPsf(), xyTransform)
             warped = self.warper.warpExposure(finalWcs, coaddPatch, maxBBox=finalBBox)
 
             # Check if warped image is viable
             if not np.any(np.isfinite(warped.image.array)):
                 self.log.info("No overlap for warped %s. Skipping" % coaddExposure.ref.dataId)
                 continue
-
-            warped.setPsf(psfWarped)
 
             exp = afwImage.ExposureF(finalBBox, finalWcs)
             exp.maskedImage.set(np.nan, afwImage.Mask.getPlaneBitMask("NO_DATA"), np.nan)
@@ -667,10 +663,11 @@ class GetMultiTractCoaddTemplateTask(pipeBase.PipelineTask):
             maskedImageList.append(exp.maskedImage)
             weightList.append(1)
             record = tractsCatalog.addNew()
-            record.setPsf(psfWarped)
-            record.setWcs(finalWcs)
+            record.setPsf(coaddPatch.getPsf())
+            record.setWcs(coaddPatch.getWcs())
             record.setPhotoCalib(coaddPatch.getPhotoCalib())
-            record.setBBox(warped.getBBox())
+            record.setBBox(coaddPatch.getBBox())
+            record.setValidPolygon(afwGeom.Polygon(geom.Box2D(coaddPatch.getBBox()).getCorners()))
             record.set(tractKey, coaddExposure.ref.dataId['tract'])
             record.set(patchKey, coaddExposure.ref.dataId['patch'])
             record.set(weightKey, 1.)
