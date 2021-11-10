@@ -323,7 +323,7 @@ def backgroundSubtract(config, maskedImages):
         del backobj
 
     t1 = time.time()
-    logger = Log.getLogger("ip.diffim.backgroundSubtract")
+    logger = Log.getLogger("lsst.ip.diffim.backgroundSubtract")
     logger.debug("Total time for background subtraction : %.2f s", (t1 - t0))
     return backgrounds
 

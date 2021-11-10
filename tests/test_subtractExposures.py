@@ -14,7 +14,7 @@ import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
 
 verbosity = 4
-logUtils.traceSetAt("ip.diffim", verbosity)
+logUtils.traceSetAt("lsst.ip.diffim", verbosity)
 Log.getLogger('psfMatch').setLevel(Log.INFO)
 
 display = False

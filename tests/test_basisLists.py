@@ -11,7 +11,7 @@ import lsst.pex.config as pexConfig
 import lsst.pex.exceptions
 
 # Increase the number for more verbose messages
-logUtils.traceSetAt("ip.diffim", 0)
+logUtils.traceSetAt("lsst.ip.diffim", 0)
 
 
 class DiffimTestCases(unittest.TestCase):

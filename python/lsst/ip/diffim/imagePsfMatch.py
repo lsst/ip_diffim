@@ -197,7 +197,7 @@ class ImagePsfMatchTask(PsfMatchTask):
     .. code-block:: py
 
         import lsst.log.utils as logUtils
-        logUtils.traceSetAt("ip.diffim", 4)
+        logUtils.traceSetAt("lsst.ip.diffim", 4)
 
     Examples
     --------

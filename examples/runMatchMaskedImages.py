@@ -103,7 +103,7 @@ Notes:
 
     if options.verbosity > 0:
         print('Verbosity =', options.verbosity)
-        logUtils.traceSetAt("ip.diffim", options.verbosity)
+        logUtils.traceSetAt("lsst.ip.diffim", options.verbosity)
 
     ####
 

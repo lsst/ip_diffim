@@ -39,9 +39,9 @@ import lsst.pex.config as pexConfig
 afwDisplay.setDefaultMaskTransparency(75)
 
 verbosity = 2
-logUtils.traceSetAt("ip.diffim", verbosity)
+logUtils.traceSetAt("lsst.ip.diffim", verbosity)
 
-logger = Log.getLogger("ip.diffim.JackknifeResampleKernel")
+logger = Log.getLogger("lsst.ip.diffim.JackknifeResampleKernel")
 
 display = False
 writefits = False

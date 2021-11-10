@@ -55,7 +55,7 @@ def main():
         sys.exit(1)
 
     print('Verbosity =', options.verbosity)
-    logUtils.traceSetAt("ip.diffim", options.verbosity)
+    logUtils.traceSetAt("lsst.ip.diffim", options.verbosity)
 
     snap1Exp = afwImage.ExposureF(options.s1)
     snap2Exp = afwImage.ExposureF(options.s2)

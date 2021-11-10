@@ -28,7 +28,7 @@ import lsst.log.utils as logUtils
 import lsst.pex.config as pexConfig
 import lsst.afw.display as afwDisplay
 verbosity = 4
-logUtils.traceSetAt("ip.diffim", verbosity)
+logUtils.traceSetAt("lsst.ip.diffim", verbosity)
 
 imSize = 75
 rdm = afwMath.Random(afwMath.Random.MT19937, 10101)

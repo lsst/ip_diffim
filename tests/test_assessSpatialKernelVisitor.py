@@ -11,7 +11,7 @@ import lsst.log.utils as logUtils
 import lsst.pex.config as pexConfig
 
 # Increase the number for more verbose messages; decrease for fewer messages
-logUtils.traceSetAt("ip.diffim", 4)
+logUtils.traceSetAt("lsst.ip.diffim", 4)
 
 
 class DiffimTestCases(unittest.TestCase):

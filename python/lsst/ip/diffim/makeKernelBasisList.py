@@ -186,7 +186,7 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
     if (kernelSize % 2) != 1:
         raise ValueError("Only odd-sized Alard-Lupton bases allowed")
 
-    logger = Log.getLogger("ip.diffim.generateAlardLuptonBasisList")
+    logger = Log.getLogger("lsst.ip.diffim.generateAlardLuptonBasisList")
     if (targetFwhmPix is None) or (referenceFwhmPix is None) or (not config.scaleByFwhm):
         logger.info("PSF sigmas are not available or scaling by fwhm disabled, "
                     "falling back to config values")

@@ -32,7 +32,7 @@ import lsst.pex.config as pexConfig
 import numpy as num
 
 verbosity = 0
-logUtils.traceSetAt("ip.diffim", verbosity)
+logUtils.traceSetAt("lsst.ip.diffim", verbosity)
 
 
 class DiffimTestCases(unittest.TestCase):

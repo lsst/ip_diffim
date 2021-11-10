@@ -12,7 +12,7 @@ import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.log.utils as logUtils
 import lsst.pex.config as pexConfig
 
-logUtils.traceSetAt("ip.diffim", 2)
+logUtils.traceSetAt("lsst.ip.diffim", 2)
 
 # known input images
 try:

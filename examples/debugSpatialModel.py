@@ -38,7 +38,7 @@ fwhm = 6.8
 warp = True
 
 verbosity = 4
-logUtils.traceSetAt("ip.diffim", verbosity)
+logUtils.traceSetAt("lsst.ip.diffim", verbosity)
 
 defDataDir = lsst.utils.getPackageDir('afwdata')
 imageProcDir = lsst.utils.getPackageDir('ip_diffim')

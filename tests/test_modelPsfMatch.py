@@ -10,7 +10,7 @@ import lsst.log.utils as logUtils
 import lsst.meas.algorithms as measAlg
 from lsst.ip.diffim.modelPsfMatch import nextOddInteger
 
-logUtils.traceSetAt("ip.diffim", 4)
+logUtils.traceSetAt("lsst.ip.diffim", 4)
 
 
 class PsfMatchTestCases(lsst.utils.tests.TestCase):
