@@ -6,11 +6,11 @@ from lsst.afw.coord import Observatory, Weather
 import lsst.afw.image as afwImage
 import lsst.geom as geom
 import lsst.ip.diffim as ipDiffim
-import lsst.log.utils as logUtils
+import lsst.utils.logging as logUtils
 import lsst.meas.algorithms as measAlg
 from lsst.ip.diffim.modelPsfMatch import nextOddInteger
 
-logUtils.traceSetAt("lsst.ip.diffim", 4)
+logUtils.trace_set_at("lsst.ip.diffim", 4)
 
 
 class PsfMatchTestCases(lsst.utils.tests.TestCase):

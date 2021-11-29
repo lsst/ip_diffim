@@ -6,10 +6,10 @@ import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.geom as geom
 import lsst.ip.diffim as ipDiffim
-import lsst.log.utils as logUtils
+import lsst.utils.logging as logUtils
 import lsst.pex.config as pexConfig
 
-logUtils.traceSetAt("lsst.ip.diffim", 2)
+logUtils.trace_set_at("lsst.ip.diffim", 2)
 
 
 class DiffimTestCases(lsst.utils.tests.TestCase):

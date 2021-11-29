@@ -24,11 +24,11 @@ import lsst.afw.display as afwDisplay
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
-import lsst.log.utils as logUtils
+import lsst.utils.logging as logUtils
 import numpy as num
 
 verbosity = 4
-logUtils.traceSetAt("lsst.ip.diffim", verbosity)
+logUtils.trace_set_at("lsst.ip.diffim", verbosity)
 
 # Define the diagnostic functions on the goodness of fit of the
 # spatial model (k_s) to each individual kernel (k)

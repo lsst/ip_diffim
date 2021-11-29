@@ -6,7 +6,7 @@ import re
 import numpy as np
 
 import lsst.afw.image as afwImage
-import lsst.log.utils as logUtils
+import lsst.utils.logging as logUtils
 from lsst.meas.algorithms import SingleGaussianPsf
 
 import lsst.ip.diffim as ipDiffim
@@ -97,7 +97,7 @@ Notes:
 
     if options.verbosity > 0:
         print('Verbosity =', options.verbosity)
-        logUtils.traceSetAt("lsst.ip.diffim", options.verbosity)
+        logUtils.trace_set_at("lsst.ip.diffim", options.verbosity)
 
     ####
 

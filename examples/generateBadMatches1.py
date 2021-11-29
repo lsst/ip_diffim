@@ -24,11 +24,11 @@ import lsst.afw.geom as afwGeom
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
 import numpy as num
-import lsst.log.utils as logUtils
+import lsst.utils.logging as logUtils
 import lsst.pex.config as pexConfig
 import lsst.afw.display as afwDisplay
 verbosity = 4
-logUtils.traceSetAt("lsst.ip.diffim", verbosity)
+logUtils.trace_set_at("lsst.ip.diffim", verbosity)
 
 imSize = 75
 rdm = afwMath.Random(afwMath.Random.MT19937, 10101)
