@@ -29,10 +29,10 @@ import lsst.afw.math as afwMath
 import lsst.geom as geom
 import lsst.ip.diffim as ipDiffim
 import lsst.pex.config as pexConfig
-import lsst.log.utils as logUtils
+import lsst.utils.logging as logUtils
 import lsst.afw.table as afwTable
 
-logUtils.traceSetAt("lsst.ip.diffim", 4)
+logUtils.trace_set_at("lsst.ip.diffim", 4)
 
 # known input images
 try:

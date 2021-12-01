@@ -7,11 +7,11 @@ import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.geom as geom
 import lsst.ip.diffim as ipDiffim
-import lsst.log.utils as logUtils
+import lsst.utils.logging as logUtils
 import lsst.pex.config as pexConfig
 
 # Increase the number for more verbose messages; decrease for fewer messages
-logUtils.traceSetAt("lsst.ip.diffim", 4)
+logUtils.trace_set_at("lsst.ip.diffim", 4)
 
 
 class DiffimTestCases(unittest.TestCase):

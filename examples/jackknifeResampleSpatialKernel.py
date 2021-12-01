@@ -33,13 +33,13 @@ import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
 from lsst.log import Log
-import lsst.log.utils as logUtils
+import lsst.utils.logging as logUtils
 import lsst.pex.config as pexConfig
 
 afwDisplay.setDefaultMaskTransparency(75)
 
 verbosity = 2
-logUtils.traceSetAt("lsst.ip.diffim", verbosity)
+logUtils.trace_set_at("lsst.ip.diffim", verbosity)
 
 logger = Log.getLogger("lsst.ip.diffim.JackknifeResampleKernel")
 

@@ -24,7 +24,7 @@ import optparse
 
 import lsst.afw.display as afwDisplay
 import lsst.afw.image as afwImage
-import lsst.log.utils as logUtils
+import lsst.utils.logging as logUtils
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
 
@@ -103,7 +103,7 @@ Notes:
 
     if options.verbosity > 0:
         print('Verbosity =', options.verbosity)
-        logUtils.traceSetAt("lsst.ip.diffim", options.verbosity)
+        logUtils.trace_set_at("lsst.ip.diffim", options.verbosity)
 
     ####
 

@@ -23,7 +23,7 @@ import optparse
 
 import lsst.afw.image as afwImage
 import lsst.ip.diffim as ipDiffim
-import lsst.log.utils as logUtils
+import lsst.utils.logging as logUtils
 
 
 def subtractSnaps(snap1, snap2, subconfig, doWarping=False):
@@ -55,7 +55,7 @@ def main():
         sys.exit(1)
 
     print('Verbosity =', options.verbosity)
-    logUtils.traceSetAt("lsst.ip.diffim", options.verbosity)
+    logUtils.trace_set_at("lsst.ip.diffim", options.verbosity)
 
     snap1Exp = afwImage.ExposureF(options.s1)
     snap2Exp = afwImage.ExposureF(options.s2)

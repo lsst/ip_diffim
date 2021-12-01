@@ -30,8 +30,8 @@ import lsst.afw.image as afwImage
 import lsst.daf.base as dafBase
 import lsst.meas.algorithms as measAlg
 from lsst.ip.diffim import SnapPsfMatchTask, diffimTools
-import lsst.log.utils as logUtils
-logUtils.traceSetAt("lsst.ip.diffim", 4)
+import lsst.utils.logging as logUtils
+logUtils.trace_set_at("lsst.ip.diffim", 4)
 
 afwDisplay.setDefaultMaskTransparency(75)
 

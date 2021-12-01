@@ -25,10 +25,10 @@ import lsst.utils.tests
 import lsst.afw.image as afwImage
 import lsst.geom as geom
 import lsst.ip.diffim as ipDiffim
-import lsst.log.utils as logUtils
+import lsst.utils.logging as logUtils
 
 verbosity = 0
-logUtils.traceSetAt("lsst.ip.diffim", verbosity)
+logUtils.trace_set_at("lsst.ip.diffim", verbosity)
 
 
 class DiffimTestCases(unittest.TestCase):

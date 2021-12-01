@@ -31,10 +31,10 @@ import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.daf.base as dafBase
-import lsst.log.utils as logUtils
+import lsst.utils.logging as logUtils
 import lsst.meas.algorithms as measAlg
 
-logUtils.traceSetAt("lsst.ip.diffim", 4)
+logUtils.trace_set_at("lsst.ip.diffim", 4)
 
 
 class PsfMatchTestCases(unittest.TestCase):

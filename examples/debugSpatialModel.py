@@ -28,7 +28,7 @@ import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
-import lsst.log.utils as logUtils
+import lsst.utils.logging as logUtils
 
 afwDisplay.setDefaultMaskTransparency(75)
 
@@ -38,7 +38,7 @@ fwhm = 6.8
 warp = True
 
 verbosity = 4
-logUtils.traceSetAt("lsst.ip.diffim", verbosity)
+logUtils.trace_set_at("lsst.ip.diffim", verbosity)
 
 defDataDir = lsst.utils.getPackageDir('afwdata')
 imageProcDir = lsst.utils.getPackageDir('ip_diffim')
