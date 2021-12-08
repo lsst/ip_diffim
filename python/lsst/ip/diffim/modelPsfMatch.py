@@ -336,8 +336,10 @@ class ModelPsfMatchTask(PsfMatchTask):
         result = self._buildCellSet(exposure, referencePsfModel)
         kernelCellSet = result.kernelCellSet
         referencePsfModel = result.referencePsfModel
-        fwhmScience = exposure.getPsf().computeShape().getDeterminantRadius()*sigma2fwhm
-        fwhmModel = referencePsfModel.computeShape().getDeterminantRadius()*sigma2fwhm
+        sciAvgPos = exposure.getPsf().getAveragePosition()
+        modelAvgPos = referencePsfModel.getAveragePosition()
+        fwhmScience = exposure.getPsf().computeShape(sciAvgPos).getDeterminantRadius()*sigma2fwhm
+        fwhmModel = referencePsfModel.computeShape(modelAvgPos).getDeterminantRadius()*sigma2fwhm
 
         basisList = makeKernelBasisList(self.kConfig, fwhmScience, fwhmModel, metadata=self.metadata)
         spatialSolution, psfMatchingKernel, backgroundModel = self._solve(kernelCellSet, basisList)
