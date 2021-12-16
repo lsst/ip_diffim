@@ -30,6 +30,7 @@ from .psfMatch import *
 from .imagePsfMatch import *
 from .modelPsfMatch import *
 from .snapPsfMatch import *
+from .makeKernel import *
 from .makeKernelBasisList import *
 from .diaCatalogSourceSelector import *
 from .dipoleMeasurement import *
