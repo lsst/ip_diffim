@@ -111,59 +111,6 @@ class DcrModel:
         return cls(modelImages, effectiveWavelength, bandwidth,
                    filterLabel=filterLabel, psf=psf, mask=mask, variance=variance, photoCalib=photoCalib)
 
-    @classmethod
-    def fromDataRef(cls, dataRef, effectiveWavelength, bandwidth, datasetType="dcrCoadd", numSubfilters=None,
-                    **kwargs):
-        """Load an existing DcrModel from a Gen 2 repository.
-
-        Parameters
-        ----------
-        dataRef : `lsst.daf.persistence.ButlerDataRef`
-            Data reference defining the patch for coaddition and the
-            reference Warp
-        effectiveWavelength : `float`
-            The effective wavelengths of the current filter, in nanometers.
-        bandwidth : `float`
-            The bandwidth of the current filter, in nanometers.
-        datasetType : `str`, optional
-            Name of the DcrModel in the registry {"dcrCoadd", "dcrCoadd_sub"}
-        numSubfilters : `int`
-            Number of sub-filters used to model chromatic effects within a
-            band.
-        **kwargs
-            Additional keyword arguments to pass to look up the model in the
-            data registry.
-            Common keywords and their types include: ``tract``:`str`,
-            ``patch``:`str`, ``bbox``:`lsst.afw.geom.Box2I`
-
-        Returns
-        -------
-        dcrModel : `lsst.pipe.tasks.DcrModel`
-            Best fit model of the true sky after correcting chromatic effects.
-        """
-        modelImages = []
-        filterLabel = None
-        psf = None
-        mask = None
-        variance = None
-        photoCalib = None
-        if "subfilter" in kwargs:
-            kwargs.pop("subfilter")
-        for subfilter in range(numSubfilters):
-            dcrCoadd = dataRef.get(datasetType, subfilter=subfilter,
-                                   numSubfilters=numSubfilters, **kwargs)
-            if filterLabel is None:
-                filterLabel = dcrCoadd.getFilterLabel()
-            if psf is None:
-                psf = dcrCoadd.getPsf()
-            if mask is None:
-                mask = dcrCoadd.mask
-            if variance is None:
-                variance = dcrCoadd.variance
-            if photoCalib is None:
-                photoCalib = dcrCoadd.getPhotoCalib()
-            modelImages.append(dcrCoadd.image)
-        return cls(modelImages, effectiveWavelength, bandwidth, filterLabel, psf, mask, variance, photoCalib)
 
     @classmethod
     def fromQuantum(cls, availableCoaddRefs, effectiveWavelength, bandwidth):
