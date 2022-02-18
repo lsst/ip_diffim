@@ -50,13 +50,14 @@ class DcrModel:
     """
 
     def __init__(self, modelImages, effectiveWavelength, bandwidth, filterLabel=None, psf=None,
-                 mask=None, variance=None, photoCalib=None):
+                 bbox=None, mask=None, variance=None, photoCalib=None):
         self.dcrNumSubfilters = len(modelImages)
         self.modelImages = modelImages
         self._filterLabel = filterLabel
         self._effectiveWavelength = effectiveWavelength
         self._bandwidth = bandwidth
         self._psf = psf
+        self._bbox = bbox
         self._mask = mask
         self._variance = variance
         self.photoCalib = photoCalib
@@ -97,6 +98,7 @@ class DcrModel:
         # depending on the shift or convolution type used.
         model = maskedImage.image.clone()
         mask = maskedImage.mask.clone()
+        bbox = maskedImage.bbox
         # We divide the variance by N and not N**2 because we will assume each
         # subfilter is independent. That means that the significance of
         # detected sources will be lower by a factor of sqrt(N) in the
@@ -109,8 +111,8 @@ class DcrModel:
         for subfilter in range(1, dcrNumSubfilters):
             modelImages.append(model.clone())
         return cls(modelImages, effectiveWavelength, bandwidth,
-                   filterLabel=filterLabel, psf=psf, mask=mask, variance=variance, photoCalib=photoCalib)
-
+                   filterLabel=filterLabel, psf=psf, bbox=bbox,
+                   mask=mask, variance=variance, photoCalib=photoCalib)
 
     @classmethod
     def fromQuantum(cls, availableCoaddRefs, effectiveWavelength, bandwidth):
@@ -133,6 +135,7 @@ class DcrModel:
         """
         filterLabel = None
         psf = None
+        bbox = None
         mask = None
         variance = None
         photoCalib = None
@@ -145,6 +148,8 @@ class DcrModel:
                 filterLabel = dcrCoadd.getFilterLabel()
             if psf is None:
                 psf = dcrCoadd.getPsf()
+            if bbox is None:
+                bbox = dcrCoadd.getBBox()
             if mask is None:
                 mask = dcrCoadd.mask
             if variance is None:
@@ -152,7 +157,8 @@ class DcrModel:
             if photoCalib is None:
                 photoCalib = dcrCoadd.getPhotoCalib()
             modelImages[subfilter] = dcrCoadd.image
-        return cls(modelImages, effectiveWavelength, bandwidth, filterLabel, psf, mask, variance, photoCalib)
+        return cls(modelImages, effectiveWavelength, bandwidth, filterLabel,
+                   psf, bbox, mask, variance, photoCalib)
 
     def __len__(self):
         """Return the number of subfilters.
@@ -266,7 +272,7 @@ class DcrModel:
         bbox : `lsst.afw.geom.Box2I`
             Bounding box of the DCR model.
         """
-        return self[0].getBBox()
+        return self._bbox
 
     @property
     def mask(self):
@@ -384,9 +390,17 @@ class DcrModel:
         dcrShift = calculateDcr(visitInfo, wcs, self.effectiveWavelength, self.bandwidth, len(self),
                                 splitSubfilters=splitSubfilters)
         templateImage = afwImage.ImageF(bbox)
-        refModel = self.getReferenceImage(bbox)
+        refModel = None
         for subfilter, dcr in enumerate(dcrShift):
+            if self[subfilter] is None:
+                # It is possible to load only a single DCR subfilter at a time.
+                self.log.debug("Skipping missing DCR model subfilter %d", subfilter)
+                continue
             if amplifyModel > 1:
+                if refModel is None:
+                    # amplifyModel is only an option while constructing the DcrModel,
+                    # and we don't want to calculate a reference image during image differencing.
+                    refModel = self.getReferenceImage(bbox)
                 model = (self[subfilter][bbox].array - refModel)*amplifyModel + refModel
             else:
                 model = self[subfilter][bbox].array
