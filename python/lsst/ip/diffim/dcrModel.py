@@ -50,7 +50,7 @@ class DcrModel:
     """
 
     def __init__(self, modelImages, effectiveWavelength, bandwidth, filterLabel=None, psf=None,
-                 bbox=None, mask=None, variance=None, photoCalib=None):
+                 bbox=None, wcs=None, mask=None, variance=None, photoCalib=None):
         self.dcrNumSubfilters = len(modelImages)
         self.modelImages = modelImages
         self._filterLabel = filterLabel
@@ -58,13 +58,14 @@ class DcrModel:
         self._bandwidth = bandwidth
         self._psf = psf
         self._bbox = bbox
+        self._wcs = wcs
         self._mask = mask
         self._variance = variance
         self.photoCalib = photoCalib
 
     @classmethod
     def fromImage(cls, maskedImage, dcrNumSubfilters, effectiveWavelength, bandwidth,
-                  filterLabel=None, psf=None, photoCalib=None):
+                  wcs=None, filterLabel=None, psf=None, photoCalib=None):
         """Initialize a DcrModel by dividing a coadd between the subfilters.
 
         Parameters
@@ -78,6 +79,8 @@ class DcrModel:
             The effective wavelengths of the current filter, in nanometers.
         bandwidth : `float`
             The bandwidth of the current filter, in nanometers.
+        wcs : `lsst.afw.geom.SkyWcs`
+            Coordinate system definition (wcs) for the exposure.
         filterLabel : `lsst.afw.image.FilterLabel`, optional
             The filter label, set in the current instruments' obs package.
             Required for any calculation of DCR, including making matched
@@ -98,7 +101,7 @@ class DcrModel:
         # depending on the shift or convolution type used.
         model = maskedImage.image.clone()
         mask = maskedImage.mask.clone()
-        bbox = maskedImage.bbox
+        bbox = maskedImage.getBBox()
         # We divide the variance by N and not N**2 because we will assume each
         # subfilter is independent. That means that the significance of
         # detected sources will be lower by a factor of sqrt(N) in the
@@ -111,7 +114,7 @@ class DcrModel:
         for subfilter in range(1, dcrNumSubfilters):
             modelImages.append(model.clone())
         return cls(modelImages, effectiveWavelength, bandwidth,
-                   filterLabel=filterLabel, psf=psf, bbox=bbox,
+                   filterLabel=filterLabel, psf=psf, bbox=bbox, wcs=wcs,
                    mask=mask, variance=variance, photoCalib=photoCalib)
 
     @classmethod
@@ -136,6 +139,7 @@ class DcrModel:
         filterLabel = None
         psf = None
         bbox = None
+        wcs = None
         mask = None
         variance = None
         photoCalib = None
@@ -150,6 +154,8 @@ class DcrModel:
                 psf = dcrCoadd.getPsf()
             if bbox is None:
                 bbox = dcrCoadd.getBBox()
+            if wcs is None:
+                wcs = dcrCoadd.wcs
             if mask is None:
                 mask = dcrCoadd.mask
             if variance is None:
@@ -158,7 +164,7 @@ class DcrModel:
                 photoCalib = dcrCoadd.getPhotoCalib()
             modelImages[subfilter] = dcrCoadd.image
         return cls(modelImages, effectiveWavelength, bandwidth, filterLabel,
-                   psf, bbox, mask, variance, photoCalib)
+                   psf, bbox, wcs, mask, variance, photoCalib)
 
     def __len__(self):
         """Return the number of subfilters.
@@ -275,6 +281,17 @@ class DcrModel:
         return self._bbox
 
     @property
+    def wcs(self):
+        """Return the WCS of each subfilter image.
+
+        Returns
+        -------
+        bbox : `lsst.afw.geom.SkyWcs`
+            Coordinate system definition (wcs) for the exposure.
+        """
+        return self._wcs
+
+    @property
     def mask(self):
         """Return the common mask of each subfilter image.
 
@@ -337,7 +354,7 @@ class DcrModel:
             model.assign(subModel[bbox], bbox)
 
     def buildMatchedTemplate(self, exposure=None, order=3,
-                             visitInfo=None, bbox=None, wcs=None, mask=None,
+                             visitInfo=None, bbox=None, mask=None,
                              splitSubfilters=True, splitThreshold=0., amplifyModel=1.):
         """Create a DCR-matched template image for an exposure.
 
@@ -351,10 +368,7 @@ class DcrModel:
         visitInfo : `lsst.afw.image.VisitInfo`, optional
             Metadata for the exposure. Ignored if ``exposure`` is set.
         bbox : `lsst.afw.geom.Box2I`, optional
-            Sub-region of the coadd. Ignored if ``exposure`` is set.
-        wcs : `lsst.afw.geom.SkyWcs`, optional
-            Coordinate system definition (wcs) for the exposure.
-            Ignored if ``exposure`` is set.
+            Sub-region of the coadd, or use the entire coadd if not supplied.
         mask : `lsst.afw.image.Mask`, optional
             reference mask to use for the template image.
         splitSubfilters : `bool`, optional
@@ -375,19 +389,18 @@ class DcrModel:
         Raises
         ------
         ValueError
-            If neither ``exposure`` or all of ``visitInfo``, ``bbox``, and
-            ``wcs`` are set.
+            If neither ``exposure`` or ``visitInfo`` are set.
         """
         if self.effectiveWavelength is None or self.bandwidth is None:
             raise ValueError("'effectiveWavelength' and 'bandwidth' must be set for the DcrModel in order "
                              "to calculate DCR.")
         if exposure is not None:
             visitInfo = exposure.getInfo().getVisitInfo()
-            bbox = exposure.getBBox()
-            wcs = exposure.getInfo().getWcs()
-        elif visitInfo is None or bbox is None or wcs is None:
-            raise ValueError("Either exposure or visitInfo, bbox, and wcs must be set.")
-        dcrShift = calculateDcr(visitInfo, wcs, self.effectiveWavelength, self.bandwidth, len(self),
+        elif visitInfo is None:
+            raise ValueError("Either exposure or visitInfo must be set.")
+        if bbox is None:
+            bbox = self.bbox
+        dcrShift = calculateDcr(visitInfo, self.wcs, self.effectiveWavelength, self.bandwidth, len(self),
                                 splitSubfilters=splitSubfilters)
         templateImage = afwImage.ImageF(bbox)
         refModel = None
@@ -409,7 +422,7 @@ class DcrModel:
         return templateImage
 
     def buildMatchedExposure(self, exposure=None,
-                             visitInfo=None, bbox=None, wcs=None, mask=None):
+                             visitInfo=None, bbox=None, mask=None):
         """Wrapper to create an exposure from a template image.
 
         Parameters
@@ -420,10 +433,7 @@ class DcrModel:
         visitInfo : `lsst.afw.image.VisitInfo`, optional
             Metadata for the exposure. Ignored if ``exposure`` is set.
         bbox : `lsst.afw.geom.Box2I`, optional
-            Sub-region of the coadd. Ignored if ``exposure`` is set.
-        wcs : `lsst.afw.geom.SkyWcs`, optional
-            Coordinate system definition (wcs) for the exposure.
-            Ignored if ``exposure`` is set.
+            Sub-region of the coadd, or use the entire coadd if not supplied.
         mask : `lsst.afw.image.Mask`, optional
             reference mask to use for the template image.
 
@@ -438,9 +448,9 @@ class DcrModel:
             If no `photcCalib` is set.
         """
         if bbox is None:
-            bbox = exposure.getBBox()
+            bbox = self.bbox
         templateImage = self.buildMatchedTemplate(exposure=exposure, visitInfo=visitInfo,
-                                                  bbox=bbox, wcs=wcs, mask=mask)
+                                                  bbox=bbox, mask=mask)
         maskedImage = afwImage.MaskedImageF(bbox)
         maskedImage.image = templateImage[bbox]
         maskedImage.mask = self.mask[bbox]
@@ -448,7 +458,7 @@ class DcrModel:
         # The variance of the stacked image will be `dcrNumSubfilters`
         # times the variance of the individual subfilters.
         maskedImage.variance *= self.dcrNumSubfilters
-        templateExposure = afwImage.ExposureF(bbox, wcs)
+        templateExposure = afwImage.ExposureF(bbox, self.wcs)
         templateExposure.setMaskedImage(maskedImage[bbox])
         templateExposure.setPsf(self.psf)
         templateExposure.setFilterLabel(self.filterLabel)

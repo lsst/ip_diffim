@@ -350,7 +350,6 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
                 dcrBBox.grow(-self.config.templateBorderSize)
                 dcrBBox.include(patchInnerBBox)
                 coaddPatch = dcrModel.buildMatchedExposure(bbox=dcrBBox,
-                                                           wcs=coaddWcs,
                                                            visitInfo=visitInfo)
             else:
                 if sensorRef is None:
