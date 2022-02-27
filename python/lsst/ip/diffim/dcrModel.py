@@ -698,7 +698,7 @@ def applyDcr(image, dcr, useInverse=False, splitSubfilters=False, splitThreshold
     shiftedImage : `numpy.ndarray`
         A copy of the input image with the specified shift applied.
     """
-    if doPrefilter:
+    if doPrefilter and order > 1:
         prefilteredImage = ndimage.spline_filter(image, order=order)
     else:
         prefilteredImage = image
