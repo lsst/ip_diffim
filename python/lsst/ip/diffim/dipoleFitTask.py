@@ -20,6 +20,7 @@
 # see <https://www.lsstcorp.org/LegalNotices/>.
 #
 
+import logging
 import numpy as np
 import warnings
 
@@ -28,7 +29,6 @@ import lsst.meas.base as measBase
 import lsst.afw.table as afwTable
 import lsst.afw.detection as afwDet
 import lsst.geom as geom
-from lsst.log import Log
 import lsst.pex.exceptions as pexExcept
 import lsst.pex.config as pexConfig
 from lsst.pipe.base import Struct
@@ -188,7 +188,7 @@ class DipoleModel(object):
     def __init__(self):
         import lsstDebug
         self.debug = lsstDebug.Info(__name__).debug
-        self.log = Log.getLogger(__name__)
+        self.log = logging.getLogger(__name__)
 
     def makeBackgroundModel(self, in_x, pars=None):
         """Generate gradient model (2-d array) with up to 2nd-order polynomial
@@ -527,7 +527,7 @@ class DipoleFitAlgorithm(object):
         if diffim is not None:
             self.psfSigma = diffim.getPsf().computeShape().getDeterminantRadius()
 
-        self.log = Log.getLogger(__name__)
+        self.log = logging.getLogger(__name__)
 
         import lsstDebug
         self.debug = lsstDebug.Info(__name__).debug
@@ -976,7 +976,7 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
     def __init__(self, config, name, schema, metadata):
         measBase.SingleFramePlugin.__init__(self, config, name, schema, metadata)
 
-        self.log = Log.getLogger(name)
+        self.log = logging.getLogger(name)
 
         self._setupSchema(config, name, schema, metadata)
 
