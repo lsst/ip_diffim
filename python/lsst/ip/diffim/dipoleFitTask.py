@@ -144,7 +144,8 @@ class DipoleFitTask(measBase.SingleFrameMeasurementTask):
         dpFitPluginConfig = self.config.plugins['ip_diffim_DipoleFit']
 
         self.dipoleFitter = DipoleFitPlugin(dpFitPluginConfig, name=self._DefaultName,
-                                            schema=schema, metadata=algMetadata)
+                                            schema=schema, metadata=algMetadata,
+                                            logName=self.log.name)
 
     @timeMethod
     def run(self, sources, exposure, posExp=None, negExp=None, **kwargs):
@@ -973,10 +974,12 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
         """
         return cls.FLUX_ORDER
 
-    def __init__(self, config, name, schema, metadata):
-        measBase.SingleFramePlugin.__init__(self, config, name, schema, metadata)
+    def __init__(self, config, name, schema, metadata, logName=None):
+        if logName is None:
+            logName = name
+        measBase.SingleFramePlugin.__init__(self, config, name, schema, metadata, logName=logName)
 
-        self.log = logging.getLogger(name)
+        self.log = logging.getLogger(logName)
 
         self._setupSchema(config, name, schema, metadata)
 
