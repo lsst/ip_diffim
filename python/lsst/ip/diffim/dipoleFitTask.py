@@ -20,6 +20,7 @@
 # see <https://www.lsstcorp.org/LegalNotices/>.
 #
 
+import logging
 import numpy as np
 import warnings
 
@@ -28,7 +29,6 @@ import lsst.meas.base as measBase
 import lsst.afw.table as afwTable
 import lsst.afw.detection as afwDet
 import lsst.geom as geom
-from lsst.log import Log
 import lsst.pex.exceptions as pexExcept
 import lsst.pex.config as pexConfig
 from lsst.pipe.base import Struct
@@ -144,7 +144,8 @@ class DipoleFitTask(measBase.SingleFrameMeasurementTask):
         dpFitPluginConfig = self.config.plugins['ip_diffim_DipoleFit']
 
         self.dipoleFitter = DipoleFitPlugin(dpFitPluginConfig, name=self._DefaultName,
-                                            schema=schema, metadata=algMetadata)
+                                            schema=schema, metadata=algMetadata,
+                                            logName=self.log.name)
 
     @timeMethod
     def run(self, sources, exposure, posExp=None, negExp=None, **kwargs):
@@ -188,7 +189,7 @@ class DipoleModel(object):
     def __init__(self):
         import lsstDebug
         self.debug = lsstDebug.Info(__name__).debug
-        self.log = Log.getLogger(__name__)
+        self.log = logging.getLogger(__name__)
 
     def makeBackgroundModel(self, in_x, pars=None):
         """Generate gradient model (2-d array) with up to 2nd-order polynomial
@@ -527,7 +528,7 @@ class DipoleFitAlgorithm(object):
         if diffim is not None:
             self.psfSigma = diffim.getPsf().computeShape().getDeterminantRadius()
 
-        self.log = Log.getLogger(__name__)
+        self.log = logging.getLogger(__name__)
 
         import lsstDebug
         self.debug = lsstDebug.Info(__name__).debug
@@ -973,10 +974,12 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
         """
         return cls.FLUX_ORDER
 
-    def __init__(self, config, name, schema, metadata):
-        measBase.SingleFramePlugin.__init__(self, config, name, schema, metadata)
+    def __init__(self, config, name, schema, metadata, logName=None):
+        if logName is None:
+            logName = name
+        measBase.SingleFramePlugin.__init__(self, config, name, schema, metadata, logName=logName)
 
-        self.log = Log.getLogger(name)
+        self.log = logging.getLogger(logName)
 
         self._setupSchema(config, name, schema, metadata)
 
