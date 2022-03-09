@@ -334,7 +334,7 @@ class ImagePsfMatchTask(PsfMatchTask):
     def getFwhmPix(self, psf):
         """Return the FWHM in pixels of a Psf.
         """
-        sigPix = psf.computeShape().getDeterminantRadius()
+        sigPix = psf.computeShape(psf.getAveragePosition()).getDeterminantRadius()
         return sigPix*sigma2fwhm
 
     @timeMethod

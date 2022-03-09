@@ -527,7 +527,7 @@ class DipoleDeblender(object):
         fp.spans.setMask(fmask, 1)
 
         psf = exposure.getPsf()
-        psfSigPix = psf.computeShape().getDeterminantRadius()
+        psfSigPix = psf.computeShape(psf.getAveragePosition()).getDeterminantRadius()
         psfFwhmPix = psfSigPix * self.sigma2fwhm
         subimage = afwImage.ExposureF(exposure, bbox=fbb, deep=True)
         cpsf = deblendBaseline.CachingPsf(psf)

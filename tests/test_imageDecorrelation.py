@@ -338,8 +338,10 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
         """
         # Create the matching kernel. We used Gaussian PSFs for im1 and im2, so we can compute the "expected"
         # matching kernel sigma.
-        psf1_sig = self.im1ex.getPsf().computeShape().getDeterminantRadius()
-        psf2_sig = self.im2ex.getPsf().computeShape().getDeterminantRadius()
+        psf1pos = self.im1ex.getPsf().getAveragePosition()
+        psf2pos = self.im2ex.getPsf().getAveragePosition()
+        psf1_sig = self.im1ex.getPsf().computeShape(psf1pos).getDeterminantRadius()
+        psf2_sig = self.im2ex.getPsf().computeShape(psf2pos).getDeterminantRadius()
         sig_match = np.sqrt((psf1_sig**2. - psf2_sig**2.))
         # Sanity check - make sure PSFs are correct.
         self.assertFloatsAlmostEqual(sig_match, np.sqrt((self.psf1_sigma**2. - self.psf2_sigma**2.)),

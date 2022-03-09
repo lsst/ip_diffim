@@ -1046,7 +1046,8 @@ class DipoleTestImage(object):
         detectConfig = measAlg.SourceDetectionConfig()
         detectConfig.returnOriginalFootprints = False  # should be the default
 
-        psfSigma = diffim.getPsf().computeShape().getDeterminantRadius()
+        diffimPsf = diffim.getPsf()
+        psfSigma = diffimPsf.computeShape(diffimPsf.getAveragePosition()).getDeterminantRadius()
 
         # code from imageDifference.py:
         detectConfig.thresholdPolarity = "both"
