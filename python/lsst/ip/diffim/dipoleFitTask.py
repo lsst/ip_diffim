@@ -526,7 +526,9 @@ class DipoleFitAlgorithm(object):
         self.negImage = negImage
         self.psfSigma = None
         if diffim is not None:
-            self.psfSigma = diffim.getPsf().computeShape().getDeterminantRadius()
+            diffimPsf = diffim.getPsf()
+            diffimAvgPos = diffimPsf.getAveragePosition()
+            self.psfSigma = diffimPsf.computeShape(diffimAvgPos).getDeterminantRadius()
 
         self.log = logging.getLogger(__name__)
 

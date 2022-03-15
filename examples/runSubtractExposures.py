@@ -77,7 +77,8 @@ Notes:
     fwhmS = defFwhm
     if options.fwhmS:
         if scienceExposure.hasPsf():
-            fwhm = scienceExposure.getPsf().computeShape().getDeterminantRadius() * sigma2fwhm
+            sciPsf = scienceExposure.getPsf()
+            fwhm = sciPsf.computeShape(sciPsf.getAveragePosition()).getDeterminantRadius() * sigma2fwhm
             print('NOTE: Embedded Psf has FwhmS =', fwhm)
         print('USING: FwhmS =', options.fwhmS)
         fwhmS = options.fwhmS
@@ -85,7 +86,8 @@ Notes:
     fwhmT = defFwhm
     if options.fwhmT:
         if templateExposure.hasPsf():
-            fwhm = templateExposure.getPsf().computeShape().getDeterminantRadius() * sigma2fwhm
+            templPsf = templateExposure.getPsf()
+            fwhm = templPsf.computeShape(templPsf.getAveragePosition()).getDeterminantRadius() * sigma2fwhm
             print('NOTE: Embedded Psf has FwhmT =', fwhm)
         print('USING: FwhmT =', options.fwhmT)
         fwhmT = options.fwhmT

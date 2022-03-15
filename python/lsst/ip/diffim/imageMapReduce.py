@@ -660,8 +660,8 @@ class ImageMapReduceTask(pipeBase.Task):
 
         if cellCentroidsX is None or len(cellCentroidsX) <= 0:
             # Not given centroids; construct them from cellSize/gridStep
-
-            psfFwhm = (exposure.getPsf().computeShape().getDeterminantRadius()
+            psf = exposure.getPsf()
+            psfFwhm = (psf.computeShape(psf.getAveragePosition()).getDeterminantRadius()
                        * 2.*np.sqrt(2.*np.log(2.)))
             if scaleByFwhm:
                 self.log.info("Scaling grid parameters by %f", psfFwhm)
