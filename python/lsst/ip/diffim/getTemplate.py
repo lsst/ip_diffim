@@ -481,11 +481,11 @@ class GetCalexpAsTemplateTask(pipeBase.Task):
         raise NotImplementedError("Calexp template is not supported with gen3 middleware")
 
 
-class GetMultiTractCoaddTemplateConnections(pipeBase.PipelineTaskConnections,
-                                            dimensions=("instrument", "visit", "detector", "skymap"),
-                                            defaultTemplates={"coaddName": "goodSeeing",
-                                                              "warpTypeSuffix": "",
-                                                              "fakesType": ""}):
+class GetTemplateConnections(pipeBase.PipelineTaskConnections,
+                             dimensions=("instrument", "visit", "detector", "skymap"),
+                             defaultTemplates={"coaddName": "goodSeeing",
+                                               "warpTypeSuffix": "",
+                                               "fakesType": ""}):
     bbox = pipeBase.connectionTypes.Input(
         doc="BBoxes of calexp used determine geometry of output template",
         name="{fakesType}calexp.bbox",
@@ -522,8 +522,23 @@ class GetMultiTractCoaddTemplateConnections(pipeBase.PipelineTaskConnections,
     )
 
 
-class GetMultiTractCoaddTemplateConfig(pipeBase.PipelineTaskConfig, GetCoaddAsTemplateConfig,
-                                       pipelineConnections=GetMultiTractCoaddTemplateConnections):
+class GetTemplateConfig(pipeBase.PipelineTaskConfig,
+                        pipelineConnections=GetTemplateConnections):
+    templateBorderSize = pexConfig.Field(
+        dtype=int,
+        default=10,
+        doc="Number of pixels to grow the requested template image to account for warping"
+    )
+    coaddName = pexConfig.Field(
+        doc="coadd name: typically one of 'deep', 'goodSeeing', or 'dcr'",
+        dtype=str,
+        default="deep",
+    )
+    warpType = pexConfig.Field(
+        doc="Warp type of the coadd template: one of 'direct' or 'psfMatched'",
+        dtype=str,
+        default="direct",
+    )
     warp = pexConfig.ConfigField(
         dtype=afwMath.Warper.ConfigClass,
         doc="warper configuration",
@@ -538,9 +553,9 @@ class GetMultiTractCoaddTemplateConfig(pipeBase.PipelineTaskConfig, GetCoaddAsTe
         self.coaddPsf.warpingKernelName = 'lanczos5'
 
 
-class GetMultiTractCoaddTemplateTask(pipeBase.PipelineTask):
-    ConfigClass = GetMultiTractCoaddTemplateConfig
-    _DefaultName = "getMultiTractCoaddTemplateTask"
+class GetTemplateTask(pipeBase.PipelineTask):
+    ConfigClass = GetTemplateConfig
+    _DefaultName = "getTemplateTask"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -705,3 +720,14 @@ class GetMultiTractCoaddTemplateTask(pipeBase.PipelineTask):
         templateExposure.setFilterLabel(coaddPatch.getFilterLabel())
         templateExposure.setPhotoCalib(coaddPatch.getPhotoCalib())
         return pipeBase.Struct(outputExposure=templateExposure)
+class GetMultiTractCoaddTemplateConfig(GetTemplateConfig):
+    pass
+
+
+class GetMultiTractCoaddTemplateTask(GetTemplateTask):
+    ConfigClass = GetMultiTractCoaddTemplateConfig
+    _DefaultName = "getMultiTractCoaddTemplateTask"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.log.warn("GetMultiTractCoaddTemplateTask is deprecated. Use GetTemplateTask instead.")
