@@ -42,8 +42,6 @@ from lsst.utils.timer import timeMethod
 
 __all__ = ["ImagePsfMatchConfig", "ImagePsfMatchTask", "subtractAlgorithmRegistry"]
 
-sigma2fwhm = 2.*np.sqrt(2.*np.log(2.))
-
 
 class ImagePsfMatchConfig(pexConfig.Config):
     """Configuration for image-to-image Psf matching.
@@ -63,6 +61,17 @@ class ImagePsfMatchConfig(pexConfig.Config):
     selectMeasurement = pexConfig.ConfigurableField(
         target=SingleFrameMeasurementTask,
         doc="Initial measurements used to feed stars to kernel fitting",
+    )
+    fwhmExposureGrid = pexConfig.Field(
+        doc="Grid size to compute the average FWHM in an exposure",
+        dtype=int,
+        default=10,
+    )
+    fwhmExposureBuffer = pexConfig.Field(
+        doc="Fractional buffer margin to be left out of all sides of the image during construction"
+            "of grid to compute average FWHM in an exposure",
+        dtype=float,
+        default=0.05,
     )
 
     def setDefaults(self):
@@ -331,12 +340,6 @@ class ImagePsfMatchTask(PsfMatchTask):
         self.makeSubtask("selectDetection", schema=self.selectSchema)
         self.makeSubtask("selectMeasurement", schema=self.selectSchema, algMetadata=self.selectAlgMetadata)
 
-    def getFwhmPix(self, psf):
-        """Return the FWHM in pixels of a Psf.
-        """
-        sigPix = psf.computeShape(psf.getAveragePosition()).getDeterminantRadius()
-        return sigPix*sigma2fwhm
-
     @timeMethod
     def matchExposures(self, templateExposure, scienceExposure,
                        templateFwhmPix=None, scienceFwhmPix=None,
@@ -423,14 +426,16 @@ class ImagePsfMatchTask(PsfMatchTask):
             if not templateExposure.hasPsf():
                 self.log.warning("No estimate of Psf FWHM for template image")
             else:
-                templateFwhmPix = self.getFwhmPix(templateExposure.getPsf())
+                templateFwhmPix = templateExposure.getFwhmPix(self.config.fwhmExposureBuffer,
+                                                              self.config.fwhmExposureGrid)
                 self.log.info("templateFwhmPix: %s", templateFwhmPix)
 
         if scienceFwhmPix is None:
             if not scienceExposure.hasPsf():
                 self.log.warning("No estimate of Psf FWHM for science image")
             else:
-                scienceFwhmPix = self.getFwhmPix(scienceExposure.getPsf())
+                scienceFwhmPix = scienceExposure.getFwhmPix(self.config.fwhmExposureBuffer,
+                                                            self.config.fwhmExposureGrid)
                 self.log.info("scienceFwhmPix: %s", scienceFwhmPix)
 
         if convolveTemplate:
