@@ -36,6 +36,8 @@ from lsst.meas.algorithms import CoaddPsf, CoaddPsfConfig
 
 __all__ = ["GetCoaddAsTemplateTask", "GetCoaddAsTemplateConfig",
            "GetCalexpAsTemplateTask", "GetCalexpAsTemplateConfig",
+           "GetTemplateTask", "GetTemplateConfig",
+           "GetDcrTemplateTask", "GetDcrTemplateConfig",
            "GetMultiTractCoaddTemplateTask", "GetMultiTractCoaddTemplateConfig"]
 
 
@@ -50,33 +52,11 @@ class GetCoaddAsTemplateConfig(pexConfig.Config):
         dtype=str,
         default="deep",
     )
-    numSubfilters = pexConfig.Field(
-        doc="Number of subfilters in the DcrCoadd. Used only if ``coaddName``='dcr'",
-        dtype=int,
-        default=3,
-    )
-    effectiveWavelength = pexConfig.Field(
-        doc="Effective wavelength of the filter. Used only if ``coaddName``='dcr'",
-        optional=True,
-        dtype=float,
-    )
-    bandwidth = pexConfig.Field(
-        doc="Bandwidth of the physical filter. Used only if ``coaddName``='dcr'",
-        optional=True,
-        dtype=float,
-    )
     warpType = pexConfig.Field(
         doc="Warp type of the coadd template: one of 'direct' or 'psfMatched'",
         dtype=str,
         default="direct",
     )
-
-    def validate(self):
-        if self.coaddName == 'dcr':
-            if self.effectiveWavelength is None or self.bandwidth is None:
-                raise ValueError("The effective wavelength and bandwidth of the physical filter "
-                                 "must be set in the getTemplate config for DCR coadds. "
-                                 "Required until transmission curves are used in DM-13668.")
 
 
 class GetCoaddAsTemplateTask(pipeBase.Task):
@@ -132,8 +112,6 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
                 bbox=patchInfo.getOuterBBox(),
                 tract=tractInfo.getId(),
                 patch="%s,%s" % (patchInfo.getIndex()[0], patchInfo.getIndex()[1]),
-                subfilter=0,
-                numSubfilters=self.config.numSubfilters,
             )
 
             if sensorRef.datasetExists(**patchArgDict):
@@ -168,6 +146,7 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
                 a template coadd exposure assembled out of patches
             - ``sources`` :  `None` for this subtask
         """
+        self.log.warn("GetCoaddAsTemplateTask is deprecated. Use GetTemplateTask instead.")
         skyMap = butlerQC.get(skyMapRef)
         coaddExposureRefs = butlerQC.get(coaddExposureRefs)
         tracts = [ref.dataId['tract'] for ref in coaddExposureRefs]
@@ -175,7 +154,7 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
             tractInfo = skyMap[tracts[0]]
         else:
             raise RuntimeError("Templates constructed from multiple Tracts not supported by this task. "
-                               "Use GetMultiTractCoaddTemplateTask instead.")
+                               "Use GetTemplateTask instead.")
 
         detectorBBox = exposure.getBBox()
         detectorWcs = exposure.getWcs()
@@ -331,15 +310,9 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
                 self.log.info("Constructing DCR-matched template for patch %s",
                               availableCoaddRefs[patchNumber])
 
-                if sensorRef:
-                    dcrModel = DcrModel.fromDataRef(sensorRef,
-                                                    self.config.effectiveWavelength,
-                                                    self.config.bandwidth,
-                                                    **availableCoaddRefs[patchNumber])
-                else:
-                    dcrModel = DcrModel.fromQuantum(availableCoaddRefs[patchNumber],
-                                                    self.config.effectiveWavelength,
-                                                    self.config.bandwidth)
+                dcrModel = DcrModel.fromQuantum(availableCoaddRefs[patchNumber],
+                                                self.config.effectiveWavelength,
+                                                self.config.bandwidth)
                 # The edge pixels of the DcrCoadd may contain artifacts due to missing data.
                 # Each patch has significant overlap, and the contaminated edge pixels in
                 # a new patch will overwrite good pixels in the overlap region from
@@ -481,11 +454,11 @@ class GetCalexpAsTemplateTask(pipeBase.Task):
         raise NotImplementedError("Calexp template is not supported with gen3 middleware")
 
 
-class GetMultiTractCoaddTemplateConnections(pipeBase.PipelineTaskConnections,
-                                            dimensions=("instrument", "visit", "detector", "skymap"),
-                                            defaultTemplates={"coaddName": "goodSeeing",
-                                                              "warpTypeSuffix": "",
-                                                              "fakesType": ""}):
+class GetTemplateConnections(pipeBase.PipelineTaskConnections,
+                             dimensions=("instrument", "visit", "detector", "skymap"),
+                             defaultTemplates={"coaddName": "goodSeeing",
+                                               "warpTypeSuffix": "",
+                                               "fakesType": ""}):
     bbox = pipeBase.connectionTypes.Input(
         doc="BBoxes of calexp used determine geometry of output template",
         name="{fakesType}calexp.bbox",
@@ -493,7 +466,7 @@ class GetMultiTractCoaddTemplateConnections(pipeBase.PipelineTaskConnections,
         dimensions=("instrument", "visit", "detector"),
     )
     wcs = pipeBase.connectionTypes.Input(
-        doc="WCSs of calexps that we want to fetch the template for",
+        doc="WCS of the calexp that we want to fetch the template for",
         name="{fakesType}calexp.wcs",
         storageClass="Wcs",
         dimensions=("instrument", "visit", "detector"),
@@ -522,8 +495,13 @@ class GetMultiTractCoaddTemplateConnections(pipeBase.PipelineTaskConnections,
     )
 
 
-class GetMultiTractCoaddTemplateConfig(pipeBase.PipelineTaskConfig, GetCoaddAsTemplateConfig,
-                                       pipelineConnections=GetMultiTractCoaddTemplateConnections):
+class GetTemplateConfig(pipeBase.PipelineTaskConfig,
+                        pipelineConnections=GetTemplateConnections):
+    templateBorderSize = pexConfig.Field(
+        dtype=int,
+        default=10,
+        doc="Number of pixels to grow the requested template image to account for warping"
+    )
     warp = pexConfig.ConfigField(
         dtype=afwMath.Warper.ConfigClass,
         doc="warper configuration",
@@ -538,9 +516,9 @@ class GetMultiTractCoaddTemplateConfig(pipeBase.PipelineTaskConfig, GetCoaddAsTe
         self.coaddPsf.warpingKernelName = 'lanczos5'
 
 
-class GetMultiTractCoaddTemplateTask(pipeBase.PipelineTask):
-    ConfigClass = GetMultiTractCoaddTemplateConfig
-    _DefaultName = "getMultiTractCoaddTemplateTask"
+class GetTemplateTask(pipeBase.PipelineTask):
+    ConfigClass = GetTemplateConfig
+    _DefaultName = "getTemplate"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -549,14 +527,14 @@ class GetMultiTractCoaddTemplateTask(pipeBase.PipelineTask):
     def runQuantum(self, butlerQC, inputRefs, outputRefs):
         # Read in all inputs.
         inputs = butlerQC.get(inputRefs)
-        inputs['coaddExposures'] = self.getOverlappingExposures(inputs)
-        # SkyMap only needed for filtering without
-        inputs.pop('skyMap')
+        results = self.getOverlappingExposures(inputs)
+        inputs["coaddExposures"] = results.coaddExposures
+        inputs["dataIds"] = results.dataIds
         outputs = self.run(**inputs)
         butlerQC.put(outputs, outputRefs)
 
     def getOverlappingExposures(self, inputs):
-        """Return list of coaddExposure DeferredDatasetHandles that overlap detector
+        """Return lists of coadds and their corresponding dataIds that overlap the detector.
 
         The spatial index in the registry has generous padding and often supplies
         patches near, but not directly overlapping the detector.
@@ -564,13 +542,26 @@ class GetMultiTractCoaddTemplateTask(pipeBase.PipelineTask):
 
         Parameters
         ----------
-        inputs : `dict` of task Inputs
+        inputs : `dict` of task Inputs, containing:
+            - coaddExposureRefs : list of elements of type
+                                `lsst.daf.butler.DeferredDatasetHandle` of
+                                `lsst.afw.image.Exposure`
+                Data references to exposures that might overlap the detector.
+            - bbox : `lsst.geom.Box2I`
+                Template Bounding box of the detector geometry onto which to
+                resample the coaddExposures
+            - skyMap : `lsst.skymap.SkyMap`
+                Input definition of geometry/bbox and projection/wcs for template exposures
+            - wcs : `lsst.afw.geom.SkyWcs`
+                Template WCS onto which to resample the coaddExposures
 
         Returns
         -------
-        coaddExposures : list of elements of type
-                         `lsst.daf.butler.DeferredDatasetHandle` of
-                         `lsst.afw.image.Exposure`
+        result : `lsst.pipe.base.Struct` containing these fields:
+            - coaddExposures : `list` of elements of type `lsst.afw.image.Exposure`
+                Coadd exposures that overlap the detector.
+            - dataIds : `list` of `lsst.daf.butler.DataCoordinate`
+                Data IDs of the coadd exposures that overlap the detector.
 
         Raises
         ------
@@ -582,6 +573,7 @@ class GetMultiTractCoaddTemplateTask(pipeBase.PipelineTask):
         detectorPolygon = geom.Box2D(inputs['bbox'])
         overlappingArea = 0
         coaddExposureList = []
+        dataIds = []
         for coaddRef in inputs['coaddExposures']:
             dataId = coaddRef.dataId
             patchWcs = inputs['skyMap'][dataId['tract']].getWcs()
@@ -592,14 +584,16 @@ class GetMultiTractCoaddTemplateTask(pipeBase.PipelineTask):
                 overlappingArea += patchPolygon.intersectionSingle(detectorPolygon).calculateArea()
                 self.log.info("Using template input tract=%s, patch=%s" %
                               (dataId['tract'], dataId['patch']))
-                coaddExposureList.append(coaddRef)
+                coaddExposureList.append(coaddRef.get())
+                dataIds.append(dataId)
 
         if not overlappingArea:
             raise pipeBase.NoWorkFound('No patches overlap detector')
 
-        return coaddExposureList
+        return pipeBase.Struct(coaddExposures=coaddExposureList,
+                               dataIds=dataIds)
 
-    def run(self, coaddExposures, bbox, wcs):
+    def run(self, coaddExposures, bbox, wcs, dataIds, **kwargs):
         """Warp coadds from multiple tracts to form a template for image diff.
 
         Where the tracts overlap, the resulting template image is averaged.
@@ -608,26 +602,22 @@ class GetMultiTractCoaddTemplateTask(pipeBase.PipelineTask):
 
         Parameters
         ----------
-        coaddExposures: list of DeferredDatasetHandle to `lsst.afw.image.Exposure`
+        coaddExposures : `list` of `lsst.afw.image.Exposure`
             Coadds to be mosaicked
         bbox : `lsst.geom.Box2I`
             Template Bounding box of the detector geometry onto which to
             resample the coaddExposures
         wcs : `lsst.afw.geom.SkyWcs`
             Template WCS onto which to resample the coaddExposures
+        dataIds : `list` of `lsst.daf.butler.DataCoordinate`
+            Record of the tract and patch of each coaddExposure.
+        **kwargs
+            Any additional keyword parameters.
 
         Returns
         -------
-        result : `struct`
-            return a pipeBase.Struct:
+        result : `lsst.pipe.base.Struct` containing
             - ``outputExposure`` : a template coadd exposure assembled out of patches
-
-
-        Raises
-        ------
-        NoWorkFound
-            Raised if no patches overlatp the input detector bbox
-
         """
         # Table for CoaddPSF
         tractsSchema = afwTable.ExposureTable.makeMinimalSchema()
@@ -644,15 +634,14 @@ class GetMultiTractCoaddTemplateTask(pipeBase.PipelineTask):
         maskedImageList = []
         weightList = []
 
-        for coaddExposure in coaddExposures:
-            coaddPatch = coaddExposure.get()
+        for coaddExposure, dataId in zip(coaddExposures, dataIds):
 
             # warp to detector WCS
-            warped = self.warper.warpExposure(finalWcs, coaddPatch, maxBBox=finalBBox)
+            warped = self.warper.warpExposure(finalWcs, coaddExposure, maxBBox=finalBBox)
 
             # Check if warped image is viable
             if not np.any(np.isfinite(warped.image.array)):
-                self.log.info("No overlap for warped %s. Skipping" % coaddExposure.ref.dataId)
+                self.log.info("No overlap for warped %s. Skipping" % dataId)
                 continue
 
             exp = afwImage.ExposureF(finalBBox, finalWcs)
@@ -662,13 +651,13 @@ class GetMultiTractCoaddTemplateTask(pipeBase.PipelineTask):
             maskedImageList.append(exp.maskedImage)
             weightList.append(1)
             record = tractsCatalog.addNew()
-            record.setPsf(coaddPatch.getPsf())
-            record.setWcs(coaddPatch.getWcs())
-            record.setPhotoCalib(coaddPatch.getPhotoCalib())
-            record.setBBox(coaddPatch.getBBox())
-            record.setValidPolygon(afwGeom.Polygon(geom.Box2D(coaddPatch.getBBox()).getCorners()))
-            record.set(tractKey, coaddExposure.ref.dataId['tract'])
-            record.set(patchKey, coaddExposure.ref.dataId['patch'])
+            record.setPsf(coaddExposure.getPsf())
+            record.setWcs(coaddExposure.getWcs())
+            record.setPhotoCalib(coaddExposure.getPhotoCalib())
+            record.setBBox(coaddExposure.getBBox())
+            record.setValidPolygon(afwGeom.Polygon(geom.Box2D(coaddExposure.getBBox()).getCorners()))
+            record.set(tractKey, dataId['tract'])
+            record.set(patchKey, dataId['patch'])
             record.set(weightKey, 1.)
             nPatchesFound += 1
 
@@ -702,6 +691,200 @@ class GetMultiTractCoaddTemplateTask(pipeBase.PipelineTask):
             raise RuntimeError("CoaddPsf could not be constructed")
 
         templateExposure.setPsf(coaddPsf)
-        templateExposure.setFilterLabel(coaddPatch.getFilterLabel())
-        templateExposure.setPhotoCalib(coaddPatch.getPhotoCalib())
+        templateExposure.setFilterLabel(coaddExposure.getFilterLabel())
+        templateExposure.setPhotoCalib(coaddExposure.getPhotoCalib())
         return pipeBase.Struct(outputExposure=templateExposure)
+
+
+class GetDcrTemplateConnections(GetTemplateConnections,
+                                dimensions=("instrument", "visit", "detector", "skymap"),
+                                defaultTemplates={"coaddName": "dcr",
+                                                  "warpTypeSuffix": "",
+                                                  "fakesType": ""}):
+    visitInfo = pipeBase.connectionTypes.Input(
+        doc="VisitInfo of calexp used to determine observing conditions.",
+        name="{fakesType}calexp.visitInfo",
+        storageClass="VisitInfo",
+        dimensions=("instrument", "visit", "detector"),
+    )
+    dcrCoadds = pipeBase.connectionTypes.Input(
+        doc="Input DCR template to match and subtract from the exposure",
+        name="{fakesType}dcrCoadd{warpTypeSuffix}",
+        storageClass="ExposureF",
+        dimensions=("tract", "patch", "skymap", "band", "subfilter"),
+        multiple=True,
+        deferLoad=True
+    )
+
+    def __init__(self, *, config=None):
+        super().__init__(config=config)
+        self.inputs.remove("coaddExposures")
+
+
+class GetDcrTemplateConfig(GetTemplateConfig,
+                           pipelineConnections=GetDcrTemplateConnections):
+    numSubfilters = pexConfig.Field(
+        doc="Number of subfilters in the DcrCoadd.",
+        dtype=int,
+        default=3,
+    )
+    effectiveWavelength = pexConfig.Field(
+        doc="Effective wavelength of the filter.",
+        optional=False,
+        dtype=float,
+    )
+    bandwidth = pexConfig.Field(
+        doc="Bandwidth of the physical filter.",
+        optional=False,
+        dtype=float,
+    )
+
+    def validate(self):
+        if self.effectiveWavelength is None or self.bandwidth is None:
+            raise ValueError("The effective wavelength and bandwidth of the physical filter "
+                             "must be set in the getTemplate config for DCR coadds. "
+                             "Required until transmission curves are used in DM-13668.")
+
+
+class GetDcrTemplateTask(GetTemplateTask):
+    ConfigClass = GetDcrTemplateConfig
+    _DefaultName = "getDcrTemplate"
+
+    def getOverlappingExposures(self, inputs):
+        """Return lists of coadds and their corresponding dataIds that overlap the detector.
+
+        The spatial index in the registry has generous padding and often supplies
+        patches near, but not directly overlapping the detector.
+        Filters inputs so that we don't have to read in all input coadds.
+
+        Parameters
+        ----------
+        inputs : `dict` of task Inputs, containing:
+            - coaddExposureRefs : `list` of elements of type
+                                  `lsst.daf.butler.DeferredDatasetHandle` of
+                                  `lsst.afw.image.Exposure`
+                Data references to exposures that might overlap the detector.
+            - bbox : `lsst.geom.Box2I`
+                Template Bounding box of the detector geometry onto which to
+                resample the coaddExposures
+            - skyMap : `lsst.skymap.SkyMap`
+                Input definition of geometry/bbox and projection/wcs for template exposures
+            - wcs : `lsst.afw.geom.SkyWcs`
+                Template WCS onto which to resample the coaddExposures
+            - visitInfo : `lsst.afw.image.VisitInfo`
+                Metadata for the science image.
+
+        Returns
+        -------
+        result : `lsst.pipe.base.Struct` containing these fields:
+            - coaddExposures : `list` of elements of type `lsst.afw.image.Exposure`
+                Coadd exposures that overlap the detector.
+            - dataIds : `list` of `lsst.daf.butler.DataCoordinate`
+                Data IDs of the coadd exposures that overlap the detector.
+
+        Raises
+        ------
+        NoWorkFound
+            Raised if no patches overlatp the input detector bbox
+        """
+        # Check that the patches actually overlap the detector
+        # Exposure's validPolygon would be more accurate
+        detectorPolygon = geom.Box2D(inputs["bbox"])
+        overlappingArea = 0
+        coaddExposureRefList = []
+        dataIds = []
+        patchList = dict()
+        for coaddRef in inputs["dcrCoadds"]:
+            dataId = coaddRef.dataId
+            patchWcs = inputs["skyMap"][dataId['tract']].getWcs()
+            patchBBox = inputs["skyMap"][dataId['tract']][dataId['patch']].getOuterBBox()
+            patchCorners = patchWcs.pixelToSky(geom.Box2D(patchBBox).getCorners())
+            patchPolygon = afwGeom.Polygon(inputs["wcs"].skyToPixel(patchCorners))
+            if patchPolygon.intersection(detectorPolygon):
+                overlappingArea += patchPolygon.intersectionSingle(detectorPolygon).calculateArea()
+                self.log.info("Using template input tract=%s, patch=%s, subfilter=%s" %
+                              (dataId['tract'], dataId['patch'], dataId["subfilter"]))
+                coaddExposureRefList.append(coaddRef)
+                if dataId['tract'] in patchList:
+                    patchList[dataId['tract']].append(dataId['patch'])
+                else:
+                    patchList[dataId['tract']] = [dataId['patch'], ]
+                dataIds.append(dataId)
+
+        if not overlappingArea:
+            raise pipeBase.NoWorkFound('No patches overlap detector')
+
+        self.checkPatchList(patchList)
+
+        coaddExposures = self.getDcrModel(patchList, inputs['dcrCoadds'], inputs['visitInfo'])
+        return pipeBase.Struct(coaddExposures=coaddExposures,
+                               dataIds=dataIds)
+
+    def checkPatchList(self, patchList):
+        """Check that all of the DcrModel subfilters are present for each patch.
+
+        Parameters
+        ----------
+        patchList : `dict`
+            Dict of the patches containing valid data for each tract
+
+        Raises
+        ------
+        RuntimeError
+            If the number of exposures found for a patch does not match the number of subfilters.
+        """
+        for tract in patchList:
+            for patch in set(patchList[tract]):
+                if patchList[tract].count(patch) != self.config.numSubfilters:
+                    raise RuntimeError("Invalid number of DcrModel subfilters found: %d vs %d expected",
+                                       patchList[tract].count(patch), self.config.numSubfilters)
+
+    def getDcrModel(self, patchList, coaddRefs, visitInfo):
+        """Build DCR-matched coadds from a list of exposure references.
+
+        Parameters
+        ----------
+        patchList : `dict`
+            Dict of the patches containing valid data for each tract
+        coaddRefs : `list` of elements of type
+                    `lsst.daf.butler.DeferredDatasetHandle` of
+                    `lsst.afw.image.Exposure`
+            Data references to DcrModels that overlap the detector.
+        visitInfo : `lsst.afw.image.VisitInfo`
+            Metadata for the science image.
+
+        Returns
+        -------
+        `list` of elements of type `lsst.afw.image.Exposure`
+                Coadd exposures that overlap the detector.
+        """
+        coaddExposureList = []
+        for tract in patchList:
+            for patch in set(patchList[tract]):
+                coaddRefList = [coaddRef for coaddRef in coaddRefs
+                                if _selectDataRef(coaddRef, tract, patch)]
+
+                dcrModel = DcrModel.fromQuantum(coaddRefList,
+                                                self.config.effectiveWavelength,
+                                                self.config.bandwidth,
+                                                self.config.numSubfilters)
+                coaddExposureList.append(dcrModel.buildMatchedExposure(visitInfo=visitInfo))
+        return coaddExposureList
+
+
+def _selectDataRef(coaddRef, tract, patch):
+    condition = (coaddRef.dataId['tract'] == tract) & (coaddRef.dataId['patch'] == patch)
+    return condition
+
+
+class GetMultiTractCoaddTemplateConfig(GetTemplateConfig):
+    pass
+
+
+class GetMultiTractCoaddTemplateTask(GetTemplateTask):
+    ConfigClass = GetMultiTractCoaddTemplateConfig
+    _DefaultName = "getMultiTractCoaddTemplate"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.log.warn("GetMultiTractCoaddTemplateTask is deprecated. Use GetTemplateTask instead.")
