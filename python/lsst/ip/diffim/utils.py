@@ -33,9 +33,9 @@ import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.afw.table as afwTable
-from lsst.log import Log
 import lsst.meas.algorithms as measAlg
 import lsst.meas.base as measBase
+from lsst.utils.logging import getLogger
 from .dipoleFitTask import DipoleFitAlgorithm
 from . import diffimLib
 from . import diffimTools
@@ -724,7 +724,8 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
     allResids = fullIm[sidx]/np.sqrt(fullVar[sidx])
 
     testFootprints = diffimTools.sourceToFootprintList(testSources, warpedTemplateExposure,
-                                                       exposure, config, Log.getDefaultLogger())
+                                                       exposure, config,
+                                                       getLogger(__name__).getChild("plotPixelResiduals"))
     for fp in testFootprints:
         subexp = diffExposure.Factory(diffExposure, fp["footprint"].getBBox())
         subim = subexp.getMaskedImage().getImage()

@@ -23,8 +23,9 @@
 __all__ = ["makeKernelBasisList", "generateAlardLuptonBasisList"]
 
 from . import diffimLib
-from lsst.log import Log
 import numpy as np
+
+from lsst.utils.logging import getLogger
 
 sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
 
@@ -186,7 +187,7 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
     if (kernelSize % 2) != 1:
         raise ValueError("Only odd-sized Alard-Lupton bases allowed")
 
-    logger = Log.getLogger("lsst.ip.diffim.generateAlardLuptonBasisList")
+    logger = getLogger("lsst.ip.diffim.generateAlardLuptonBasisList")
     if (targetFwhmPix is None) or (referenceFwhmPix is None) or (not config.scaleByFwhm):
         logger.info("PSF sigmas are not available or scaling by fwhm disabled, "
                     "falling back to config values")
