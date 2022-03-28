@@ -29,9 +29,9 @@ import lsst.afw.image as afwImage
 import lsst.pex.config as pexConfig
 import lsst.afw.math as afwMath
 import lsst.afw.display as afwDisplay
-import lsst.log as log
 import lsst.pipe.base as pipeBase
 from lsst.meas.algorithms import SubtractBackgroundConfig
+from lsst.utils.logging import getTraceLogger
 from lsst.utils.timer import timeMethod
 from . import utils as diutils
 from . import diffimLib
@@ -845,9 +845,9 @@ class PsfMatchTask(pipeBase.Task):
         eSum = np.sum(eigenValues)
         if eSum == 0.0:
             raise RuntimeError("Eigenvalues sum to zero")
+        trace_logger = getTraceLogger(self.log.getChild("_solve"), 5)
         for j in range(len(eigenValues)):
-            log.log("TRACE5." + self.log.name + "._solve", log.DEBUG,
-                    "Eigenvalue %d : %f (%f)", j, eigenValues[j], eigenValues[j]/eSum)
+            trace_logger.debug("Eigenvalue %d : %f (%f)", j, eigenValues[j], eigenValues[j]/eSum)
 
         nToUse = min(nComponents, len(eigenValues))
         trimBasisList = []
@@ -921,6 +921,7 @@ class PsfMatchTask(pipeBase.Task):
         ksv = diffimLib.KernelSumVisitorF(ps)
 
         # Main loop
+        trace_loggers = [getTraceLogger(self.log.getChild("_solve"), i) for i in range(5)]
         t0 = time.time()
         try:
             totalIterations = 0
@@ -930,13 +931,13 @@ class PsfMatchTask(pipeBase.Task):
                 # Make sure there are no uninitialized candidates as active occupants of Cell
                 nRejectedSkf = -1
                 while (nRejectedSkf != 0):
-                    log.log("TRACE1." + self.log.name + "._solve", log.DEBUG,
-                            "Building single kernels...")
+                    trace_loggers[1].debug("Building single kernels...")
                     kernelCellSet.visitCandidates(singlekv, nStarPerCell)
                     nRejectedSkf = singlekv.getNRejected()
-                    log.log("TRACE1." + self.log.name + "._solve", log.DEBUG,
-                            "Iteration %d, rejected %d candidates due to initial kernel fit",
-                            thisIteration, nRejectedSkf)
+                    trace_loggers[1].debug(
+                        "Iteration %d, rejected %d candidates due to initial kernel fit",
+                        thisIteration, nRejectedSkf
+                    )
 
                 # Reject outliers in kernel sum
                 ksv.resetKernelSum()
@@ -947,9 +948,10 @@ class PsfMatchTask(pipeBase.Task):
                 kernelCellSet.visitCandidates(ksv, nStarPerCell)
 
                 nRejectedKsum = ksv.getNRejected()
-                log.log("TRACE1." + self.log.name + "._solve", log.DEBUG,
-                        "Iteration %d, rejected %d candidates due to kernel sum",
-                        thisIteration, nRejectedKsum)
+                trace_loggers[1].debug(
+                    "Iteration %d, rejected %d candidates due to kernel sum",
+                    thisIteration, nRejectedKsum
+                )
 
                 # Do we jump back to the top without incrementing thisIteration?
                 if nRejectedKsum > 0:
@@ -962,13 +964,13 @@ class PsfMatchTask(pipeBase.Task):
                 # the spatial fit to these kernels
 
                 if (usePcaForSpatialKernel):
-                    log.log("TRACE0." + self.log.name + "._solve", log.DEBUG,
-                            "Building Pca basis")
+                    trace_loggers[0].debug("Building Pca basis")
 
                     nRejectedPca, spatialBasisList = self._createPcaBasis(kernelCellSet, nStarPerCell, ps)
-                    log.log("TRACE1." + self.log.name + "._solve", log.DEBUG,
-                            "Iteration %d, rejected %d candidates due to Pca kernel fit",
-                            thisIteration, nRejectedPca)
+                    trace_loggers[1].debug(
+                        "Iteration %d, rejected %d candidates due to Pca kernel fit",
+                        thisIteration, nRejectedPca
+                    )
 
                     # We don't want to continue on (yet) with the
                     # spatial modeling, because we have bad objects
@@ -990,8 +992,7 @@ class PsfMatchTask(pipeBase.Task):
                 spatialkv = diffimLib.BuildSpatialKernelVisitorF(spatialBasisList, regionBBox, ps)
                 kernelCellSet.visitCandidates(spatialkv, nStarPerCell)
                 spatialkv.solveLinearEquation()
-                log.log("TRACE2." + self.log.name + "._solve", log.DEBUG,
-                        "Spatial kernel built with %d candidates", spatialkv.getNCandidates())
+                trace_loggers[2].debug("Spatial kernel built with %d candidates", spatialkv.getNCandidates())
                 spatialKernel, spatialBackground = spatialkv.getSolutionPair()
 
                 # Check the quality of the spatial fit (look at residuals)
@@ -999,11 +1000,11 @@ class PsfMatchTask(pipeBase.Task):
                 kernelCellSet.visitCandidates(assesskv, nStarPerCell)
                 nRejectedSpatial = assesskv.getNRejected()
                 nGoodSpatial = assesskv.getNGood()
-                log.log("TRACE1." + self.log.name + "._solve", log.DEBUG,
-                        "Iteration %d, rejected %d candidates due to spatial kernel fit",
-                        thisIteration, nRejectedSpatial)
-                log.log("TRACE1." + self.log.name + "._solve", log.DEBUG,
-                        "%d candidates used in fit", nGoodSpatial)
+                trace_loggers[1].debug(
+                    "Iteration %d, rejected %d candidates due to spatial kernel fit",
+                    thisIteration, nRejectedSpatial
+                )
+                trace_loggers[1].debug("%d candidates used in fit", nGoodSpatial)
 
                 # If only nGoodSpatial == 0, might be other candidates in the cells
                 if nGoodSpatial == 0 and nRejectedSpatial == 0:
@@ -1018,15 +1019,14 @@ class PsfMatchTask(pipeBase.Task):
 
             # Final fit if above did not converge
             if (nRejectedSpatial > 0) and (thisIteration == maxSpatialIterations):
-                log.log("TRACE1." + self.log.name + "._solve", log.DEBUG, "Final spatial fit")
+                trace_loggers[1].debug("Final spatial fit")
                 if (usePcaForSpatialKernel):
                     nRejectedPca, spatialBasisList = self._createPcaBasis(kernelCellSet, nStarPerCell, ps)
                 regionBBox = kernelCellSet.getBBox()
                 spatialkv = diffimLib.BuildSpatialKernelVisitorF(spatialBasisList, regionBBox, ps)
                 kernelCellSet.visitCandidates(spatialkv, nStarPerCell)
                 spatialkv.solveLinearEquation()
-                log.log("TRACE2." + self.log.name + "._solve", log.DEBUG,
-                        "Spatial kernel built with %d candidates", spatialkv.getNCandidates())
+                trace_loggers[2].debug("Spatial kernel built with %d candidates", spatialkv.getNCandidates())
                 spatialKernel, spatialBackground = spatialkv.getSolutionPair()
 
             spatialSolution = spatialkv.getKernelSolution()
@@ -1034,12 +1034,11 @@ class PsfMatchTask(pipeBase.Task):
         except Exception as e:
             self.log.error("ERROR: Unable to calculate psf matching kernel")
 
-            log.log("TRACE1." + self.log.name + "._solve", log.DEBUG, "%s", e)
+            trace_loggers[1].debug("%s", e)
             raise e
 
         t1 = time.time()
-        log.log("TRACE0." + self.log.name + "._solve", log.DEBUG,
-                "Total time to compute the spatial kernel : %.2f s", (t1 - t0))
+        trace_loggers[0].debug("Total time to compute the spatial kernel : %.2f s", (t1 - t0))
 
         if display:
             self._displayDebug(kernelCellSet, spatialKernel, spatialBackground)
