@@ -21,6 +21,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import logging
 import os
 import sys
 import unittest
@@ -33,13 +34,12 @@ import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.ip.diffim as ipDiffim
 import lsst.ip.diffim.diffimTools as diffimTools
-from lsst.log import Log
 import lsst.utils.logging as logUtils
 import lsst.pex.config as pexConfig
 
 logUtils.trace_set_at("lsst.ip.diffim", 6)
-logger = Log.getLogger("lsst.ip.diffim.compareLambdaTypes")
-logger.setLevel(Log.DEBUG)
+logger = logUtils.getLogger("lsst.ip.diffim.compareLambdaTypes")
+logger.setLevel(logging.DEBUG)
 
 display = True
 writefits = False

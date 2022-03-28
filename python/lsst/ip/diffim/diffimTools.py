@@ -37,8 +37,8 @@ import lsst.afw.table as afwTable
 import lsst.afw.detection as afwDetect
 import lsst.afw.math as afwMath
 import lsst.geom as geom
-from lsst.log import Log
 import lsst.pex.config as pexConfig
+from lsst.utils.logging import getLogger
 from .makeKernelBasisList import makeKernelBasisList
 
 # Helper functions for ipDiffim; mostly viewing of results and writing
@@ -323,7 +323,7 @@ def backgroundSubtract(config, maskedImages):
         del backobj
 
     t1 = time.time()
-    logger = Log.getLogger("lsst.ip.diffim.backgroundSubtract")
+    logger = getLogger("lsst.ip.diffim.backgroundSubtract")
     logger.debug("Total time for background subtraction : %.2f s", (t1 - t0))
     return backgrounds
 

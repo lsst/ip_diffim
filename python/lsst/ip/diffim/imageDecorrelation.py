@@ -25,7 +25,6 @@ import numpy as np
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.geom as geom
-import lsst.log
 import lsst.meas.algorithms as measAlg
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
@@ -739,7 +738,7 @@ class DecorrelateALKernelMapper(DecorrelateALKernelTask, ImageMapper):
 
         # Prevent too much log INFO verbosity from DecorrelateALKernelTask.run
         logLevel = self.log.getLevel()
-        self.log.setLevel(lsst.log.WARN)
+        self.log.setLevel(self.log.WARNING)
         res = DecorrelateALKernelTask.run(self, subExp2, subExp1, expandedSubExposure,
                                           psfMatchingKernel, preConvKernel, **kwargs)
         self.log.setLevel(logLevel)  # reset the log level
