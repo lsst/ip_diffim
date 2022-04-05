@@ -1,9 +1,10 @@
+# This file is part of ip_diffim.
 #
-# LSST Data Management System
-# Copyright 2016 LSST Corporation.
-#
-# This product includes software developed by the
-# LSST Project (http://www.lsst.org/).
+# Developed for the LSST Data Management System.
+# This product includes software developed by the LSST Project
+# (https://www.lsst.org).
+# See the COPYRIGHT file at the top-level directory of this distribution
+# for details of code ownership.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -12,14 +13,11 @@
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.    See the
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
-# You should have received a copy of the LSST License Statement and
-# the GNU General Public License along with this program.  If not,
-# see <http://www.lsstcorp.org/LegalNotices/>.
-#
-
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
 
 import lsst.afw.image as afwImage
@@ -66,14 +64,14 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
 
     Notes
     -----
-    From the given skymap, the closest tract is selected;  multiple tracts  are
+    From the given skymap, the closest tract is selected; multiple tracts are
     not supported. The assembled template inherits the WCS of the selected
     skymap tract and the resolution of the template exposures. Overlapping box
     regions of the input template patches are pixel by pixel copied into the
     assembled template image. There is no warping or pixel resampling.
 
-    Pixels with no overlap of any available input patches are set to ``nan`` value
-    and ``NO_DATA`` flagged.
+    Pixels with no overlap of any available input patches are set to ``nan``
+    value and ``NO_DATA`` flagged.
     """
 
     ConfigClass = GetCoaddAsTemplateConfig
@@ -86,7 +84,8 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
         Parameters
         ----------
         exposure : `lsst.afw.image.Exposure`
-            The science exposure to define the sky region of the template coadd.
+            The science exposure to define the sky region of the template
+            coadd.
         butlerQC : `lsst.pipe.base.ButlerQuantumContext`
             Butler like object that supports getting data by DatasetRef.
         skyMapRef : `lsst.daf.butler.DatasetRef`
@@ -97,11 +96,16 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
         Returns
         -------
         result : `lsst.pipe.base.Struct`
-            - ``exposure`` : `lsst.afw.image.ExposureF`
-                a template coadd exposure assembled out of patches
-            - ``sources`` :  `None` for this subtask
+           A struct with attibutes:
+
+            ``exposure``
+                Template coadd exposure assembled out of patches
+                (`lsst.afw.image.ExposureF`).
+            ``sources``
+                Always `None` for this subtask.
+
         """
-        self.log.warn("GetCoaddAsTemplateTask is deprecated. Use GetTemplateTask instead.")
+        self.log.warning("GetCoaddAsTemplateTask is deprecated. Use GetTemplateTask instead.")
         skyMap = butlerQC.get(skyMapRef)
         coaddExposureRefs = butlerQC.get(coaddExposureRefs)
         tracts = [ref.dataId['tract'] for ref in coaddExposureRefs]
@@ -163,12 +167,14 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
         return pipeBase.Struct(exposure=templateExposure, sources=None, area=pixGood)
 
     def getOverlapPatchList(self, exposure, skyMap):
-        """Select the relevant tract and its patches that overlap with the science exposure.
+        """Select the relevant tract and its patches that overlap with the
+        science exposure.
 
         Parameters
         ----------
         exposure : `lsst.afw.image.Exposure`
-            The science exposure to define the sky region of the template coadd.
+            The science exposure to define the sky region of the template
+            coadd.
 
         skyMap : `lsst.skymap.BaseSkyMap`
             SkyMap object that corresponds to the template coadd.
@@ -178,10 +184,11 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
         result : `tuple` of
          - ``tractInfo`` : `lsst.skymap.TractInfo`
              The selected tract.
-         - ``patchList`` : `list` of `lsst.skymap.PatchInfo`
+         - ``patchList`` : `list` [`lsst.skymap.PatchInfo`]
              List of all overlap patches of the selected tract.
-         - ``skyCorners`` : `list` of `lsst.geom.SpherePoint`
-             Corners of the exposure in the sky in the order given by `lsst.geom.Box2D.getCorners`.
+         - ``skyCorners`` : `list` [`lsst.geom.SpherePoint`]
+             Corners of the exposure in the sky in the order given by
+             `lsst.geom.Box2D.getCorners`.
         """
         expWcs = exposure.getWcs()
         expBoxD = geom.Box2D(exposure.getBBox())
@@ -213,7 +220,7 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
             The selected tract.
         patchList : iterable of `lsst.skymap.patchInfo.PatchInfo`
             Patches to consider for making the template exposure.
-        skyCorners : list of `lsst.geom.SpherePoint`
+        skyCorners : `list` [`lsst.geom.SpherePoint`]
             Sky corner coordinates to be covered by the template exposure.
         availableCoaddRefs : `dict` [`int`]
             Dictionary of spatially relevant retrieved coadd patches,
@@ -226,7 +233,7 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
 
         Returns
         -------
-        templateExposure: `lsst.afw.image.ExposureF`
+        templateExposure : `lsst.afw.image.ExposureF`
             The created template exposure.
         """
         if sensorRef is not None:
@@ -275,10 +282,10 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
                 dcrModel = DcrModel.fromQuantum(availableCoaddRefs[patchNumber],
                                                 self.config.effectiveWavelength,
                                                 self.config.bandwidth)
-                # The edge pixels of the DcrCoadd may contain artifacts due to missing data.
-                # Each patch has significant overlap, and the contaminated edge pixels in
-                # a new patch will overwrite good pixels in the overlap region from
-                # previous patches.
+                # The edge pixels of the DcrCoadd may contain artifacts due to
+                # missing data.  Each patch has significant overlap, and the
+                # contaminated edge pixels in a new patch will overwrite good
+                # pixels in the overlap region from previous patches.
                 # Shrink the BBox to remove the contaminated pixels,
                 # but make sure it is only the overlap region that is reduced.
                 dcrBBox = geom.Box2I(patchSubBBox)
@@ -300,11 +307,12 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
             if coaddFilterLabel is None:
                 coaddFilterLabel = coaddPatch.getFilter()
 
-            # Retrieve the PSF for this coadd tract, if not already retrieved
+            # Retrieve the PSF for this coadd tract, if not already retrieved.
             if coaddPsf is None and coaddPatch.hasPsf():
                 coaddPsf = coaddPatch.getPsf()
 
-            # Retrieve the calibration for this coadd tract, if not already retrieved
+            # Retrieve the calibration for this coadd tract, if not already
+            # retrieved>
             if coaddPhotoCalib is None:
                 coaddPhotoCalib = coaddPatch.getPhotoCalib()
 
@@ -414,39 +422,45 @@ class GetTemplateTask(pipeBase.PipelineTask):
         butlerQC.put(outputs, outputRefs)
 
     def getOverlappingExposures(self, inputs):
-        """Return lists of coadds and their corresponding dataIds that overlap the detector.
+        """Return lists of coadds and their corresponding dataIds that overlap
+        the detector.
 
-        The spatial index in the registry has generous padding and often supplies
-        patches near, but not directly overlapping the detector.
+        The spatial index in the registry has generous padding and often
+        supplies patches near, but not directly overlapping the detector.
         Filters inputs so that we don't have to read in all input coadds.
 
         Parameters
         ----------
         inputs : `dict` of task Inputs, containing:
-            - coaddExposureRefs : list of elements of type
-                                `lsst.daf.butler.DeferredDatasetHandle` of
-                                `lsst.afw.image.Exposure`
+            - coaddExposureRefs : `list`
+                                [`lsst.daf.butler.DeferredDatasetHandle` of
+                                `lsst.afw.image.Exposure`]
                 Data references to exposures that might overlap the detector.
             - bbox : `lsst.geom.Box2I`
                 Template Bounding box of the detector geometry onto which to
-                resample the coaddExposures
+                resample the coaddExposures.
             - skyMap : `lsst.skymap.SkyMap`
-                Input definition of geometry/bbox and projection/wcs for template exposures
+                Input definition of geometry/bbox and projection/wcs for
+                template exposures.
             - wcs : `lsst.afw.geom.SkyWcs`
-                Template WCS onto which to resample the coaddExposures
+                Template WCS onto which to resample the coaddExposures.
 
         Returns
         -------
-        result : `lsst.pipe.base.Struct` containing these fields:
-            - coaddExposures : `list` of elements of type `lsst.afw.image.Exposure`
-                Coadd exposures that overlap the detector.
-            - dataIds : `list` of `lsst.daf.butler.DataCoordinate`
-                Data IDs of the coadd exposures that overlap the detector.
+        result : `lsst.pipe.base.Struct`
+           A struct with attributes:
+
+           ``coaddExposures``
+               List of Coadd exposures that overlap the detector (`list`
+               [`lsst.afw.image.Exposure`]).
+           ``dataIds``
+               List of data IDs of the coadd exposures that overlap the
+               detector (`list` [`lsst.daf.butler.DataCoordinate`]).
 
         Raises
         ------
         NoWorkFound
-            Raised if no patches overlap the input detector bbox
+            Raised if no patches overlap the input detector bbox.
         """
         # Check that the patches actually overlap the detector
         # Exposure's validPolygon would be more accurate
@@ -486,22 +500,26 @@ class GetTemplateTask(pipeBase.PipelineTask):
 
         Parameters
         ----------
-        coaddExposures : `list` of `lsst.afw.image.Exposure`
-            Coadds to be mosaicked
+        coaddExposures : `list` [`lsst.afw.image.Exposure`]
+            Coadds to be mosaicked.
         bbox : `lsst.geom.Box2I`
             Template Bounding box of the detector geometry onto which to
-            resample the coaddExposures
+            resample the ``coaddExposures``.
         wcs : `lsst.afw.geom.SkyWcs`
-            Template WCS onto which to resample the coaddExposures
-        dataIds : `list` of `lsst.daf.butler.DataCoordinate`
+            Template WCS onto which to resample the ``coaddExposures``.
+        dataIds : `list` [`lsst.daf.butler.DataCoordinate`]
             Record of the tract and patch of each coaddExposure.
         **kwargs
             Any additional keyword parameters.
 
         Returns
         -------
-        result : `lsst.pipe.base.Struct` containing
-            - ``template`` : a template coadd exposure assembled out of patches
+        result : `lsst.pipe.base.Struct`
+           A struct with attributes:
+
+           ``template``
+               A template coadd exposure assembled out of patches
+               (`lsst.afw.image.ExposureF`).
         """
         # Table for CoaddPSF
         tractsSchema = afwTable.ExposureTable.makeMinimalSchema()
@@ -563,8 +581,8 @@ class GetTemplateTask(pipeBase.PipelineTask):
                                                                weightList, clipped=0, maskMap=[])
         templateExposure.maskedImage.setXY0(xy0)
 
-        # CoaddPsf centroid not only must overlap image, but must overlap the part of
-        # image with data. Use centroid of region with data
+        # CoaddPsf centroid not only must overlap image, but must overlap the
+        # part of image with data. Use centroid of region with data.
         boolmask = templateExposure.mask.array & templateExposure.mask.getPlaneBitMask('NO_DATA') == 0
         maskx = afwImage.makeMaskFromArray(boolmask.astype(afwImage.MaskPixel))
         centerCoord = afwGeom.SpanSet.fromMask(maskx, 1).computeCentroid()
@@ -635,41 +653,47 @@ class GetDcrTemplateTask(GetTemplateTask):
     _DefaultName = "getDcrTemplate"
 
     def getOverlappingExposures(self, inputs):
-        """Return lists of coadds and their corresponding dataIds that overlap the detector.
+        """Return lists of coadds and their corresponding dataIds that overlap
+        the detector.
 
-        The spatial index in the registry has generous padding and often supplies
-        patches near, but not directly overlapping the detector.
+        The spatial index in the registry has generous padding and often
+        supplies patches near, but not directly overlapping the detector.
         Filters inputs so that we don't have to read in all input coadds.
 
         Parameters
         ----------
         inputs : `dict` of task Inputs, containing:
-            - coaddExposureRefs : `list` of elements of type
-                                  `lsst.daf.butler.DeferredDatasetHandle` of
-                                  `lsst.afw.image.Exposure`
+            - coaddExposureRefs : `list`
+                                  [`lsst.daf.butler.DeferredDatasetHandle` of
+                                  `lsst.afw.image.Exposure`]
                 Data references to exposures that might overlap the detector.
             - bbox : `lsst.geom.Box2I`
                 Template Bounding box of the detector geometry onto which to
-                resample the coaddExposures
+                resample the coaddExposures.
             - skyMap : `lsst.skymap.SkyMap`
-                Input definition of geometry/bbox and projection/wcs for template exposures
+                Input definition of geometry/bbox and projection/wcs for
+                template exposures.
             - wcs : `lsst.afw.geom.SkyWcs`
-                Template WCS onto which to resample the coaddExposures
+                Template WCS onto which to resample the coaddExposures.
             - visitInfo : `lsst.afw.image.VisitInfo`
                 Metadata for the science image.
 
         Returns
         -------
-        result : `lsst.pipe.base.Struct` containing these fields:
-            - coaddExposures : `list` of elements of type `lsst.afw.image.Exposure`
-                Coadd exposures that overlap the detector.
-            - dataIds : `list` of `lsst.daf.butler.DataCoordinate`
-                Data IDs of the coadd exposures that overlap the detector.
+        result : `lsst.pipe.base.Struct`
+           A struct with attibutes:
+
+           ``coaddExposures``
+               Coadd exposures that overlap the detector (`list`
+               [`lsst.afw.image.Exposure`]).
+           ``dataIds``
+               Data IDs of the coadd exposures that overlap the detector
+               (`list` [`lsst.daf.butler.DataCoordinate`]).
 
         Raises
         ------
         NoWorkFound
-            Raised if no patches overlatp the input detector bbox
+            Raised if no patches overlatp the input detector bbox.
         """
         # Check that the patches actually overlap the detector
         # Exposure's validPolygon would be more accurate
@@ -705,17 +729,19 @@ class GetDcrTemplateTask(GetTemplateTask):
                                dataIds=dataIds)
 
     def checkPatchList(self, patchList):
-        """Check that all of the DcrModel subfilters are present for each patch.
+        """Check that all of the DcrModel subfilters are present for each
+        patch.
 
         Parameters
         ----------
         patchList : `dict`
-            Dict of the patches containing valid data for each tract
+            Dict of the patches containing valid data for each tract.
 
         Raises
         ------
         RuntimeError
-            If the number of exposures found for a patch does not match the number of subfilters.
+            If the number of exposures found for a patch does not match the
+            number of subfilters.
         """
         for tract in patchList:
             for patch in set(patchList[tract]):
@@ -729,18 +755,17 @@ class GetDcrTemplateTask(GetTemplateTask):
         Parameters
         ----------
         patchList : `dict`
-            Dict of the patches containing valid data for each tract
-        coaddRefs : `list` of elements of type
-                    `lsst.daf.butler.DeferredDatasetHandle` of
-                    `lsst.afw.image.Exposure`
-            Data references to DcrModels that overlap the detector.
+            Dict of the patches containing valid data for each tract.
+        coaddRefs : `list` [`lsst.daf.butler.DeferredDatasetHandle`]
+            Data references to `~lsst.afw.image.Exposure` representing
+            DcrModels that overlap the detector.
         visitInfo : `lsst.afw.image.VisitInfo`
             Metadata for the science image.
 
         Returns
         -------
-        `list` of elements of type `lsst.afw.image.Exposure`
-                Coadd exposures that overlap the detector.
+        coaddExposureList : `list` [`lsst.afw.image.Exposure`]
+            Coadd exposures that overlap the detector.
         """
         coaddExposureList = []
         for tract in patchList:
@@ -771,4 +796,4 @@ class GetMultiTractCoaddTemplateTask(GetTemplateTask):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.log.warn("GetMultiTractCoaddTemplateTask is deprecated. Use GetTemplateTask instead.")
+        self.log.warning("GetMultiTractCoaddTemplateTask is deprecated. Use GetTemplateTask instead.")
