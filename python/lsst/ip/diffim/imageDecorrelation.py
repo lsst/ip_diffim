@@ -230,21 +230,6 @@ class DecorrelateALKernelTask(pipeBase.Task):
         self.log.info("Original variance plane means. Science:%.5e, warped template:%.5e)",
                       svar, tvar)
 
-        if templateMatched:
-            # Regular subtraction, we convolved the template
-            self.log.info("Decorrelation after template image convolution")
-            expVar = svar
-            matchedVar = tvar
-            exposure = scienceExposure
-            matchedExposure = templateExposure
-        else:
-            # We convolved the science image
-            self.log.info("Decorrelation after science image convolution")
-            expVar = tvar
-            matchedVar = svar
-            exposure = templateExposure
-            matchedExposure = scienceExposure
-
         # Should not happen unless entire image has been masked, which could happen
         # if this is a small subimage of the main exposure. In this case, just return a full NaN
         # exposure
@@ -256,13 +241,32 @@ class DecorrelateALKernelTask(pipeBase.Task):
                 outExposure = subtractedExposure.clone()
                 return pipeBase.Struct(correctedExposure=outExposure, )
 
-        # The maximal correction value converges to sqrt(matchedVar/expVar).
+        if templateMatched:
+            # Regular subtraction, we convolved the template
+            self.log.info("Decorrelation after template image convolution")
+            varianceMean = svar
+            targetVarianceMean = tvar
+            # variance plane of the image that is not convolved
+            variance = scienceExposure.variance.array
+            # Variance plane of the convolved image, before convolution.
+            targetVariance = templateExposure.variance.array
+        else:
+            # We convolved the science image
+            self.log.info("Decorrelation after science image convolution")
+            varianceMean = tvar
+            targetVarianceMean = svar
+            # variance plane of the image that is not convolved
+            variance = templateExposure.variance.array
+            # Variance plane of the convolved image, before convolution.
+            targetVariance = scienceExposure.variance.array
+
+        # The maximal correction value converges to sqrt(targetVarianceMean/varianceMean).
         # Correction divergence warning if the correction exceeds 4 orders of magnitude.
-        mOverExpVar = matchedVar/expVar
+        mOverExpVar = targetVarianceMean/varianceMean
         if mOverExpVar > 1e8:
             self.log.warning("Diverging correction: matched image variance is "
                              " much larger than the unconvolved one's"
-                             ", matchedVar/expVar:%.2e", mOverExpVar)
+                             ", targetVarianceMean/varianceMean:%.2e", mOverExpVar)
 
         oldVarMean = self.computeVarianceMean(subtractedExposure)
         self.log.info("Variance plane mean of uncorrected diffim: %f", oldVarMean)
@@ -282,13 +286,13 @@ class DecorrelateALKernelTask(pipeBase.Task):
             self.log.info("Decorrelation of likelihood image")
             self.computeCommonShape(preConvImg.array.shape, kArr.shape,
                                     psfArr.shape, diffExpArr.shape)
-            corr = self.computeScoreCorrection(kArr, expVar, matchedVar, preConvImg.array)
+            corr = self.computeScoreCorrection(kArr, varianceMean, targetVarianceMean, preConvImg.array)
         else:
             self.log.info("Decorrelation of difference image")
             self.computeCommonShape(kArr.shape, psfArr.shape, diffExpArr.shape)
-            corr = self.computeDiffimCorrection(kArr, expVar, matchedVar)
 
         diffExpArr = self.computeCorrectedImage(corr.corrft, diffExpArr)
+            corr = self.computeDiffimCorrection(kArr, varianceMean, targetVarianceMean)
 
         corrPsfArr = self.computeCorrectedDiffimPsf(corr.corrft, psfArr)
         psfcI = afwImage.ImageD(psfDim)
@@ -304,12 +308,12 @@ class DecorrelateALKernelTask(pipeBase.Task):
         if self.config.completeVarPlanePropagation:
             self.log.debug("Using full variance plane calculation in decorrelation")
             newVarArr = self.calculateVariancePlane(
-                exposure.variance.array, matchedExposure.variance.array,
-                expVar, matchedVar, corr.cnft, corr.crft)
+                variance, targetVariance,
+                varianceMean, targetVarianceMean, corr.cnft, corr.crft)
         else:
             self.log.debug("Using estimated variance plane calculation in decorrelation")
             newVarArr = self.estimateVariancePlane(
-                exposure.variance.array, matchedExposure.variance.array,
+                variance, targetVariance,
                 corr.cnft, corr.crft)
 
         corrExpVarArr = correctedExposure.variance.array
