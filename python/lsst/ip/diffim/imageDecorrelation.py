@@ -129,7 +129,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
         scienceExposure : `lsst.afw.image.Exposure`
             The original science exposure (before pre-convolution, if ``preConvMode==True``).
         templateExposure : `lsst.afw.image.Exposure`
-            The original template exposure warped into the science exposure dimensions.
+            The original template exposure warped, but not psf-matched, to the science exposure.
         subtractedExposure : `lsst.afw.image.Exposure`
             the subtracted exposure produced by
             `ip_diffim.ImagePsfMatchTask.subtractExposures()`. The `subtractedExposure` must
@@ -181,8 +181,10 @@ class DecorrelateALKernelTask(pipeBase.Task):
         image PSF corrected by the center of image matching kernel.
 
         If ``templateMatched==True``, the templateExposure was matched (convolved)
-        to the ``scienceExposure`` by ``psfMatchingKernel``. Otherwise the ``scienceExposure``
-        was matched (convolved) by ``psfMatchingKernel``.
+        to the ``scienceExposure`` by ``psfMatchingKernel`` during image differencing.
+        Otherwise the ``scienceExposure`` was matched (convolved) by ``psfMatchingKernel``.
+        In either case, note that the original template and science images are required,
+        not the psf-matched version.
 
         This task discards the variance plane of ``subtractedExposure`` and re-computes
         it from the variance planes of ``scienceExposure`` and ``templateExposure``.
