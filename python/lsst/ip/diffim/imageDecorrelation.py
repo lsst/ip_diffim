@@ -294,11 +294,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
         diffExpArr = self.computeCorrectedImage(corr.corrft, diffExpArr)
             corr = self.computeDiffimCorrection(kArr, varianceMean, targetVarianceMean)
 
-        corrPsfArr = self.computeCorrectedDiffimPsf(corr.corrft, psfArr)
-        psfcI = afwImage.ImageD(psfDim)
-        psfcI.array = corrPsfArr
-        psfcK = afwMath.FixedKernel(psfcI)
-        psfNew = measAlg.KernelPsf(psfcK)
+        correctedPsf = self.computeCorrectedDiffimPsf(corr.corrft, psfImg.array)
 
         correctedExposure = subtractedExposure.clone()
         correctedExposure.image.array[...] = diffExpArr  # Allow for numpy type casting
@@ -323,7 +319,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
             # ImagePsfMatch.subtractExposures re-scales the difference in
             # the science image convolution mode
             corrExpVarArr /= kSumSq
-        correctedExposure.setPsf(psfNew)
+        correctedExposure.setPsf(correctedPsf)
 
         newVarMean = self.computeVarianceMean(correctedExposure)
         self.log.info("Variance plane mean of corrected diffim: %.5e", newVarMean)
@@ -613,7 +609,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
 
         Returns
         -------
-        psfNew : `numpy.ndarray`
+        correctedPsf : `lsst.meas.algorithms.KernelPsf`
             The corrected psf, same shape as `psfOld`, sum normed to 1.
 
         Notes
@@ -629,7 +625,12 @@ class DecorrelateALKernelTask(pipeBase.Task):
         psfNew = psfNew.real
         psfNew = self.padCenterOriginArray(psfNew, psfShape, useInverse=True)
         psfNew = psfNew/psfNew.sum()
-        return psfNew
+
+        psfcI = afwImage.ImageD(geom.Extent2I(*psfShape))
+        psfcI.array = psfNew
+        psfcK = afwMath.FixedKernel(psfcI)
+        correctedPsf = measAlg.KernelPsf(psfcK)
+        return correctedPsf
 
     def computeCorrectedImage(self, corrft, imgOld):
         """Compute the decorrelated difference image.
