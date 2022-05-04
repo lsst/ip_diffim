@@ -248,10 +248,10 @@ class DecorrelateALKernelTask(pipeBase.Task):
         # Should not happen unless entire image has been masked, which could happen
         # if this is a small subimage of the main exposure. In this case, just return a full NaN
         # exposure
-        if np.isnan(expVar) or np.isnan(matchedVar):
+        if np.isnan(svar) or np.isnan(tvar):
             # Double check that one of the exposures is all NaNs
-            if (np.all(np.isnan(exposure.image.array))
-                    or np.all(np.isnan(matchedExposure.image.array))):
+            if (np.all(np.isnan(scienceExposure.image.array))
+                    or np.all(np.isnan(templateExposure.image.array))):
                 self.log.warning('Template or science image is entirely NaNs: skipping decorrelation.')
                 outExposure = subtractedExposure.clone()
                 return pipeBase.Struct(correctedExposure=outExposure, )
