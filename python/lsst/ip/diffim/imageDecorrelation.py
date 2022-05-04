@@ -272,53 +272,48 @@ class DecorrelateALKernelTask(pipeBase.Task):
         self.log.info("Variance plane mean of uncorrected diffim: %f", oldVarMean)
 
         kArr = kimg.array
-        diffExpArr = subtractedExposure.image.array
+        diffimShape = subtractedExposure.image.array.shape
         psfImg = subtractedExposure.getPsf().computeKernelImage(geom.Point2D(xcen, ycen))
-        psfDim = psfImg.getDimensions()
-        psfArr = psfImg.array
+        psfShape = psfImg.array.shape
+
+        if preConvMode:
+            self.log.info("Decorrelation of likelihood image")
+            self.computeCommonShape(preConvImg.array.shape, kArr.shape,
+                                    psfShape, diffimShape)
+            corr = self.computeScoreCorrection(kArr, varianceMean, targetVarianceMean, preConvImg.array)
+        else:
+            self.log.info("Decorrelation of difference image")
+            self.computeCommonShape(kArr.shape, psfShape, diffimShape)
+            corr = self.computeDiffimCorrection(kArr, varianceMean, targetVarianceMean)
+
+        correctedImage = self.computeCorrectedImage(corr.corrft, subtractedExposure.image.array)
+        correctedPsf = self.computeCorrectedDiffimPsf(corr.corrft, psfImg.array)
+
+        # The subtracted exposure variance plane is already correlated, we cannot propagate
+        # it through another convolution; instead we need to use the uncorrelated originals
+        # The whitening should scale it to varianceMean + targetVarianceMean on average
+        if self.config.completeVarPlanePropagation:
+            self.log.debug("Using full variance plane calculation in decorrelation")
+            correctedVariance = self.calculateVariancePlane(
+                variance, targetVariance,
+                varianceMean, targetVarianceMean, corr.cnft, corr.crft)
+        else:
+            self.log.debug("Using estimated variance plane calculation in decorrelation")
+            correctedVariance = self.estimateVariancePlane(
+                variance, targetVariance,
+                corr.cnft, corr.crft)
 
         # Determine the common shape
         kSum = np.sum(kArr)
         kSumSq = kSum*kSum
         self.log.debug("Matching kernel sum: %.3e", kSum)
-
-        if preConvMode:
-            self.log.info("Decorrelation of likelihood image")
-            self.computeCommonShape(preConvImg.array.shape, kArr.shape,
-                                    psfArr.shape, diffExpArr.shape)
-            corr = self.computeScoreCorrection(kArr, varianceMean, targetVarianceMean, preConvImg.array)
-        else:
-            self.log.info("Decorrelation of difference image")
-            self.computeCommonShape(kArr.shape, psfArr.shape, diffExpArr.shape)
-
-        diffExpArr = self.computeCorrectedImage(corr.corrft, diffExpArr)
-            corr = self.computeDiffimCorrection(kArr, varianceMean, targetVarianceMean)
-
-        correctedPsf = self.computeCorrectedDiffimPsf(corr.corrft, psfImg.array)
-
-        correctedExposure = subtractedExposure.clone()
-        correctedExposure.image.array[...] = diffExpArr  # Allow for numpy type casting
-        # The subtracted exposure variance plane is already correlated, we cannot propagate
-        # it through another convolution; instead we need to use the uncorrelated originals
-        # The whitening should scale it to expVar + matchedVar on average
-        if self.config.completeVarPlanePropagation:
-            self.log.debug("Using full variance plane calculation in decorrelation")
-            newVarArr = self.calculateVariancePlane(
-                variance, targetVariance,
-                varianceMean, targetVarianceMean, corr.cnft, corr.crft)
-        else:
-            self.log.debug("Using estimated variance plane calculation in decorrelation")
-            newVarArr = self.estimateVariancePlane(
-                variance, targetVariance,
-                corr.cnft, corr.crft)
-
-        corrExpVarArr = correctedExposure.variance.array
-        corrExpVarArr[...] = newVarArr  # Allow for numpy type casting
-
         if not templateMatched:
             # ImagePsfMatch.subtractExposures re-scales the difference in
             # the science image convolution mode
-            corrExpVarArr /= kSumSq
+            correctedVariance /= kSumSq
+        correctedExposure = subtractedExposure.clone()
+        correctedExposure.image.array[...] = correctedImage  # Allow for numpy type casting
+        correctedExposure.variance.array[...] = correctedVariance
         correctedExposure.setPsf(correctedPsf)
 
         newVarMean = self.computeVarianceMean(correctedExposure)
