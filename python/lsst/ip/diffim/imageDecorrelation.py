@@ -737,7 +737,7 @@ class DecorrelateALKernelMapper(DecorrelateALKernelTask, ImageMapper):
         subExp1 = templateExposure.Factory(templateExposure, expandedSubExposure.getBBox())
 
         # Prevent too much log INFO verbosity from DecorrelateALKernelTask.run
-        logLevel = self.log.getLevel()
+        logLevel = self.log.level
         self.log.setLevel(self.log.WARNING)
         res = DecorrelateALKernelTask.run(self, subExp2, subExp1, expandedSubExposure,
                                           psfMatchingKernel, preConvKernel, **kwargs)

@@ -294,7 +294,7 @@ class ImageReducer(pipeBase.Task):
             mask.getArray()[isNan[0], isNan[1]] |= bad
 
         if reduceOp == 'average':
-            wts = weights.getArray().astype(np.float)
+            wts = weights.getArray().astype(float)
             self.log.info('AVERAGE: Maximum overlap: %f', np.nanmax(wts))
             self.log.info('AVERAGE: Average overlap: %f', np.nanmean(wts))
             self.log.info('AVERAGE: Minimum overlap: %f', np.nanmin(wts))
