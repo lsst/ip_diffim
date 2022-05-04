@@ -579,7 +579,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
         v1[filtInf] = np.inf
 
         D = np.real(np.fft.ifft2(c2ft))
-        c2ft = np.fft.fft2(D*D)
+        c2SqFt = np.fft.fft2(D*D)
 
         v2shape = vplane2.shape
         filtInf = np.isinf(vplane2)
@@ -587,7 +587,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
         vplane2 = np.copy(vplane2)
         vplane2[filtInf | filtNan] = varMean2
         D = self.padCenterOriginArray(vplane2, self.freqSpaceShape)
-        v2 = np.real(np.fft.ifft2(np.fft.fft2(D) * c2ft))
+        v2 = np.real(np.fft.ifft2(np.fft.fft2(D) * c2SqFt))
         v2 = self.padCenterOriginArray(v2, v2shape, useInverse=True)
         v2[filtNan] = np.nan
         v2[filtInf] = np.inf
