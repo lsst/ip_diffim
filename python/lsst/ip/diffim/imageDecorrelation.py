@@ -311,17 +311,16 @@ class DecorrelateALKernelTask(pipeBase.Task):
             # ImagePsfMatch.subtractExposures re-scales the difference in
             # the science image convolution mode
             correctedVariance /= kSumSq
-        correctedExposure = subtractedExposure.clone()
-        correctedExposure.image.array[...] = correctedImage  # Allow for numpy type casting
-        correctedExposure.variance.array[...] = correctedVariance
-        correctedExposure.setPsf(correctedPsf)
+        subtractedExposure.image.array[...] = correctedImage  # Allow for numpy type casting
+        subtractedExposure.variance.array[...] = correctedVariance
+        subtractedExposure.setPsf(correctedPsf)
 
-        newVarMean = self.computeVarianceMean(correctedExposure)
+        newVarMean = self.computeVarianceMean(subtractedExposure)
         self.log.info("Variance plane mean of corrected diffim: %.5e", newVarMean)
 
         # TODO DM-23857 As part of the spatially varying correction implementation
         # consider whether returning a Struct is still necessary.
-        return pipeBase.Struct(correctedExposure=correctedExposure, )
+        return pipeBase.Struct(correctedExposure=subtractedExposure, )
 
     def computeCommonShape(self, *shapes):
         """Calculate the common shape for FFT operations. Set `self.freqSpaceShape`
