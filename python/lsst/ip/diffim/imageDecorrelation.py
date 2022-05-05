@@ -129,7 +129,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
         scienceExposure : `lsst.afw.image.Exposure`
             The original science exposure (before pre-convolution, if ``preConvMode==True``).
         templateExposure : `lsst.afw.image.Exposure`
-            The original template exposure warped into the science exposure dimensions.
+            The original template exposure warped, but not psf-matched, to the science exposure.
         subtractedExposure : `lsst.afw.image.Exposure`
             the subtracted exposure produced by
             `ip_diffim.ImagePsfMatchTask.subtractExposures()`. The `subtractedExposure` must
@@ -181,8 +181,10 @@ class DecorrelateALKernelTask(pipeBase.Task):
         image PSF corrected by the center of image matching kernel.
 
         If ``templateMatched==True``, the templateExposure was matched (convolved)
-        to the ``scienceExposure`` by ``psfMatchingKernel``. Otherwise the ``scienceExposure``
-        was matched (convolved) by ``psfMatchingKernel``.
+        to the ``scienceExposure`` by ``psfMatchingKernel`` during image differencing.
+        Otherwise the ``scienceExposure`` was matched (convolved) by ``psfMatchingKernel``.
+        In either case, note that the original template and science images are required,
+        not the psf-matched version.
 
         This task discards the variance plane of ``subtractedExposure`` and re-computes
         it from the variance planes of ``scienceExposure`` and ``templateExposure``.
@@ -228,103 +230,97 @@ class DecorrelateALKernelTask(pipeBase.Task):
         self.log.info("Original variance plane means. Science:%.5e, warped template:%.5e)",
                       svar, tvar)
 
-        if templateMatched:
-            # Regular subtraction, we convolved the template
-            self.log.info("Decorrelation after template image convolution")
-            expVar = svar
-            matchedVar = tvar
-            exposure = scienceExposure
-            matchedExposure = templateExposure
-        else:
-            # We convolved the science image
-            self.log.info("Decorrelation after science image convolution")
-            expVar = tvar
-            matchedVar = svar
-            exposure = templateExposure
-            matchedExposure = scienceExposure
-
         # Should not happen unless entire image has been masked, which could happen
         # if this is a small subimage of the main exposure. In this case, just return a full NaN
         # exposure
-        if np.isnan(expVar) or np.isnan(matchedVar):
+        if np.isnan(svar) or np.isnan(tvar):
             # Double check that one of the exposures is all NaNs
-            if (np.all(np.isnan(exposure.image.array))
-                    or np.all(np.isnan(matchedExposure.image.array))):
+            if (np.all(np.isnan(scienceExposure.image.array))
+                    or np.all(np.isnan(templateExposure.image.array))):
                 self.log.warning('Template or science image is entirely NaNs: skipping decorrelation.')
                 outExposure = subtractedExposure.clone()
                 return pipeBase.Struct(correctedExposure=outExposure, )
 
-        # The maximal correction value converges to sqrt(matchedVar/expVar).
+        if templateMatched:
+            # Regular subtraction, we convolved the template
+            self.log.info("Decorrelation after template image convolution")
+            varianceMean = svar
+            targetVarianceMean = tvar
+            # variance plane of the image that is not convolved
+            variance = scienceExposure.variance.array
+            # Variance plane of the convolved image, before convolution.
+            targetVariance = templateExposure.variance.array
+        else:
+            # We convolved the science image
+            self.log.info("Decorrelation after science image convolution")
+            varianceMean = tvar
+            targetVarianceMean = svar
+            # variance plane of the image that is not convolved
+            variance = templateExposure.variance.array
+            # Variance plane of the convolved image, before convolution.
+            targetVariance = scienceExposure.variance.array
+
+        # The maximal correction value converges to sqrt(targetVarianceMean/varianceMean).
         # Correction divergence warning if the correction exceeds 4 orders of magnitude.
-        mOverExpVar = matchedVar/expVar
+        mOverExpVar = targetVarianceMean/varianceMean
         if mOverExpVar > 1e8:
             self.log.warning("Diverging correction: matched image variance is "
                              " much larger than the unconvolved one's"
-                             ", matchedVar/expVar:%.2e", mOverExpVar)
+                             ", targetVarianceMean/varianceMean:%.2e", mOverExpVar)
 
         oldVarMean = self.computeVarianceMean(subtractedExposure)
         self.log.info("Variance plane mean of uncorrected diffim: %f", oldVarMean)
 
         kArr = kimg.array
-        diffExpArr = subtractedExposure.image.array
+        diffimShape = subtractedExposure.image.array.shape
         psfImg = subtractedExposure.getPsf().computeKernelImage(geom.Point2D(xcen, ycen))
-        psfDim = psfImg.getDimensions()
-        psfArr = psfImg.array
+        psfShape = psfImg.array.shape
+
+        if preConvMode:
+            self.log.info("Decorrelation of likelihood image")
+            self.computeCommonShape(preConvImg.array.shape, kArr.shape,
+                                    psfShape, diffimShape)
+            corr = self.computeScoreCorrection(kArr, varianceMean, targetVarianceMean, preConvImg.array)
+        else:
+            self.log.info("Decorrelation of difference image")
+            self.computeCommonShape(kArr.shape, psfShape, diffimShape)
+            corr = self.computeDiffimCorrection(kArr, varianceMean, targetVarianceMean)
+
+        correctedImage = self.computeCorrectedImage(corr.corrft, subtractedExposure.image.array)
+        correctedPsf = self.computeCorrectedDiffimPsf(corr.corrft, psfImg.array)
+
+        # The subtracted exposure variance plane is already correlated, we cannot propagate
+        # it through another convolution; instead we need to use the uncorrelated originals
+        # The whitening should scale it to varianceMean + targetVarianceMean on average
+        if self.config.completeVarPlanePropagation:
+            self.log.debug("Using full variance plane calculation in decorrelation")
+            correctedVariance = self.calculateVariancePlane(
+                variance, targetVariance,
+                varianceMean, targetVarianceMean, corr.cnft, corr.crft)
+        else:
+            self.log.debug("Using estimated variance plane calculation in decorrelation")
+            correctedVariance = self.estimateVariancePlane(
+                variance, targetVariance,
+                corr.cnft, corr.crft)
 
         # Determine the common shape
         kSum = np.sum(kArr)
         kSumSq = kSum*kSum
         self.log.debug("Matching kernel sum: %.3e", kSum)
-
-        if preConvMode:
-            self.log.info("Decorrelation of likelihood image")
-            self.computeCommonShape(preConvImg.array.shape, kArr.shape,
-                                    psfArr.shape, diffExpArr.shape)
-            corr = self.computeScoreCorrection(kArr, expVar, matchedVar, preConvImg.array)
-        else:
-            self.log.info("Decorrelation of difference image")
-            self.computeCommonShape(kArr.shape, psfArr.shape, diffExpArr.shape)
-            corr = self.computeDiffimCorrection(kArr, expVar, matchedVar)
-
-        diffExpArr = self.computeCorrectedImage(corr.corrft, diffExpArr)
-
-        corrPsfArr = self.computeCorrectedDiffimPsf(corr.corrft, psfArr)
-        psfcI = afwImage.ImageD(psfDim)
-        psfcI.array = corrPsfArr
-        psfcK = afwMath.FixedKernel(psfcI)
-        psfNew = measAlg.KernelPsf(psfcK)
-
-        correctedExposure = subtractedExposure.clone()
-        correctedExposure.image.array[...] = diffExpArr  # Allow for numpy type casting
-        # The subtracted exposure variance plane is already correlated, we cannot propagate
-        # it through another convolution; instead we need to use the uncorrelated originals
-        # The whitening should scale it to expVar + matchedVar on average
-        if self.config.completeVarPlanePropagation:
-            self.log.debug("Using full variance plane calculation in decorrelation")
-            newVarArr = self.calculateVariancePlane(
-                exposure.variance.array, matchedExposure.variance.array,
-                expVar, matchedVar, corr.cnft, corr.crft)
-        else:
-            self.log.debug("Using estimated variance plane calculation in decorrelation")
-            newVarArr = self.estimateVariancePlane(
-                exposure.variance.array, matchedExposure.variance.array,
-                corr.cnft, corr.crft)
-
-        corrExpVarArr = correctedExposure.variance.array
-        corrExpVarArr[...] = newVarArr  # Allow for numpy type casting
-
         if not templateMatched:
             # ImagePsfMatch.subtractExposures re-scales the difference in
             # the science image convolution mode
-            corrExpVarArr /= kSumSq
-        correctedExposure.setPsf(psfNew)
+            correctedVariance /= kSumSq
+        subtractedExposure.image.array[...] = correctedImage  # Allow for numpy type casting
+        subtractedExposure.variance.array[...] = correctedVariance
+        subtractedExposure.setPsf(correctedPsf)
 
-        newVarMean = self.computeVarianceMean(correctedExposure)
+        newVarMean = self.computeVarianceMean(subtractedExposure)
         self.log.info("Variance plane mean of corrected diffim: %.5e", newVarMean)
 
         # TODO DM-23857 As part of the spatially varying correction implementation
         # consider whether returning a Struct is still necessary.
-        return pipeBase.Struct(correctedExposure=correctedExposure, )
+        return pipeBase.Struct(correctedExposure=subtractedExposure, )
 
     def computeCommonShape(self, *shapes):
         """Calculate the common shape for FFT operations. Set `self.freqSpaceShape`
@@ -579,7 +575,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
         v1[filtInf] = np.inf
 
         D = np.real(np.fft.ifft2(c2ft))
-        c2ft = np.fft.fft2(D*D)
+        c2SqFt = np.fft.fft2(D*D)
 
         v2shape = vplane2.shape
         filtInf = np.isinf(vplane2)
@@ -587,7 +583,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
         vplane2 = np.copy(vplane2)
         vplane2[filtInf | filtNan] = varMean2
         D = self.padCenterOriginArray(vplane2, self.freqSpaceShape)
-        v2 = np.real(np.fft.ifft2(np.fft.fft2(D) * c2ft))
+        v2 = np.real(np.fft.ifft2(np.fft.fft2(D) * c2SqFt))
         v2 = self.padCenterOriginArray(v2, v2shape, useInverse=True)
         v2[filtNan] = np.nan
         v2[filtInf] = np.inf
@@ -607,7 +603,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
 
         Returns
         -------
-        psfNew : `numpy.ndarray`
+        correctedPsf : `lsst.meas.algorithms.KernelPsf`
             The corrected psf, same shape as `psfOld`, sum normed to 1.
 
         Notes
@@ -623,7 +619,12 @@ class DecorrelateALKernelTask(pipeBase.Task):
         psfNew = psfNew.real
         psfNew = self.padCenterOriginArray(psfNew, psfShape, useInverse=True)
         psfNew = psfNew/psfNew.sum()
-        return psfNew
+
+        psfcI = afwImage.ImageD(geom.Extent2I(*psfShape))
+        psfcI.array = psfNew
+        psfcK = afwMath.FixedKernel(psfcI)
+        correctedPsf = measAlg.KernelPsf(psfcK)
+        return correctedPsf
 
     def computeCorrectedImage(self, corrft, imgOld):
         """Compute the decorrelated difference image.
@@ -737,7 +738,7 @@ class DecorrelateALKernelMapper(DecorrelateALKernelTask, ImageMapper):
         subExp1 = templateExposure.Factory(templateExposure, expandedSubExposure.getBBox())
 
         # Prevent too much log INFO verbosity from DecorrelateALKernelTask.run
-        logLevel = self.log.getLevel()
+        logLevel = self.log.level
         self.log.setLevel(self.log.WARNING)
         res = DecorrelateALKernelTask.run(self, subExp2, subExp1, expandedSubExposure,
                                           psfMatchingKernel, preConvKernel, **kwargs)
