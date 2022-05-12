@@ -416,8 +416,8 @@ class ModelPsfMatchTask(PsfMatchTask):
 
         sciencePsfModel = exposure.getPsf()
 
-        dimenR = referencePsfModel.getLocalKernel().getDimensions()
         psfWidth, psfHeight = dimenR
+        dimenR = referencePsfModel.getLocalKernel(scienceBBox.getCenter()).getDimensions()
 
         regionSizeX, regionSizeY = scienceBBox.getDimensions()
         scienceX0, scienceY0 = scienceBBox.getMin()
