@@ -44,7 +44,7 @@ __all__ = ["GetCoaddAsTemplateTask", "GetCoaddAsTemplateConfig",
 class GetCoaddAsTemplateConfig(pexConfig.Config):
     templateBorderSize = pexConfig.Field(
         dtype=int,
-        default=10,
+        default=20,
         doc="Number of pixels to grow the requested template image to account for warping"
     )
     coaddName = pexConfig.Field(
@@ -499,7 +499,7 @@ class GetTemplateConfig(pipeBase.PipelineTaskConfig,
                         pipelineConnections=GetTemplateConnections):
     templateBorderSize = pexConfig.Field(
         dtype=int,
-        default=10,
+        default=20,
         doc="Number of pixels to grow the requested template image to account for warping"
     )
     warp = pexConfig.ConfigField(
