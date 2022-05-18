@@ -331,10 +331,12 @@ class ImagePsfMatchTask(PsfMatchTask):
         self.makeSubtask("selectDetection", schema=self.selectSchema)
         self.makeSubtask("selectMeasurement", schema=self.selectSchema, algMetadata=self.selectAlgMetadata)
 
-    def getFwhmPix(self, psf):
+    def getFwhmPix(self, psf, position=None):
         """Return the FWHM in pixels of a Psf.
         """
-        sigPix = psf.computeShape(psf.getAveragePosition()).getDeterminantRadius()
+        if position is None:
+            position = psf.getAveragePosition()
+        sigPix = psf.computeShape(position).getDeterminantRadius()
         return sigPix*sigma2fwhm
 
     @timeMethod

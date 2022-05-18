@@ -336,6 +336,8 @@ class ModelPsfMatchTask(PsfMatchTask):
         result = self._buildCellSet(exposure, referencePsfModel)
         kernelCellSet = result.kernelCellSet
         referencePsfModel = result.referencePsfModel
+        # TODO: This should be evaluated at (or close to) the center of the
+        # exposure's bounding box in DM-32756.
         sciAvgPos = exposure.getPsf().getAveragePosition()
         modelAvgPos = referencePsfModel.getAveragePosition()
         fwhmScience = exposure.getPsf().computeShape(sciAvgPos).getDeterminantRadius()*sigma2fwhm
@@ -416,8 +418,7 @@ class ModelPsfMatchTask(PsfMatchTask):
 
         sciencePsfModel = exposure.getPsf()
 
-        dimenR = referencePsfModel.getLocalKernel().getDimensions()
-        psfWidth, psfHeight = dimenR
+        dimenR = referencePsfModel.getLocalKernel(scienceBBox.getCenter()).getDimensions()
 
         regionSizeX, regionSizeY = scienceBBox.getDimensions()
         scienceX0, scienceY0 = scienceBBox.getMin()
