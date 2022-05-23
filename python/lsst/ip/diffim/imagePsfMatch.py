@@ -340,6 +340,14 @@ class ImagePsfMatchTask(PsfMatchTask):
         self.makeSubtask("selectDetection", schema=self.selectSchema)
         self.makeSubtask("selectMeasurement", schema=self.selectSchema, algMetadata=self.selectAlgMetadata)
 
+    def getFwhmPix(self, psf, position=None):
+        """Return the FWHM in pixels of a Psf.
+        """
+        if position is None:
+            position = psf.getAveragePosition()
+        sigPix = psf.computeShape(position).getDeterminantRadius()
+        return sigPix*sigma2fwhm
+
     @timeMethod
     def matchExposures(self, templateExposure, scienceExposure,
                        templateFwhmPix=None, scienceFwhmPix=None,

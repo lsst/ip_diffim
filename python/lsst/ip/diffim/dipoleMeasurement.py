@@ -24,12 +24,12 @@ import numpy as np
 import lsst.afw.image as afwImage
 import lsst.geom as geom
 import lsst.pex.config as pexConfig
-from lsst.log import Log
 import lsst.meas.deblender.baseline as deblendBaseline
 from lsst.meas.base.pluginRegistry import register
 from lsst.meas.base import SingleFrameMeasurementTask, SingleFrameMeasurementConfig, \
     SingleFramePluginConfig, SingleFramePlugin
 import lsst.afw.display as afwDisplay
+from lsst.utils.logging import getLogger
 
 __all__ = ("DipoleMeasurementConfig", "DipoleMeasurementTask", "DipoleAnalysis", "DipoleDeblender",
            "SourceFlagChecker", "ClassificationDipoleConfig", "ClassificationDipolePlugin")
@@ -514,7 +514,7 @@ class DipoleDeblender(object):
 
         # Always deblend as Psf
         self.psfChisqCut1 = self.psfChisqCut2 = self.psfChisqCut2b = np.inf
-        self.log = Log.getLogger('lsst.ip.diffim.DipoleDeblender')
+        self.log = getLogger('lsst.ip.diffim.DipoleDeblender')
         self.sigma2fwhm = 2. * np.sqrt(2. * np.log(2.))
 
     def __call__(self, source, exposure):

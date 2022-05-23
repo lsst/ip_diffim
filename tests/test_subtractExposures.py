@@ -1,3 +1,4 @@
+import logging
 import os
 import unittest
 
@@ -7,7 +8,6 @@ import lsst.utils
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.geom as geom
-from lsst.log import Log
 import lsst.utils.logging as logUtils
 import lsst.meas.algorithms as measAlg
 import lsst.ip.diffim as ipDiffim
@@ -15,7 +15,7 @@ import lsst.ip.diffim.diffimTools as diffimTools
 
 verbosity = 4
 logUtils.trace_set_at("lsst.ip.diffim", verbosity)
-Log.getLogger('psfMatch').setLevel(Log.INFO)
+logUtils.getLogger('lsst.psfMatch').setLevel(logging.INFO)
 
 display = False
 

@@ -118,7 +118,7 @@ class DcrModel:
                    mask=mask, variance=variance, photoCalib=photoCalib)
 
     @classmethod
-    def fromQuantum(cls, availableCoaddRefs, effectiveWavelength, bandwidth):
+    def fromQuantum(cls, availableCoaddRefs, effectiveWavelength, bandwidth, numSubfilters):
         """Load an existing DcrModel from a Gen 3 repository.
 
         Parameters
@@ -130,6 +130,8 @@ class DcrModel:
             The effective wavelengths of the current filter, in nanometers.
         bandwidth : `float`
             The bandwidth of the current filter, in nanometers.
+        numSubfilters : `int`
+            Number of subfilters in the DcrCoadd.
 
         Returns
         -------
@@ -143,7 +145,7 @@ class DcrModel:
         mask = None
         variance = None
         photoCalib = None
-        modelImages = [None]*len(availableCoaddRefs)
+        modelImages = [None]*numSubfilters
 
         for coaddRef in availableCoaddRefs:
             subfilter = coaddRef.dataId["subfilter"]

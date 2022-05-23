@@ -26,9 +26,9 @@ import lsst.afw.display as afwDisplay
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.geom as geom
-import lsst.log as log
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
+from lsst.utils.logging import getTraceLogger
 from lsst.utils.timer import timeMethod
 from .makeKernelBasisList import makeKernelBasisList
 from .psfMatch import PsfMatchTask, PsfMatchConfigAL
@@ -336,6 +336,8 @@ class ModelPsfMatchTask(PsfMatchTask):
         result = self._buildCellSet(exposure, referencePsfModel)
         kernelCellSet = result.kernelCellSet
         referencePsfModel = result.referencePsfModel
+        # TODO: This should be evaluated at (or close to) the center of the
+        # exposure's bounding box in DM-32756.
         sciAvgPos = exposure.getPsf().getAveragePosition()
         modelAvgPos = referencePsfModel.getAveragePosition()
         fwhmScience = exposure.getPsf().computeShape(sciAvgPos).getDeterminantRadius()*sigma2fwhm
@@ -416,8 +418,7 @@ class ModelPsfMatchTask(PsfMatchTask):
 
         sciencePsfModel = exposure.getPsf()
 
-        dimenR = referencePsfModel.getLocalKernel().getDimensions()
-        psfWidth, psfHeight = dimenR
+        dimenR = referencePsfModel.getLocalKernel(scienceBBox.getCenter()).getDimensions()
 
         regionSizeX, regionSizeY = scienceBBox.getDimensions()
         scienceX0, scienceY0 = scienceBBox.getMin()
@@ -495,8 +496,7 @@ class ModelPsfMatchTask(PsfMatchTask):
                 # place at center of cell
                 posX = sizeCellX*col + sizeCellX//2 + scienceX0
 
-                log.log("TRACE4." + self.log.name, log.DEBUG,
-                        "Creating Psf candidate at %.1f %.1f", posX, posY)
+                getTraceLogger(self.log, 4).debug("Creating Psf candidate at %.1f %.1f", posX, posY)
 
                 # reference kernel image, at location of science subimage
                 referenceMI = self._makePsfMaskedImage(referencePsfModel, posX, posY, dimensions=dimenR)

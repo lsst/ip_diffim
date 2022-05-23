@@ -449,7 +449,7 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
 
         self._setUpSourcelessImages(svar=svar, tvar=tvar)
         diffExp, mKernel, expected_var = self._makeAndTestUncorrectedDiffim()
-        corrected_diffExp = self._runDecorrelationTask(diffExp, mKernel)
+        corrected_diffExp = self._runDecorrelationTask(diffExp.clone(), mKernel)
 
         rho_sci = estimatePixelCorrelation(self.im1ex.getImage().getArray())
         rho_rawdiff = estimatePixelCorrelation(diffExp.getImage().getArray())
@@ -529,7 +529,7 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
         diffExp, mKernel, expected_var = self._makeAndTestUncorrectedDiffim()
         variances = []
         for spatiallyVarying in [False, True]:
-            corrected_diffExp = self._runDecorrelationSpatialTask(diffExp, mKernel,
+            corrected_diffExp = self._runDecorrelationSpatialTask(diffExp.clone(), mKernel,
                                                                   spatiallyVarying)
             var, mn = self._testDecorrelation(expected_var, corrected_diffExp)
             variances.append(var)
