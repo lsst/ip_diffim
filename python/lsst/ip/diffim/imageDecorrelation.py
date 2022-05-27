@@ -620,7 +620,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
         psfNew = self.padCenterOriginArray(psfNew, psfShape, useInverse=True)
         psfNew = psfNew/psfNew.sum()
 
-        psfcI = afwImage.ImageD(geom.Extent2I(*psfShape))
+        psfcI = afwImage.ImageD(geom.Extent2I(psfShape[1], psfShape[0]))
         psfcI.array = psfNew
         psfcK = afwMath.FixedKernel(psfcI)
         correctedPsf = measAlg.KernelPsf(psfcK)
