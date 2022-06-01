@@ -40,8 +40,10 @@ from .getTemplate import *
 from .diaCatalogSourceSelector import *
 from lsst.meas.base import wrapSimpleAlgorithm
 from .dipoleFitTask import *
+from .detectAndMeasure import *
 from .imageDecorrelation import *
 from .imageMapReduce import *
+from .subtractImages import *
 from .zogy import *
 from .version import *
 
