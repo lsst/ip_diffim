@@ -20,6 +20,8 @@
 # see <https://www.lsstcorp.org/LegalNotices/>.
 #
 
+"""Tests of the old ImageDifferenceTask interface."""
+
 import numpy as np
 
 import lsst.afw.geom as afwGeom
