@@ -22,7 +22,7 @@
 """Support utilities for Measuring sources"""
 
 # Export DipoleTestImage to expose fake image generating funcs
-__all__ = ["DipoleTestImage"]
+__all__ = ["DipoleTestImage", "getPsfFwhm"]
 
 import numpy as np
 
@@ -496,7 +496,7 @@ def plotKernelCoefficients(spatialKernel, kernelCellSet, showBadCandidates=False
 
     allParams = []
     for cell in kernelCellSet.getCellList():
-        cellBBox = afwGeom.Box2D(cell.getBBox())
+        cellBBox = geom.Box2D(cell.getBBox())
         # Determine which panel this spatial cell belongs to
         iX = int((cellBBox.getCenterX() - x0)//wCell)
         iY = int((cellBBox.getCenterY() - y0)//hCell)
@@ -1078,3 +1078,22 @@ class DipoleTestImage(object):
 
         else:
             return detectTask, schema
+
+
+def getPsfFwhm(psf):
+    """Calculate the FWHM in pixels of a supplied PSF.
+
+    Parameters
+    ----------
+    psf : `lsst.afw.detection.Psf`
+        Point spread function (PSF) to evaluate.
+
+    Returns
+    -------
+    psfSize : `float`
+        The FWHM of the PSF computed at its average position.
+    """
+    sigma2fwhm = 2.*np.sqrt(2.*np.log(2.))
+    psfAvgPos = psf.getAveragePosition()
+    psfSize = psf.computeShape(psfAvgPos).getDeterminantRadius()*sigma2fwhm
+    return psfSize

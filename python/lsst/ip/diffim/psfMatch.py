@@ -21,6 +21,7 @@
 
 __all__ = ["DetectionConfig", "PsfMatchConfig", "PsfMatchConfigAL", "PsfMatchConfigDF", "PsfMatchTask"]
 
+import abc
 import time
 
 import numpy as np
@@ -525,7 +526,7 @@ class PsfMatchConfigDF(PsfMatchConfig):
     )
 
 
-class PsfMatchTask(pipeBase.Task):
+class PsfMatchTask(pipeBase.Task, abc.ABC):
     """Base class for Psf Matching; should not be called directly
 
     Notes
@@ -870,6 +871,7 @@ class PsfMatchTask(pipeBase.Task):
 
         return nRejectedPca, spatialBasisList
 
+    @abc.abstractmethod
     def _buildCellSet(self, *args):
         """Fill a SpatialCellSet with KernelCandidates for the Psf-matching process;
         override in derived classes"""

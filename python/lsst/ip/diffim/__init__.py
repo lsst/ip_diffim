@@ -30,6 +30,7 @@ from .psfMatch import *
 from .imagePsfMatch import *
 from .modelPsfMatch import *
 from .snapPsfMatch import *
+from .makeKernel import *
 from .makeKernelBasisList import *
 from .diaCatalogSourceSelector import *
 from .dipoleMeasurement import *
@@ -39,8 +40,10 @@ from .getTemplate import *
 from .diaCatalogSourceSelector import *
 from lsst.meas.base import wrapSimpleAlgorithm
 from .dipoleFitTask import *
+from .detectAndMeasure import *
 from .imageDecorrelation import *
 from .imageMapReduce import *
+from .subtractImages import *
 from .zogy import *
 from .version import *
 
