@@ -137,7 +137,7 @@ def makeTestImage(seed=5, nSrc=20, psfSize=2., noiseLevel=5.,
 
 class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
 
-    def test_allowed_config_modes(self):
+    def notest_allowed_config_modes(self):
         """Verify the allowable modes for convolution.
         """
         config = subtractImages.AlardLuptonSubtractTask.ConfigClass()
@@ -148,7 +148,7 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         with self.assertRaises(FieldValidationError):
             config.mode = 'aotu'
 
-    def test_mismatched_template(self):
+    def notest_mismatched_template(self):
         """Test that an error is raised if the template
         does not fully contain the science image.
         """
@@ -161,7 +161,7 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         with self.assertRaises(AssertionError):
             task.run(template, science, sources)
 
-    def test_equal_images(self):
+    def notest_equal_images(self):
         """Test that running with enough sources produces reasonable output,
         with the same size psf in the template and science.
         """
@@ -181,7 +181,7 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         # stddev of difference image should be close to expected value.
         self.assertFloatsAlmostEqual(np.std(output.difference.image.array), np.sqrt(2)*noiseLevel, rtol=0.1)
 
-    def test_auto_convolveTemplate(self):
+    def notest_auto_convolveTemplate(self):
         """Test that auto mode gives the same result as convolveTemplate when
         the template psf is the smaller.
         """
@@ -202,7 +202,7 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         outputAuto = task.run(template, scienceOrig, sources)
         self.assertMaskedImagesEqual(output.difference.maskedImage, outputAuto.difference.maskedImage)
 
-    def test_auto_convolveScience(self):
+    def notest_auto_convolveScience(self):
         """Test that auto mode gives the same result as convolveScience when
         the science psf is the smaller.
         """
@@ -243,7 +243,7 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         self.assertFloatsAlmostEqual(np.nanstd(output.difference.image.array),
                                      np.sqrt(2)*noiseLevel, rtol=0.1)
 
-    def test_template_better(self):
+    def notest_template_better(self):
         """Test that running with enough sources produces reasonable output,
         with the template psf being smaller than the science.
         """
@@ -263,7 +263,7 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         # stddev of difference image should be close to expected value.
         self.assertFloatsAlmostEqual(np.std(output.difference.image.array), np.sqrt(2)*noiseLevel, rtol=0.1)
 
-    def test_symmetry(self):
+    def notest_symmetry(self):
         """Test that convolving the science and convolving the template are
         symmetric: if the psfs are switched between them, the difference image
         should be nearly the same.
@@ -297,7 +297,7 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         # stddev of difference image should be close to expected value
         self.assertFloatsAlmostEqual(np.nanstd(delta.image.array), 2*np.sqrt(2)*noiseLevel, rtol=.1)
 
-    def test_few_sources(self):
+    def notest_few_sources(self):
         """Test with only 1 source, to check that we get a useful error.
         """
         xSize = 256
@@ -310,7 +310,7 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
                                     'Unable to determine kernel sum; 0 candidates'):
             task.run(template, science, sources)
 
-    def test_images_unmodified(self):
+    def notest_images_unmodified(self):
         """Verify that image subtraction does not change the input images.
         """
         noiseLevel = 1.
@@ -337,7 +337,7 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         self.assertMaskedImagesEqual(science.maskedImage,
                                      scienceOrig.maskedImage)
 
-    def test_background_subtraction(self):
+    def notest_background_subtraction(self):
         """Check that we can recover the background,
         and that it is subtracted correctly in the difference image.
         """
@@ -387,7 +387,7 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         _run_and_check_images(config, "convolveTemplate")
         _run_and_check_images(config, "convolveScience")
 
-    def test_scale_variance(self):
+    def notest_scale_variance(self):
         """Check variance scaling of the image difference.
         """
         noiseLevel = 1.
@@ -443,7 +443,7 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         _run_and_check_images(doDecorrelation=False, doScaleVariance=True, scaleFactor=scaleFactor)
         _run_and_check_images(doDecorrelation=False, doScaleVariance=False, scaleFactor=scaleFactor)
 
-    def test_exposure_properties_convolve_template(self):
+    def notest_exposure_properties_convolve_template(self):
         """Check that all necessary exposure metadata is included
         when the template is convolved.
         """
@@ -492,7 +492,7 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         _run_and_check_images(doDecorrelation=True)
         _run_and_check_images(doDecorrelation=False)
 
-    def test_exposure_properties_convolve_science(self):
+    def notest_exposure_properties_convolve_science(self):
         """Check that all necessary exposure metadata is included
         when the science image is convolved.
         """

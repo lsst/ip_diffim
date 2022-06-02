@@ -9,6 +9,8 @@
  * @ingroup ip_diffim
  */
 
+#include <iostream>
+
 #include "lsst/afw/math.h"
 #include "lsst/afw/image.h"
 #include "lsst/log/Log.h"
@@ -104,10 +106,10 @@ namespace detail {
 
         MaskedImageT diffim = kCandidate->getDifferenceImage(kernelPtr, background);
 
-        if (DEBUG_IMAGES) {
-            kImage.writeFits(str(boost::format("askv_k%d.fits") % kCandidate->getId()));
-            diffim.writeFits(str(boost::format("askv_d%d.fits") % kCandidate->getId()));
-        }
+        //if (DEBUG_IMAGES) {
+        kImage.writeFits(str(boost::format("askv_k%d.fits") % kCandidate->getId()));
+        diffim.writeFits(str(boost::format("askv_d%d.fits") % kCandidate->getId()));
+        //}
 
         /* Official resids */
         try {
@@ -153,6 +155,8 @@ namespace detail {
         }
 
         if (_ps->getAsBool("spatialKernelClipping")) {
+            std::cout << fabs(_imstats.getMean()) << " " << _ps->getAsDouble("candidateResidualMeanMax") << "\n";
+            std::cout << _imstats.getRms() << " " << _ps->getAsDouble("candidateResidualStdMax") << "\n";
             if (fabs(_imstats.getMean()) > _ps->getAsDouble("candidateResidualMeanMax")) {
                 kCandidate->setStatus(afwMath::SpatialCellCandidate::BAD);
                 LOGL_DEBUG("TRACE3.ip.diffim.AssessSpatialKernelVisitor.processCandidate",

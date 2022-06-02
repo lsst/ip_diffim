@@ -108,10 +108,10 @@ namespace diffim {
                 for (x_iterator ptr = image.x_at(x0, y), end = image.x_at(x1, y);
                      ptr != end; ++ptr) {
                     if (!((*ptr).mask() & _bpMask)) {
-                        double const ivar = 1. / (*ptr).variance();
+                        double const ivar = 1. / (double) (*ptr).variance();
                         if (std::isfinite(ivar)) {
-                            _xsum  += (*ptr).image() * sqrt(ivar);
-                            _x2sum += (*ptr).image() * (*ptr).image() * ivar;
+                            _xsum  += (double) (*ptr).image() * sqrt(ivar);
+                            _x2sum += (double) (*ptr).image() * (double) (*ptr).image() * ivar;
                             _npix  += 1;
                         }
                     }

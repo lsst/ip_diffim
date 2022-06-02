@@ -9,6 +9,7 @@
  * @ingroup ip_diffim
  */
 #include <limits>
+#include <iostream>
 
 #include "lsst/afw/math.h"
 #include "lsst/log/Log.h"
@@ -89,6 +90,7 @@ namespace detail {
     template<typename PixelT>
     void KernelSumVisitor<PixelT>::processCandidate(lsst::afw::math::SpatialCellCandidate
                                                     *candidate) {
+        std::cout << "processCandidate " << _kSums.size() << "\n";
 
         KernelCandidate<PixelT> *kCandidate = dynamic_cast<KernelCandidate<PixelT> *>(candidate);
         if (kCandidate == NULL) {
@@ -101,6 +103,7 @@ namespace detail {
         /* Grab all kernel sums and look for outliers */
         if (_mode == AGGREGATE) {
             _kSums.push_back(kCandidate->getKernelSolution(KernelCandidate<PixelT>::ORIG)->getKsum());
+            std::cout << "AGGREGATE " << _kSums.size() << "\n";
         }
         else if (_mode == REJECT) {
             if (_ps->getAsBool("kernelSumClipping")) {
@@ -121,6 +124,8 @@ namespace detail {
                            "Sigma clipping not enabled");
             }
         }
+
+        std::cout << "processCandidate (end) " << _kSums.size() << "\n";
     }
 
     template<typename PixelT>

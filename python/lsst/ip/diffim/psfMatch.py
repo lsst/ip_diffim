@@ -929,6 +929,7 @@ class PsfMatchTask(pipeBase.Task, abc.ABC):
             totalIterations = 0
             thisIteration = 0
             while (thisIteration < maxSpatialIterations):
+                print('Iteration ', thisIteration)
 
                 # Make sure there are no uninitialized candidates as active occupants of Cell
                 nRejectedSkf = -1
@@ -940,12 +941,19 @@ class PsfMatchTask(pipeBase.Task, abc.ABC):
                         "Iteration %d, rejected %d candidates due to initial kernel fit",
                         thisIteration, nRejectedSkf
                     )
+                    print('ARGH', nRejectedSkf)
 
                 # Reject outliers in kernel sum
                 ksv.resetKernelSum()
                 ksv.setMode(diffimLib.KernelSumVisitorF.AGGREGATE)
                 kernelCellSet.visitCandidates(ksv, nStarPerCell)
-                ksv.processKsumDistribution()
+                try:
+                    print('Trying...')
+                    ksv.processKsumDistribution()
+                except:
+                    print('(failing)...')
+                    import IPython
+                    IPython.embed()
                 ksv.setMode(diffimLib.KernelSumVisitorF.REJECT)
                 kernelCellSet.visitCandidates(ksv, nStarPerCell)
 
@@ -1007,6 +1015,8 @@ class PsfMatchTask(pipeBase.Task, abc.ABC):
                     thisIteration, nRejectedSpatial
                 )
                 trace_loggers[1].debug("%d candidates used in fit", nGoodSpatial)
+                print('reject ', nRejectedSpatial)
+                print('used ', nGoodSpatial)
 
                 # If only nGoodSpatial == 0, might be other candidates in the cells
                 if nGoodSpatial == 0 and nRejectedSpatial == 0:
@@ -1014,6 +1024,7 @@ class PsfMatchTask(pipeBase.Task, abc.ABC):
 
                 if nRejectedSpatial == 0:
                     # Nothing rejected, finished with spatial fit
+                    print('Should break')
                     break
 
                 # Otherwise, iterate on...
