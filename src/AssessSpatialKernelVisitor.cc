@@ -103,6 +103,7 @@ namespace detail {
         /* </hack> */
 
         double background = (*_spatialBackground)(kCandidate->getXCenter(), kCandidate->getYCenter());
+        std::cout << "background " << kCandidate->getXCenter() << " " << kCandidate->getYCenter() << " " << background << "\n";
 
         MaskedImageT diffim = kCandidate->getDifferenceImage(kernelPtr, background);
 
