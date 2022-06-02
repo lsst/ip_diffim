@@ -952,8 +952,9 @@ class PsfMatchTask(pipeBase.Task, abc.ABC):
                     ksv.processKsumDistribution()
                 except:
                     print('(failing)...')
-                    import IPython
-                    IPython.embed()
+                    # import IPython
+                    # IPython.embed()
+                    raise RuntimeError("fail")
                 ksv.setMode(diffimLib.KernelSumVisitorF.REJECT)
                 kernelCellSet.visitCandidates(ksv, nStarPerCell)
 

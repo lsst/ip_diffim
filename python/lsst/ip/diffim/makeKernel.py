@@ -126,8 +126,8 @@ class MakeKernelTask(PsfMatchTask):
         basisList = self.makeKernelBasisList(templateFwhmPix, scienceFwhmPix,
                                              metadata=self.metadata)
         print('before solve')
-        import IPython
-        IPython.embed()
+        # import IPython
+        # IPython.embed()
         spatialSolution, psfMatchingKernel, backgroundModel = self._solve(kernelCellSet, basisList)
         return lsst.pipe.base.Struct(
             psfMatchingKernel=psfMatchingKernel,

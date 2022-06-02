@@ -12,6 +12,7 @@
 #include <cmath>
 #include <algorithm>
 #include <limits>
+#include <iostream>
 
 #include <memory>
 #include "boost/timer.hpp"
@@ -131,13 +132,14 @@ namespace diffim {
     void KernelSolution::solve(Eigen::MatrixXd const& mMat,
                                Eigen::VectorXd const& bVec) {
 
-        if (DEBUG_MATRIX) {
+        //if (DEBUG_MATRIX) {
             std::cout << "M " << std::endl;
             std::cout << mMat << std::endl;
             std::cout << "B " << std::endl;
             std::cout << bVec << std::endl;
-        }
+            //}
 
+            std::cout << "bvecsize = " << bVec.size() << "\n";
         Eigen::VectorXd aVec = Eigen::VectorXd::Zero(bVec.size());
 
         boost::timer t;
@@ -148,6 +150,7 @@ namespace diffim {
 		_solvedBy = LU;
 		Eigen::FullPivLU<Eigen::MatrixXd> lu(mMat);
 		if (lu.isInvertible()) {
+                    std::cout << "LU\n";
 			aVec = lu.solve(bVec);
 		} else {
 			LOGL_DEBUG("TRACE3.ip.diffim.KernelSolution.solve",
@@ -156,9 +159,21 @@ namespace diffim {
 			try {
 
 				_solvedBy = EIGENVECTOR;
-				Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eVecValues(mMat);
+				//Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eVecValues(mMat);
+                                Eigen::EigenSolver<Eigen::MatrixXd> eVecValues(mMat);
 				Eigen::MatrixXd const& rMat = eVecValues.eigenvectors();
 				Eigen::VectorXd eValues = eVecValues.eigenvalues();
+
+                                std::cout << "rmat:\n";
+                                std::cout << rMat << "\n";
+                                std::cout << "evalues:\n";
+                                std::cout << eValues << "\n";
+
+                                std::cout << "mMat\n";
+                                std::cout << mMat << "\n";
+                                std::cout << "adj\n";
+                                std::cout << mMat.adjoint() << "\n";
+
 
 				for (int i = 0; i != eValues.rows(); ++i) {
 					if (eValues(i) != 0.0) {
@@ -167,6 +182,7 @@ namespace diffim {
 				}
 
 				aVec = rMat * eValues.asDiagonal() * rMat.transpose() * bVec;
+                                std::cout << "eigen\n";
 			} catch (pexExcept::Exception& e) {
 
 				_solvedBy = NONE;
@@ -181,10 +197,10 @@ namespace diffim {
         LOGL_DEBUG("TRACE3.ip.diffim.KernelSolution.solve",
                    "Compute time for matrix math : %.2f s", time);
 
-        if (DEBUG_MATRIX) {
-		  std::cout << "A " << std::endl;
-            std::cout << aVec << std::endl;
-        }
+        // if (DEBUG_MATRIX) {
+        std::cout << "A " << std::endl;
+        std::cout << aVec << std::endl;
+        // }
 
         _aVec = aVec;
     }
@@ -1565,6 +1581,7 @@ namespace diffim {
                            "Unable to determine spatial background solution %d (nan)") % (idx)));
                 }
                 bgCoeffs[i] = _aVec(idx);
+                std::cout << "bgCoeffs[i] " << i << " " << bgCoeffs[i] << " " << idx << "\n";
             }
         }
         else {

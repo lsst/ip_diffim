@@ -10,6 +10,7 @@
  */
 
 #include <memory>
+#include <iostream>
 #include "boost/timer.hpp"
 
 #include "Eigen/Core"
@@ -88,6 +89,7 @@ namespace detail {
 
         std::string spatialModelType = ps.getAsString("spatialModelType");
         if (spatialModelType == "chebyshev1") {
+            std::cout << "cheby " << regionBBox << " " << spatialBgOrder << "\n";
             spatialKernelFunction = afwMath::Kernel::SpatialFunctionPtr(
                 new afwMath::Chebyshev1Function2<double>(spatialKernelOrder, geom::Box2D(regionBBox))
                 );
@@ -97,6 +99,7 @@ namespace detail {
 
         }
         else if (spatialModelType == "polynomial") {
+            std::cout << "poly " << spatialKernelOrder << " " << spatialBgOrder << "\n";
             spatialKernelFunction = afwMath::Kernel::SpatialFunctionPtr(
                 new afwMath::PolynomialFunction2<double>(spatialKernelOrder)
                 );

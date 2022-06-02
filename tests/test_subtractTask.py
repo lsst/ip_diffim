@@ -229,6 +229,10 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         """
         noiseLevel = 1.
         science, sources = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=6)
+
+        # import IPython
+        # IPython.embed()
+
         template, _ = makeTestImage(psfSize=3.0, noiseLevel=noiseLevel, noiseSeed=7,
                                     templateBorderSize=20, doApplyCalibration=True)
         config = subtractImages.AlardLuptonSubtractTask.ConfigClass()
