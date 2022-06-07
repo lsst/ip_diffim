@@ -151,7 +151,7 @@ class DcrModel:
             subfilter = coaddRef.dataId["subfilter"]
             dcrCoadd = coaddRef.get()
             if filterLabel is None:
-                filterLabel = dcrCoadd.getFilterLabel()
+                filterLabel = dcrCoadd.getFilter()
             if psf is None:
                 psf = dcrCoadd.getPsf()
             if bbox is None:
@@ -463,7 +463,7 @@ class DcrModel:
         templateExposure = afwImage.ExposureF(bbox, self.wcs)
         templateExposure.setMaskedImage(maskedImage[bbox])
         templateExposure.setPsf(self.psf)
-        templateExposure.setFilterLabel(self.filter)
+        templateExposure.setFilter(self.filter)
         if self.photoCalib is None:
             raise RuntimeError("No PhotoCalib set for the DcrModel. "
                                "If the DcrModel was created from a masked image"

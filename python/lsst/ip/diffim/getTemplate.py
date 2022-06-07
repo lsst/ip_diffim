@@ -340,7 +340,7 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
             coaddExposure.maskedImage.assign(coaddPatch.maskedImage[overlapBox], overlapBox)
 
             if coaddFilterLabel is None:
-                coaddFilterLabel = coaddPatch.getFilterLabel()
+                coaddFilterLabel = coaddPatch.getFilter()
 
             # Retrieve the PSF for this coadd tract, if not already retrieved
             if coaddPsf is None and coaddPatch.hasPsf():
@@ -359,7 +359,7 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
 
         coaddExposure.setPhotoCalib(coaddPhotoCalib)
         coaddExposure.setPsf(coaddPsf)
-        coaddExposure.setFilterLabel(coaddFilterLabel)
+        coaddExposure.setFilter(coaddFilterLabel)
         return coaddExposure
 
     def getCoaddDatasetName(self):
@@ -691,7 +691,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
             raise RuntimeError("CoaddPsf could not be constructed")
 
         templateExposure.setPsf(coaddPsf)
-        templateExposure.setFilterLabel(coaddExposure.getFilterLabel())
+        templateExposure.setFilter(coaddExposure.getFilter())
         templateExposure.setPhotoCalib(coaddExposure.getPhotoCalib())
         return pipeBase.Struct(outputExposure=templateExposure)
 
