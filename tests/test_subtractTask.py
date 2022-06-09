@@ -149,6 +149,15 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         with self.assertRaises(FieldValidationError):
             config.mode = 'aotu'
 
+    def test_config_validate_forceCompatibility(self):
+        """Check that forceCompatibility sets `mode=convolveTemplate`.
+        """
+        config = subtractImages.AlardLuptonSubtractTask.ConfigClass()
+        config.mode = "auto"
+        config.forceCompatibility = True
+        config.validate()
+        self.assertEqual(config.mode, "convolveTemplate")
+
     def test_mismatched_template(self):
         """Test that an error is raised if the template
         does not fully contain the science image.

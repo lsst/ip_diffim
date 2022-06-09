@@ -141,6 +141,8 @@ class AlardLuptonSubtractConfig(lsst.pipe.base.PipelineTaskConfig,
         self.makeKernel.kernel.active.fitForBackground = self.doSubtractBackground
         self.makeKernel.kernel.active.spatialKernelOrder = 1
         self.makeKernel.kernel.active.spatialBgOrder = 2
+
+    def validate(self):
         if self.forceCompatibility:
             self.mode = "convolveTemplate"
 
