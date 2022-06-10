@@ -163,6 +163,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         # Normalization is an extra, unnecessary, calculation and will result
         #  in mis-subtraction of the images if there are calibration errors.
         self.convolutionControl.setDoNormalize(False)
+        self.convolutionControl.setDoCopyEdge(True)
 
     def run(self, template, science, sources):
         """PSF match, subtract, and decorrelate two images.
@@ -204,10 +205,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         if self.config.forceCompatibility:
             # Compatibility option to maintain old functionality
             # This should be removed in the future!
+            self.log.warning("Running with `config.forceCompatibility=True`")
             sources = None
-        kernelSources = self.makeKernel.selectKernelSources(template, science,
-                                                            candidateList=sources,
-                                                            preconvolved=False)
         sciencePsfSize = getPsfFwhm(science.psf)
         templatePsfSize = getPsfFwhm(template.psf)
         self.log.info("Science PSF size: %f", sciencePsfSize)
@@ -228,12 +227,27 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         else:
             raise RuntimeError("Cannot handle AlardLuptonSubtract mode: %s", self.config.mode)
 
+        if self.config.doScaleVariance and ~self.config.forceCompatibility:
+            # Scale the variance of the template and science images before
+            # convolution, subtraction, or decorrelation so that they have the
+            # correct ratio.
+            templateVarFactor = self.scaleVariance.run(template.maskedImage)
+            sciVarFactor = self.scaleVariance.run(science.maskedImage)
+            self.log.info("Template variance scaling factor: %.2f", templateVarFactor)
+            self.metadata.add("scaleTemplateVarianceFactor", templateVarFactor)
+            self.log.info("Science variance scaling factor: %.2f", sciVarFactor)
+            self.metadata.add("scaleScienceVarianceFactor", sciVarFactor)
+
+        kernelSources = self.makeKernel.selectKernelSources(template, science,
+                                                            candidateList=sources,
+                                                            preconvolved=False)
         if convolveTemplate:
             subtractResults = self.runConvolveTemplate(template, science, kernelSources)
         else:
             subtractResults = self.runConvolveScience(template, science, kernelSources)
 
-        if self.config.doScaleVariance:
+        if self.config.doScaleVariance and self.config.forceCompatibility:
+            # The old behavior scaled the variance of the final image difference.
             diffimVarFactor = self.scaleVariance.run(subtractResults.difference.maskedImage)
             self.log.info("Diffim variance scaling factor: %.2f", diffimVarFactor)
             self.metadata.add("scaleDiffimVarianceFactor", diffimVarFactor)
@@ -277,7 +291,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         matchedTemplate = self._convolveExposure(template, kernelResult.psfMatchingKernel,
                                                  self.convolutionControl,
                                                  bbox=science.getBBox(),
-                                                 psf=science.psf)
+                                                 psf=science.psf,
+                                                 photoCalib=science.getPhotoCalib())
         difference = _subtractImages(science, matchedTemplate,
                                      backgroundModel=(kernelResult.backgroundModel
                                                       if self.config.doSubtractBackground else None))
@@ -286,6 +301,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
 
         return lsst.pipe.base.Struct(difference=correctedExposure,
                                      matchedTemplate=matchedTemplate,
+                                     matchedScience=science,
                                      backgroundModel=kernelResult.backgroundModel,
                                      psfMatchingKernel=kernelResult.psfMatchingKernel)
 
@@ -326,22 +342,29 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         # We must invert the background model if the matching kernel is solved for the science image.
         kernelResult.backgroundModel.setParameters([-p for p in modelParams])
 
+        kernelImage = lsst.afw.image.ImageD(kernelResult.psfMatchingKernel.getDimensions())
+        norm = kernelResult.psfMatchingKernel.computeImage(kernelImage, doNormalize=False)
+
         matchedScience = self._convolveExposure(science, kernelResult.psfMatchingKernel,
                                                 self.convolutionControl,
                                                 psf=template.psf)
 
-        difference = _subtractImages(matchedScience, template[science.getBBox()],
+        # Place back on native photometric scale
+        matchedScience.maskedImage /= norm
+        matchedTemplate = template.clone()[science.getBBox()]
+        matchedTemplate.maskedImage /= norm
+        matchedTemplate.setPhotoCalib(science.getPhotoCalib())
+
+        difference = _subtractImages(matchedScience, matchedTemplate,
                                      backgroundModel=(kernelResult.backgroundModel
                                                       if self.config.doSubtractBackground else None))
 
-        # Place back on native photometric scale
-        difference.maskedImage /= kernelResult.psfMatchingKernel.computeImage(
-            lsst.afw.image.ImageD(kernelResult.psfMatchingKernel.getDimensions()), False)
         correctedExposure = self.finalize(template, science, difference, kernelResult.psfMatchingKernel,
                                           templateMatched=False)
 
         return lsst.pipe.base.Struct(difference=correctedExposure,
-                                     matchedTemplate=template,
+                                     matchedTemplate=matchedTemplate,
+                                     matchedScience=matchedScience,
                                      backgroundModel=kernelResult.backgroundModel,
                                      psfMatchingKernel=kernelResult.psfMatchingKernel,)
 
@@ -426,7 +449,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
     @staticmethod
     def _convolveExposure(exposure, kernel, convolutionControl,
                           bbox=None,
-                          psf=None):
+                          psf=None,
+                          photoCalib=None):
         """Convolve an exposure with the given kernel.
 
         Parameters
@@ -441,6 +465,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             Bounding box to trim the convolved exposure to.
         psf : `lsst.afw.detection.Psf`, optional
             Point spread function (PSF) to set for the convolved exposure.
+        photoCalib : `lsst.afw.image.PhotoCalib`, optional
+            Photometric calibration of the convolved exposure.
 
         Returns
         -------
@@ -450,6 +476,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         convolvedExposure = exposure.clone()
         if psf is not None:
             convolvedExposure.setPsf(psf)
+        if photoCalib is not None:
+            convolvedExposure.setPhotoCalib(photoCalib)
         convolvedImage = lsst.afw.image.MaskedImageF(exposure.getBBox())
         lsst.afw.math.convolve(convolvedImage, exposure.maskedImage, kernel, convolutionControl)
         convolvedExposure.setMaskedImage(convolvedImage)
