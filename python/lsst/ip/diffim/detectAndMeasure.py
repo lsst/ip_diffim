@@ -304,7 +304,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             diaSources = results.sources
 
         if self.config.doSkySources:
-            self.addSkySources(self, diaSources, difference.mask, difference.info.id)
+            self.addSkySources(diaSources, difference.mask, difference.info.id)
 
         self.measureDiaSources(diaSources, science, difference, template)
 
