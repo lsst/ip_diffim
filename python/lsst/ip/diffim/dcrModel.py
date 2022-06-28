@@ -561,7 +561,7 @@ class DcrModel:
         # The noise should be lower in the smoothed image by
         # sqrt(Nsmooth) ~ fwhm pixels
         noiseLevel /= fwhm
-        smoothRef = ndimage.filters.gaussian_filter(referenceImage, filterWidth, mode='constant')
+        smoothRef = ndimage.gaussian_filter(referenceImage, filterWidth, mode='constant')
         # Add a three sigma offset to both the reference and model to prevent
         # dividing by zero. Note that this will also slightly suppress faint
         # variations in color.
@@ -574,12 +574,12 @@ class DcrModel:
                                       highThreshold=highThreshold,
                                       lowThreshold=lowThreshold,
                                       regularizationWidth=regularizationWidth)
-            smoothModel = ndimage.filters.gaussian_filter(model.array, filterWidth, mode='constant')
+            smoothModel = ndimage.gaussian_filter(model.array, filterWidth, mode='constant')
             smoothModel += 3.*noiseLevel
             relativeModel = smoothModel/smoothRef
             # Now sharpen the smoothed relativeModel using an alpha of 3.
             alpha = 3.
-            relativeModel2 = ndimage.filters.gaussian_filter(relativeModel, filterWidth/alpha)
+            relativeModel2 = ndimage.gaussian_filter(relativeModel, filterWidth/alpha)
             relativeModel += alpha*(relativeModel - relativeModel2)
             model.array = relativeModel*referenceImage
 
@@ -653,13 +653,13 @@ class DcrModel:
             highPixels = image > highThreshold
             if regularizationWidth > 0:
                 # Erode and dilate ``highPixels`` to exclude noisy pixels.
-                highPixels = ndimage.morphology.binary_opening(highPixels, structure=filterStructure)
+                highPixels = ndimage.binary_opening(highPixels, structure=filterStructure)
             image[highPixels] = highThreshold[highPixels]
         if lowThreshold is not None:
             lowPixels = image < lowThreshold
             if regularizationWidth > 0:
                 # Erode and dilate ``lowPixels`` to exclude noisy pixels.
-                lowPixels = ndimage.morphology.binary_opening(lowPixels, structure=filterStructure)
+                lowPixels = ndimage.binary_opening(lowPixels, structure=filterStructure)
             image[lowPixels] = lowThreshold[lowPixels]
 
 

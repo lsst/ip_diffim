@@ -727,7 +727,7 @@ class DipoleFitAlgorithm(object):
                         gmod.set_param_hint('y2Neg', value=bgParsNeg[5])
 
         y, x = np.mgrid[bbox.getBeginY():bbox.getEndY(), bbox.getBeginX():bbox.getEndX()]
-        in_x = np.array([x, y]).astype(np.float)
+        in_x = np.array([x, y]).astype(np.float64)
         in_x[0, :] -= in_x[0, :].mean()  # center it!
         in_x[1, :] -= in_x[1, :].mean()
 
