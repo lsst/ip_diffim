@@ -632,7 +632,7 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
             # check PSF, WCS, bbox, filterLabel, photoCalib, aperture correction
             self._compare_apCorrMaps(apCorrMap, output.difference.info.getApCorrMap())
             self.assertWcsAlmostEqualOverBBox(science.getWcs(), output.difference.getWcs(), science.getBBox())
-            self.assertEqual(science.getFilterLabel(), output.difference.getFilterLabel())
+            self.assertEqual(science.filter, output.difference.filter)
             self.assertEqual(science.getPhotoCalib(), output.difference.getPhotoCalib())
         _run_and_check_images(doDecorrelation=True)
         _run_and_check_images(doDecorrelation=False)
@@ -681,7 +681,7 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
             # check PSF, WCS, bbox, filterLabel, photoCalib, aperture correction
             self._compare_apCorrMaps(apCorrMap, output.difference.info.getApCorrMap())
             self.assertWcsAlmostEqualOverBBox(science.getWcs(), output.difference.getWcs(), science.getBBox())
-            self.assertEqual(science.getFilterLabel(), output.difference.getFilterLabel())
+            self.assertEqual(science.filter, output.difference.filter)
             self.assertEqual(science.getPhotoCalib(), output.difference.getPhotoCalib())
 
         _run_and_check_images(doDecorrelation=True)
