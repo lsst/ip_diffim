@@ -455,11 +455,11 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
                                np.max(model.array - templateImage))
             highThreshold = templateImage*clampFrequency
             highPix = model.array > highThreshold
-            highPix = ndimage.morphology.binary_opening(highPix, iterations=regularizationWidth)
+            highPix = ndimage.binary_opening(highPix, iterations=regularizationWidth)
             self.assertFalse(np.all(highPix))
             lowThreshold = templateImage/clampFrequency
             lowPix = model.array < lowThreshold
-            lowPix = ndimage.morphology.binary_opening(lowPix, iterations=regularizationWidth)
+            lowPix = ndimage.binary_opening(lowPix, iterations=regularizationWidth)
             self.assertFalse(np.all(lowPix))
 
     def testRegularizationSidelobes(self):
@@ -517,11 +517,11 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         # Check that all of the outliers are clipped
         highThreshold = oldModel.array*modelClampFactor
         highPix = newModel.array > highThreshold
-        highPix = ndimage.morphology.binary_opening(highPix, iterations=regularizationWidth)
+        highPix = ndimage.binary_opening(highPix, iterations=regularizationWidth)
         self.assertFalse(np.all(highPix))
         lowThreshold = oldModel.array/modelClampFactor
         lowPix = newModel.array < lowThreshold
-        lowPix = ndimage.morphology.binary_opening(lowPix, iterations=regularizationWidth)
+        lowPix = ndimage.binary_opening(lowPix, iterations=regularizationWidth)
         self.assertFalse(np.all(lowPix))
 
     def testIterateModel(self):
