@@ -46,7 +46,7 @@ class DetectAndMeasureConnections(pipeBase.PipelineTaskConnections,
         storageClass="ExposureF",
         name="{fakesType}calexp"
     )
-    template = pipeBase.connectionTypes.Input(
+    matchedTemplate = pipeBase.connectionTypes.Input(
         doc="Warped and PSF-matched template used to create the difference image.",
         dimensions=("instrument", "visit", "detector"),
         storageClass="ExposureF",
@@ -247,14 +247,14 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         idFactory = self.makeIdFactory(expId=expId, expBits=expBits)
 
         outputs = self.run(inputs['science'],
-                           inputs['template'],
+                           inputs['matchedTemplate'],
                            inputs['difference'],
                            inputs['selectSources'],
                            idFactory=idFactory)
         butlerQC.put(outputs, outputRefs)
 
     @timeMethod
-    def run(self, science, template, difference, selectSources,
+    def run(self, science, matchedTemplate, difference, selectSources,
             idFactory=None):
         """Detect and measure sources on a difference image.
 
@@ -262,7 +262,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         ----------
         science : `lsst.afw.image.ExposureF`
             Science exposure that the template was subtracted from.
-        template : `lsst.afw.image.ExposureF`
+        matchedTemplate : `lsst.afw.image.ExposureF`
             Warped and PSF-matched template that was used produce the
             difference image.
         difference : `lsst.afw.image.ExposureF`
@@ -306,7 +306,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         if self.config.doSkySources:
             self.addSkySources(diaSources, difference.mask, difference.info.id)
 
-        self.measureDiaSources(diaSources, science, difference, template)
+        self.measureDiaSources(diaSources, science, difference, matchedTemplate)
 
         if self.config.doForcedMeasurement:
             self.measureForcedSources(diaSources, science, difference.getWcs())

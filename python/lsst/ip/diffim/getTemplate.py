@@ -487,7 +487,7 @@ class GetTemplateConnections(pipeBase.PipelineTaskConnections,
         multiple=True,
         deferLoad=True
     )
-    outputExposure = pipeBase.connectionTypes.Output(
+    template = pipeBase.connectionTypes.Output(
         doc="Warped template used to create `subtractedExposure`.",
         dimensions=("instrument", "visit", "detector"),
         storageClass="ExposureF",
@@ -617,7 +617,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
         Returns
         -------
         result : `lsst.pipe.base.Struct` containing
-            - ``outputExposure`` : a template coadd exposure assembled out of patches
+            - ``template`` : a template coadd exposure assembled out of patches
         """
         # Table for CoaddPSF
         tractsSchema = afwTable.ExposureTable.makeMinimalSchema()
@@ -693,7 +693,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
         templateExposure.setPsf(coaddPsf)
         templateExposure.setFilter(coaddExposure.getFilter())
         templateExposure.setPhotoCalib(coaddExposure.getPhotoCalib())
-        return pipeBase.Struct(outputExposure=templateExposure)
+        return pipeBase.Struct(template=templateExposure)
 
 
 class GetDcrTemplateConnections(GetTemplateConnections,
