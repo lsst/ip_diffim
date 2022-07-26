@@ -30,6 +30,7 @@ import lsst.pex.config
 import lsst.pipe.base
 from lsst.pipe.base import connectionTypes
 from . import MakeKernelTask, DecorrelateALKernelTask
+from lsst.utils.timer import timeMethod
 
 __all__ = ["AlardLuptonSubtractConfig", "AlardLuptonSubtractTask"]
 
@@ -225,6 +226,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
 
         return exposure
 
+    @timeMethod
     def run(self, template, science, sources, finalizedPsfApCorrCatalog=None):
         """PSF match, subtract, and decorrelate two images.
 
