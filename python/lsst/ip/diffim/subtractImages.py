@@ -148,7 +148,7 @@ class AlardLuptonSubtractConfig(lsst.pipe.base.PipelineTaskConfig,
 
     forceCompatibility = lsst.pex.config.Field(
         dtype=bool,
-        default=False,
+        default=True,
         doc="Set up and run diffim using settings that ensure the results"
         "are compatible with the old version in pipe_tasks.",
         deprecated="This option is only for backwards compatibility purposes"
