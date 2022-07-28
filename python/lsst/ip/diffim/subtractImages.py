@@ -296,7 +296,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         else:
             raise RuntimeError("Cannot handle AlardLuptonSubtract mode: %s", self.config.mode)
 
-        if self.config.doScaleVariance and ~self.config.forceCompatibility:
+        if self.config.doScaleVariance and not self.config.forceCompatibility:
             # Scale the variance of the template and science images before
             # convolution, subtraction, or decorrelation so that they have the
             # correct ratio.
