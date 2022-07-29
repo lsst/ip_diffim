@@ -122,8 +122,8 @@ class ModelPsfMatchTask(PsfMatchTask):
 
     Debug variables
 
-    The `lsst.pipe.base.cmdLineTask.CmdLineTask` command line task interface supports a
-    flag -d/--debug to import debug.py from your PYTHONPATH.  The relevant contents of debug.py
+    The ``pipetask`` command line interface supports a
+    flag --debug to import @b debug.py from your PYTHONPATH.  The relevant contents of debug.py
     for this Task include:
 
     .. code-block:: py
