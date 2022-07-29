@@ -1,6 +1,5 @@
 setupRequired(afw)
 setupRequired(daf_base)
-setupRequired(daf_persistence)
 setupRequired(log)
 setupRequired(meas_astrom)
 setupRequired(meas_algorithms)
