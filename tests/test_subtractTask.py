@@ -207,6 +207,7 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         config = subtractImages.AlardLuptonSubtractTask.ConfigClass()
         config.doSubtractBackground = False
         config.mode = "convolveTemplate"
+        config.forceCompatibility = False
 
         task = subtractImages.AlardLuptonSubtractTask(config=config)
         output = task.run(template.clone(), science.clone(), sources)
@@ -227,6 +228,7 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         config = subtractImages.AlardLuptonSubtractTask.ConfigClass()
         config.doSubtractBackground = False
         config.mode = "convolveScience"
+        config.forceCompatibility = False
 
         task = subtractImages.AlardLuptonSubtractTask(config=config)
         output = task.run(template.clone(), science.clone(), sources)
@@ -249,6 +251,7 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
                                         templateBorderSize=20, doApplyCalibration=True)
             config = subtractImages.AlardLuptonSubtractTask.ConfigClass()
             config.doSubtractBackground = False
+            config.forceCompatibility = False
             task = subtractImages.AlardLuptonSubtractTask(config=config)
             output = task.run(template, science, sources)
             self.assertFloatsAlmostEqual(task.metadata["scaleTemplateVarianceFactor"], 1., atol=.05)
@@ -286,6 +289,7 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
                                         templateBorderSize=20, doApplyCalibration=True)
             config = subtractImages.AlardLuptonSubtractTask.ConfigClass()
             config.doSubtractBackground = False
+            config.forceCompatibility = False
             task = subtractImages.AlardLuptonSubtractTask(config=config)
             output = task.run(template, science, sources)
             self.assertFloatsAlmostEqual(task.metadata["scaleTemplateVarianceFactor"], 1., atol=.05)
@@ -326,6 +330,7 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         config = subtractImages.AlardLuptonSubtractTask.ConfigClass()
         config.mode = 'auto'
         config.doSubtractBackground = False
+        config.forceCompatibility = False
         task = subtractImages.AlardLuptonSubtractTask(config=config)
 
         # The science image will be modified in place, so use a copy for the second run.
@@ -421,6 +426,7 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
                                          xSize=xSize, ySize=ySize, x0=x0, y0=y0)
         config = subtractImages.AlardLuptonSubtractTask.ConfigClass()
         config.doSubtractBackground = True
+        config.forceCompatibility = False
 
         config.makeKernel.kernel.name = "AL"
         config.makeKernel.kernel.active.fitForBackground = True
@@ -468,6 +474,7 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
 
             config = subtractImages.AlardLuptonSubtractTask.ConfigClass()
             config.doSubtractBackground = False
+            config.forceCompatibility = False
             config.doDecorrelation = doDecorrelation
             config.doScaleVariance = doScaleVariance
             task = subtractImages.AlardLuptonSubtractTask(config=config)
@@ -536,6 +543,7 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
 
             config = subtractImages.AlardLuptonSubtractTask.ConfigClass()
             config.doSubtractBackground = False
+            config.forceCompatibility = False
             config.doDecorrelation = doDecorrelation
             config.doScaleVariance = doScaleVariance
             task = subtractImages.AlardLuptonSubtractTask(config=config)
@@ -611,6 +619,7 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
 
         config = subtractImages.AlardLuptonSubtractTask.ConfigClass()
         config.mode = "convolveTemplate"
+        config.forceCompatibility = False
 
         def _run_and_check_images(doDecorrelation):
             """Check that the metadata is correct with or without decorrelation.
@@ -660,6 +669,7 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
 
         config = subtractImages.AlardLuptonSubtractTask.ConfigClass()
         config.mode = "convolveScience"
+        config.forceCompatibility = False
 
         def _run_and_check_images(doDecorrelation):
             """Check that the metadata is correct with or without decorrelation.

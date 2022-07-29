@@ -30,6 +30,7 @@ import lsst.pex.config
 import lsst.pipe.base
 from lsst.pipe.base import connectionTypes
 from . import MakeKernelTask, DecorrelateALKernelTask
+from lsst.utils.timer import timeMethod
 
 __all__ = ["AlardLuptonSubtractConfig", "AlardLuptonSubtractTask"]
 
@@ -147,7 +148,7 @@ class AlardLuptonSubtractConfig(lsst.pipe.base.PipelineTaskConfig,
 
     forceCompatibility = lsst.pex.config.Field(
         dtype=bool,
-        default=False,
+        default=True,
         doc="Set up and run diffim using settings that ensure the results"
         "are compatible with the old version in pipe_tasks.",
         deprecated="This option is only for backwards compatibility purposes"
@@ -225,6 +226,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
 
         return exposure
 
+    @timeMethod
     def run(self, template, science, sources, finalizedPsfApCorrCatalog=None):
         """PSF match, subtract, and decorrelate two images.
 
@@ -294,7 +296,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         else:
             raise RuntimeError("Cannot handle AlardLuptonSubtract mode: %s", self.config.mode)
 
-        if self.config.doScaleVariance and ~self.config.forceCompatibility:
+        if self.config.doScaleVariance and not self.config.forceCompatibility:
             # Scale the variance of the template and science images before
             # convolution, subtraction, or decorrelation so that they have the
             # correct ratio.
