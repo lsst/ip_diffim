@@ -35,7 +35,6 @@ from lsst.ip.diffim.dcrModel import DcrModel
 from lsst.meas.algorithms import CoaddPsf, CoaddPsfConfig
 
 __all__ = ["GetCoaddAsTemplateTask", "GetCoaddAsTemplateConfig",
-           "GetCalexpAsTemplateTask", "GetCalexpAsTemplateConfig",
            "GetTemplateTask", "GetTemplateConfig",
            "GetDcrTemplateTask", "GetDcrTemplateConfig",
            "GetMultiTractCoaddTemplateTask", "GetMultiTractCoaddTemplateConfig"]
@@ -374,84 +373,6 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
         warpType = self.config.warpType
         suffix = "" if warpType == "direct" else warpType[0].upper() + warpType[1:]
         return self.config.coaddName + "Coadd" + suffix
-
-
-class GetCalexpAsTemplateConfig(pexConfig.Config):
-    doAddCalexpBackground = pexConfig.Field(
-        dtype=bool,
-        default=True,
-        doc="Add background to calexp before processing it."
-    )
-
-
-class GetCalexpAsTemplateTask(pipeBase.Task):
-    """Subtask to retrieve calexp of the same ccd number as the science image SensorRef
-    for use as an image difference template. Only gen2 supported.
-
-    To be run as a subtask by pipe.tasks.ImageDifferenceTask.
-    Intended for use with simulations and surveys that repeatedly visit the same pointing.
-    This code was originally part of Winter2013ImageDifferenceTask.
-    """
-
-    ConfigClass = GetCalexpAsTemplateConfig
-    _DefaultName = "GetCalexpAsTemplateTask"
-
-    def run(self, exposure, sensorRef, templateIdList):
-        """Return a calexp exposure with based on input sensorRef.
-
-        Construct a dataId based on the sensorRef.dataId combined
-        with the specifications from the first dataId in templateIdList
-
-        Parameters
-        ----------
-        exposure :  `lsst.afw.image.Exposure`
-            exposure (unused)
-        sensorRef : `list` of `lsst.daf.persistence.ButlerDataRef`
-            Data reference of the calexp(s) to subtract from.
-        templateIdList : `list` of `lsst.daf.persistence.ButlerDataRef`
-            Data reference of the template calexp to be subtraced.
-            Can be incomplete, fields are initialized from `sensorRef`.
-            If there are multiple items, only the first one is used.
-
-        Returns
-        -------
-        result : `struct`
-
-            return a pipeBase.Struct:
-
-                - ``exposure`` : a template calexp
-                - ``sources`` : source catalog measured on the template
-        """
-
-        if len(templateIdList) == 0:
-            raise RuntimeError("No template data reference supplied.")
-        if len(templateIdList) > 1:
-            self.log.warning("Multiple template data references supplied. Using the first one only.")
-
-        templateId = sensorRef.dataId.copy()
-        templateId.update(templateIdList[0])
-
-        self.log.info("Fetching calexp (%s) as template.", templateId)
-
-        butler = sensorRef.getButler()
-        template = butler.get(datasetType="calexp", dataId=templateId)
-        if self.config.doAddCalexpBackground:
-            templateBg = butler.get(datasetType="calexpBackground", dataId=templateId)
-            mi = template.getMaskedImage()
-            mi += templateBg.getImage()
-
-        if not template.hasPsf():
-            raise pipeBase.TaskError("Template has no psf")
-
-        templateSources = butler.get(datasetType="src", dataId=templateId)
-        return pipeBase.Struct(exposure=template,
-                               sources=templateSources)
-
-    def runDataRef(self, *args, **kwargs):
-        return self.run(*args, **kwargs)
-
-    def runQuantum(self, **kwargs):
-        raise NotImplementedError("Calexp template is not supported with gen3 middleware")
 
 
 class GetTemplateConnections(pipeBase.PipelineTaskConnections,
