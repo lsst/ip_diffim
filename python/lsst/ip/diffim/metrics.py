@@ -31,7 +31,6 @@ import astropy.units as u
 
 from lsst.pipe.base import Struct, connectionTypes
 from lsst.verify import Measurement
-from lsst.verify.gen2tasks import register
 from lsst.verify.tasks import MetricTask, MetricConfig, MetricConnections, \
     MetricComputationError
 
@@ -56,7 +55,6 @@ class NumberSciSourcesMetricConfig(
     pass
 
 
-@register("numSciSources")
 class NumberSciSourcesMetricTask(MetricTask):
     """Task that computes the number of cataloged non-primary science sources.
 
@@ -122,7 +120,6 @@ class FractionDiaSourcesToSciSourcesMetricConfig(
     pass
 
 
-@register("fracDiaSourcesToSciSources")
 class FractionDiaSourcesToSciSourcesMetricTask(MetricTask):
     """Task that computes the ratio of difference image sources to science
     sources in an image, visit, etc.
