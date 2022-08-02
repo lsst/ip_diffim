@@ -196,8 +196,8 @@ class GetCoaddAsTemplateTask(pipeBase.Task):
 
     def run(self, tractInfo, patchList, skyCorners, availableCoaddRefs,
             sensorRef=None, visitInfo=None):
-        """Gen2 and gen3 shared code: determination of exposure dimensions and
-        copying of pixels from overlapping patch regions.
+        """Determination of exposure dimensions and copying of pixels from
+        overlapping patch regions.
 
         Parameters
         ----------
