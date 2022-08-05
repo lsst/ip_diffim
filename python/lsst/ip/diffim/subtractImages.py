@@ -99,7 +99,7 @@ class AlardLuptonSubtractConfig(lsst.pipe.base.PipelineTaskConfig,
                                 pipelineConnections=AlardLuptonSubtractConnections):
     mode = lsst.pex.config.ChoiceField(
         dtype=str,
-        default="auto",
+        default="convolveTemplate",
         allowed={"auto": "Choose which image to convolve at runtime.",
                  "convolveScience": "Only convolve the science image.",
                  "convolveTemplate": "Only convolve the template image."},
@@ -148,7 +148,7 @@ class AlardLuptonSubtractConfig(lsst.pipe.base.PipelineTaskConfig,
 
     forceCompatibility = lsst.pex.config.Field(
         dtype=bool,
-        default=True,
+        default=False,
         doc="Set up and run diffim using settings that ensure the results"
         "are compatible with the old version in pipe_tasks.",
         deprecated="This option is only for backwards compatibility purposes"
@@ -162,8 +162,10 @@ class AlardLuptonSubtractConfig(lsst.pipe.base.PipelineTaskConfig,
         self.makeKernel.kernel.active.spatialBgOrder = 2
 
     def validate(self):
-        if self.forceCompatibility:
-            self.mode = "convolveTemplate"
+        if self.forceCompatibility and not (self.mode == "convolveTemplate"):
+            msg = f"forceCompatibility=True requires mode='convolveTemplate', but mode was '{self.mode}'."
+            raise lsst.pex.config.FieldValidationError(AlardLuptonSubtractConfig.forceCompatibility,
+                                                       self, msg)
 
 
 class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
