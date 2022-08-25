@@ -267,9 +267,9 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             difference image.
         difference : `lsst.afw.image.ExposureF`
             Result of subtracting template from the science image.
-        selectSources : `lsst.afw.table.SourceCatalog`, optional
+        selectSources : `lsst.afw.table.SourceCatalog`
             Identified sources on the science exposure.
-        idFactory : `lsst.afw.table.IdFactory`
+        idFactory : `lsst.afw.table.IdFactory`, optional
             Generator object to assign ids to detected sources in the difference image.
 
         Returns
