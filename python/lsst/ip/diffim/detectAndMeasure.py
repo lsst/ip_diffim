@@ -58,13 +58,6 @@ class DetectAndMeasureConnections(pipeBase.PipelineTaskConnections,
         storageClass="ExposureF",
         name="{fakesType}{coaddName}Diff_differenceTempExp",
     )
-    selectSources = pipeBase.connectionTypes.Input(
-        doc="Sources measured on the science exposure; will be matched to the "
-            "detected sources on the difference image.",
-        dimensions=("instrument", "visit", "detector"),
-        storageClass="SourceCatalog",
-        name="{fakesType}src",
-    )
     outputSchema = pipeBase.connectionTypes.InitOutput(
         doc="Schema (as an example catalog) for output DIASource catalog.",
         storageClass="SourceCatalog",
@@ -249,12 +242,11 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         outputs = self.run(inputs['science'],
                            inputs['matchedTemplate'],
                            inputs['difference'],
-                           inputs['selectSources'],
                            idFactory=idFactory)
         butlerQC.put(outputs, outputRefs)
 
     @timeMethod
-    def run(self, science, matchedTemplate, difference, selectSources,
+    def run(self, science, matchedTemplate, difference,
             idFactory=None):
         """Detect and measure sources on a difference image.
 
@@ -267,8 +259,6 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             difference image.
         difference : `lsst.afw.image.ExposureF`
             Result of subtracting template from the science image.
-        selectSources : `lsst.afw.table.SourceCatalog`
-            Identified sources on the science exposure.
         idFactory : `lsst.afw.table.IdFactory`, optional
             Generator object to assign ids to detected sources in the difference image.
 
