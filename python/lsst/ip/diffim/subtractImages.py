@@ -254,7 +254,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                 Result of subtracting template and science.
             ``matchedTemplate`` : `lsst.afw.image.ExposureF`
                 Warped and PSF-matched template exposure.
-            ``backgroundModel`` : `lsst.afw.math.Chebyshev1Function2D`
+            ``backgroundModel`` : `lsst.afw.math.Function2D`
                 Background model that was fit while solving for the PSF-matching kernel
             ``psfMatchingKernel`` : `lsst.afw.math.Kernel`
                 Kernel used to PSF-match the convolved image.
@@ -348,7 +348,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                 Result of subtracting template and science.
             ``matchedTemplate`` : `lsst.afw.image.ExposureF`
                 Warped and PSF-matched template exposure.
-            ``backgroundModel`` : `lsst.afw.math.Chebyshev1Function2D`
+            ``backgroundModel`` : `lsst.afw.math.Function2D`
                 Background model that was fit while solving for the PSF-matching kernel
             ``psfMatchingKernel`` : `lsst.afw.math.Kernel`
                 Kernel used to PSF-match the template to the science image.
@@ -399,7 +399,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             ``matchedTemplate`` : `lsst.afw.image.ExposureF`
                 Warped template exposure. Note that in this case, the template
                 is not PSF-matched to the science image.
-            ``backgroundModel`` : `lsst.afw.math.Chebyshev1Function2D`
+            ``backgroundModel`` : `lsst.afw.math.Function2D`
                 Background model that was fit while solving for the PSF-matching kernel
             ``psfMatchingKernel`` : `lsst.afw.math.Kernel`
                Kernel used to PSF-match the science image to the template.
