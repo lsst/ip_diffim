@@ -112,12 +112,6 @@ class TestNumSciSources(MetricTaskTestCase):
         self.assertEqual(meas.metric_name, Name(metric="ip_diffim.numSciSources"))
         assert_quantity_allclose(meas.quantity, 1 * u.count)
 
-    def testMissingData(self):
-        result = self.task.run(None)
-        lsst.pipe.base.testUtils.assertValidOutput(self.task, result)
-        meas = result.measurement
-        self.assertIsNone(meas)
-
 
 class TestFractionDiaSources(MetricTaskTestCase):
 
@@ -156,18 +150,6 @@ class TestFractionDiaSources(MetricTaskTestCase):
         diaCatalog = _makeDummyCatalog(0)
         with self.assertRaises(MetricComputationError):
             self.task.run(sciCatalog, diaCatalog)
-
-    def testMissingData(self):
-        result = self.task.run(None, None)
-        lsst.pipe.base.testUtils.assertValidOutput(self.task, result)
-        meas = result.measurement
-        self.assertIsNone(meas)
-
-    def testSemiMissingData(self):
-        result = self.task.run(sciSources=_makeDummyCatalog(3), diaSources=None)
-        lsst.pipe.base.testUtils.assertValidOutput(self.task, result)
-        meas = result.measurement
-        self.assertIsNone(meas)
 
     def testSkySources(self):
         sciCatalog = _makeDummyCatalog(5, skyFlag=True)

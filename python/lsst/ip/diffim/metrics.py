@@ -68,12 +68,12 @@ class NumberSciSourcesMetricTask(MetricTask):
     ConfigClass = NumberSciSourcesMetricConfig
 
     def run(self, sources):
-        """Count the number of non-primary science sources.
+        """Count the number of primary science sources.
 
         Parameters
         ----------
-        sources : `lsst.afw.table.SourceCatalog` or `None`
-            A science source catalog, which may be empty or `None`.
+        sources : `lsst.afw.table.SourceCatalog`
+            A science source catalog, which may be empty.
 
         Returns
         -------
@@ -84,12 +84,8 @@ class NumberSciSourcesMetricTask(MetricTask):
                 the total number of non-primary science sources
                 (`lsst.verify.Measurement` or `None`)
         """
-        if sources is not None:
-            nSciSources = _countRealSources(sources)
-            meas = Measurement(self.config.metricName, nSciSources * u.count)
-        else:
-            self.log.info("Nothing to do: no catalogs found.")
-            meas = None
+        nSciSources = _countRealSources(sources)
+        meas = Measurement(self.config.metricName, nSciSources * u.count)
         return Struct(measurement=meas)
 
 
@@ -138,9 +134,9 @@ class FractionDiaSourcesToSciSourcesMetricTask(MetricTask):
 
         Parameters
         ----------
-        sciSources : `lsst.afw.table.SourceCatalog` or `None`
-            A science source catalog, which may be empty or `None`.
-        diaSources : `lsst.afw.table.SourceCatalog` or `None`
+        sciSources : `lsst.afw.table.SourceCatalog`
+            A science source catalog, which may be empty.
+        diaSources : `lsst.afw.table.SourceCatalog`
             A DIASource catalog for the same unit of processing
             as ``sciSources``.
 
@@ -152,18 +148,14 @@ class FractionDiaSourcesToSciSourcesMetricTask(MetricTask):
             ``measurement``
                 the ratio (`lsst.verify.Measurement` or `None`)
         """
-        if diaSources is not None and sciSources is not None:
-            nSciSources = _countRealSources(sciSources)
-            nDiaSources = _countRealSources(diaSources)
-            metricName = self.config.metricName
-            if nSciSources <= 0:
-                raise MetricComputationError(
-                    "No science sources found; ratio of DIASources to science sources ill-defined.")
-            else:
-                meas = Measurement(metricName, nDiaSources / nSciSources * u.dimensionless_unscaled)
+        nSciSources = _countRealSources(sciSources)
+        nDiaSources = _countRealSources(diaSources)
+        metricName = self.config.metricName
+        if nSciSources <= 0:
+            raise MetricComputationError(
+                "No science sources found; ratio of DIASources to science sources ill-defined.")
         else:
-            self.log.info("Nothing to do: no catalogs found.")
-            meas = None
+            meas = Measurement(metricName, nDiaSources / nSciSources * u.dimensionless_unscaled)
         return Struct(measurement=meas)
 
 
