@@ -32,7 +32,7 @@ from lsst.utils.timer import timeMethod
 
 from . import DipoleFitTask
 
-__all__ = ["DetectAndMeasureConfig", "DetectAndMeasureTask"]
+__all__ = ["DetectAndMeasureConfig", "DetectAndMeasureTask", "DetectAndMeasureCoaddConfig", "DetectAndMeasureCoaddTask"]
 
 
 class DetectAndMeasureConnections(pipeBase.PipelineTaskConnections,
@@ -392,3 +392,86 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                           "ip_diffim_forced_PsfFlux_flag_edge", True)
         for diaSource, forcedSource in zip(diaSources, forcedSources):
             diaSource.assign(forcedSource, mapper)
+
+
+class DetectAndMeasureCoaddConnections(pipeBase.PipelineTaskConnections,
+                                  dimensions=("tract", "patch", "band", "skymap"),
+                                  defaultTemplates={"coaddName": "deepNightCoadd",
+                                                    "templateName": "goodSeeingCoadd",
+                                                    "differenceName": "goodSeeingDiff_differenceCoadd",
+                                                    "scienceSrcName": "deepNightCoadd_det",
+                                                    "warpTypeSuffix": "",
+                                                    "fakesType": ""
+                                                    }):
+    science = pipeBase.connectionTypes.Input(
+        doc="Input science exposure.",
+        dimensions=("tract", "patch", "band", "skymap"),
+        storageClass="ExposureF",
+        name="{fakesType}{coaddName}_calexp"
+    )
+    matchedTemplate = pipeBase.connectionTypes.Input(
+        doc="Warped and PSF-matched template used to create the difference image.",
+        dimensions=("tract", "patch", "band", "skymap"),
+        storageClass="ExposureF",
+        name="{fakesType}{templateName}",
+    )
+    difference = pipeBase.connectionTypes.Input(
+        doc="Result of subtracting template from science.",
+        dimensions=("tract", "patch", "band", "skymap"),
+        storageClass="ExposureF",
+        name="{fakesType}{differenceName}",
+    )
+    selectSources = pipeBase.connectionTypes.Input(
+        doc="Sources measured on the science exposure; will be matched to the "
+            "detected sources on the difference image.",
+        dimensions=("tract", "patch", "band", "skymap"),
+        storageClass="SourceCatalog",
+        name="{fakesType}{scienceSrcName}",
+    )
+    outputSchema = pipeBase.connectionTypes.InitOutput(
+        doc="Schema (as an example catalog) for output DIASource catalog.",
+        storageClass="SourceCatalog",
+        name="{fakesType}{differenceName}_diaSrc_schema",
+    )
+    diaSources = pipeBase.connectionTypes.Output(
+        doc="Detected diaSources on the difference image.",
+        dimensions=("tract", "patch", "band", "skymap"),
+        storageClass="SourceCatalog",
+        name="{fakesType}{differenceName}_diaSrc",
+    )
+    subtractedMeasuredExposure = pipeBase.connectionTypes.Output(
+        doc="Difference image with detection mask plane filled in.",
+        dimensions=("tract", "patch", "band", "skymap"),
+        storageClass="ExposureF",
+        name="{fakesType}{differenceName}Exp",
+    )
+
+
+class DetectAndMeasureCoaddConfig(DetectAndMeasureConfig,
+                             pipelineConnections=DetectAndMeasureCoaddConnections):
+    """Config for DetectAndMeasureTask
+    """
+
+    def setDefaults(self):
+        super().setDefaults()
+        self.doApCorr = False
+
+class DetectAndMeasureCoaddTask(DetectAndMeasureTask):
+    """Detect and measure sources on a difference image.
+    """
+    ConfigClass = DetectAndMeasureCoaddConfig
+    _DefaultName = "detectAndMeasureCoadd"
+
+    def runQuantum(self, butlerQC: pipeBase.ButlerQuantumContext,
+                   inputRefs: pipeBase.InputQuantizedConnection,
+                   outputRefs: pipeBase.OutputQuantizedConnection):
+        inputs = butlerQC.get(inputRefs)
+        exposureIdInfo = ExposureIdInfo.fromDataId(butlerQC.quantum.dataId, "tract_patch_band")
+        idFactory = exposureIdInfo.makeSourceIdFactory()
+
+        outputs = self.run(inputs['science'],
+                           inputs['matchedTemplate'],
+                           inputs['difference'],
+                           inputs['selectSources'],
+                           idFactory=idFactory)
+        butlerQC.put(outputs, outputRefs)

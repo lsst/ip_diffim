@@ -32,7 +32,12 @@ from lsst.pipe.base import connectionTypes
 from . import MakeKernelTask, DecorrelateALKernelTask
 from lsst.utils.timer import timeMethod
 
-__all__ = ["AlardLuptonSubtractConfig", "AlardLuptonSubtractTask"]
+__all__ = [
+    "AlardLuptonSubtractConfig",
+    "AlardLuptonSubtractTask",
+    "CoaddAlardLuptonSubtractConfig",
+    "CoaddAlardLuptonSubtractTask",
+]
 
 _dimensions = ("instrument", "visit", "detector")
 _defaultTemplates = {"coaddName": "deep", "fakesType": ""}
@@ -613,3 +618,75 @@ def _subtractImages(science, template, backgroundModel=None):
         difference.maskedImage -= backgroundModel
     difference.maskedImage -= template.maskedImage
     return difference
+
+
+########################################################
+
+
+_coaddDimensions = ("tract", "patch", "band", "skymap")
+_coaddDefaultTemplates = {"templateCoaddName": "goodSeeing", 
+                          "scienceCoaddName": "deepCoadd",
+                          "scienceCoaddSrcName": "deepCoadd_det"}
+
+
+class CoaddSubtractInputConnections(
+    lsst.pipe.base.PipelineTaskConnections,
+    dimensions=_coaddDimensions,
+    defaultTemplates=_coaddDefaultTemplates,
+):
+    template = connectionTypes.Input(
+        doc="Input template from the coadd",
+        dimensions=("tract", "patch", "skymap", "band"),
+        storageClass="ExposureF",
+        name="{templateCoaddName}Coadd",
+    )
+    science = connectionTypes.Input(
+        doc="Input science exposure to subtract from.",
+        dimensions=("tract", "patch", "skymap", "band"),
+        storageClass="ExposureF",
+        name="{scienceCoaddName}",
+    )
+    sources = connectionTypes.Input(
+        doc="Sources measured on the science exposure; "
+        "used to select sources for making the matching kernel.",
+        dimensions=("tract", "patch", "skymap", "band"),
+        storageClass="SourceCatalog",
+        name="{scienceCoaddSrcName}",
+    )
+
+
+class CoaddSubtractImageOutputConnections(
+    lsst.pipe.base.PipelineTaskConnections,
+    dimensions=_coaddDimensions,
+    defaultTemplates=_coaddDefaultTemplates,
+):
+    difference = connectionTypes.Output(
+        doc="Result of subtracting convolved template from science image.",
+        dimensions=("tract", "patch", "skymap", "band"),
+        storageClass="ExposureF",
+        name="{templateCoaddName}Diff_differenceCoadd",
+    )
+
+
+class CoaddAlardLuptonSubtractConnections(
+    CoaddSubtractInputConnections, CoaddSubtractImageOutputConnections
+):
+    def __init__(self, *, config=None):
+        super().__init__(config=config)
+
+
+class CoaddAlardLuptonSubtractConfig(
+    AlardLuptonSubtractConfig, pipelineConnections=CoaddAlardLuptonSubtractConnections
+):
+    def setDefaults(self):
+        super().setDefaults()
+        self.doDecorrelation = False
+
+
+class CoaddAlardLuptonSubtractTask(AlardLuptonSubtractTask):
+    """Compute the image difference of a science and template image using
+    the Alard & Lupton (1998) algorithm.
+    """
+
+    ConfigClass = CoaddAlardLuptonSubtractConfig
+    _DefaultName = "CoaddAlardLuptonSubtract"
