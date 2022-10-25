@@ -365,12 +365,13 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         """
         xSize = 256
         ySize = 256
-        science, sources = makeTestImage(psfSize=2.4, nSrc=1, xSize=xSize, ySize=ySize)
-        template, _ = makeTestImage(psfSize=2.0, nSrc=1, xSize=xSize, ySize=ySize, doApplyCalibration=True)
+        science, sources = makeTestImage(psfSize=2.4, nSrc=10, xSize=xSize, ySize=ySize)
+        template, _ = makeTestImage(psfSize=2.0, nSrc=10, xSize=xSize, ySize=ySize, doApplyCalibration=True)
         config = subtractImages.AlardLuptonSubtractTask.ConfigClass()
         task = subtractImages.AlardLuptonSubtractTask(config=config)
-        with self.assertRaisesRegex(lsst.pex.exceptions.Exception,
-                                    'Unable to determine kernel sum; 0 candidates'):
+        sources = sources[0:1]
+        with self.assertRaisesRegex(RuntimeError,
+                                    "Cannot compute PSF matching kernel: too few sources selected."):
             task.run(template, science, sources)
 
     def test_order_equal_images(self):

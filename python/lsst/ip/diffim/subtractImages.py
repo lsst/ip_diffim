@@ -276,6 +276,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         ------
         RuntimeError
             If an unsupported convolution mode is supplied.
+        RuntimeError
+            If there are too few sources to calculate the PSF matching kernel.
         lsst.pipe.base.NoWorkFound
             Raised if fraction of good pixels, defined as not having NO_DATA
             set, is less then the configured requiredTemplateFraction
@@ -331,6 +333,11 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
 
         selectSources = self._sourceSelector(sources)
         self.log.info("%i sources used out of %i from the input catalog", len(selectSources), len(sources))
+        if len(selectSources) < self.config.makeKernel.nStarPerCell:
+            self.log.warning("Too few sources to calculate the PSF matching kernel: "
+                             "%i selected but %i needed for the calculation.",
+                             len(selectSources), self.config.makeKernel.nStarPerCell)
+            raise RuntimeError("Cannot compute PSF matching kernel: too few sources selected.")
         if convolveTemplate:
             subtractResults = self.runConvolveTemplate(template, science, selectSources)
         else:
