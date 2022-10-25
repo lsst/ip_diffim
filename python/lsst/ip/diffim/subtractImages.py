@@ -297,6 +297,10 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             convolveTemplate = False
         else:
             raise RuntimeError("Cannot handle AlardLuptonSubtract mode: %s", self.config.mode)
+        # put the template on the same photometric scale as the science image
+        photoCalib = template.getPhotoCalib()
+        self.log.info("Applying photometric calibration to template: %f", photoCalib.getCalibrationMean())
+        template.maskedImage = photoCalib.calibrateImage(template.maskedImage)
 
         if self.config.doScaleVariance and not self.config.forceCompatibility:
             # Scale the variance of the template and science images before
