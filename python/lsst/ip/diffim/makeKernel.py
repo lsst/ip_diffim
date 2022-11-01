@@ -348,15 +348,21 @@ class MakeKernelTask(PsfMatchTask):
         -------
         kernelCellSet : `lsst.afw.math.SpatialCellSet`
             a SpatialCellSet for use with self._solve
+
+        Raises
+        ------
+        RuntimeError
+            If no `candidateList` is supplied.
         """
         if not candidateList:
             raise RuntimeError("Candidate list must be populated by makeCandidateList")
 
         sizeCellX, sizeCellY = self._adaptCellSize(candidateList)
 
+        imageBBox = templateMaskedImage.getBBox()
+        imageBBox.clip(scienceMaskedImage.getBBox())
         # Object to store the KernelCandidates for spatial modeling
-        kernelCellSet = lsst.afw.math.SpatialCellSet(templateMaskedImage.getBBox(),
-                                                     sizeCellX, sizeCellY)
+        kernelCellSet = lsst.afw.math.SpatialCellSet(imageBBox, sizeCellX, sizeCellY)
 
         ps = lsst.pex.config.makePropertySet(self.kConfig)
         # Place candidates within the spatial grid
