@@ -571,7 +571,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
         statsCtrl = afwMath.StatisticsControl()
         statsCtrl.setNanSafe(True)
         statsCtrl.setWeighted(True)
-        statsCtrl.setCalcErrorFromInputVariance(True)
+        statsCtrl.setCalcErrorMosaicMode(True)
 
         templateExposure = afwImage.ExposureF(finalBBox, finalWcs)
         templateExposure.maskedImage.set(np.nan, afwImage.Mask.getPlaneBitMask("NO_DATA"), np.nan)
