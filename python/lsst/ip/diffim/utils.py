@@ -1080,20 +1080,33 @@ class DipoleTestImage(object):
             return detectTask, schema
 
 
-def getPsfFwhm(psf):
-    """Calculate the FWHM in pixels of a supplied PSF.
+def getPsfFwhm(psf, average=True):
+    """Directly calculate the horizontal and vertical widths
+    of a PSF at half its maximum value.
 
     Parameters
     ----------
     psf : `lsst.afw.detection.Psf`
         Point spread function (PSF) to evaluate.
+    average : `bool`, optional
+        Set to return the average width.
 
     Returns
     -------
-    psfSize : `float`
+    psfSize : `float`, or `tuple` of `float`
         The FWHM of the PSF computed at its average position.
+        Returns the widths along the Y and X axes,
+        or the average of the two if `average` is set.
     """
-    sigma2fwhm = 2.*np.sqrt(2.*np.log(2.))
-    psfAvgPos = psf.getAveragePosition()
-    psfSize = psf.computeShape(psfAvgPos).getDeterminantRadius()*sigma2fwhm
-    return psfSize
+    pos = psf.getAveragePosition()
+    image = psf.computeKernelImage(pos).array
+    peak = psf.computePeak(pos)
+    peakLocs = np.unravel_index(np.argmax(image), image.shape)
+
+    def sliceWidth(image, threshold, peaks, axis):
+        vec = image.take(peaks[1 - axis], axis=axis)
+        low = np.interp(threshold, vec[:peaks[axis] + 1], np.arange(peaks[axis] + 1))
+        high = np.interp(threshold, vec[:peaks[axis] - 1:-1], np.arange(len(vec) - 1, peaks[axis] - 1, -1))
+        return high - low
+    width = (sliceWidth(image, peak/2., peakLocs, axis=0), sliceWidth(image, peak/2., peakLocs, axis=1))
+    return np.mean(width) if average else width

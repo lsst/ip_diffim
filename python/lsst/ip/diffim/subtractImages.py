@@ -145,6 +145,19 @@ class AlardLuptonSubtractConfig(lsst.pipe.base.PipelineTaskConfig,
         dtype=bool,
         default=False,
     )
+    detectionThreshold = lsst.pex.config.Field(
+        dtype=float,
+        default=10,
+        doc="Minimum signal to noise ration of detected sources "
+        "to use for calculating the PSF matching kernel."
+    )
+    badSourceFlags = lsst.pex.config.ListField(
+        dtype=str,
+        doc="Flags that, if set, the associated source should not "
+        "be used to determine the PSF matching kernel.",
+        default=("sky_source", "slot_Centroid_flag",
+                 "slot_ApFlux_flag", "slot_PsfFlux_flag", ),
+    )
 
     forceCompatibility = lsst.pex.config.Field(
         dtype=bool,
@@ -263,6 +276,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         ------
         RuntimeError
             If an unsupported convolution mode is supplied.
+        RuntimeError
+            If there are too few sources to calculate the PSF matching kernel.
         lsst.pipe.base.NoWorkFound
             Raised if fraction of good pixels, defined as not having NO_DATA
             set, is less then the configured requiredTemplateFraction
@@ -280,15 +295,18 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             sources = None
         sciencePsfSize = getPsfFwhm(science.psf)
         templatePsfSize = getPsfFwhm(template.psf)
-        self.log.info("Science PSF size: %f", sciencePsfSize)
-        self.log.info("Template PSF size: %f", templatePsfSize)
+        self.log.info("Science PSF FWHM: %f pixels", sciencePsfSize)
+        self.log.info("Template PSF FWHM: %f pixels", templatePsfSize)
         if self.config.mode == "auto":
-            if sciencePsfSize < templatePsfSize:
-                self.log.info("Template PSF size is greater: convolving science image.")
-                convolveTemplate = False
+            convolveTemplate = _shapeTest(template.psf, science.psf)
+            if convolveTemplate:
+                if sciencePsfSize < templatePsfSize:
+                    self.log.info("Average template PSF size is greater, "
+                                  "but science PSF greater in one dimension: convolving template image.")
+                else:
+                    self.log.info("Science PSF size is greater: convolving template image.")
             else:
-                self.log.info("Science PSF size is greater: convolving template image.")
-                convolveTemplate = True
+                self.log.info("Template PSF size is greater: convolving science image.")
         elif self.config.mode == "convolveTemplate":
             self.log.info("`convolveTemplate` is set: convolving template image.")
             convolveTemplate = True
@@ -297,6 +315,10 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             convolveTemplate = False
         else:
             raise RuntimeError("Cannot handle AlardLuptonSubtract mode: %s", self.config.mode)
+        # put the template on the same photometric scale as the science image
+        photoCalib = template.getPhotoCalib()
+        self.log.info("Applying photometric calibration to template: %f", photoCalib.getCalibrationMean())
+        template.maskedImage = photoCalib.calibrateImage(template.maskedImage)
 
         if self.config.doScaleVariance and not self.config.forceCompatibility:
             # Scale the variance of the template and science images before
@@ -309,13 +331,17 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             self.log.info("Science variance scaling factor: %.2f", sciVarFactor)
             self.metadata.add("scaleScienceVarianceFactor", sciVarFactor)
 
-        kernelSources = self.makeKernel.selectKernelSources(template, science,
-                                                            candidateList=sources,
-                                                            preconvolved=False)
+        selectSources = self._sourceSelector(sources)
+        self.log.info("%i sources used out of %i from the input catalog", len(selectSources), len(sources))
+        if len(selectSources) < self.config.makeKernel.nStarPerCell:
+            self.log.warning("Too few sources to calculate the PSF matching kernel: "
+                             "%i selected but %i needed for the calculation.",
+                             len(selectSources), self.config.makeKernel.nStarPerCell)
+            raise RuntimeError("Cannot compute PSF matching kernel: too few sources selected.")
         if convolveTemplate:
-            subtractResults = self.runConvolveTemplate(template, science, kernelSources)
+            subtractResults = self.runConvolveTemplate(template, science, selectSources)
         else:
-            subtractResults = self.runConvolveScience(template, science, kernelSources)
+            subtractResults = self.runConvolveScience(template, science, selectSources)
 
         if self.config.doScaleVariance and self.config.forceCompatibility:
             # The old behavior scaled the variance of the final image difference.
@@ -325,7 +351,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
 
         return subtractResults
 
-    def runConvolveTemplate(self, template, science, sources):
+    def runConvolveTemplate(self, template, science, selectSources):
         """Convolve the template image with a PSF-matching kernel and subtract
         from the science image.
 
@@ -335,7 +361,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             Template exposure, warped to match the science exposure.
         science : `lsst.afw.image.ExposureF`
             Science exposure to subtract from the template.
-        sources : `lsst.afw.table.SourceCatalog`
+        selectSources : `lsst.afw.table.SourceCatalog`
             Identified sources on the science exposure. This catalog is used to
             select sources in order to perform the AL PSF matching on stamp
             images around them.
@@ -357,7 +383,12 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             # Compatibility option to maintain old behavior
             # This should be removed in the future!
             template = template[science.getBBox()]
-        kernelResult = self.makeKernel.run(template, science, sources, preconvolved=False)
+
+        kernelSources = self.makeKernel.selectKernelSources(template, science,
+                                                            candidateList=selectSources,
+                                                            preconvolved=False)
+        kernelResult = self.makeKernel.run(template, science, kernelSources,
+                                           preconvolved=False)
 
         matchedTemplate = self._convolveExposure(template, kernelResult.psfMatchingKernel,
                                                  self.convolutionControl,
@@ -376,7 +407,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                                      backgroundModel=kernelResult.backgroundModel,
                                      psfMatchingKernel=kernelResult.psfMatchingKernel)
 
-    def runConvolveScience(self, template, science, sources):
+    def runConvolveScience(self, template, science, selectSources):
         """Convolve the science image with a PSF-matching kernel and subtract the template image.
 
         Parameters
@@ -385,7 +416,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             Template exposure, warped to match the science exposure.
         science : `lsst.afw.image.ExposureF`
             Science exposure to subtract from the template.
-        sources : `lsst.afw.table.SourceCatalog`
+        selectSources : `lsst.afw.table.SourceCatalog`
             Identified sources on the science exposure. This catalog is used to
             select sources in order to perform the AL PSF matching on stamp
             images around them.
@@ -408,7 +439,11 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             # Compatibility option to maintain old behavior
             # This should be removed in the future!
             template = template[science.getBBox()]
-        kernelResult = self.makeKernel.run(science, template, sources, preconvolved=False)
+        kernelSources = self.makeKernel.selectKernelSources(science, template,
+                                                            candidateList=selectSources,
+                                                            preconvolved=False)
+        kernelResult = self.makeKernel.run(science, template, kernelSources,
+                                           preconvolved=False)
         modelParams = kernelResult.backgroundModel.getParameters()
         # We must invert the background model if the matching kernel is solved for the science image.
         kernelResult.backgroundModel.setParameters([-p for p in modelParams])
@@ -557,6 +592,31 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         else:
             return convolvedExposure[bbox]
 
+    def _sourceSelector(self, sources):
+        """Select sources from a catalog that meet the selection criteria.
+
+        Parameters
+        ----------
+        sources : `lsst.afw.table.SourceCatalog`
+            Input source catalog to select sources from.
+
+        Returns
+        -------
+        `lsst.afw.table.SourceCatalog`
+            The source catalog filtered to include only the selected sources.
+        """
+        flags = [True, ]*len(sources)
+        for flag in self.config.badSourceFlags:
+            try:
+                flags *= ~sources[flag]
+            except Exception as e:
+                self.log.warning("Could not apply source flag: %s", e)
+        sToNFlag = (sources.getPsfInstFlux()/sources.getPsfInstFluxErr()) > self.config.detectionThreshold
+        flags *= sToNFlag
+        selectSources = sources[flags]
+
+        return selectSources.copy(deep=True)
+
 
 def checkTemplateIsSufficient(templateExposure, logger, requiredTemplateFraction=0.):
     """Raise NoWorkFound if template coverage < requiredTemplateFraction
@@ -615,3 +675,25 @@ def _subtractImages(science, template, backgroundModel=None):
         difference.maskedImage -= backgroundModel
     difference.maskedImage -= template.maskedImage
     return difference
+
+
+def _shapeTest(psf1, psf2):
+    """Determine whether psf1 is narrower in either dimension than psf2.
+
+    Parameters
+    ----------
+    psf1 : `lsst.afw.detection.Psf`
+        Reference point spread function (PSF) to evaluate.
+    psf2 : `lsst.afw.detection.Psf`
+        Candidate point spread function (PSF) to evaluate.
+
+    Returns
+    -------
+    `bool`
+        Returns True if psf1 is narrower than psf2 in either dimension.
+    """
+    shape1 = getPsfFwhm(psf1, average=False)
+    shape2 = getPsfFwhm(psf2, average=False)
+    xTest = shape1[0] < shape2[0]
+    yTest = shape1[1] < shape2[1]
+    return xTest | yTest
