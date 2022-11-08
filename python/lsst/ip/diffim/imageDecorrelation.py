@@ -219,7 +219,8 @@ class DecorrelateALKernelTask(pipeBase.Task):
         preConvImg = None
         if preConvMode:
             if preConvKernel is None:
-                preConvKernel = scienceExposure.getPsf().getLocalKernel()  # at average position
+                pos = scienceExposure.getPsf().getAveragePosition()
+                preConvKernel = scienceExposure.getPsf().getLocalKernel(pos)
             preConvImg = afwImage.ImageD(preConvKernel.getDimensions())
             preConvKernel.computeImage(preConvImg, True)
 

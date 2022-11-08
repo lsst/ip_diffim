@@ -71,8 +71,14 @@ class PsfMatchTestCases(lsst.utils.tests.TestCase):
         psfModel = measAlg.DoubleGaussianPsf(self.ksize + 2, self.ksize + 2, self.sigma2)
         psfMatch = ipDiffim.ModelPsfMatchTask(config=self.config)
         results = psfMatch.run(self.exp, psfModel)
-        self.assertEqual(results.psfMatchedExposure.getPsf().computeImage().getDimensions(),
-                         self.exp.getPsf().computeImage().getDimensions())
+        self.assertEqual(
+            results.psfMatchedExposure.getPsf().computeImage(
+                results.psfMatchedExposure.getPsf().getAveragePosition()
+            ).getDimensions(),
+            self.exp.getPsf().computeImage(
+                self.exp.getPsf().getAveragePosition()
+            ).getDimensions()
+        )
         self.assertEqual(results.psfMatchedExposure.getPsf().getSigma1(), self.sigma2)
 
     def testPadPsf(self):
@@ -87,7 +93,12 @@ class PsfMatchTestCases(lsst.utils.tests.TestCase):
         autoPaddedKernel = nextOddInteger(self.subconfig.kernelSize*self.config.autoPadPsfTo)
         psfMatch = ipDiffim.ModelPsfMatchTask(config=self.config)
         results = psfMatch.run(self.exp, psfModel)
-        self.assertEqual(results.psfMatchedExposure.getPsf().computeImage().getWidth(), autoPaddedKernel)
+        self.assertEqual(
+            results.psfMatchedExposure.getPsf().computeImage(
+                results.psfMatchedExposure.getPsf().getAveragePosition()
+            ).getWidth(),
+            autoPaddedKernel
+        )
 
         # Test manual padding
         self.config.doAutoPadPsf = False
@@ -96,8 +107,12 @@ class PsfMatchTestCases(lsst.utils.tests.TestCase):
             self.config.padPsfBy = padPix
             psfMatch = ipDiffim.ModelPsfMatchTask(config=self.config)
             results = psfMatch.run(self.exp, psfModel)
-            self.assertEqual(results.psfMatchedExposure.getPsf().computeImage().getWidth(),
-                             self.ksize + padPix)
+            self.assertEqual(
+                results.psfMatchedExposure.getPsf().computeImage(
+                    results.psfMatchedExposure.getPsf().getAveragePosition()
+                ).getWidth(),
+                self.ksize + padPix
+            )
 
         PAD_ODD_VALUES = [1, 3, 5]
         for padPix in PAD_ODD_VALUES:
