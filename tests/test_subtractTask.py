@@ -26,12 +26,12 @@ import lsst.afw.table as afwTable
 import lsst.geom
 import lsst.ip.diffim.imagePsfMatch
 import lsst.meas.algorithms as measAlg
+from lsst.ip.diffim import subtractImages
+from lsst.pex.config import FieldValidationError
 import lsst.utils.tests
 import numpy as np
-from lsst.ip.diffim import subtractImages
-from lsst.ip.diffim.utils import (computeRobustStatistics, evaluateMeanPsfFwhm,
-                                  getPsfFwhm, makeStats, makeTestImage)
-from lsst.pex.config import FieldValidationError
+from lsst.ip.diffim.utils import (computeRobustStatistics, computePSFNoiseEquivalentArea,
+                                  evaluateMeanPsfFwhm, getPsfFwhm, makeStats, makeTestImage)
 from lsst.pex.exceptions import InvalidParameterError
 
 
@@ -85,7 +85,7 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         # Mean of difference image should be close to zero.
         meanError = noiseLevel/np.sqrt(output.difference.image.array.size)
         # Make sure to include pixels with the DETECTED mask bit set.
-        statsCtrl = makeStats(badMaskPlanes=("EDGE", "BAD", "NO_DATA"))
+        statsCtrl = makeStats(badMaskPlanes=("EDGE", "BAD", "NO_DATA", "DETECTED", "DETECTED_NEGATIVE"))
         differenceMean = computeRobustStatistics(output.difference.image, output.difference.mask, statsCtrl)
         self.assertFloatsAlmostEqual(differenceMean, 0, atol=5*meanError)
         # stddev of difference image should be close to expected value.
@@ -346,19 +346,21 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         config2.doSubtractBackground = False
         task2 = subtractImages.AlardLuptonSubtractTask(config=config2)
         results_convolveScience = task2.run(template2, science2, sources2)
-        diff1 = science1.maskedImage.clone()
-        diff1 -= template1.maskedImage
-        diff2 = science2.maskedImage.clone()
-        diff2 -= template2.maskedImage
-        self.assertFloatsAlmostEqual(results_convolveTemplate.difference.image.array,
+        bbox = results_convolveTemplate.difference.getBBox().clippedTo(
+            results_convolveScience.difference.getBBox())
+        diff1 = science1.maskedImage.clone()[bbox]
+        diff1 -= template1.maskedImage[bbox]
+        diff2 = science2.maskedImage.clone()[bbox]
+        diff2 -= template2.maskedImage[bbox]
+        self.assertFloatsAlmostEqual(results_convolveTemplate.difference[bbox].image.array,
                                      diff1.image.array,
                                      atol=noiseLevel*5.)
-        self.assertFloatsAlmostEqual(results_convolveScience.difference.image.array,
+        self.assertFloatsAlmostEqual(results_convolveScience.difference[bbox].image.array,
                                      diff2.image.array,
                                      atol=noiseLevel*5.)
         diffErr = noiseLevel*2
-        self.assertMaskedImagesAlmostEqual(results_convolveTemplate.difference.maskedImage,
-                                           results_convolveScience.difference.maskedImage,
+        self.assertMaskedImagesAlmostEqual(results_convolveTemplate.difference[bbox].maskedImage,
+                                           results_convolveScience.difference[bbox].maskedImage,
                                            atol=diffErr*5.)
 
     def test_background_subtraction(self):
@@ -668,6 +670,261 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
             self.assertEqual(value.getBBox(), value2.getBBox())
             self.assertFloatsAlmostEqual(
                 value.getCoefficients(), value2.getCoefficients(), rtol=0.0)
+
+
+class AlardLuptonPreconvolveSubtractTest(lsst.utils.tests.TestCase):
+
+    def test_mismatched_template(self):
+        """Test that an error is raised if the template
+        does not fully contain the science image.
+        """
+        xSize = 200
+        ySize = 200
+        science, sources = makeTestImage(psfSize=2.4, xSize=xSize + 20, ySize=ySize + 20)
+        template, _ = makeTestImage(psfSize=2.4, xSize=xSize, ySize=ySize, doApplyCalibration=True)
+        config = subtractImages.AlardLuptonPreconvolveSubtractTask.ConfigClass()
+        task = subtractImages.AlardLuptonPreconvolveSubtractTask(config=config)
+        with self.assertRaises(AssertionError):
+            task.run(template, science, sources)
+
+    def test_equal_images(self):
+        """Test that running with enough sources produces reasonable output,
+        with the same size psf in the template and science.
+        """
+        noiseLevel = 1.
+        science, sources = makeTestImage(psfSize=2.4, noiseLevel=noiseLevel, noiseSeed=6)
+        template, _ = makeTestImage(psfSize=2.4, noiseLevel=noiseLevel, noiseSeed=7,
+                                    templateBorderSize=20, doApplyCalibration=True)
+        config = subtractImages.AlardLuptonPreconvolveSubtractTask.ConfigClass()
+        config.doSubtractBackground = False
+        task = subtractImages.AlardLuptonPreconvolveSubtractTask(config=config)
+        output = task.run(template, science, sources)
+        # There shoud be no NaN values in the Score image
+        self.assertTrue(np.all(np.isfinite(output.scoreExposure.image.array)))
+        # Mean of Score image should be close to zero.
+        meanError = noiseLevel/np.sqrt(output.scoreExposure.image.array.size)
+        # Make sure to include pixels with the DETECTED mask bit set.
+        statsCtrl = makeStats(badMaskPlanes=("EDGE", "BAD", "NO_DATA"))
+        scoreMean = computeRobustStatistics(output.scoreExposure.image,
+                                            output.scoreExposure.mask,
+                                            statsCtrl)
+        self.assertFloatsAlmostEqual(scoreMean, 0, atol=5*meanError)
+        nea = computePSFNoiseEquivalentArea(science.psf)
+        # stddev of Score image should be close to expected value.
+        scoreStd = computeRobustStatistics(output.scoreExposure.image, output.scoreExposure.mask,
+                                           statsCtrl=statsCtrl, statistic=afwMath.STDEV)
+        self.assertFloatsAlmostEqual(scoreStd, np.sqrt(2)*noiseLevel/np.sqrt(nea), rtol=0.1)
+
+    def test_agnostic_template_psf(self):
+        """Test that the Score image is the same whether the template PSF is
+        larger or smaller than the science image PSF.
+        """
+        noiseLevel = .3
+        science, sources = makeTestImage(psfSize=2.4, noiseLevel=noiseLevel,
+                                         noiseSeed=6, templateBorderSize=0)
+        template1, _ = makeTestImage(psfSize=3.0, noiseLevel=noiseLevel,
+                                     noiseSeed=7, doApplyCalibration=True)
+        template2, _ = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel,
+                                     noiseSeed=8, doApplyCalibration=True)
+        config = subtractImages.AlardLuptonPreconvolveSubtractTask.ConfigClass()
+        config.doSubtractBackground = False
+        task = subtractImages.AlardLuptonPreconvolveSubtractTask(config=config)
+
+        science_better = task.run(template1, science.clone(), sources)
+        template_better = task.run(template2, science, sources)
+        bbox = science_better.scoreExposure.getBBox().clippedTo(template_better.scoreExposure.getBBox())
+
+        delta = template_better.scoreExposure[bbox].clone()
+        delta.image -= science_better.scoreExposure[bbox].image
+        delta.variance -= science_better.scoreExposure[bbox].variance
+        delta.mask.array &= science_better.scoreExposure[bbox].mask.array
+
+        statsCtrl = makeStats(badMaskPlanes=("EDGE", "BAD", "NO_DATA"))
+        # Mean of delta should be very close to zero.
+        nGoodPix = np.sum(np.isfinite(delta.image.array))
+        meanError = 2*noiseLevel/np.sqrt(nGoodPix)
+        deltaMean = computeRobustStatistics(delta.image, delta.mask, statsCtrl)
+        deltaStd = computeRobustStatistics(delta.image, delta.mask, statsCtrl,
+                                           statistic=afwMath.STDEV)
+        self.assertFloatsAlmostEqual(deltaMean, 0, atol=5*meanError)
+        nea = computePSFNoiseEquivalentArea(science.psf)
+        # stddev of Score image should be close to expected value
+        self.assertFloatsAlmostEqual(deltaStd, np.sqrt(2)*noiseLevel/np.sqrt(nea), rtol=.1)
+
+    def test_few_sources(self):
+        """Test with only 1 source, to check that we get a useful error.
+        """
+        xSize = 256
+        ySize = 256
+        science, sources = makeTestImage(psfSize=2.4, nSrc=10, xSize=xSize, ySize=ySize)
+        template, _ = makeTestImage(psfSize=2.0, nSrc=10, xSize=xSize, ySize=ySize, doApplyCalibration=True)
+        config = subtractImages.AlardLuptonPreconvolveSubtractTask.ConfigClass()
+        task = subtractImages.AlardLuptonPreconvolveSubtractTask(config=config)
+        sources = sources[0:1]
+        with self.assertRaisesRegex(RuntimeError,
+                                    "Cannot compute PSF matching kernel: too few sources selected."):
+            task.run(template, science, sources)
+
+    def test_background_subtraction(self):
+        """Check that we can recover the background,
+        and that it is subtracted correctly in the Score image.
+        """
+        noiseLevel = 1.
+        xSize = 512
+        ySize = 512
+        x0 = 123
+        y0 = 456
+        template, _ = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=7,
+                                    templateBorderSize=20,
+                                    xSize=xSize, ySize=ySize, x0=x0, y0=y0,
+                                    doApplyCalibration=True)
+        params = [2.2, 2.1, 2.0, 1.2, 1.1, 1.0]
+
+        bbox2D = lsst.geom.Box2D(lsst.geom.Point2D(x0, y0), lsst.geom.Extent2D(xSize, ySize))
+        background_model = afwMath.Chebyshev1Function2D(params, bbox2D)
+        science, sources = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=6,
+                                         background=background_model,
+                                         xSize=xSize, ySize=ySize, x0=x0, y0=y0)
+        config = subtractImages.AlardLuptonPreconvolveSubtractTask.ConfigClass()
+        config.doSubtractBackground = True
+
+        config.makeKernel.kernel.name = "AL"
+        config.makeKernel.kernel.active.fitForBackground = True
+        config.makeKernel.kernel.active.spatialKernelOrder = 1
+        config.makeKernel.kernel.active.spatialBgOrder = 2
+        statsCtrl = makeStats(badMaskPlanes=("EDGE", "BAD", "NO_DATA"))
+
+        task = subtractImages.AlardLuptonPreconvolveSubtractTask(config=config)
+        output = task.run(template.clone(), science.clone(), sources)
+
+        # We should be fitting the same number of parameters as were in the input model
+        self.assertEqual(output.backgroundModel.getNParameters(), background_model.getNParameters())
+
+        # The parameters of the background fit should be close to the input model
+        self.assertFloatsAlmostEqual(np.array(output.backgroundModel.getParameters()),
+                                     np.array(params), rtol=0.2)
+
+        # stddev of Score image should be close to expected value.
+        # This will fail if we have mis-subtracted the background.
+        stdVal = computeRobustStatistics(output.scoreExposure.image, output.scoreExposure.mask,
+                                         statsCtrl, statistic=afwMath.STDEV)
+        # get the img psf Noise Equivalent Area value
+        nea = computePSFNoiseEquivalentArea(science.psf)
+        self.assertFloatsAlmostEqual(stdVal, np.sqrt(2)*noiseLevel/np.sqrt(nea), rtol=0.1)
+
+    def test_scale_variance(self):
+        """Check variance scaling of the Score image.
+        """
+        scienceNoiseLevel = 4.
+        templateNoiseLevel = 2.
+        scaleFactor = 1.345
+        # Make sure to include pixels with the DETECTED mask bit set.
+        statsCtrl = makeStats(badMaskPlanes=("EDGE", "BAD", "NO_DATA"))
+
+        def _run_and_check_images(science, template, sources, statsCtrl,
+                                  doDecorrelation, doScaleVariance, scaleFactor=1.):
+            """Check that the variance plane matches the expected value for
+            different configurations of ``doDecorrelation`` and ``doScaleVariance``.
+            """
+
+            config = subtractImages.AlardLuptonPreconvolveSubtractTask.ConfigClass()
+            config.doSubtractBackground = False
+            config.doDecorrelation = doDecorrelation
+            config.doScaleVariance = doScaleVariance
+            task = subtractImages.AlardLuptonPreconvolveSubtractTask(config=config)
+            output = task.run(template.clone(), science.clone(), sources)
+            if doScaleVariance:
+                self.assertFloatsAlmostEqual(task.metadata["scaleTemplateVarianceFactor"],
+                                             scaleFactor, atol=0.05)
+                self.assertFloatsAlmostEqual(task.metadata["scaleScienceVarianceFactor"],
+                                             scaleFactor, atol=0.05)
+
+            scienceNoise = computeRobustStatistics(science.variance, science.mask, statsCtrl)
+            # get the img psf Noise Equivalent Area value
+            nea = computePSFNoiseEquivalentArea(science.psf)
+            scienceNoise /= nea
+            if doDecorrelation:
+                templateNoise = computeRobustStatistics(template.variance, template.mask, statsCtrl)
+                templateNoise /= nea
+            else:
+                # Don't divide by NEA in this case, since the template is convolved
+                #  and in the same units as the Score exposure.
+                templateNoise = computeRobustStatistics(output.matchedTemplate.variance,
+                                                        output.matchedTemplate.mask,
+                                                        statsCtrl)
+            if doScaleVariance:
+                templateNoise *= scaleFactor
+                scienceNoise *= scaleFactor
+            varMean = computeRobustStatistics(output.scoreExposure.variance,
+                                              output.scoreExposure.mask,
+                                              statsCtrl)
+            self.assertFloatsAlmostEqual(varMean, scienceNoise + templateNoise, rtol=0.1)
+
+        science, sources = makeTestImage(psfSize=3.0, noiseLevel=scienceNoiseLevel, noiseSeed=6)
+        template, _ = makeTestImage(psfSize=2.0, noiseLevel=templateNoiseLevel, noiseSeed=7,
+                                    templateBorderSize=20, doApplyCalibration=True)
+        # Verify that the variance plane of the Score image is correct
+        #  when the template and science variance planes are correct
+        _run_and_check_images(science, template, sources, statsCtrl,
+                              doDecorrelation=True, doScaleVariance=True)
+        _run_and_check_images(science, template, sources, statsCtrl,
+                              doDecorrelation=True, doScaleVariance=False)
+        _run_and_check_images(science, template, sources, statsCtrl,
+                              doDecorrelation=False, doScaleVariance=True)
+        _run_and_check_images(science, template, sources, statsCtrl,
+                              doDecorrelation=False, doScaleVariance=False)
+
+        # Verify that the variance plane of the Score image is correct
+        #  when the template variance plane is incorrect
+        template.variance.array /= scaleFactor
+        science.variance.array /= scaleFactor
+        _run_and_check_images(science, template, sources, statsCtrl,
+                              doDecorrelation=True, doScaleVariance=True, scaleFactor=scaleFactor)
+        _run_and_check_images(science, template, sources, statsCtrl,
+                              doDecorrelation=True, doScaleVariance=False, scaleFactor=scaleFactor)
+        _run_and_check_images(science, template, sources, statsCtrl,
+                              doDecorrelation=False, doScaleVariance=True, scaleFactor=scaleFactor)
+        _run_and_check_images(science, template, sources, statsCtrl,
+                              doDecorrelation=False, doScaleVariance=False, scaleFactor=scaleFactor)
+
+    def test_exposure_properties(self):
+        """Check that all necessary exposure metadata is included
+        with the Score image.
+        """
+        noiseLevel = 1.
+        science, sources = makeTestImage(psfSize=3.0, noiseLevel=noiseLevel, noiseSeed=6)
+        psf = science.psf
+        psfAvgPos = psf.getAveragePosition()
+        psfSize = getPsfFwhm(science.psf)
+        psfImg = psf.computeKernelImage(psfAvgPos)
+        template, _ = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=7,
+                                    templateBorderSize=20, doApplyCalibration=True)
+
+        config = subtractImages.AlardLuptonPreconvolveSubtractTask.ConfigClass()
+
+        def _run_and_check_images(doDecorrelation):
+            """Check that the metadata is correct with or without decorrelation.
+            """
+            config.doDecorrelation = doDecorrelation
+            task = subtractImages.AlardLuptonPreconvolveSubtractTask(config=config)
+            output = task.run(template.clone(), science.clone(), sources)
+            psfOut = output.scoreExposure.psf
+            psfAvgPos = psfOut.getAveragePosition()
+            if doDecorrelation:
+                # Decorrelation requires recalculating the PSF,
+                #  so it will not be the same as the input
+                psfOutSize = getPsfFwhm(science.psf)
+                self.assertFloatsAlmostEqual(psfSize, psfOutSize)
+            else:
+                psfOutImg = psfOut.computeKernelImage(psfAvgPos)
+                self.assertImagesAlmostEqual(psfImg, psfOutImg)
+
+            # check PSF, WCS, bbox, filterLabel, photoCalib
+            self.assertWcsAlmostEqualOverBBox(science.wcs, output.scoreExposure.wcs, science.getBBox())
+            self.assertEqual(science.filter, output.scoreExposure.filter)
+            self.assertEqual(science.photoCalib, output.scoreExposure.photoCalib)
+        _run_and_check_images(doDecorrelation=True)
+        _run_and_check_images(doDecorrelation=False)
 
 
 def setup_module(module):
