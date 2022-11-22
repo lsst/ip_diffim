@@ -289,8 +289,8 @@ class ZogyTask(pipeBase.Task):
         sig1 = psf1.computeShape(psf1.getAveragePosition()).getDeterminantRadius()
         sig2 = psf2.computeShape(psf2.getAveragePosition()).getDeterminantRadius()
         sig = max(sig1, sig2)
-        psfBBox1 = psf1.computeBBox()
-        psfBBox2 = psf2.computeBBox()
+        psfBBox1 = psf1.computeBBox(psf1.getAveragePosition())
+        psfBBox2 = psf2.computeBBox(psf2.getAveragePosition())
         return max(10 * sig, psfBBox1.getWidth(), psfBBox1.getHeight(),
                    psfBBox2.getWidth(), psfBBox2.getHeight())
 

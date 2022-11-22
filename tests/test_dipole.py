@@ -76,9 +76,10 @@ def createDipole(w, h, xc, yc, scaling=100.0, fracOffset=1.2):
     # Create Psf for dipole creation and measurement
     psfSize = 17
     psf = measAlg.DoubleGaussianPsf(psfSize, psfSize, 2.0, 3.5, 0.1)
-    psfFwhmPix = sigma2fwhm*psf.computeShape(psf.getAveragePosition()).getDeterminantRadius()
-    psfim = psf.computeImage().convertF()
-    psfim *= scaling/psf.computePeak()
+    pos = psf.getAveragePosition()
+    psfFwhmPix = sigma2fwhm*psf.computeShape(pos).getDeterminantRadius()
+    psfim = psf.computeImage(pos).convertF()
+    psfim *= scaling/psf.computePeak(pos)
     psfw, psfh = psfim.getDimensions()
     psfSum = np.sum(psfim.getArray())
 
