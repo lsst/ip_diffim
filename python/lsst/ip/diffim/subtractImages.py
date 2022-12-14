@@ -159,26 +159,11 @@ class AlardLuptonSubtractConfig(lsst.pipe.base.PipelineTaskConfig,
                  "slot_ApFlux_flag", "slot_PsfFlux_flag", ),
     )
 
-    forceCompatibility = lsst.pex.config.Field(
-        dtype=bool,
-        default=False,
-        doc="Set up and run diffim using settings that ensure the results"
-        "are compatible with the old version in pipe_tasks.",
-        deprecated="This option is only for backwards compatibility purposes"
-        " and will be removed after v24.",
-    )
-
     def setDefaults(self):
         self.makeKernel.kernel.name = "AL"
         self.makeKernel.kernel.active.fitForBackground = self.doSubtractBackground
         self.makeKernel.kernel.active.spatialKernelOrder = 1
         self.makeKernel.kernel.active.spatialBgOrder = 2
-
-    def validate(self):
-        if self.forceCompatibility and not (self.mode == "convolveTemplate"):
-            msg = f"forceCompatibility=True requires mode='convolveTemplate', but mode was '{self.mode}'."
-            raise lsst.pex.config.FieldValidationError(AlardLuptonSubtractConfig.forceCompatibility,
-                                                       self, msg)
 
 
 class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
@@ -288,11 +273,6 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                                             finalizedPsfApCorrCatalog=finalizedPsfApCorrCatalog)
         checkTemplateIsSufficient(template, self.log,
                                   requiredTemplateFraction=self.config.requiredTemplateFraction)
-        if self.config.forceCompatibility:
-            # Compatibility option to maintain old functionality
-            # This should be removed in the future!
-            self.log.warning("Running with `config.forceCompatibility=True`")
-            sources = None
         sciencePsfSize = getPsfFwhm(science.psf)
         templatePsfSize = getPsfFwhm(template.psf)
         self.log.info("Science PSF FWHM: %f pixels", sciencePsfSize)
@@ -320,7 +300,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         self.log.info("Applying photometric calibration to template: %f", photoCalib.getCalibrationMean())
         template.maskedImage = photoCalib.calibrateImage(template.maskedImage)
 
-        if self.config.doScaleVariance and not self.config.forceCompatibility:
+        if self.config.doScaleVariance:
             # Scale the variance of the template and science images before
             # convolution, subtraction, or decorrelation so that they have the
             # correct ratio.
@@ -342,12 +322,6 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             subtractResults = self.runConvolveTemplate(template, science, selectSources)
         else:
             subtractResults = self.runConvolveScience(template, science, selectSources)
-
-        if self.config.doScaleVariance and self.config.forceCompatibility:
-            # The old behavior scaled the variance of the final image difference.
-            diffimVarFactor = self.scaleVariance.run(subtractResults.difference.maskedImage)
-            self.log.info("Diffim variance scaling factor: %.2f", diffimVarFactor)
-            self.metadata.add("scaleDiffimVarianceFactor", diffimVarFactor)
 
         return subtractResults
 
@@ -379,11 +353,6 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             ``psfMatchingKernel`` : `lsst.afw.math.Kernel`
                 Kernel used to PSF-match the template to the science image.
         """
-        if self.config.forceCompatibility:
-            # Compatibility option to maintain old behavior
-            # This should be removed in the future!
-            template = template[science.getBBox()]
-
         kernelSources = self.makeKernel.selectKernelSources(template, science,
                                                             candidateList=selectSources,
                                                             preconvolved=False)
@@ -435,10 +404,6 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             ``psfMatchingKernel`` : `lsst.afw.math.Kernel`
                Kernel used to PSF-match the science image to the template.
         """
-        if self.config.forceCompatibility:
-            # Compatibility option to maintain old behavior
-            # This should be removed in the future!
-            template = template[science.getBBox()]
         kernelSources = self.makeKernel.selectKernelSources(science, template,
                                                             candidateList=selectSources,
                                                             preconvolved=False)

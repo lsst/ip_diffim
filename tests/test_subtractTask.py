@@ -149,25 +149,6 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         with self.assertRaises(FieldValidationError):
             config.mode = 'aotu'
 
-    def test_config_validate_forceCompatibility(self):
-        """Check that forceCompatibility sets `mode=convolveTemplate`.
-        """
-        config = subtractImages.AlardLuptonSubtractTask.ConfigClass()
-        config.mode = "auto"
-        config.forceCompatibility = True
-        # Ensure we're not trying to change config values inside validate().
-        config.freeze()
-        with self.assertRaises(FieldValidationError):
-            config.validate()
-
-        config = subtractImages.AlardLuptonSubtractTask.ConfigClass()
-        config.mode = "convolveTemplate"
-        config.forceCompatibility = True
-        # Ensure we're not trying to change config values inside validate().
-        config.freeze()
-        # Should not raise:
-        config.validate()
-
     def test_mismatched_template(self):
         """Test that an error is raised if the template
         does not fully contain the science image.
@@ -259,7 +240,6 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
                                         templateBorderSize=20, doApplyCalibration=True)
             config = subtractImages.AlardLuptonSubtractTask.ConfigClass()
             config.doSubtractBackground = False
-            config.forceCompatibility = False
             config.mode = "convolveScience"
             task = subtractImages.AlardLuptonSubtractTask(config=config)
             output = task.run(template, science, sources)
@@ -298,7 +278,6 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
                                         templateBorderSize=20, doApplyCalibration=True)
             config = subtractImages.AlardLuptonSubtractTask.ConfigClass()
             config.doSubtractBackground = False
-            config.forceCompatibility = False
             task = subtractImages.AlardLuptonSubtractTask(config=config)
             output = task.run(template, science, sources)
             self.assertFloatsAlmostEqual(task.metadata["scaleTemplateVarianceFactor"], 1., atol=.05)
@@ -482,7 +461,6 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
 
             config = subtractImages.AlardLuptonSubtractTask.ConfigClass()
             config.doSubtractBackground = False
-            config.forceCompatibility = False
             config.doDecorrelation = doDecorrelation
             config.doScaleVariance = doScaleVariance
             task = subtractImages.AlardLuptonSubtractTask(config=config)
@@ -552,7 +530,6 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
             config = subtractImages.AlardLuptonSubtractTask.ConfigClass()
             config.mode = "convolveScience"
             config.doSubtractBackground = False
-            config.forceCompatibility = False
             config.doDecorrelation = doDecorrelation
             config.doScaleVariance = doScaleVariance
             task = subtractImages.AlardLuptonSubtractTask(config=config)
