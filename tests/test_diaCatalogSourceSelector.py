@@ -27,7 +27,7 @@ import lsst.utils.tests
 import lsst.afw.table as afwTable
 import lsst.afw.image as afwImage
 import lsst.geom as geom
-from lsst.meas.algorithms import LoadReferenceObjectsTask, getRefFluxField
+from lsst.meas.algorithms import convertReferenceCatalog, getRefFluxField
 import lsst.ip.diffim as ipDiffim
 
 
@@ -51,9 +51,8 @@ class DiaCatalogSourceSelectorTest(lsst.utils.tests.TestCase):
         del self.srcCat
 
     def makeRefCatalog(self):
-        schema = LoadReferenceObjectsTask.makeMinimalSchema(filterNameList=["g", "r"],
-                                                            addIsPhotometric=True,
-                                                            addIsResolved=True)
+        schema = convertReferenceCatalog._makeSchema(filterNameList=["g", "r"], addIsPhotometric=True,
+                                                     addIsResolved=True)
         catalog = afwTable.SimpleCatalog(schema)
         return catalog
 
