@@ -159,15 +159,6 @@ class ModelPsfMatchTask(PsfMatchTask):
     --------
     A complete example of using ModelPsfMatchTask
 
-    This code is modelPsfMatchTask.py in the examples directory, and can be run as e.g.
-
-    .. code-block :: none
-
-        examples/modelPsfMatchTask.py
-        examples/modelPsfMatchTask.py --debug
-        examples/modelPsfMatchTask.py --debug --template /path/to/templateExp.fits
-        --science /path/to/scienceExp.fits
-
     Create a subclass of ModelPsfMatchTask that accepts two exposures.
     Note that the "template" exposure contains the Psf that will get matched to,
     and the "science" exposure is the one that will be convolved:
