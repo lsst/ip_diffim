@@ -66,7 +66,7 @@ class SubtractInputConnections(lsst.pipe.base.PipelineTaskConnections,
              "sorted on id for fast lookup."),
         dimensions=("instrument", "visit"),
         storageClass="ExposureCatalog",
-        name="finalized_psf_ap_corr_catalog",
+        name="finalVisitSummary",
     )
 
 
