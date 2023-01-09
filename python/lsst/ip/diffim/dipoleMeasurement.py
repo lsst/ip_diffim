@@ -232,16 +232,6 @@ class DipoleMeasurementTask(SingleFrameMeasurementTask):
         config.slots.centroid = "ip_diffim_NaiveDipoleCentroid"
         config.doReplaceWithNoise = False
 
-    This code is dipoleMeasTask.py in the examples directory, and can be run as e.g.
-
-    .. code-block:: none
-
-        examples/dipoleMeasTask.py
-        examples/dipoleMeasTask.py --debug
-        examples/dipoleMeasTask.py --debug --image /path/to/image.fits
-
-
-
     Start the processing by parsing the command line, where the user has the option of
     enabling debugging output and/or sending their own image for demonstration
     (in case they have not downloaded the afwdata package).

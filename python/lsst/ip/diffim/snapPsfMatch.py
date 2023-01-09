@@ -171,15 +171,6 @@ class SnapPsfMatchTask(ImagePsfMatchTask):
 
     Examples
     --------
-    This code is snapPsfMatchTask.py in the examples directory, and can be run as e.g.
-
-    .. code-block:: py
-
-        examples/snapPsfMatchTask.py
-        examples/snapPsfMatchTask.py --debug
-        examples/snapPsfMatchTask.py --debug --template /path/to/templateExp.fits
-        --science /path/to/scienceExp.fits
-
     First, create a subclass of SnapPsfMatchTask that accepts two exposures.
     Ideally these exposures would have been taken back-to-back,
     such that the pointing/background/Psf does not vary substantially between the two:

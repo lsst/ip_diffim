@@ -203,15 +203,6 @@ class ImagePsfMatchTask(PsfMatchTask):
     --------
     A complete example of using ImagePsfMatchTask
 
-    This code is imagePsfMatchTask.py in the examples directory, and can be run as e.g.
-
-    .. code-block:: none
-
-        examples/imagePsfMatchTask.py --debug
-        examples/imagePsfMatchTask.py --debug --mode="matchExposures"
-        examples/imagePsfMatchTask.py --debug --template /path/to/templateExp.fits
-        --science /path/to/scienceExp.fits
-
     Create a subclass of ImagePsfMatchTask that allows us to either match exposures, or subtract exposures:
 
     .. code-block:: none

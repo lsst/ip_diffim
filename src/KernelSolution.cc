@@ -902,10 +902,6 @@ namespace diffim {
            accounted for.  However, we still need to be aware of this fact if
            addressing subregions of an Eigen matrix.  This is why the slicing is
            done in Afw, its cleaner.
-
-           Please see examples/maskedKernel.cc for elaboration on some of the
-           tests done to make sure this indexing gets done right.
-
         */
 
 
