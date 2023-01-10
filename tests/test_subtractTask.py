@@ -22,118 +22,13 @@
 import unittest
 import numpy as np
 
-import lsst.afw.geom as afwGeom
-from lsst.afw.image import PhotoCalib
-import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.geom
-from lsst.meas.algorithms.testUtils import plantSources
 import lsst.ip.diffim.imagePsfMatch
 from lsst.ip.diffim import subtractImages
-from lsst.ip.diffim.utils import getPsfFwhm
+from lsst.ip.diffim.utils import getPsfFwhm, makeTestImage, makeStats, computeRobustStatistics
 from lsst.pex.config import FieldValidationError
 import lsst.utils.tests
-
-
-def makeFakeWcs():
-    """Make a fake, affine Wcs.
-    """
-    crpix = lsst.geom.Point2D(123.45, 678.9)
-    crval = lsst.geom.SpherePoint(0.1, 0.1, lsst.geom.degrees)
-    cdMatrix = np.array([[5.19513851e-05, -2.81124812e-07],
-                        [-3.25186974e-07, -5.19112119e-05]])
-    return afwGeom.makeSkyWcs(crpix, crval, cdMatrix)
-
-
-def makeTestImage(seed=5, nSrc=20, psfSize=2., noiseLevel=5.,
-                  noiseSeed=6, fluxLevel=500., fluxRange=2.,
-                  kernelSize=32, templateBorderSize=0,
-                  background=None,
-                  xSize=256,
-                  ySize=256,
-                  x0=12345,
-                  y0=67890,
-                  calibration=1.,
-                  doApplyCalibration=False,
-                  ):
-    """Make a reproduceable PSF-convolved exposure for testing.
-
-    Parameters
-    ----------
-    seed : `int`, optional
-        Seed value to initialize the random number generator for sources.
-    nSrc : `int`, optional
-        Number of sources to simulate.
-    psfSize : `float`, optional
-        Width of the PSF of the simulated sources, in pixels.
-    noiseLevel : `float`, optional
-        Standard deviation of the noise to add to each pixel.
-    noiseSeed : `int`, optional
-        Seed value to initialize the random number generator for noise.
-    fluxLevel : `float`, optional
-        Reference flux of the simulated sources.
-    fluxRange : `float`, optional
-        Range in flux amplitude of the simulated sources.
-    kernelSize : `int`, optional
-        Size in pixels of the kernel for simulating sources.
-    templateBorderSize : `int`, optional
-        Size in pixels of the image border used to pad the image.
-    background : `lsst.afw.math.Chebyshev1Function2D`, optional
-        Optional background to add to the output image.
-    xSize, ySize : `int`, optional
-        Size in pixels of the simulated image.
-    x0, y0 : `int`, optional
-        Origin of the image.
-    calibration : `float`, optional
-        Conversion factor between instFlux and nJy.
-    doApplyCalibration : `bool`, optional
-        Apply the photometric calibration and return the image in nJy?
-
-    Returns
-    -------
-    modelExposure : `lsst.afw.image.Exposure`
-        The model image, with the mask and variance planes.
-    sourceCat : `lsst.afw.table.SourceCatalog`
-        Catalog of sources detected on the model image.
-    """
-    # Distance from the inner edge of the bounding box to avoid placing test
-    # sources in the model images.
-    bufferSize = kernelSize/2 + templateBorderSize + 1
-
-    bbox = lsst.geom.Box2I(lsst.geom.Point2I(x0, y0), lsst.geom.Extent2I(xSize, ySize))
-    if templateBorderSize > 0:
-        bbox.grow(templateBorderSize)
-
-    rng = np.random.RandomState(seed)
-    rngNoise = np.random.RandomState(noiseSeed)
-    x0, y0 = bbox.getBegin()
-    xSize, ySize = bbox.getDimensions()
-    xLoc = rng.rand(nSrc)*(xSize - 2*bufferSize) + bufferSize + x0
-    yLoc = rng.rand(nSrc)*(ySize - 2*bufferSize) + bufferSize + y0
-
-    flux = (rng.rand(nSrc)*(fluxRange - 1.) + 1.)*fluxLevel
-    sigmas = [psfSize for src in range(nSrc)]
-    coordList = list(zip(xLoc, yLoc, flux, sigmas))
-    skyLevel = 0
-    # Don't use the built in poisson noise: it modifies the global state of numpy random
-    modelExposure = plantSources(bbox, kernelSize, skyLevel, coordList, addPoissonNoise=False)
-    modelExposure.setWcs(makeFakeWcs())
-    noise = rngNoise.randn(ySize, xSize)*noiseLevel
-    noise -= np.mean(noise)
-    modelExposure.variance.array = np.sqrt(np.abs(modelExposure.image.array)) + noiseLevel**2
-    modelExposure.image.array += noise
-
-    # Run source detection to set up the mask plane
-    psfMatchTask = lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask()
-    sourceCat = psfMatchTask.getSelectSources(modelExposure)
-    modelExposure.setPhotoCalib(PhotoCalib(calibration, 0., bbox))
-    if background is not None:
-        modelExposure.image += background
-    modelExposure.maskedImage /= calibration
-    if doApplyCalibration:
-        modelExposure.maskedImage = modelExposure.photoCalib.calibrateImage(modelExposure.maskedImage)
-
-    return modelExposure, sourceCat
 
 
 class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
@@ -179,12 +74,12 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         # Mean of difference image should be close to zero.
         meanError = noiseLevel/np.sqrt(output.difference.image.array.size)
         # Make sure to include pixels with the DETECTED mask bit set.
-        statsCtrl = _makeStats(badMaskPlanes=("EDGE", "BAD", "NO_DATA"))
-        differenceMean = _computeRobustStatistics(output.difference.image, output.difference.mask, statsCtrl)
+        statsCtrl = makeStats(badMaskPlanes=("EDGE", "BAD", "NO_DATA"))
+        differenceMean = computeRobustStatistics(output.difference.image, output.difference.mask, statsCtrl)
         self.assertFloatsAlmostEqual(differenceMean, 0, atol=5*meanError)
         # stddev of difference image should be close to expected value.
-        differenceStd = _computeRobustStatistics(output.difference.image, output.difference.mask,
-                                                 _makeStats(), statistic=afwMath.STDEV)
+        differenceStd = computeRobustStatistics(output.difference.image, output.difference.mask,
+                                                makeStats(), statistic=afwMath.STDEV)
         self.assertFloatsAlmostEqual(differenceStd, np.sqrt(2)*noiseLevel, rtol=0.1)
 
     def test_auto_convolveTemplate(self):
@@ -231,8 +126,8 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         """Test that running with enough sources produces reasonable output,
         with the science psf being smaller than the template.
         """
-        statsCtrl = _makeStats()
-        statsCtrlDetect = _makeStats(badMaskPlanes=("EDGE", "BAD", "NO_DATA"))
+        statsCtrl = makeStats()
+        statsCtrlDetect = makeStats(badMaskPlanes=("EDGE", "BAD", "NO_DATA"))
 
         def _run_and_check_images(statsCtrl, statsCtrlDetect, scienceNoiseLevel, templateNoiseLevel):
             science, sources = makeTestImage(psfSize=2.0, noiseLevel=scienceNoiseLevel, noiseSeed=6)
@@ -248,16 +143,16 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
             # Mean of difference image should be close to zero.
             nGoodPix = np.sum(np.isfinite(output.difference.image.array))
             meanError = (scienceNoiseLevel + templateNoiseLevel)/np.sqrt(nGoodPix)
-            diffimMean = _computeRobustStatistics(output.difference.image, output.difference.mask,
-                                                  statsCtrlDetect)
+            diffimMean = computeRobustStatistics(output.difference.image, output.difference.mask,
+                                                 statsCtrlDetect)
 
             self.assertFloatsAlmostEqual(diffimMean, 0, atol=5*meanError)
             # stddev of difference image should be close to expected value.
             noiseLevel = np.sqrt(scienceNoiseLevel**2 + templateNoiseLevel**2)
-            varianceMean = _computeRobustStatistics(output.difference.variance, output.difference.mask,
-                                                    statsCtrl)
-            diffimStd = _computeRobustStatistics(output.difference.image, output.difference.mask,
-                                                 statsCtrl, statistic=afwMath.STDEV)
+            varianceMean = computeRobustStatistics(output.difference.variance, output.difference.mask,
+                                                   statsCtrl)
+            diffimStd = computeRobustStatistics(output.difference.image, output.difference.mask,
+                                                statsCtrl, statistic=afwMath.STDEV)
             self.assertFloatsAlmostEqual(varianceMean, noiseLevel**2, rtol=0.1)
             self.assertFloatsAlmostEqual(diffimStd, noiseLevel, rtol=0.1)
 
@@ -269,8 +164,8 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         """Test that running with enough sources produces reasonable output,
         with the template psf being smaller than the science.
         """
-        statsCtrl = _makeStats()
-        statsCtrlDetect = _makeStats(badMaskPlanes=("EDGE", "BAD", "NO_DATA"))
+        statsCtrl = makeStats()
+        statsCtrlDetect = makeStats(badMaskPlanes=("EDGE", "BAD", "NO_DATA"))
 
         def _run_and_check_images(statsCtrl, statsCtrlDetect, scienceNoiseLevel, templateNoiseLevel):
             science, sources = makeTestImage(psfSize=3.0, noiseLevel=scienceNoiseLevel, noiseSeed=6)
@@ -287,15 +182,15 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
             # Mean of difference image should be close to zero.
             meanError = (scienceNoiseLevel + templateNoiseLevel)/np.sqrt(output.difference.image.array.size)
 
-            diffimMean = _computeRobustStatistics(output.difference.image, output.difference.mask,
-                                                  statsCtrlDetect)
+            diffimMean = computeRobustStatistics(output.difference.image, output.difference.mask,
+                                                 statsCtrlDetect)
             self.assertFloatsAlmostEqual(diffimMean, 0, atol=5*meanError)
             # stddev of difference image should be close to expected value.
             noiseLevel = np.sqrt(scienceNoiseLevel**2 + templateNoiseLevel**2)
-            varianceMean = _computeRobustStatistics(output.difference.variance, output.difference.mask,
-                                                    statsCtrl)
-            diffimStd = _computeRobustStatistics(output.difference.image, output.difference.mask,
-                                                 statsCtrl, statistic=afwMath.STDEV)
+            varianceMean = computeRobustStatistics(output.difference.variance, output.difference.mask,
+                                                   statsCtrl)
+            diffimStd = computeRobustStatistics(output.difference.image, output.difference.mask,
+                                                statsCtrl, statistic=afwMath.STDEV)
             self.assertFloatsAlmostEqual(varianceMean, noiseLevel**2, rtol=0.1)
             self.assertFloatsAlmostEqual(diffimStd, noiseLevel, rtol=0.1)
 
@@ -329,12 +224,12 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         delta.variance -= science_better.difference.variance
         delta.mask.array -= science_better.difference.mask.array
 
-        statsCtrl = _makeStats()
+        statsCtrl = makeStats()
         # Mean of delta should be very close to zero.
         nGoodPix = np.sum(np.isfinite(delta.image.array))
         meanError = 2*noiseLevel/np.sqrt(nGoodPix)
-        deltaMean = _computeRobustStatistics(delta.image, delta.mask, statsCtrl)
-        deltaStd = _computeRobustStatistics(delta.image, delta.mask, statsCtrl, statistic=afwMath.STDEV)
+        deltaMean = computeRobustStatistics(delta.image, delta.mask, statsCtrl)
+        deltaStd = computeRobustStatistics(delta.image, delta.mask, statsCtrl, statistic=afwMath.STDEV)
         self.assertFloatsAlmostEqual(deltaMean, 0, atol=5*meanError)
         # stddev of difference image should be close to expected value
         self.assertFloatsAlmostEqual(deltaStd, 2*np.sqrt(2)*noiseLevel, rtol=.1)
@@ -419,7 +314,7 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         config.makeKernel.kernel.active.fitForBackground = True
         config.makeKernel.kernel.active.spatialKernelOrder = 1
         config.makeKernel.kernel.active.spatialBgOrder = 2
-        statsCtrl = _makeStats()
+        statsCtrl = makeStats()
 
         def _run_and_check_images(config, statsCtrl, mode):
             """Check that the fit background matches the input model.
@@ -437,8 +332,8 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
 
             # stddev of difference image should be close to expected value.
             # This will fail if we have mis-subtracted the background.
-            stdVal = _computeRobustStatistics(output.difference.image, output.difference.mask,
-                                              statsCtrl, statistic=afwMath.STDEV)
+            stdVal = computeRobustStatistics(output.difference.image, output.difference.mask,
+                                             statsCtrl, statistic=afwMath.STDEV)
             self.assertFloatsAlmostEqual(stdVal, np.sqrt(2)*noiseLevel, rtol=0.1)
 
         _run_and_check_images(config, statsCtrl, "convolveTemplate")
@@ -451,7 +346,7 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         templateNoiseLevel = 2.
         scaleFactor = 1.345
         # Make sure to include pixels with the DETECTED mask bit set.
-        statsCtrl = _makeStats(badMaskPlanes=("EDGE", "BAD", "NO_DATA"))
+        statsCtrl = makeStats(badMaskPlanes=("EDGE", "BAD", "NO_DATA"))
 
         def _run_and_check_images(science, template, sources, statsCtrl,
                                   doDecorrelation, doScaleVariance, scaleFactor=1.):
@@ -471,18 +366,18 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
                 self.assertFloatsAlmostEqual(task.metadata["scaleScienceVarianceFactor"],
                                              scaleFactor, atol=0.05)
 
-            scienceNoise = _computeRobustStatistics(science.variance, science.mask, statsCtrl)
+            scienceNoise = computeRobustStatistics(science.variance, science.mask, statsCtrl)
             if doDecorrelation:
-                templateNoise = _computeRobustStatistics(template.variance, template.mask, statsCtrl)
+                templateNoise = computeRobustStatistics(template.variance, template.mask, statsCtrl)
             else:
-                templateNoise = _computeRobustStatistics(output.matchedTemplate.variance,
-                                                         output.matchedTemplate.mask,
-                                                         statsCtrl)
+                templateNoise = computeRobustStatistics(output.matchedTemplate.variance,
+                                                        output.matchedTemplate.mask,
+                                                        statsCtrl)
 
             if doScaleVariance:
                 templateNoise *= scaleFactor
                 scienceNoise *= scaleFactor
-            varMean = _computeRobustStatistics(output.difference.variance, output.difference.mask, statsCtrl)
+            varMean = computeRobustStatistics(output.difference.variance, output.difference.mask, statsCtrl)
             self.assertFloatsAlmostEqual(varMean, scienceNoise + templateNoise, rtol=0.1)
 
         science, sources = makeTestImage(psfSize=3.0, noiseLevel=scienceNoiseLevel, noiseSeed=6)
@@ -519,7 +414,7 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         templateNoiseLevel = 2.
         scaleFactor = 1.345
         # Make sure to include pixels with the DETECTED mask bit set.
-        statsCtrl = _makeStats(badMaskPlanes=("EDGE", "BAD", "NO_DATA"))
+        statsCtrl = makeStats(badMaskPlanes=("EDGE", "BAD", "NO_DATA"))
 
         def _run_and_check_images(science, template, sources, statsCtrl,
                                   doDecorrelation, doScaleVariance, scaleFactor=1.):
@@ -540,19 +435,19 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
                 self.assertFloatsAlmostEqual(task.metadata["scaleScienceVarianceFactor"],
                                              scaleFactor, atol=0.05)
 
-            templateNoise = _computeRobustStatistics(template.variance, template.mask, statsCtrl)
+            templateNoise = computeRobustStatistics(template.variance, template.mask, statsCtrl)
             if doDecorrelation:
-                scienceNoise = _computeRobustStatistics(science.variance, science.mask, statsCtrl)
+                scienceNoise = computeRobustStatistics(science.variance, science.mask, statsCtrl)
             else:
-                scienceNoise = _computeRobustStatistics(output.matchedScience.variance,
-                                                        output.matchedScience.mask,
-                                                        statsCtrl)
+                scienceNoise = computeRobustStatistics(output.matchedScience.variance,
+                                                       output.matchedScience.mask,
+                                                       statsCtrl)
 
             if doScaleVariance:
                 templateNoise *= scaleFactor
                 scienceNoise *= scaleFactor
 
-            varMean = _computeRobustStatistics(output.difference.variance, output.difference.mask, statsCtrl)
+            varMean = computeRobustStatistics(output.difference.variance, output.difference.mask, statsCtrl)
             self.assertFloatsAlmostEqual(varMean, scienceNoise + templateNoise, rtol=0.1)
 
         science, sources = makeTestImage(psfSize=2.0, noiseLevel=scienceNoiseLevel, noiseSeed=6)
@@ -699,53 +594,6 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
             self.assertEqual(value.getBBox(), value2.getBBox())
             self.assertFloatsAlmostEqual(
                 value.getCoefficients(), value2.getCoefficients(), rtol=0.0)
-
-
-def _makeStats(badMaskPlanes=None):
-    """Create a statistics control for configuring calculations on images.
-
-    Parameters
-    ----------
-    badMaskPlanes : `list` of `str`, optional
-        List of mask planes to exclude from calculations.
-
-    Returns
-    -------
-    statsControl : ` lsst.afw.math.StatisticsControl`
-        Statistics control object for configuring calculations on images.
-    """
-    if badMaskPlanes is None:
-        badMaskPlanes = ("INTRP", "EDGE", "DETECTED", "SAT", "CR",
-                         "BAD", "NO_DATA", "DETECTED_NEGATIVE")
-    statsControl = afwMath.StatisticsControl()
-    statsControl.setNumSigmaClip(3.)
-    statsControl.setNumIter(3)
-    statsControl.setAndMask(afwImage.Mask.getPlaneBitMask(badMaskPlanes))
-    return statsControl
-
-
-def _computeRobustStatistics(image, mask, statsCtrl, statistic=afwMath.MEANCLIP):
-    """Calculate a robust mean of the variance plane of an exposure.
-
-    Parameters
-    ----------
-    image : `lsst.afw.image.Image`
-        Image or variance plane of an exposure to evaluate.
-    mask : `lsst.afw.image.Mask`
-        Mask plane to use for excluding pixels.
-    statsCtrl : `lsst.afw.math.StatisticsControl`
-        Statistics control object for configuring the calculation.
-    statistic : `lsst.afw.math.Property`, optional
-        The type of statistic to compute. Typical values are
-        ``afwMath.MEANCLIP`` or ``afwMath.STDEVCLIP``.
-
-    Returns
-    -------
-    value : `float`
-        The result of the statistic calculated from the unflagged pixels.
-    """
-    statObj = afwMath.makeStatistics(image, mask, statistic, statsCtrl)
-    return statObj.getValue(statistic)
 
 
 def setup_module(module):
