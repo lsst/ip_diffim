@@ -22,6 +22,10 @@
 import unittest
 import numpy as np
 
+import lsst.afw.detection as afwDetection
+import lsst.meas.algorithms as measAlg
+import lsst.afw.table as afwTable
+import lsst.afw.geom as afwGeom
 import lsst.afw.math as afwMath
 import lsst.geom
 import lsst.ip.diffim.imagePsfMatch
@@ -81,6 +85,129 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         differenceStd = computeRobustStatistics(output.difference.image, output.difference.mask,
                                                 makeStats(), statistic=afwMath.STDEV)
         self.assertFloatsAlmostEqual(differenceStd, np.sqrt(2)*noiseLevel, rtol=0.1)
+
+    def test_psf_size(self):
+        """DM-32756."""
+
+        # class CustomPsf(afwDetection.Psf):
+        #     def __init__(self, psf, *args, **kwargs) -> None:
+        #         super().__init__(*args, **kwargs)
+        #         self._psf = psf
+
+        #     # def __getattribute__(self, __name: str) -> Any:
+        #     #     return self._psf.__getattribute__(__name)
+
+        #     def getAveragePosition(self):
+        #         return lsst.geom.Point2D(-10000, -10000)
+
+        #     def computeKernelImage(self, position=None):
+        #         if position is None:
+        #             position = self.getAveragePosition()
+        #         return self._psf.computeKernelImage(position)
+
+        #     def computePeak(self, position=None):
+        #         if position is None:
+        #             postition = self.getAveragePosition()
+        #         return self._psf.computePeak(position)
+
+        #     def computeShape(self, position=None):
+        #         if position is None:
+        #             position = self.getAveragePosition()
+        #         return self._psf.computeShape(position)
+
+        # schema = afwTable.ExposureTable.makeMinimalSchema()
+        # catalog = afwTable.ExposureCatalog(schema)
+        # for i in range(1, 10, 1):
+        #     record = catalog.getTable().makeRecord()
+        #     psf = measAlg.DoubleGaussianPsf(21, 21, i, 1.0, 0.0)
+        #     record.setPsf(psf)
+        #     crpix = lsst.geom.PointD(i*1000.0, i*1000.0)
+        #     crval = lsst.geom.SpherePoint(0.0, 0.0, lsst.geom.degrees)
+        #     cdMatrix = afwGeom.makeCdMatrix(scale=0.168*lsst.geom.arcseconds, flipX=True)
+        #     wcs = afwGeom.makeSkyWcs(crpix=crpix, crval=crval, cdMatrix=cdMatrix)
+
+        schema = afwTable.ExposureTable.makeMinimalSchema()
+        weightKey = schema.addField("weight", type="D", doc="Coadd weight")
+        mycatalog = afwTable.ExposureCatalog(schema)
+
+        # # Each of the 9 has its peculiar Psf, Wcs, weight, and bounding box.
+        # for i in range(1, 10, 1):
+        #     record = mycatalog.getTable().makeRecord()
+        #     psf = measAlg.DoubleGaussianPsf(100, 100, i, 1.00, 0.0)
+        #     record.setPsf(psf)
+        #     crpix = lsst.geom.PointD(i*1000.0, i*1000.0)
+        #     wcs = afwGeom.makeSkyWcs(crpix=crpix, crval=crval, cdMatrix=cdMatrix)
+
+        #     record.setWcs(wcs)
+        #     record['customweightname'] = 1.0 * (i+1)
+        #     record['id'] = i
+        #     bbox = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Extent2I(i*1000, i*1000))
+        #     record.setBBox(bbox)
+        #     mycatalog.append(record)
+
+        # coaddPsf = measAlg.CoaddPsf(catalog, wcs)
+
+        noiseLevel = 1.
+        science, sources = makeTestImage(psfSize=2.4, noiseLevel=noiseLevel, noiseSeed=6)
+        template, _ = makeTestImage(psfSize=2.4, noiseLevel=noiseLevel, noiseSeed=7,
+                                    templateBorderSize=20, doApplyCalibration=True)
+        template2, cat2 = makeTestImage(psfSize=2.4, noiseLevel=noiseLevel, noiseSeed=7,
+                                    templateBorderSize=20, doApplyCalibration=True, x0=0, y0=0)
+
+        import pdb; pdb.set_trace()
+        # record1 = mycatalog.addNew()
+        # record1.setPsf(template2.psf)
+        # record1.setWcs(template2.wcs)
+        # record1.setD(weightKey, 1.0)
+        # record1.setBBox(lsst.geom.Box2I(lsst.geom.Point2I(145654, 13342), lsst.geom.Extent2I(100, 100)))
+        # record2 = mycatalog.addNew()
+        # record2.setPsf(template2.psf)
+        # record2.setWcs(template2.wcs)
+        # record2.setD(weightKey, 1.0)
+        # record2.setBBox(lsst.geom.Box2I(lsst.geom.Point2I(1456548, 133242), lsst.geom.Extent2I(100, 100)))
+
+        kernel = measAlg.DoubleGaussianPsf(7, 7, 2.0).getKernel()
+        psf1 = measAlg.KernelPsf(kernel, lsst.geom.Point2D(0, 50))
+        psf2 = measAlg.KernelPsf(kernel, lsst.geom.Point2D(100, 50))
+        record1 = mycatalog.addNew()
+        record1.setPsf(psf1)
+        record1.setWcs(template2.wcs)
+        record1.setD(weightKey, 1.0)
+        record1.setBBox(lsst.geom.Box2I(lsst.geom.Point2I(-40, 0), lsst.geom.Point2I(40, 100)))
+        record2 = mycatalog.addNew()
+        record2.setPsf(psf2)
+        record2.setWcs(template2.wcs)
+        record2.setD(weightKey, 1.0)
+        record2.setBBox(lsst.geom.Box2I(lsst.geom.Point2I(2600, 2690), lsst.geom.Point2I(2840, 3100)))
+        psf2 = measAlg.CoaddPsf(mycatalog, template2.wcs)
+
+        # record2 = self.mycatalog.addNew()
+        # record2.setPsf(tepsf)
+        # record2.setWcs(wcs)
+        # record2.setD(self.weightKey, 1.0)
+        # record2.setBBox(lsst.geom.Box2I(lsst.geom.Point2I(60, 0), lsst.geom.Point2I(140, 100)))
+
+        #psf2 = measAlg.CoaddPsf(mycatalog, template2.wcs)
+        config = subtractImages.AlardLuptonSubtractTask.ConfigClass()
+        config.doSubtractBackground = False
+        task = subtractImages.AlardLuptonSubtractTask(config=config)
+        original_psf = template.psf.clone()
+        template.setPsf(psf2)
+        output = task.run(template, science, sources)
+        # There shoud be no NaN values in the difference image
+        self.assertTrue(np.all(np.isfinite(output.difference.image.array)))
+        # Mean of difference image should be close to zero.
+        meanError = noiseLevel/np.sqrt(output.difference.image.array.size)
+        # Make sure to include pixels with the DETECTED mask bit set.
+        statsCtrl = makeStats(badMaskPlanes=("EDGE", "BAD", "NO_DATA"))
+        differenceMean = computeRobustStatistics(output.difference.image, output.difference.mask, statsCtrl)
+        self.assertFloatsAlmostEqual(differenceMean, 0, atol=5*meanError)
+        # stddev of difference image should be close to expected value.
+        differenceStd = computeRobustStatistics(output.difference.image, output.difference.mask,
+                                                makeStats(), statistic=afwMath.STDEV)
+        self.assertFloatsAlmostEqual(differenceStd, np.sqrt(2)*noiseLevel, rtol=0.1)
+
+        raise AssertionError("We want a failure")
 
     def test_auto_convolveTemplate(self):
         """Test that auto mode gives the same result as convolveTemplate when
