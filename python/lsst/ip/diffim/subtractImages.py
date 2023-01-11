@@ -28,6 +28,7 @@ from lsst.ip.diffim.utils import getPsfFwhm
 from lsst.meas.algorithms import ScaleVarianceTask
 import lsst.pex.config
 import lsst.pipe.base
+from lsst.pex.exceptions import InvalidParameterError
 from lsst.pipe.base import connectionTypes
 from . import MakeKernelTask, DecorrelateALKernelTask
 from lsst.utils.timer import timeMethod
@@ -158,6 +159,17 @@ class AlardLuptonSubtractConfig(lsst.pipe.base.PipelineTaskConfig,
         default=("sky_source", "slot_Centroid_flag",
                  "slot_ApFlux_flag", "slot_PsfFlux_flag", ),
     )
+    fwhmExposureGrid = lsst.pex.config.Field(
+        doc="Grid size to compute the average FWHM in an exposure",
+        dtype=int,
+        default=10,
+    )
+    fwhmExposureBuffer = lsst.pex.config.Field(
+        doc="Fractional buffer margin to be left out of all sides of the image during construction"
+            "of grid to compute average FWHM in an exposure",
+        dtype=float,
+        default=0.05,
+    )
 
     def setDefaults(self):
         self.makeKernel.kernel.name = "AL"
@@ -273,12 +285,20 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                                             finalizedPsfApCorrCatalog=finalizedPsfApCorrCatalog)
         checkTemplateIsSufficient(template, self.log,
                                   requiredTemplateFraction=self.config.requiredTemplateFraction)
-        sciencePsfSize = getPsfFwhm(science.psf)
-        templatePsfSize = getPsfFwhm(template.psf)
+
+        sciencePsfSize = science.evaluateMedianFwhm(self.config.fwhmExposureBuffer, self.config.fwhmExposureGrid)
+        templatePsfSize = template.evaluateMedianFwhm(self.config.fwhmExposureBuffer, self.config.fwhmExposureGrid)
+
+        try:
+            convolveTemplate = _shapeTest(template.psf, science.psf)
+            self.log.warn("getPsfFwhm worked.")
+        except InvalidParameterError as e:
+            convolveTemplate = templatePsfSize < sciencePsfSize
+            self.log.warning("evaluateMedianFwhm had to be invoked. %s", e)
+
         self.log.info("Science PSF FWHM: %f pixels", sciencePsfSize)
         self.log.info("Template PSF FWHM: %f pixels", templatePsfSize)
         if self.config.mode == "auto":
-            convolveTemplate = _shapeTest(template.psf, science.psf)
             if convolveTemplate:
                 if sciencePsfSize < templatePsfSize:
                     self.log.info("Average template PSF size is greater, "
