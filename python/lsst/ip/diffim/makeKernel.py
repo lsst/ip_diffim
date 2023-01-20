@@ -38,7 +38,7 @@ from .psfMatch import PsfMatchConfig, PsfMatchTask, PsfMatchConfigAL, PsfMatchCo
 
 from . import diffimLib
 from . import diffimTools
-from .utils import getPsfFwhm
+from .utils import evaluateMeanPsfFwhm
 
 
 class MakeKernelConfig(PsfMatchConfig):
@@ -130,8 +130,14 @@ class MakeKernelTask(PsfMatchTask):
                 Spatially varying background-matching function.
         """
         kernelCellSet = self._buildCellSet(template.maskedImage, science.maskedImage, kernelSources)
-        templateFwhmPix = getPsfFwhm(template.psf)
-        scienceFwhmPix = getPsfFwhm(science.psf)
+        templateFwhmPix = evaluateMeanPsfFwhm(template,
+                                              fwhmExposureBuffer=self.config.fwhmExposureBuffer,
+                                              fwhmExposureGrid=self.config.fwhmExposureGrid
+                                              )
+        scienceFwhmPix = evaluateMeanPsfFwhm(science,
+                                             fwhmExposureBuffer=self.config.fwhmExposureBuffer,
+                                             fwhmExposureGrid=self.config.fwhmExposureGrid
+                                             )
         if preconvolved:
             scienceFwhmPix *= np.sqrt(2)
         basisList = self.makeKernelBasisList(templateFwhmPix, scienceFwhmPix,
@@ -165,8 +171,14 @@ class MakeKernelTask(PsfMatchTask):
             field for the Sources deemed to be appropriate for Psf
             matching.
         """
-        templateFwhmPix = getPsfFwhm(template.psf)
-        scienceFwhmPix = getPsfFwhm(science.psf)
+        templateFwhmPix = evaluateMeanPsfFwhm(template,
+                                              fwhmExposureBuffer=self.config.fwhmExposureBuffer,
+                                              fwhmExposureGrid=self.config.fwhmExposureGrid
+                                              )
+        scienceFwhmPix = evaluateMeanPsfFwhm(science,
+                                             fwhmExposureBuffer=self.config.fwhmExposureBuffer,
+                                             fwhmExposureGrid=self.config.fwhmExposureGrid
+                                             )
         if preconvolved:
             scienceFwhmPix *= np.sqrt(2)
         kernelSize = self.makeKernelBasisList(templateFwhmPix, scienceFwhmPix)[0].getWidth()
