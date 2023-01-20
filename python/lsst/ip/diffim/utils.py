@@ -33,15 +33,18 @@ import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.afw.table as afwTable
 import lsst.meas.algorithms as measAlg
-from lsst.meas.algorithms.testUtils import plantSources
 import lsst.meas.base as measBase
+from lsst.meas.algorithms.testUtils import plantSources
+from lsst.pex.exceptions import InvalidParameterError
 from lsst.utils.logging import getLogger
 from .dipoleFitTask import DipoleFitAlgorithm
 from . import diffimLib
 from . import diffimTools
 
 afwDisplay.setDefaultMaskTransparency(75)
-keptPlots = False                       # Have we arranged to keep spatial plots open?
+keptPlots = False  # Have we arranged to keep spatial plots open?
+
+_LOG = getLogger(__name__)
 
 
 def showSourceSet(sSet, xy0=(0, 0), frame=0, ctype=afwDisplay.GREEN, symb="+", size=2):
@@ -725,7 +728,7 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
 
     testFootprints = diffimTools.sourceToFootprintList(testSources, warpedTemplateExposure,
                                                        exposure, config,
-                                                       getLogger(__name__).getChild("plotPixelResiduals"))
+                                                       _LOG.getChild("plotPixelResiduals"))
     for fp in testFootprints:
         subexp = diffExposure.Factory(diffExposure, fp["footprint"].getBBox())
         subim = subexp.getMaskedImage().getImage()
