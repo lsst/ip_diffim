@@ -1080,36 +1080,43 @@ class DipoleTestImage(object):
             return detectTask, schema
 
 
-def getPsfFwhm(psf, average=True):
+def _sliceWidth(image, threshold, peaks, axis):
+    vec = image.take(peaks[1 - axis], axis=axis)
+    low = np.interp(threshold, vec[:peaks[axis] + 1], np.arange(peaks[axis] + 1))
+    high = np.interp(threshold, vec[:peaks[axis] - 1:-1], np.arange(len(vec) - 1, peaks[axis] - 1, -1))
+    return high - low
+
+
+def getPsfFwhm(psf, average=True, position=None):
     """Directly calculate the horizontal and vertical widths
     of a PSF at half its maximum value.
 
     Parameters
     ----------
-    psf : `lsst.afw.detection.Psf`
+    psf : `~lsst.afw.detection.Psf`
         Point spread function (PSF) to evaluate.
     average : `bool`, optional
-        Set to return the average width.
+        Set to return the average width over Y and X axes.
+    position : `~lsst.geom.Point2D`, optional
+        The position at which to evaluate the PSF. If `None`, then the
+        average position is used.
 
     Returns
     -------
-    psfSize : `float`, or `tuple` of `float`
+    psfSize : `float` | `tuple` [`float`]
         The FWHM of the PSF computed at its average position.
         Returns the widths along the Y and X axes,
         or the average of the two if `average` is set.
     """
-    pos = psf.getAveragePosition()
-    image = psf.computeKernelImage(pos).array
-    peak = psf.computePeak(pos)
+    if position is None:
+        position = psf.getAveragePosition()
+    image = psf.computeKernelImage(position).array
+    peak = psf.computePeak(position)
     peakLocs = np.unravel_index(np.argmax(image), image.shape)
+    width = _sliceWidth(image, peak/2., peakLocs, axis=0), _sliceWidth(image, peak/2., peakLocs, axis=1)
+    return np.nanmean(width) if average else width
 
-    def sliceWidth(image, threshold, peaks, axis):
-        vec = image.take(peaks[1 - axis], axis=axis)
-        low = np.interp(threshold, vec[:peaks[axis] + 1], np.arange(peaks[axis] + 1))
-        high = np.interp(threshold, vec[:peaks[axis] - 1:-1], np.arange(len(vec) - 1, peaks[axis] - 1, -1))
-        return high - low
-    width = (sliceWidth(image, peak/2., peakLocs, axis=0), sliceWidth(image, peak/2., peakLocs, axis=1))
-    return np.mean(width) if average else width
+
 
 
 def detectTestSources(exposure):
