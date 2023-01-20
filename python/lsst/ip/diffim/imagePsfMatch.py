@@ -322,14 +322,6 @@ class ImagePsfMatchTask(PsfMatchTask):
         self.makeSubtask("selectDetection", schema=self.selectSchema)
         self.makeSubtask("selectMeasurement", schema=self.selectSchema, algMetadata=self.selectAlgMetadata)
 
-    def getFwhmPix(self, psf, position=None):
-        """Return the FWHM in pixels of a Psf.
-        """
-        if position is None:
-            position = psf.getAveragePosition()
-        sigPix = psf.computeShape(position).getDeterminantRadius()
-        return sigPix*sigma2fwhm
-
     @timeMethod
     def matchExposures(self, templateExposure, scienceExposure,
                        templateFwhmPix=None, scienceFwhmPix=None,
@@ -416,14 +408,14 @@ class ImagePsfMatchTask(PsfMatchTask):
             if not templateExposure.hasPsf():
                 self.log.warning("No estimate of Psf FWHM for template image")
             else:
-                templateFwhmPix = self.getFwhmPix(templateExposure.getPsf())
+                templateFwhmPix = diffimUtils.getPsfFwhm(templateExposure.psf)
                 self.log.info("templateFwhmPix: %s", templateFwhmPix)
 
         if scienceFwhmPix is None:
             if not scienceExposure.hasPsf():
                 self.log.warning("No estimate of Psf FWHM for science image")
             else:
-                scienceFwhmPix = self.getFwhmPix(scienceExposure.getPsf())
+                scienceFwhmPix = diffimUtils.getPsfFwhm(scienceExposure.psf)
                 self.log.info("scienceFwhmPix: %s", scienceFwhmPix)
 
         if convolveTemplate:
