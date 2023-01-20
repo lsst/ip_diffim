@@ -20,15 +20,16 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import unittest
-import numpy as np
 
 import lsst.afw.math as afwMath
 import lsst.geom
 import lsst.ip.diffim.imagePsfMatch
+import lsst.meas.algorithms as measAlg
+import lsst.utils.tests
+import numpy as np
 from lsst.ip.diffim import subtractImages
 from lsst.ip.diffim.utils import getPsfFwhm, makeTestImage, makeStats, computeRobustStatistics
 from lsst.pex.config import FieldValidationError
-import lsst.utils.tests
 
 
 class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
