@@ -22,8 +22,9 @@
 """Support utilities for Measuring sources"""
 
 # Export DipoleTestImage to expose fake image generating funcs
-__all__ = ["DipoleTestImage", "getPsfFwhm"]
+__all__ = ["DipoleTestImage", "evaluateMeanPsfFwhm", "getPsfFwhm"]
 
+import itertools
 import numpy as np
 import lsst.geom as geom
 import lsst.afw.detection as afwDet
@@ -1110,6 +1111,10 @@ def getPsfFwhm(psf, average=True, position=None):
         The FWHM of the PSF computed at its average position.
         Returns the widths along the Y and X axes,
         or the average of the two if `average` is set.
+
+    See Also
+    --------
+    evaluateMeanPsfFwhm
     """
     if position is None:
         position = psf.getAveragePosition()
@@ -1120,6 +1125,63 @@ def getPsfFwhm(psf, average=True, position=None):
     return np.nanmean(width) if average else width
 
 
+def evaluateMeanPsfFwhm(exposure: afwImage.Exposure,
+                        fwhmExposureBuffer: float, fwhmExposureGrid: int) -> float:
+    """Get the median PSF FWHM by evaluating it on a grid within an exposure.
+
+    Parameters
+    ----------
+    exposure : `~lsst.afw.image.Exposure`
+        The exposure for which the mean FWHM of the PSF is to be computed.
+        The exposure must contain a `psf` attribute.
+    fwhmExposureBuffer : `float`
+        Fractional buffer margin to be left out of all sides of the image
+        during the construction of the grid to compute mean PSF FWHM in an
+        exposure.
+    fwhmExposureGrid : `int`
+        Grid size to compute the mean FWHM in an exposure.
+
+    Returns
+    -------
+    meanFwhm : `float`
+        The mean PSF FWHM on the exposure.
+
+    Raises
+    ------
+    ValueError
+        Raised if the PSF cannot be computed at any of the grid points.
+
+    See Also
+    --------
+    getPsfFwhm
+    """
+
+    psf = exposure.psf
+
+    bbox = exposure.getBBox()
+    xmax, ymax = bbox.getMax()
+    xmin, ymin = bbox.getMin()
+
+    xbuffer = fwhmExposureBuffer*(xmax-xmin)
+    ybuffer = fwhmExposureBuffer*(ymax-ymin)
+
+    width = []
+    for (x, y) in itertools.product(np.linspace(xmin+xbuffer, xmax-xbuffer, fwhmExposureGrid),
+                                    np.linspace(ymin+ybuffer, ymax-ybuffer, fwhmExposureGrid)
+                                    ):
+        pos = geom.Point2D(x, y)
+        try:
+            fwhm = getPsfFwhm(psf, average=True, position=pos)
+        except InvalidParameterError:
+            _LOG.debug("Unable to compute PSF FWHM at position (%f, %f).", x, y)
+            continue
+
+        width.append(fwhm)
+
+    if not width:
+        raise ValueError("Unable to compute PSF FWHM at any position on the exposure.")
+
+    return np.nanmean(width)
 
 
 def detectTestSources(exposure):
