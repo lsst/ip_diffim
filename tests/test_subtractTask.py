@@ -22,14 +22,24 @@
 import unittest
 
 import lsst.afw.math as afwMath
+import lsst.afw.table as afwTable
 import lsst.geom
 import lsst.ip.diffim.imagePsfMatch
 import lsst.meas.algorithms as measAlg
 import lsst.utils.tests
 import numpy as np
 from lsst.ip.diffim import subtractImages
-from lsst.ip.diffim.utils import getPsfFwhm, makeTestImage, makeStats, computeRobustStatistics
+from lsst.ip.diffim.utils import (computeRobustStatistics, evaluateMeanPsfFwhm,
+                                  getPsfFwhm, makeStats, makeTestImage)
 from lsst.pex.config import FieldValidationError
+from lsst.pex.exceptions import InvalidParameterError
+
+
+class CustomCoaddPsf(measAlg.CoaddPsf):
+    """A custom CoaddPSF that overrides the getAveragePosition method.
+    """
+    def getAveragePosition(self):
+        return lsst.geom.Point2D(-10000, -10000)
 
 
 class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
@@ -82,6 +92,69 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         differenceStd = computeRobustStatistics(output.difference.image, output.difference.mask,
                                                 makeStats(), statistic=afwMath.STDEV)
         self.assertFloatsAlmostEqual(differenceStd, np.sqrt(2)*noiseLevel, rtol=0.1)
+
+    def test_psf_size(self):
+        """Test that the image subtract task runs without failing, if
+        fwhmExposureBuffer and fwhmExposureGrid parameters are set.
+        """
+        noiseLevel = 1.
+        science, sources = makeTestImage(psfSize=2.4, noiseLevel=noiseLevel, noiseSeed=6)
+        template, _ = makeTestImage(psfSize=2.4, noiseLevel=noiseLevel, noiseSeed=7,
+                                    templateBorderSize=20, doApplyCalibration=True)
+
+        schema = afwTable.ExposureTable.makeMinimalSchema()
+        weightKey = schema.addField("weight", type="D", doc="Coadd weight")
+        exposureCatalog = afwTable.ExposureCatalog(schema)
+        kernel = measAlg.DoubleGaussianPsf(7, 7, 2.0).getKernel()
+        psf = measAlg.KernelPsf(kernel, template.getBBox().getCenter())
+
+        record = exposureCatalog.addNew()
+        record.setPsf(psf)
+        record.setWcs(template.wcs)
+        record.setD(weightKey, 1.0)
+        record.setBBox(template.getBBox())
+
+        customPsf = CustomCoaddPsf(exposureCatalog, template.wcs)
+        template.setPsf(customPsf)
+
+        # Test that we get an exception if we simply get the FWHM at center.
+        with self.assertRaises(InvalidParameterError):
+            getPsfFwhm(template.psf, True)
+
+        with self.assertRaises(InvalidParameterError):
+            getPsfFwhm(template.psf, False)
+
+        # Test that evaluateMeanPsfFwhm runs successfully on the template.
+        evaluateMeanPsfFwhm(template, fwhmExposureBuffer=0.05, fwhmExposureGrid=10)
+
+        # Since the PSF is spatially invariant, the FWHM should be the same at
+        # all points in the science image.
+        fwhm1 = getPsfFwhm(science.psf, False)
+        fwhm2 = evaluateMeanPsfFwhm(science, fwhmExposureBuffer=0.05, fwhmExposureGrid=10)
+        self.assertAlmostEqual(fwhm1[0], fwhm2, places=13)
+        self.assertAlmostEqual(fwhm1[1], fwhm2, places=13)
+
+        self.assertAlmostEqual(evaluateMeanPsfFwhm(science, fwhmExposureBuffer=0.05,
+                                                   fwhmExposureGrid=10),
+                               getPsfFwhm(science.psf, True), places=7
+                               )
+
+        # Test that the image subtraction task runs successfully.
+        config = subtractImages.AlardLuptonSubtractTask.ConfigClass()
+        config.doSubtractBackground = False
+        task = subtractImages.AlardLuptonSubtractTask(config=config)
+
+        # Test that the task runs if we take the mean FWHM on a grid.
+        with self.assertLogs(level="INFO") as cm:
+            task.run(template, science, sources)
+
+        # Check that evaluateMeanPsfFwhm was called.
+        # This tests that getPsfFwhm failed raising InvalidParameterError,
+        # that is caught and handled appropriately.
+        logMessage = ("INFO:lsst.alardLuptonSubtract:Unable to evaluate PSF at the average position. "
+                      "Evaluting PSF on a grid of points."
+                      )
+        self.assertIn(logMessage, cm.output)
 
     def test_auto_convolveTemplate(self):
         """Test that auto mode gives the same result as convolveTemplate when
