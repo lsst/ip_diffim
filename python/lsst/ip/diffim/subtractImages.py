@@ -28,6 +28,7 @@ from lsst.ip.diffim.utils import evaluateMeanPsfFwhm, getPsfFwhm
 from lsst.meas.algorithms import ScaleVarianceTask
 import lsst.pex.config
 import lsst.pipe.base
+from lsst.pex.exceptions import InvalidParameterError
 from lsst.pipe.base import connectionTypes
 from . import MakeKernelTask, DecorrelateALKernelTask
 from lsst.utils.timer import timeMethod
@@ -303,7 +304,10 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         self.log.info("Template PSF FWHM: %f pixels", templatePsfSize)
 
         if self.config.mode == "auto":
-            convolveTemplate = _shapeTest(template.psf, science.psf)
+            convolveTemplate = _shapeTest(template,
+                                          science,
+                                          fwhmExposureBuffer=fwhmExposureBuffer,
+                                          fwhmExposureGrid=fwhmExposureGrid)
             if convolveTemplate:
                 if sciencePsfSize < templatePsfSize:
                     self.log.info("Average template PSF size is greater, "
@@ -667,23 +671,43 @@ def _subtractImages(science, template, backgroundModel=None):
     return difference
 
 
-def _shapeTest(psf1, psf2):
-    """Determine whether psf1 is narrower in either dimension than psf2.
+def _shapeTest(exp1, exp2, fwhmExposureBuffer, fwhmExposureGrid):
+    """Determine that the PSF of ``exp1`` is not wider than that of ``exp2``.
 
     Parameters
     ----------
-    psf1 : `lsst.afw.detection.Psf`
-        Reference point spread function (PSF) to evaluate.
-    psf2 : `lsst.afw.detection.Psf`
-        Candidate point spread function (PSF) to evaluate.
-
+    exp1 : `~lsst.afw.image.Exposure`
+        Exposure with the reference point spread function (PSF) to evaluate.
+    exp2 : `~lsst.afw.image.Exposure`
+        Exposure with a candidate point spread function (PSF) to evaluate.
+    fwhmExposureBuffer : `float`
+        Fractional buffer margin to be left out of all sides of the image
+        during the construction of the grid to compute mean PSF FWHM in an
+        exposure, if the PSF is not available at its average position.
+    fwhmExposureGrid : `int`
+        Grid size to compute the mean FWHM in an exposure, if the PSF is not
+        available at its average position.
     Returns
     -------
-    `bool`
-        Returns True if psf1 is narrower than psf2 in either dimension.
+    result : `bool`
+        True if ``exp1`` has a PSF that is not wider than that of ``exp2`` in
+        either dimension.
     """
-    shape1 = getPsfFwhm(psf1, average=False)
-    shape2 = getPsfFwhm(psf2, average=False)
-    xTest = shape1[0] < shape2[0]
-    yTest = shape1[1] < shape2[1]
+    try:
+        shape1 = getPsfFwhm(exp1.psf, average=False)
+        shape2 = getPsfFwhm(exp2.psf, average=False)
+    except InvalidParameterError:
+        shape1 = evaluateMeanPsfFwhm(exp1,
+                                     fwhmExposureBuffer=fwhmExposureBuffer,
+                                     fwhmExposureGrid=fwhmExposureGrid
+                                     )
+        shape2 = evaluateMeanPsfFwhm(exp2,
+                                     fwhmExposureBuffer=fwhmExposureBuffer,
+                                     fwhmExposureGrid=fwhmExposureGrid
+                                     )
+        return shape1 <= shape2
+
+    # Results from getPsfFwhm is a tuple of two values, one for each dimension.
+    xTest = shape1[0] <= shape2[0]
+    yTest = shape1[1] <= shape2[1]
     return xTest | yTest
