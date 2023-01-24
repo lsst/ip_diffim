@@ -58,6 +58,17 @@ class MakeKernelConfig(PsfMatchConfig):
         target=SingleFrameMeasurementTask,
         doc="Initial measurements used to feed stars to kernel fitting",
     )
+    fwhmExposureGrid = lsst.pex.config.Field(
+        doc="Grid size to compute the average PSF FWHM in an exposure",
+        dtype=int,
+        default=10,
+    )
+    fwhmExposureBuffer = lsst.pex.config.Field(
+        doc="Fractional buffer margin to be left out of all sides of the image during construction"
+            "of grid to compute average PSF FWHM in an exposure",
+        dtype=float,
+        default=0.05,
+    )
 
     def setDefaults(self):
         # High sigma detections only
