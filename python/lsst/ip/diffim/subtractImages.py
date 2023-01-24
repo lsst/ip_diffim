@@ -24,7 +24,7 @@ import numpy as np
 import lsst.afw.image
 import lsst.afw.math
 import lsst.geom
-from lsst.ip.diffim.utils import getPsfFwhm
+from lsst.ip.diffim.utils import evaluateMeanPsfFwhm, getPsfFwhm
 from lsst.meas.algorithms import ScaleVarianceTask
 import lsst.pex.config
 import lsst.pipe.base
@@ -273,10 +273,35 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                                             finalizedPsfApCorrCatalog=finalizedPsfApCorrCatalog)
         checkTemplateIsSufficient(template, self.log,
                                   requiredTemplateFraction=self.config.requiredTemplateFraction)
-        sciencePsfSize = getPsfFwhm(science.psf)
-        templatePsfSize = getPsfFwhm(template.psf)
+
+        # In the event that getPsfFwhm fails, evaluate the PSF on a grid.
+        fwhmExposureBuffer = self.config.makeKernel.fwhmExposureBuffer
+        fwhmExposureGrid = self.config.makeKernel.fwhmExposureGrid
+
+        # Calling getPsfFwhm on template.psf fails on some rare occasions when
+        # the template has no input exposures at the average position of the
+        # stars. So we try getPsfFwhm first on template, and if that fails we
+        # evaluate the PSF on a grid specified by fwhmExposure* fields.
+        # To keep consistent definitions for PSF size on the template and
+        # science images, we use the same method for both.
+        try:
+            templatePsfSize = getPsfFwhm(template.psf)
+            sciencePsfSize = getPsfFwhm(science.psf)
+        except InvalidParameterError:
+            self.log.info("Unable to evaluate PSF at the average position. "
+                          "Evaluting PSF on a grid of points."
+                          )
+            templatePsfSize = evaluateMeanPsfFwhm(template,
+                                                  fwhmExposureBuffer=fwhmExposureBuffer,
+                                                  fwhmExposureGrid=fwhmExposureGrid
+                                                  )
+            sciencePsfSize = evaluateMeanPsfFwhm(science,
+                                                 fwhmExposureBuffer=fwhmExposureBuffer,
+                                                 fwhmExposureGrid=fwhmExposureGrid
+                                                 )
         self.log.info("Science PSF FWHM: %f pixels", sciencePsfSize)
         self.log.info("Template PSF FWHM: %f pixels", templatePsfSize)
+
         if self.config.mode == "auto":
             convolveTemplate = _shapeTest(template.psf, science.psf)
             if convolveTemplate:
