@@ -187,7 +187,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
 
         # Have an XY0
         psfmatch = ipDiffim.ImagePsfMatchTask(config=self.config)
-        fwhm = psfmatch.getFwhmPix(self.psf)
+        fwhm = ipDiffim.utils.getPsfFwhm(self.psf)
         results1 = psfmatch.subtractExposures(templateSubImage, scienceSubImage, doWarping=True,
                                               templateFwhmPix=fwhm, scienceFwhmPix=fwhm)
         spatialKernel1 = results1.psfMatchingKernel

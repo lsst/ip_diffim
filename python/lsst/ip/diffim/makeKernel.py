@@ -38,7 +38,7 @@ from .psfMatch import PsfMatchConfig, PsfMatchTask, PsfMatchConfigAL, PsfMatchCo
 
 from . import diffimLib
 from . import diffimTools
-from .utils import getPsfFwhm
+from .utils import evaluateMeanPsfFwhm
 
 
 class MakeKernelConfig(PsfMatchConfig):
@@ -57,6 +57,17 @@ class MakeKernelConfig(PsfMatchConfig):
     selectMeasurement = lsst.pex.config.ConfigurableField(
         target=SingleFrameMeasurementTask,
         doc="Initial measurements used to feed stars to kernel fitting",
+    )
+    fwhmExposureGrid = lsst.pex.config.Field(
+        doc="Grid size to compute the average PSF FWHM in an exposure",
+        dtype=int,
+        default=10,
+    )
+    fwhmExposureBuffer = lsst.pex.config.Field(
+        doc="Fractional buffer margin to be left out of all sides of the image during construction"
+            "of grid to compute average PSF FWHM in an exposure",
+        dtype=float,
+        default=0.05,
     )
 
     def setDefaults(self):
@@ -119,8 +130,14 @@ class MakeKernelTask(PsfMatchTask):
                 Spatially varying background-matching function.
         """
         kernelCellSet = self._buildCellSet(template.maskedImage, science.maskedImage, kernelSources)
-        templateFwhmPix = getPsfFwhm(template.psf)
-        scienceFwhmPix = getPsfFwhm(science.psf)
+        templateFwhmPix = evaluateMeanPsfFwhm(template,
+                                              fwhmExposureBuffer=self.config.fwhmExposureBuffer,
+                                              fwhmExposureGrid=self.config.fwhmExposureGrid
+                                              )
+        scienceFwhmPix = evaluateMeanPsfFwhm(science,
+                                             fwhmExposureBuffer=self.config.fwhmExposureBuffer,
+                                             fwhmExposureGrid=self.config.fwhmExposureGrid
+                                             )
         if preconvolved:
             scienceFwhmPix *= np.sqrt(2)
         basisList = self.makeKernelBasisList(templateFwhmPix, scienceFwhmPix,
@@ -154,8 +171,14 @@ class MakeKernelTask(PsfMatchTask):
             field for the Sources deemed to be appropriate for Psf
             matching.
         """
-        templateFwhmPix = getPsfFwhm(template.psf)
-        scienceFwhmPix = getPsfFwhm(science.psf)
+        templateFwhmPix = evaluateMeanPsfFwhm(template,
+                                              fwhmExposureBuffer=self.config.fwhmExposureBuffer,
+                                              fwhmExposureGrid=self.config.fwhmExposureGrid
+                                              )
+        scienceFwhmPix = evaluateMeanPsfFwhm(science,
+                                             fwhmExposureBuffer=self.config.fwhmExposureBuffer,
+                                             fwhmExposureGrid=self.config.fwhmExposureGrid
+                                             )
         if preconvolved:
             scienceFwhmPix *= np.sqrt(2)
         kernelSize = self.makeKernelBasisList(templateFwhmPix, scienceFwhmPix)[0].getWidth()
