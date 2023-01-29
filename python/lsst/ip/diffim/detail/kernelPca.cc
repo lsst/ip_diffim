@@ -20,7 +20,7 @@
  * see <https://www.lsstcorp.org/LegalNotices/>.
  */
 #include "pybind11/pybind11.h"
-#include "pybind11/eigen.h"
+#include "lsst/cpputils/python.h"
 #include "pybind11/stl.h"
 
 #include <memory>
@@ -49,14 +49,17 @@ namespace {
  * @param[in] suffix  Class name suffix associated with PixeT, e.g. "F" for `float`
  */
 template <typename PixelT>
-void declareKernelPca(py::module& mod, std::string const& suffix) {
+void declareKernelPca(lsst::cpputils::python::WrapperCollection &wrappers, std::string const& suffix) {
     using ImageT = afw::image::Image<PixelT>;
-    py::class_<KernelPca<ImageT>, std::shared_ptr<KernelPca<ImageT>>, afw::image::ImagePca<ImageT>> cls(
-            mod, ("KernelPca" + suffix).c_str());
+    using PyClass = py::class_<KernelPca<ImageT>, std::shared_ptr<KernelPca<ImageT>>, afw::image::ImagePca<ImageT>>;
 
-    cls.def(py::init<bool>(), "constantWeight"_a = true);
+    std::string name = "KernelPca" + suffix;
+    wrappers.wrapType(PyClass(wrappers.module, name.c_str()), [](auto &mod, auto &cls) {
 
-    cls.def("analyze", &KernelPca<ImageT>::analyze);
+        cls.def(py::init<bool>(), "constantWeight"_a = true);
+
+        cls.def("analyze", &KernelPca<ImageT>::analyze);
+    });
 }
 
 /**
@@ -67,32 +70,32 @@ void declareKernelPca(py::module& mod, std::string const& suffix) {
  * @param[in] suffix  Class name suffix associated with PixeT, e.g. "F" for `float`
  */
 template <typename PixelT>
-void declareKernelPcaVisitor(py::module& mod, std::string const& suffix) {
-    py::class_<KernelPcaVisitor<PixelT>, std::shared_ptr<KernelPcaVisitor<PixelT>>,
-               afw::math::CandidateVisitor>
-            cls(mod, ("KernelPcaVisitor" + suffix).c_str());
+void declareKernelPcaVisitor(lsst::cpputils::python::WrapperCollection &wrappers, std::string const& suffix) {
+    using PyClass = py::class_<KernelPcaVisitor<PixelT>, std::shared_ptr<KernelPcaVisitor<PixelT>>,
+               afw::math::CandidateVisitor>;
 
+    std::string name = "KernelPcaVisitor" + suffix;
     // note that KernelPcaVisitor<PixelT>::ImageT
     // is always the same (pixels of type lsst::afw::math::Kernel::Pixel, not PixelT)
     using KernelImageT = typename KernelPcaVisitor<PixelT>::ImageT;
-    cls.def(py::init<std::shared_ptr<KernelPca<KernelImageT>>>(), "imagePca"_a);
 
-    cls.def("getEigenKernels", &KernelPcaVisitor<PixelT>::getEigenKernels);
-    cls.def("processCandidate", &KernelPcaVisitor<PixelT>::processCandidate, "candidate"_a);
-    cls.def("subtractMean", &KernelPcaVisitor<PixelT>::subtractMean);
-    cls.def("returnMean", &KernelPcaVisitor<PixelT>::returnMean);
+    wrappers.wrapType(PyClass(wrappers.module, name.c_str()), [](auto &mod, auto &cls) {
+        cls.def(py::init<std::shared_ptr<KernelPca<KernelImageT>>>(), "imagePca"_a);
 
-    mod.def("makeKernelPcaVisitor", &makeKernelPcaVisitor<PixelT>, "imagePca"_a);
+        cls.def("getEigenKernels", &KernelPcaVisitor<PixelT>::getEigenKernels);
+        cls.def("processCandidate", &KernelPcaVisitor<PixelT>::processCandidate, "candidate"_a);
+        cls.def("subtractMean", &KernelPcaVisitor<PixelT>::subtractMean);
+        cls.def("returnMean", &KernelPcaVisitor<PixelT>::returnMean);
+
+        mod.def("makeKernelPcaVisitor", &makeKernelPcaVisitor<PixelT>, "imagePca"_a);
+    });
 }
 
 }  // namespace lsst::ip::diffim::detail::<anonymous>
 
-PYBIND11_MODULE(kernelPca, mod) {
-    py::module::import("lsst.afw.image");
-    py::module::import("lsst.afw.math");
-
-    declareKernelPca<afw::math::Kernel::Pixel>(mod, "D");
-    declareKernelPcaVisitor<float>(mod, "F");
+void wrapKernelPca(lsst::cpputils::python::WrapperCollection &wrappers) {
+    declareKernelPca<afw::math::Kernel::Pixel>(wrappers, "D");
+    declareKernelPcaVisitor<float>(wrappers, "F");
 }
 
 }  // detail

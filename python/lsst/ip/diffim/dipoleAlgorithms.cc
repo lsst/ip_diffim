@@ -21,6 +21,7 @@
  */
 
 #include "pybind11/pybind11.h"
+#include "lsst/cpputils/python.h"
 #include "pybind11/stl.h"
 
 #include <memory>
@@ -39,117 +40,122 @@ namespace diffim {
 
 namespace {
 
-void declareDipoleCentroidControl(py::module &mod) {
-    py::class_<DipoleCentroidControl, std::shared_ptr<DipoleCentroidControl>> cls(mod,
-                                                                                  "DipoleCentroidControl");
+void declareDipoleCentroidControl(lsst::cpputils::python::WrapperCollection &wrappers) {
+    using PyDipoleCentroidControl = py::class_<DipoleCentroidControl, std::shared_ptr<DipoleCentroidControl>>;
 
-    cls.def(py::init<>());
+    wrappers.wrapType(PyDipoleCentroidControl(wrappers.module, "DipoleCentroidControl"), [](auto &mod, auto &cls) {
+        cls.def(py::init<>());
+    });
 }
 
-void declareDipoleFluxControl(py::module &mod) {
-    py::class_<DipoleFluxControl, std::shared_ptr<DipoleFluxControl>> cls(mod, "DipoleFluxControl");
+void declareDipoleFluxControl(lsst::cpputils::python::WrapperCollection &wrappers) {
+    using PyDipoleFluxControl = py::class_<DipoleFluxControl, std::shared_ptr<DipoleFluxControl>>;
 
-    cls.def(py::init<>());
+    wrappers.wrapType(PyDipoleFluxControl(wrappers.module, "DipoleFluxControl"), [](auto &mod, auto &cls) {
+        cls.def(py::init<>());
+    });
 }
 
-void declareDipolePsfFluxControl(py::module &mod) {
-    py::class_<PsfDipoleFluxControl, std::shared_ptr<PsfDipoleFluxControl>, DipoleFluxControl> cls(
-            mod, "PsfDipoleFluxControl");
+void declareDipolePsfFluxControl(lsst::cpputils::python::WrapperCollection &wrappers) {
+    using PyPsfDipoleFluxControl =
+            py::class_<PsfDipoleFluxControl, std::shared_ptr<PsfDipoleFluxControl>, DipoleFluxControl>;
+    wrappers.wrapType(PyPsfDipoleFluxControl(wrappers.module, "PsfDipoleFluxControl"), [](auto &mod, auto &cls) {
+        cls.def(py::init<>());
 
-    cls.def(py::init<>());
-
-    LSST_DECLARE_CONTROL_FIELD(cls, PsfDipoleFluxControl, stepSizeCoord);
-    LSST_DECLARE_CONTROL_FIELD(cls, PsfDipoleFluxControl, stepSizeFlux);
-    LSST_DECLARE_CONTROL_FIELD(cls, PsfDipoleFluxControl, errorDef);
-    LSST_DECLARE_CONTROL_FIELD(cls, PsfDipoleFluxControl, maxFnCalls);
+        LSST_DECLARE_CONTROL_FIELD(cls, PsfDipoleFluxControl, stepSizeCoord);
+        LSST_DECLARE_CONTROL_FIELD(cls, PsfDipoleFluxControl, stepSizeFlux);
+        LSST_DECLARE_CONTROL_FIELD(cls, PsfDipoleFluxControl, errorDef);
+        LSST_DECLARE_CONTROL_FIELD(cls, PsfDipoleFluxControl, maxFnCalls);
+    });
 }
 
-void declareDipoleCentroidAlgorithm(py::module &mod) {
+void declareDipoleCentroidAlgorithm(lsst::cpputils::python::WrapperCollection &wrappers) {
     // Abstract class, so add a leading underscore to Python name and do not wrap constructor
-    py::class_<DipoleCentroidAlgorithm, std::shared_ptr<DipoleCentroidAlgorithm>, meas::base::SimpleAlgorithm>
-            cls(mod, "_DipoleCentroidAlgorithm");
+    using PyDipoleCentroidAlgorithm =
+            py::class_<DipoleCentroidAlgorithm, std::shared_ptr<DipoleCentroidAlgorithm>, meas::base::SimpleAlgorithm>;
 
-    cls.attr("FAILURE") = py::cast(DipoleCentroidAlgorithm::FAILURE);
-    cls.attr("POS_FLAG") = py::cast(DipoleCentroidAlgorithm::POS_FLAG);
-    cls.attr("NEG_FLAG") = py::cast(DipoleCentroidAlgorithm::NEG_FLAG);
-    cls.def_static("getFlagDefinitions", &DipoleCentroidAlgorithm::getFlagDefinitions,
-                   py::return_value_policy::copy);
+    wrappers.wrapType(PyDipoleCentroidAlgorithm(wrappers.module, "_DipoleCentroidAlgorithm"), [](auto &mod, auto &cls) {
+        cls.attr("FAILURE") = py::cast(DipoleCentroidAlgorithm::FAILURE);
+        cls.attr("POS_FLAG") = py::cast(DipoleCentroidAlgorithm::POS_FLAG);
+        cls.attr("NEG_FLAG") = py::cast(DipoleCentroidAlgorithm::NEG_FLAG);
+        cls.def_static("getFlagDefinitions", &DipoleCentroidAlgorithm::getFlagDefinitions,
+                       py::return_value_policy::copy);
 
-    cls.def("getPositiveKeys", &DipoleCentroidAlgorithm::getPositiveKeys);
-    cls.def("getNegativeKeys", &DipoleCentroidAlgorithm::getNegativeKeys);
+        cls.def("getPositiveKeys", &DipoleCentroidAlgorithm::getPositiveKeys);
+        cls.def("getNegativeKeys", &DipoleCentroidAlgorithm::getNegativeKeys);
+    });
 }
 
-void declareDipoleFluxAlgorithm(py::module &mod) {
+void declareDipoleFluxAlgorithm(lsst::cpputils::python::WrapperCollection &wrappers) {
     // Abstract class, so add a leading underscore to Python name and do not wrap constructor
-    py::class_<DipoleFluxAlgorithm, std::shared_ptr<DipoleFluxAlgorithm>, meas::base::SimpleAlgorithm> cls(
-            mod, "_DipoleFluxAlgorithm");
+    using PyDipoleFluxAlgorithm =
+            py::class_<DipoleFluxAlgorithm, std::shared_ptr<DipoleFluxAlgorithm>, meas::base::SimpleAlgorithm>;
+    wrappers.wrapType(PyDipoleFluxAlgorithm(wrappers.module, "_DipoleFluxAlgorithm"), [](auto &mod, auto &cls) {
+        cls.attr("FAILURE") = py::cast(DipoleFluxAlgorithm::FAILURE);
+        cls.attr("POS_FLAG") = py::cast(DipoleFluxAlgorithm::POS_FLAG);
+        cls.attr("NEG_FLAG") = py::cast(DipoleFluxAlgorithm::NEG_FLAG);
+        cls.def_static("getFlagDefinitions", &DipoleFluxAlgorithm::getFlagDefinitions,
+                       py::return_value_policy::copy);
 
-    cls.attr("FAILURE") = py::cast(DipoleFluxAlgorithm::FAILURE);
-    cls.attr("POS_FLAG") = py::cast(DipoleFluxAlgorithm::POS_FLAG);
-    cls.attr("NEG_FLAG") = py::cast(DipoleFluxAlgorithm::NEG_FLAG);
-    cls.def_static("getFlagDefinitions", &DipoleFluxAlgorithm::getFlagDefinitions,
-                   py::return_value_policy::copy);
-
-    cls.def("getPositiveKeys", &DipoleFluxAlgorithm::getPositiveKeys);
-    cls.def("getNegativeKeys", &DipoleFluxAlgorithm::getNegativeKeys);
+        cls.def("getPositiveKeys", &DipoleFluxAlgorithm::getPositiveKeys);
+        cls.def("getNegativeKeys", &DipoleFluxAlgorithm::getNegativeKeys);
+    });
 }
 
-void declareNaiveDipoleFlux(py::module &mod) {
-    py::module::import("lsst.meas.base");
+void declareNaiveDipoleFlux(lsst::cpputils::python::WrapperCollection &wrappers) {
+    using PyNaiveDipoleFlux = py::class_<NaiveDipoleFlux, std::shared_ptr<NaiveDipoleFlux>, DipoleFluxAlgorithm>;
 
-    py::class_<NaiveDipoleFlux, std::shared_ptr<NaiveDipoleFlux>, DipoleFluxAlgorithm> cls(mod,
-                                                                                           "NaiveDipoleFlux");
+    wrappers.wrapType(PyNaiveDipoleFlux(wrappers.module, "NaiveDipoleFlux"), [](auto &mod, auto &cls) {
+        cls.def(py::init<NaiveDipoleFlux::Control const &, std::string const &, afw::table::Schema &>(), "ctrl"_a,
+                "name"_a, "schema"_a);
 
-    cls.def(py::init<NaiveDipoleFlux::Control const &, std::string const &, afw::table::Schema &>(), "ctrl"_a,
-            "name"_a, "schema"_a);
-
-    cls.def("measure", &NaiveDipoleFlux::measure, "measRecord"_a, "exposure"_a);
-    cls.def("fail", &NaiveDipoleFlux::fail, "measRecord"_a, "error"_a = NULL);
+        cls.def("measure", &NaiveDipoleFlux::measure, "measRecord"_a, "exposure"_a);
+        cls.def("fail", &NaiveDipoleFlux::fail, "measRecord"_a, "error"_a = nullptr);
+    });
 }
 
-void declareNaiveDipoleCentroid(py::module &mod) {
-    py::class_<NaiveDipoleCentroid, std::shared_ptr<NaiveDipoleCentroid>, DipoleCentroidAlgorithm> cls(
-            mod, "NaiveDipoleCentroid");
+void declareNaiveDipoleCentroid(lsst::cpputils::python::WrapperCollection &wrappers) {
+    using PyNaiveDipoleCentroid =
+            py::class_<NaiveDipoleCentroid, std::shared_ptr<NaiveDipoleCentroid>, DipoleCentroidAlgorithm>;
+    wrappers.wrapType(PyNaiveDipoleCentroid(wrappers.module, "NaiveDipoleCentroid"), [](auto &mod, auto &cls) {
+        cls.def(py::init<NaiveDipoleCentroid::Control const &, std::string const &, afw::table::Schema &>(),
+                "ctrl"_a, "name"_a, "schema"_a);
 
-    cls.def(py::init<NaiveDipoleCentroid::Control const &, std::string const &, afw::table::Schema &>(),
-            "ctrl"_a, "name"_a, "schema"_a);
+        cls.def("getCenterKeys", &NaiveDipoleCentroid::getCenterKeys);
+        cls.def("getPositiveKeys", &NaiveDipoleCentroid::getPositiveKeys);
+        cls.def("getNegativeKeys", &NaiveDipoleCentroid::getNegativeKeys);
 
-    cls.def("getCenterKeys", &NaiveDipoleCentroid::getCenterKeys);
-    cls.def("getPositiveKeys", &NaiveDipoleCentroid::getPositiveKeys);
-    cls.def("getNegativeKeys", &NaiveDipoleCentroid::getNegativeKeys);
-
-    cls.def("measure", &NaiveDipoleCentroid::measure, "measRecord"_a, "exposure"_a);
-    cls.def("mergeCentroids", &NaiveDipoleCentroid::mergeCentroids, "source"_a, "posValue"_a, "negValue"_a);
-    cls.def("fail", &NaiveDipoleCentroid::fail, "measRecord"_a, "error"_a = NULL);
+        cls.def("measure", &NaiveDipoleCentroid::measure, "measRecord"_a, "exposure"_a);
+        cls.def("mergeCentroids", &NaiveDipoleCentroid::mergeCentroids, "source"_a, "posValue"_a, "negValue"_a);
+        cls.def("fail", &NaiveDipoleCentroid::fail, "measRecord"_a, "error"_a = nullptr);
+    });
 }
 
-void declarePsfDipoleFlux(py::module &mod) {
-    py::class_<PsfDipoleFlux, std::shared_ptr<PsfDipoleFlux>, DipoleFluxAlgorithm> cls(mod, "PsfDipoleFlux");
+void declarePsfDipoleFlux(lsst::cpputils::python::WrapperCollection &wrappers) {
+    using PyPsfDipoleFlux =  py::class_<PsfDipoleFlux, std::shared_ptr<PsfDipoleFlux>, DipoleFluxAlgorithm>;
 
-    cls.def(py::init<PsfDipoleFlux::Control const &, std::string const &, afw::table::Schema &>(), "ctrl"_a,
-            "name"_a, "schema"_a);
+    wrappers.wrapType(PyPsfDipoleFlux(wrappers.module, "PsfDipoleFlux"), [](auto &mod, auto &cls) {
+        cls.def(py::init<PsfDipoleFlux::Control const &, std::string const &, afw::table::Schema &>(), "ctrl"_a,
+                "name"_a, "schema"_a);
 
-    cls.def("chi2", &PsfDipoleFlux::chi2, "source"_a, "exposure"_a, "negCenterX"_a, "negCenterY"_a,
-            "negFlux"_a, "posCenterX"_a, "posCenterY"_a, "posFlux"_a);
-    cls.def("measure", &PsfDipoleFlux::measure, "measRecord"_a, "exposure"_a);
-    cls.def("fail", &PsfDipoleFlux::fail, "measRecord"_a, "error"_a = NULL);
+        cls.def("chi2", &PsfDipoleFlux::chi2, "source"_a, "exposure"_a, "negCenterX"_a, "negCenterY"_a,
+                "negFlux"_a, "posCenterX"_a, "posCenterY"_a, "posFlux"_a);
+        cls.def("measure", &PsfDipoleFlux::measure, "measRecord"_a, "exposure"_a);
+        cls.def("fail", &PsfDipoleFlux::fail, "measRecord"_a, "error"_a = nullptr);
+    });
 }
 
 }  // namespace lsst::ip::diffim::<anonymous>
 
-PYBIND11_MODULE(_dipoleAlgorithms, mod) {
-    py::module::import("lsst.afw.table");
-    py::module::import("lsst.meas.base");
-    py::module::import("lsst.pex.config");
-
-    declareDipoleCentroidControl(mod);
-    declareDipoleFluxControl(mod);
-    declareDipolePsfFluxControl(mod);
-    declareDipoleCentroidAlgorithm(mod);
-    declareDipoleFluxAlgorithm(mod);
-    declareNaiveDipoleFlux(mod);
-    declareNaiveDipoleCentroid(mod);
-    declarePsfDipoleFlux(mod);
+void wrapDipoleAlgorithms(lsst::cpputils::python::WrapperCollection &wrappers) {
+    declareDipoleCentroidControl(wrappers);
+    declareDipoleFluxControl(wrappers);
+    declareDipolePsfFluxControl(wrappers);
+    declareDipoleCentroidAlgorithm(wrappers);
+    declareDipoleFluxAlgorithm(wrappers);
+    declareNaiveDipoleFlux(wrappers);
+    declareNaiveDipoleCentroid(wrappers);
+    declarePsfDipoleFlux(wrappers);
 }
 
 }  // diffim

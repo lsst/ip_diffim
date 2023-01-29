@@ -19,4 +19,4 @@
 # the GNU General Public License along with this program.  If not,
 # see <https://www.lsstcorp.org/LegalNotices/>.
 #
-from .diffimDetailLib import *
+from .._ipdiffimLib import *

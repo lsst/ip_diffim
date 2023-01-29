@@ -20,6 +20,7 @@
  * see <https://www.lsstcorp.org/LegalNotices/>.
  */
 #include "pybind11/pybind11.h"
+#include "lsst/cpputils/python.h"
 
 #include <memory>
 #include <string>
@@ -46,39 +47,38 @@ namespace {
  * @param[in] suffix  Class name suffix associated with PixeT, e.g. "F" for `float`
  */
 template <typename PixelT>
-void declareKernelSumVisitor(py::module& mod, std::string const& suffix) {
+void declareKernelSumVisitor(lsst::cpputils::python::WrapperCollection &wrappers, std::string const& suffix) {
     using Class = KernelSumVisitor<PixelT>;
 
-    py::class_<Class, std::shared_ptr<Class>, afw::math::CandidateVisitor> cls(
-            mod, ("KernelSumVisitor" + suffix).c_str());
+    using PyClass = py::class_<Class, std::shared_ptr<Class>, afw::math::CandidateVisitor>;
+    std::string name = "KernelSumVisitor" + suffix;
+    auto clsDef = wrappers.wrapType(PyClass(wrappers.module, name.c_str()), [](auto &mod, auto &cls) {
+        cls.def(py::init<daf::base::PropertySet const &>(), "ps"_a);
 
-    py::enum_<typename Class::Mode>(cls, "Mode")
-            .value("AGGREGATE", Class::Mode::AGGREGATE)
-            .value("REJECT", Class::Mode::REJECT)
-            .export_values();
+        cls.def("setMode", &Class::setMode, "mode"_a);
+        cls.def("getNRejected", &Class::getNRejected);
+        cls.def("getkSumMean", &Class::getkSumMean);
+        cls.def("getkSumStd", &Class::getkSumStd);
+        cls.def("getdkSumMax", &Class::getdkSumMax);
+        cls.def("getkSumNpts", &Class::getkSumNpts);
+        cls.def("resetKernelSum", &Class::resetKernelSum);
+        cls.def("processCandidate", &Class::processCandidate, "candidate"_a);
+        cls.def("processKsumDistribution", &Class::processKsumDistribution);
 
-    cls.def(py::init<daf::base::PropertySet const&>(), "ps"_a);
+        mod.def("makeKernelSumVisitor", &makeKernelSumVisitor<PixelT>, "ps"_a);
+    });
 
-    cls.def("setMode", &Class::setMode, "mode"_a);
-    cls.def("getNRejected", &Class::getNRejected);
-    cls.def("getkSumMean", &Class::getkSumMean);
-    cls.def("getkSumStd", &Class::getkSumStd);
-    cls.def("getdkSumMax", &Class::getdkSumMax);
-    cls.def("getkSumNpts", &Class::getkSumNpts);
-    cls.def("resetKernelSum", &Class::resetKernelSum);
-    cls.def("processCandidate", &Class::processCandidate, "candidate"_a);
-    cls.def("processKsumDistribution", &Class::processKsumDistribution);
-
-    mod.def("makeKernelSumVisitor", &makeKernelSumVisitor<PixelT>, "ps"_a);
+    wrappers.wrapType(py::enum_<typename Class::Mode>(clsDef, "Mode"), [](auto &mod, auto &enm) {
+        enm.value("AGGREGATE", Class::Mode::AGGREGATE);
+        enm.value("REJECT", Class::Mode::REJECT);
+        enm.export_values();
+    });
 }
 
 }  // namespace lsst::ip::diffim::detail::<anonymous>
 
-PYBIND11_MODULE(kernelSumVisitor, mod) {
-    py::module::import("lsst.afw.math");
-    py::module::import("lsst.daf.base");
-
-    declareKernelSumVisitor<float>(mod, "F");
+void wrapKernelSumVisitor(lsst::cpputils::python::WrapperCollection &wrappers) {
+    declareKernelSumVisitor<float>(wrappers, "F");
 }
 
 }  // detail

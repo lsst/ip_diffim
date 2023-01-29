@@ -20,6 +20,7 @@
  * see <https://www.lsstcorp.org/LegalNotices/>.
  */
 #include "pybind11/pybind11.h"
+#include "lsst/cpputils/python.h"
 
 #include <string>
 
@@ -43,22 +44,24 @@ namespace {
  * @param[in] suffix  Class name suffix associated with mask pixel type, use "U" for `afw::image::MaskPixel`
  */
 template <typename MaskT>
-void declareFindSetBits(py::module& mod, std::string const& suffix) {
-    py::class_<FindSetBits<MaskT>> cls(mod, ("FindSetBits" + suffix).c_str());
+void declareFindSetBits(lsst::cpputils::python::WrapperCollection &wrappers, std::string const& suffix) {
+    using PyFindSetBits = py::class_<FindSetBits<MaskT>>;
 
-    cls.def(py::init<>());
+    std::string name = "FindSetBits" + suffix;
+    wrappers.wrapType(PyFindSetBits(wrappers.module, name.c_str()), [](auto &mod, auto &cls) {
 
-    cls.def("reset", &FindSetBits<MaskT>::reset);
-    cls.def("getBits", &FindSetBits<MaskT>::getBits);
-    cls.def("apply", &FindSetBits<MaskT>::apply, "mask"_a);
+        cls.def(py::init<>());
+
+        cls.def("reset", &FindSetBits<MaskT>::reset);
+        cls.def("getBits", &FindSetBits<MaskT>::getBits);
+        cls.def("apply", &FindSetBits<MaskT>::apply, "mask"_a);
+    });
 }
 
 }  // namespace lsst::ip::diffim::<anonymous>
 
-PYBIND11_MODULE(findSetBits, mod) {
-    py::module::import("lsst.afw.image");
-
-    declareFindSetBits<afw::image::Mask<afw::image::MaskPixel>>(mod, "U");
+void wrapFindSetBits(lsst::cpputils::python::WrapperCollection &wrappers) {
+    declareFindSetBits<afw::image::Mask<afw::image::MaskPixel>>(wrappers, "U");
 }
 
 }  // diffim

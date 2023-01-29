@@ -1,9 +1,0 @@
-# -*- python -*-
-from lsst.sconsUtils import scripts
-scripts.BasicSConscript.pybind11([
-    "assessSpatialKernelVisitor",
-    "buildSingleKernelVisitor",
-    "buildSpatialKernelVisitor",
-    "kernelPca",
-    "kernelSumVisitor",
-], addUnderscore=False)

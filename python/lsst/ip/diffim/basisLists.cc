@@ -20,6 +20,7 @@
  * see <https://www.lsstcorp.org/LegalNotices/>.
  */
 #include "pybind11/pybind11.h"
+#include "lsst/cpputils/python.h"
 #include "pybind11/eigen.h"
 #include "pybind11/stl.h"
 
@@ -36,10 +37,8 @@ namespace lsst {
 namespace ip {
 namespace diffim {
 
-PYBIND11_MODULE(basisLists, mod) {
-    py::module::import("lsst.afw.math");
-    py::module::import("lsst.daf.base");
-
+void wrapBasisLists(lsst::cpputils::python::WrapperCollection &wrappers) {
+    auto &mod = wrappers.module;
     mod.def("makeDeltaFunctionBasisList", &makeDeltaFunctionBasisList, "width"_a, "height"_a);
     mod.def("makeRegularizationMatrix", &makeRegularizationMatrix, "ps"_a);
     mod.def("makeForwardDifferenceMatrix", &makeForwardDifferenceMatrix, "width"_a, "height"_a, "orders"_a,

@@ -20,6 +20,7 @@
  * see <https://www.lsstcorp.org/LegalNotices/>.
  */
 #include "pybind11/pybind11.h"
+#include "lsst/cpputils/python.h"
 
 #include <memory>
 #include <string>
@@ -45,32 +46,32 @@ namespace {
  * @param[in] suffix  Class name suffix associated with PixeT, e.g. "F" for `float`
  */
 template <typename PixelT>
-void declareAssessSpatialKernelVisitor(py::module& mod, std::string const& suffix) {
-    py::class_<AssessSpatialKernelVisitor<PixelT>, std::shared_ptr<AssessSpatialKernelVisitor<PixelT>>,
-               lsst::afw::math::CandidateVisitor>
-            cls(mod, ("AssessSpatialKernelVisitor" + suffix).c_str());
+void declareAssessSpatialKernelVisitor(lsst::cpputils::python::WrapperCollection &wrappers, std::string const& suffix) {
+    using PyCLass = py::class_<AssessSpatialKernelVisitor<PixelT>, std::shared_ptr<AssessSpatialKernelVisitor<PixelT>>,
+               lsst::afw::math::CandidateVisitor>;
 
-    cls.def(py::init<std::shared_ptr<afw::math::LinearCombinationKernel>,
-                     afw::math::Kernel::SpatialFunctionPtr, daf::base::PropertySet const&>(),
-            "spatialKernel"_a, "spatialBackground"_a, "ps"_a);
+    std::string name = "AssessSpatialKernelVisitor" + suffix;
 
-    cls.def("reset", &AssessSpatialKernelVisitor<PixelT>::reset);
-    cls.def("getNGood", &AssessSpatialKernelVisitor<PixelT>::getNGood);
-    cls.def("getNRejected", &AssessSpatialKernelVisitor<PixelT>::getNRejected);
-    cls.def("getNProcessed", &AssessSpatialKernelVisitor<PixelT>::getNProcessed);
-    cls.def("processCandidate", &AssessSpatialKernelVisitor<PixelT>::processCandidate, "candidate"_a);
+    wrappers.wrapType(PyCLass(wrappers.module, name.c_str()), [](auto &mod, auto &cls) {
+        cls.def(py::init<std::shared_ptr<afw::math::LinearCombinationKernel>,
+                        afw::math::Kernel::SpatialFunctionPtr, daf::base::PropertySet const &>(),
+                "spatialKernel"_a, "spatialBackground"_a, "ps"_a);
 
-    mod.def("makeAssessSpatialKernelVisitor", &makeAssessSpatialKernelVisitor<PixelT>, "spatialKernel"_a,
-            "spatialBackground"_a, "ps"_a);
+        cls.def("reset", &AssessSpatialKernelVisitor<PixelT>::reset);
+        cls.def("getNGood", &AssessSpatialKernelVisitor<PixelT>::getNGood);
+        cls.def("getNRejected", &AssessSpatialKernelVisitor<PixelT>::getNRejected);
+        cls.def("getNProcessed", &AssessSpatialKernelVisitor<PixelT>::getNProcessed);
+        cls.def("processCandidate", &AssessSpatialKernelVisitor<PixelT>::processCandidate, "candidate"_a);
+
+        mod.def("makeAssessSpatialKernelVisitor", &makeAssessSpatialKernelVisitor<PixelT>, "spatialKernel"_a,
+                "spatialBackground"_a, "ps"_a);
+    });
 }
 
 }  // namespace lsst::ip::diffim::detail::<anonymous>
 
-PYBIND11_MODULE(assessSpatialKernelVisitor, mod) {
-    py::module::import("lsst.afw.math");
-    py::module::import("lsst.daf.base");
-
-    declareAssessSpatialKernelVisitor<float>(mod, "F");
+void wrapAssessSpatialKernelVisitor(lsst::cpputils::python::WrapperCollection &wrappers) {
+    declareAssessSpatialKernelVisitor<float>(wrappers, "F");
 }
 
 }  // detail
