@@ -24,6 +24,7 @@ import lsst.daf.base as dafBase
 from lsst.meas.algorithms import SkyObjectsTask, SourceDetectionTask
 from lsst.meas.base import ForcedMeasurementTask, ApplyApCorrTask
 import lsst.meas.extensions.trailedSources  # noqa: F401
+import lsst.meas.extensions.shapeHSM
 from lsst.obs.base import ExposureIdInfo
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
@@ -148,7 +149,12 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         self.measurement.algorithms.names.add('base_PeakLikelihoodFlux')
         self.measurement.plugins.names |= ['ext_trailedSources_Naive',
                                            'base_LocalPhotoCalib',
-                                           'base_LocalWcs']
+                                           'base_LocalWcs',
+                                           'ext_shapeHSM_HsmSourceMoments',
+                                           'ext_shapeHSM_HsmPsfMoments',
+                                           ]
+        self.measurement.slots.psfShape = "ext_shapeHSM_HsmPsfMoments"
+        self.measurement.slots.shape = "ext_shapeHSM_HsmSourceMoments"
 
         self.forcedMeasurement.plugins = ["base_TransformedCentroid", "base_PsfFlux"]
         self.forcedMeasurement.copyColumns = {
