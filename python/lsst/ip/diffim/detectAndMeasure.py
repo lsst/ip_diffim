@@ -33,7 +33,8 @@ from lsst.utils.timer import timeMethod
 
 from . import DipoleFitTask
 
-__all__ = ["DetectAndMeasureConfig", "DetectAndMeasureTask"]
+__all__ = ["DetectAndMeasureConfig", "DetectAndMeasureTask",
+           "DetectAndMeasureScoreConfig", "DetectAndMeasureScoreTask"]
 
 
 class DetectAndMeasureConnections(pipeBase.PipelineTaskConnections,
@@ -245,16 +246,21 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                                                       returnMaxBits=True)
         idFactory = self.makeIdFactory(expId=expId, expBits=expBits)
 
-        outputs = self.run(inputs['science'],
-                           inputs['matchedTemplate'],
-                           inputs['difference'],
-                           idFactory=idFactory)
+        outputs = self.run(**inputs, idFactory=idFactory)
         butlerQC.put(outputs, outputRefs)
 
     @timeMethod
     def run(self, science, matchedTemplate, difference,
             idFactory=None):
         """Detect and measure sources on a difference image.
+
+        The difference image will be convolved with a gaussian approximation of
+        the PSF to form a maximum likelihood image for detection.
+        Close positive and negative detections will optionally be merged into
+        dipole diaSources.
+        Sky sources, or forced detections in background regions, will optionally
+        be added, and the configured measurement algorithm will be run on all
+        detections.
 
         Parameters
         ----------
@@ -270,7 +276,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
         Returns
         -------
-        results : `lsst.pipe.base.Struct`
+        measurementResults : `lsst.pipe.base.Struct`
 
             ``subtractedMeasuredExposure`` : `lsst.afw.image.ExposureF`
                 Subtracted exposure with detection mask applied.
@@ -289,15 +295,49 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             doSmooth=True,
         )
 
+        return self.processResults(science, matchedTemplate, difference, results.sources, table,
+                                   positiveFootprints=results.positive, negativeFootprints=results.negative)
+
+    def processResults(self, science, matchedTemplate, difference, sources, table,
+                       positiveFootprints=None, negativeFootprints=None,):
+        """Measure and process the results of source detection.
+
+        Parameters
+        ----------
+        sources : `lsst.afw.table.SourceCatalog`
+            Detected sources on the difference exposure.
+        positiveFootprints : `lsst.afw.detection.FootprintSet`, optional
+            Positive polarity footprints.
+        negativeFootprints : `lsst.afw.detection.FootprintSet`, optional
+            Negative polarity footprints.
+        table : `lsst.afw.table.SourceTable`
+            Table object that will be used to create the SourceCatalog.
+        science : `lsst.afw.image.ExposureF`
+            Science exposure that the template was subtracted from.
+        matchedTemplate : `lsst.afw.image.ExposureF`
+            Warped and PSF-matched template that was used produce the
+            difference image.
+        difference : `lsst.afw.image.ExposureF`
+            Result of subtracting template from the science image.
+
+        Returns
+        -------
+        measurementResults : `lsst.pipe.base.Struct`
+
+            ``subtractedMeasuredExposure`` : `lsst.afw.image.ExposureF`
+                Subtracted exposure with detection mask applied.
+            ``diaSources``  : `lsst.afw.table.SourceCatalog`
+                The catalog of detected sources.
+        """
         if self.config.doMerge:
-            fpSet = results.fpSets.positive
-            fpSet.merge(results.fpSets.negative, self.config.growFootprint,
+            fpSet = positiveFootprints
+            fpSet.merge(negativeFootprints, self.config.growFootprint,
                         self.config.growFootprint, False)
             diaSources = afwTable.SourceCatalog(table)
             fpSet.makeSources(diaSources)
             self.log.info("Merging detections into %d sources", len(diaSources))
         else:
-            diaSources = results.sources
+            diaSources = sources
 
         if self.config.doSkySources:
             self.addSkySources(diaSources, difference.mask, difference.info.id)
@@ -307,10 +347,12 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         if self.config.doForcedMeasurement:
             self.measureForcedSources(diaSources, science, difference.getWcs())
 
-        return pipeBase.Struct(
+        measurementResults = pipeBase.Struct(
             subtractedMeasuredExposure=difference,
             diaSources=diaSources,
         )
+
+        return measurementResults
 
     def addSkySources(self, diaSources, mask, seed):
         """Add sources in empty regions of the difference image
@@ -388,3 +430,82 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                           "ip_diffim_forced_PsfFlux_flag_edge", True)
         for diaSource, forcedSource in zip(diaSources, forcedSources):
             diaSource.assign(forcedSource, mapper)
+
+
+class DetectAndMeasureScoreConnections(DetectAndMeasureConnections):
+    scoreExposure = pipeBase.connectionTypes.Input(
+        doc="Maximum likelihood image for detection.",
+        dimensions=("instrument", "visit", "detector"),
+        storageClass="ExposureF",
+        name="{fakesType}{coaddName}Diff_scoreExp",
+    )
+
+
+class DetectAndMeasureScoreConfig(DetectAndMeasureConfig,
+                                  pipelineConnections=DetectAndMeasureScoreConnections):
+    pass
+
+
+class DetectAndMeasureScoreTask(DetectAndMeasureTask):
+    """Detect DIA sources using a score image,
+    and measure the detections on the difference image.
+
+    Source detection is run on the supplied score, or maximum likelihood,
+    image. Note that no additional convolution will be done in this case.
+    Close positive and negative detections will optionally be merged into
+    dipole diaSources.
+    Sky sources, or forced detections in background regions, will optionally
+    be added, and the configured measurement algorithm will be run on all
+    detections.
+    """
+    ConfigClass = DetectAndMeasureScoreConfig
+    _DefaultName = "detectAndMeasureScore"
+
+    @timeMethod
+    def run(self, science, matchedTemplate, difference, scoreExposure,
+            idFactory=None):
+        """Detect and measure sources on a score image.
+
+        Parameters
+        ----------
+        science : `lsst.afw.image.ExposureF`
+            Science exposure that the template was subtracted from.
+        matchedTemplate : `lsst.afw.image.ExposureF`
+            Warped and PSF-matched template that was used produce the
+            difference image.
+        difference : `lsst.afw.image.ExposureF`
+            Result of subtracting template from the science image.
+        scoreExposure : `lsst.afw.image.ExposureF`
+            Score or maximum likelihood difference image
+        idFactory : `lsst.afw.table.IdFactory`, optional
+            Generator object to assign ids to detected sources in the difference image.
+
+        Returns
+        -------
+        measurementResults : `lsst.pipe.base.Struct`
+
+            ``subtractedMeasuredExposure`` : `lsst.afw.image.ExposureF`
+                Subtracted exposure with detection mask applied.
+            ``diaSources``  : `lsst.afw.table.SourceCatalog`
+                The catalog of detected sources.
+        """
+        # Ensure that we start with an empty detection mask.
+        mask = scoreExposure.mask
+        mask &= ~(mask.getPlaneBitMask("DETECTED") | mask.getPlaneBitMask("DETECTED_NEGATIVE"))
+
+        table = afwTable.SourceTable.make(self.schema, idFactory)
+        table.setMetadata(self.algMetadata)
+        # Exclude the edge of the CCD from detection.
+        # This operation would be performed in the detection subtask if doSmooth=True
+        #  but we need to apply the cut here since we are using a preconvolved image.
+        goodBBox = scoreExposure.getPsf().getKernel().shrinkBBox(scoreExposure.getBBox())
+        results = self.detection.run(
+            table=table,
+            exposure=scoreExposure[goodBBox],
+            doSmooth=False,
+        )
+        # Copy the detection mask from the Score image to the difference image
+        difference.mask.assign(scoreExposure.mask, scoreExposure.getBBox())
+
+        return self.processResults(science, matchedTemplate, difference, results.sources, table,
+                                   positiveFootprints=results.positive, negativeFootprints=results.negative)

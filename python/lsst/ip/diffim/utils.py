@@ -1236,6 +1236,9 @@ def makeTestImage(seed=5, nSrc=20, psfSize=2., noiseLevel=5.,
                   y0=67890,
                   calibration=1.,
                   doApplyCalibration=False,
+                  xLoc=None,
+                  yLoc=None,
+                  flux=None,
                   ):
     """Make a reproduceable PSF-convolved exposure for testing.
 
@@ -1269,6 +1272,12 @@ def makeTestImage(seed=5, nSrc=20, psfSize=2., noiseLevel=5.,
         Conversion factor between instFlux and nJy.
     doApplyCalibration : `bool`, optional
         Apply the photometric calibration and return the image in nJy?
+    xLoc, yLoc : `list` of `float`, optional
+        User-specified coordinates of the simulated sources.
+        If specified, must have length equal to ``nSrc``
+    flux : `list` of `float`, optional
+        User-specified fluxes of the simulated sources.
+        If specified, must have length equal to ``nSrc``
 
     Returns
     -------
@@ -1289,10 +1298,22 @@ def makeTestImage(seed=5, nSrc=20, psfSize=2., noiseLevel=5.,
     rngNoise = np.random.RandomState(noiseSeed)
     x0, y0 = bbox.getBegin()
     xSize, ySize = bbox.getDimensions()
-    xLoc = rng.rand(nSrc)*(xSize - 2*bufferSize) + bufferSize + x0
-    yLoc = rng.rand(nSrc)*(ySize - 2*bufferSize) + bufferSize + y0
+    if xLoc is None:
+        xLoc = rng.rand(nSrc)*(xSize - 2*bufferSize) + bufferSize + x0
+    else:
+        if len(xLoc) != nSrc:
+            raise ValueError("xLoc must have length equal to nSrc. %f supplied vs %f", len(xLoc), nSrc)
+    if yLoc is None:
+        yLoc = rng.rand(nSrc)*(ySize - 2*bufferSize) + bufferSize + y0
+    else:
+        if len(yLoc) != nSrc:
+            raise ValueError("yLoc must have length equal to nSrc. %f supplied vs %f", len(yLoc), nSrc)
 
-    flux = (rng.rand(nSrc)*(fluxRange - 1.) + 1.)*fluxLevel
+    if flux is None:
+        flux = (rng.rand(nSrc)*(fluxRange - 1.) + 1.)*fluxLevel
+    else:
+        if len(flux) != nSrc:
+            raise ValueError("flux must have length equal to nSrc. %f supplied vs %f", len(flux), nSrc)
     sigmas = [psfSize for src in range(nSrc)]
     coordList = list(zip(xLoc, yLoc, flux, sigmas))
     skyLevel = 0
