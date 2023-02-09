@@ -1111,8 +1111,9 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
                 verbose=False, display=False)
         except pexExcept.LengthError:
             self.fail(measRecord, measBase.MeasurementError('edge failure', self.FAILURE_EDGE))
-        except Exception:
-            self.fail(measRecord, measBase.MeasurementError('dipole fit failure', self.FAILURE_FIT))
+        except Exception as e:
+            self.fail(measRecord, measBase.MeasurementError('Exception in dipole fit', self.FAILURE_FIT))
+            self.log.error("Exception in dipole fit. %s: %s", e.__class__.__name__, e)
 
         if result is None:
             measRecord.set(self.classificationFlagKey, False)
