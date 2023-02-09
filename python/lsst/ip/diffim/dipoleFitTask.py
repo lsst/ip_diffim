@@ -754,10 +754,9 @@ class DipoleFitAlgorithm(object):
             # Ignore lmfit unknown argument warnings:
             # "psf, rel_weight, footprint, modelObj" all become pass-through kwargs for makeModel.
             warnings.filterwarnings("ignore", "The keyword argument .* does not match", UserWarning)
-            result = gmod.fit(z, weights=weights, x=in_x,
+            result = gmod.fit(z, weights=weights, x=in_x, max_nfev=250,
                               verbose=verbose,
-                              fit_kws={'ftol': tol, 'xtol': tol, 'gtol': tol,
-                                       'maxfev': 250},  # see scipy docs
+                              fit_kws={'ftol': tol, 'xtol': tol, 'gtol': tol},  # see scipy docs
                               psf=self.diffim.getPsf(),  # hereon: kwargs that get passed to makeModel()
                               rel_weight=rel_weight,
                               footprint=fp,
