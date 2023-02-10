@@ -51,9 +51,6 @@ class DipoleTestImage:
     """
 
     def __init__(self, xc=None, yc=None, flux=None, offsets=None, gradientParams=None):
-        self.display = False  # Display (plot) the output dipole thumbnails (matplotlib)
-        self.verbose = False  # be verbose during fitting
-
         self.xc = xc if xc is not None else [65.3, 24.2]
         self.yc = yc if yc is not None else [38.6, 78.5]
         self.offsets = offsets if offsets is not None else np.array([-2., 2.])
@@ -94,6 +91,11 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
         Test that the resulting fluxes/centroids are very close to the
         input values for both dipoles in the image.
         """
+        # Display (plot) the output dipole thumbnails with matplotlib.
+        display = False
+        # Be verbose during fitting, including the lmfit internal details.
+        verbose = False
+
         dipoleTestImage = DipoleTestImage()
         catalog = dipoleTestImage.testImage.detectDipoleSources(minBinSize=32)
 
@@ -108,7 +110,7 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
             alg = DipoleFitAlgorithm(testImage.diffim, testImage.posImage, testImage.negImage)
             result, _ = alg.fitDipole(
                 s, rel_weight=0.5, separateNegParams=False,
-                verbose=params.verbose, display=params.display)
+                verbose=verbose, display=display)
 
             self.assertFloatsAlmostEqual((result.posFlux + abs(result.negFlux))/2.,
                                          dipoleTestImage.flux[i], rtol=rtol)
