@@ -94,16 +94,16 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
         Test that the resulting fluxes/centroids are very close to the
         input values for both dipoles in the image.
         """
-        params = DipoleTestImage()
-        catalog = params.testImage.detectDipoleSources(minBinSize=32)
+        dipoleTestImage = DipoleTestImage()
+        catalog = dipoleTestImage.testImage.detectDipoleSources(minBinSize=32)
 
         for s in catalog:
             fp = s.getFootprint()
             self.assertTrue(len(fp.getPeaks()) == 2)
 
-        rtol = params.rtol
-        offsets = params.offsets
-        testImage = params.testImage
+        rtol = dipoleTestImage.rtol
+        offsets = dipoleTestImage.offsets
+        testImage = dipoleTestImage.testImage
         for i, s in enumerate(catalog):
             alg = DipoleFitAlgorithm(testImage.diffim, testImage.posImage, testImage.negImage)
             result, _ = alg.fitDipole(
@@ -111,13 +111,13 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
                 verbose=params.verbose, display=params.display)
 
             self.assertFloatsAlmostEqual((result.posFlux + abs(result.negFlux))/2.,
-                                         params.flux[i], rtol=rtol)
-            self.assertFloatsAlmostEqual(result.posCentroidX, params.xc[i] + offsets[i], rtol=rtol)
-            self.assertFloatsAlmostEqual(result.posCentroidY, params.yc[i] + offsets[i], rtol=rtol)
-            self.assertFloatsAlmostEqual(result.negCentroidX, params.xc[i] - offsets[i], rtol=rtol)
-            self.assertFloatsAlmostEqual(result.negCentroidY, params.yc[i] - offsets[i], rtol=rtol)
+                                         dipoleTestImage.flux[i], rtol=rtol)
+            self.assertFloatsAlmostEqual(result.posCentroidX, dipoleTestImage.xc[i] + offsets[i], rtol=rtol)
+            self.assertFloatsAlmostEqual(result.posCentroidY, dipoleTestImage.yc[i] + offsets[i], rtol=rtol)
+            self.assertFloatsAlmostEqual(result.negCentroidX, dipoleTestImage.xc[i] - offsets[i], rtol=rtol)
+            self.assertFloatsAlmostEqual(result.negCentroidY, dipoleTestImage.yc[i] - offsets[i], rtol=rtol)
 
-    def _runDetection(self, params):
+    def _runDetection(self, dipoleTestImage):
         """Run 'diaSource' detection on the diffim, including merging of
         positive and negative sources.
 
@@ -125,7 +125,7 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
         """
 
         # Create the various tasks and schema -- avoid code reuse.
-        testImage = params.testImage
+        testImage = dipoleTestImage.testImage
         detectTask, schema = testImage.detectDipoleSources(doMerge=False, minBinSize=32)
 
         measureConfig = measBase.SingleFrameMeasurementConfig()
@@ -161,7 +161,7 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
         measureTask.run(sources, testImage.diffim, testImage.posImage, testImage.negImage)
         return sources
 
-    def _checkTaskOutput(self, params, sources, rtol=None):
+    def _checkTaskOutput(self, dipoleTestImage, sources, rtol=None):
         """Compare the fluxes/centroids in `sources` are entered
         into the correct slots of the catalog, and have values that
         are very close to the input values for both dipoles in the
@@ -173,21 +173,21 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
         """
 
         if rtol is None:
-            rtol = params.rtol
-        offsets = params.offsets
+            rtol = dipoleTestImage.rtol
+        offsets = dipoleTestImage.offsets
         for i, r1 in enumerate(sources):
             result = r1.extract("ip_diffim_DipoleFit*")
             self.assertFloatsAlmostEqual((result['ip_diffim_DipoleFit_pos_instFlux']
                                           + abs(result['ip_diffim_DipoleFit_neg_instFlux']))/2.,
-                                         params.flux[i], rtol=rtol)
+                                         dipoleTestImage.flux[i], rtol=rtol)
             self.assertFloatsAlmostEqual(result['ip_diffim_DipoleFit_pos_centroid_x'],
-                                         params.xc[i] + offsets[i], rtol=rtol)
+                                         dipoleTestImage.xc[i] + offsets[i], rtol=rtol)
             self.assertFloatsAlmostEqual(result['ip_diffim_DipoleFit_pos_centroid_y'],
-                                         params.yc[i] + offsets[i], rtol=rtol)
+                                         dipoleTestImage.yc[i] + offsets[i], rtol=rtol)
             self.assertFloatsAlmostEqual(result['ip_diffim_DipoleFit_neg_centroid_x'],
-                                         params.xc[i] - offsets[i], rtol=rtol)
+                                         dipoleTestImage.xc[i] - offsets[i], rtol=rtol)
             self.assertFloatsAlmostEqual(result['ip_diffim_DipoleFit_neg_centroid_y'],
-                                         params.yc[i] - offsets[i], rtol=rtol)
+                                         dipoleTestImage.yc[i] - offsets[i], rtol=rtol)
             # Note this is dependent on the noise (variance) being realistic in the image.
             # otherwise it throws off the chi2 estimate, which is used for classification:
             self.assertTrue(result['ip_diffim_DipoleFit_flag_classification'])
@@ -225,9 +225,9 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
         generated by the existing ip_diffim_DipoleMeasurement task
         (PsfDipoleFit).
         """
-        params = DipoleTestImage()
-        sources = self._runDetection(params)
-        self._checkTaskOutput(params, sources)
+        dipoleTestImage = DipoleTestImage()
+        sources = self._runDetection(dipoleTestImage)
+        self._checkTaskOutput(dipoleTestImage, sources)
 
     def testDipoleTaskNoPosImage(self):
         """Test the dipole fitting singleFramePlugin in the case where no
@@ -242,10 +242,10 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
         generated by the existing ip_diffim_DipoleMeasurement task
         (PsfDipoleFit).
         """
-        params = DipoleTestImage()
-        params.testImage.posImage = None
-        sources = self._runDetection(params)
-        self._checkTaskOutput(params, sources)
+        dipoleTestImage = DipoleTestImage()
+        dipoleTestImage.testImage.posImage = None
+        sources = self._runDetection(dipoleTestImage)
+        self._checkTaskOutput(dipoleTestImage, sources)
 
     def testDipoleTaskNoNegImage(self):
         """Test the dipole fitting singleFramePlugin in the case where no
@@ -260,10 +260,10 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
         generated by the existing ip_diffim_DipoleMeasurement task
         (PsfDipoleFit).
         """
-        params = DipoleTestImage()
-        params.testImage.negImage = None
-        sources = self._runDetection(params)
-        self._checkTaskOutput(params, sources)
+        dipoleTestImage = DipoleTestImage()
+        dipoleTestImage.testImage.negImage = None
+        sources = self._runDetection(dipoleTestImage)
+        self._checkTaskOutput(dipoleTestImage, sources)
 
     def testDipoleTaskNoPreSubImages(self):
         """Test the dipole fitting singleFramePlugin in the case where no
@@ -280,10 +280,10 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
         generated by the existing ip_diffim_DipoleMeasurement task
         (PsfDipoleFit).
         """
-        params = DipoleTestImage()
-        params.testImage.posImage = params.testImage.negImage = None
-        sources = self._runDetection(params)
-        self._checkTaskOutput(params, sources)
+        dipoleTestImage = DipoleTestImage()
+        dipoleTestImage.testImage.posImage = dipoleTestImage.testImage.negImage = None
+        sources = self._runDetection(dipoleTestImage)
+        self._checkTaskOutput(dipoleTestImage, sources)
 
     def testDipoleEdge(self):
         """Test the too-close-to-image-edge scenario for dipole fitting
@@ -295,8 +295,8 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
         if not measured.
         """
 
-        params = DipoleTestImage(xc=[5.3, 4.8], yc=[4.6, 96.5])
-        sources = self._runDetection(params)
+        dipoleTestImage = DipoleTestImage(xc=[5.3, 4.8], yc=[4.6, 96.5])
+        sources = self._runDetection(dipoleTestImage)
 
         self.assertTrue(len(sources) == 2)
 
