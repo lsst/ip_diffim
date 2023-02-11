@@ -20,6 +20,7 @@
  * see <https://www.lsstcorp.org/LegalNotices/>.
  */
 #include "pybind11/pybind11.h"
+#include "lsst/cpputils/python.h"
 #include "pybind11/stl.h"
 
 #include <memory>
@@ -50,32 +51,29 @@ namespace {
  * @param[in] suffix  Class name suffix associated with PixeT, e.g. "F" for `float`
  */
 template <typename PixelT>
-void declareBuildSpatialKernelVisitor(py::module& mod, std::string const& suffix) {
-    py::class_<BuildSpatialKernelVisitor<PixelT>, std::shared_ptr<BuildSpatialKernelVisitor<PixelT>>,
-               afw::math::CandidateVisitor>
-            cls(mod, ("BuildSpatialKernelVisitor" + suffix).c_str());
+void declareBuildSpatialKernelVisitor(lsst::cpputils::python::WrapperCollection &wrappers, std::string const& suffix) {
+    std::string name = "BuildSpatialKernelVisitor" + suffix;
+    using PyClass = py::class_<BuildSpatialKernelVisitor<PixelT>, std::shared_ptr<BuildSpatialKernelVisitor<PixelT>>,
+               afw::math::CandidateVisitor>;
+    wrappers.wrapType(PyClass(wrappers.module, name.c_str()), [](auto &mod, auto &cls) {
+        cls.def(py::init<afw::math::KernelList, geom::Box2I const &, daf::base::PropertySet const &>(), "basisList"_a,
+                "regionBBox"_a, "ps"_a);
 
-    cls.def(py::init<afw::math::KernelList, geom::Box2I const&, daf::base::PropertySet const&>(), "basisList"_a,
-            "regionBBox"_a, "ps"_a);
+        cls.def("getNCandidates", &BuildSpatialKernelVisitor<PixelT>::getNCandidates);
+        cls.def("processCandidate", &BuildSpatialKernelVisitor<PixelT>::processCandidate, "candidate"_a);
+        cls.def("solveLinearEquation", &BuildSpatialKernelVisitor<PixelT>::solveLinearEquation);
+        cls.def("getKernelSolution", &BuildSpatialKernelVisitor<PixelT>::getKernelSolution);
+        cls.def("getSolutionPair", &BuildSpatialKernelVisitor<PixelT>::getSolutionPair);
 
-    cls.def("getNCandidates", &BuildSpatialKernelVisitor<PixelT>::getNCandidates);
-    cls.def("processCandidate", &BuildSpatialKernelVisitor<PixelT>::processCandidate, "candidate"_a);
-    cls.def("solveLinearEquation", &BuildSpatialKernelVisitor<PixelT>::solveLinearEquation);
-    cls.def("getKernelSolution", &BuildSpatialKernelVisitor<PixelT>::getKernelSolution);
-    cls.def("getSolutionPair", &BuildSpatialKernelVisitor<PixelT>::getSolutionPair);
-
-    mod.def("makeBuildSpatialKernelVisitor", &makeBuildSpatialKernelVisitor<PixelT>, "basisList"_a,
-            "regionBBox"_a, "ps"_a);
+        mod.def("makeBuildSpatialKernelVisitor", &makeBuildSpatialKernelVisitor<PixelT>, "basisList"_a,
+                "regionBBox"_a, "ps"_a);
+    });
 }
 
 }  // namespace lsst::ip::diffim::detail::<anonymous>
 
-PYBIND11_MODULE(buildSpatialKernelVisitor, mod) {
-    py::module::import("lsst.afw.math");
-    py::module::import("lsst.afw.geom");
-    py::module::import("lsst.daf.base");
-
-    declareBuildSpatialKernelVisitor<float>(mod, "F");
+void wrapBuildSpatialKernelVisitor(lsst::cpputils::python::WrapperCollection &wrappers) {
+    declareBuildSpatialKernelVisitor<float>(wrappers, "F");
 }
 
 }  // detail

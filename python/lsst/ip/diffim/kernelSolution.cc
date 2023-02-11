@@ -20,12 +20,12 @@
  * see <https://www.lsstcorp.org/LegalNotices/>.
  */
 #include "pybind11/pybind11.h"
+#include "lsst/cpputils/python.h"
 #include "pybind11/eigen.h"
 
 #include <memory>
 
 #include "Eigen/Core"
-#include "ndarray/pybind11.h"
 
 #include "lsst/daf/base/PropertySet.h"
 #include "lsst/ip/diffim/KernelSolution.h"
@@ -42,44 +42,46 @@ namespace {
 /**
  * Wrap KernelSolution
  */
-void declareKernelSolution(py::module &mod) {
-    py::class_<KernelSolution, std::shared_ptr<KernelSolution>> cls(mod, "KernelSolution");
+void declareKernelSolution(lsst::cpputils::python::WrapperCollection &wrappers) {
+    using PyKernelSolution = py::class_<KernelSolution, std::shared_ptr<KernelSolution>>;
 
-    cls.def(py::init<Eigen::MatrixXd, Eigen::VectorXd, bool>(), "mMat"_a, "bVec"_a, "fitForBackground"_a);
-    cls.def(py::init<bool>(), "fitForBackground"_a);
-    cls.def(py::init<>());
+    wrappers.wrapType(PyKernelSolution(wrappers.module, "KernelSolution"), [](auto &mod, auto &cls) {
+        cls.def(py::init<Eigen::MatrixXd, Eigen::VectorXd, bool>(), "mMat"_a, "bVec"_a, "fitForBackground"_a);
+        cls.def(py::init<bool>(), "fitForBackground"_a);
+        cls.def(py::init<>());
 
-    py::enum_<KernelSolution::KernelSolvedBy>(cls, "KernelSolvedBy")
-            .value("NONE", KernelSolution::KernelSolvedBy::NONE)
-            .value("CHOLESKY_LDLT", KernelSolution::KernelSolvedBy::CHOLESKY_LDLT)
-            .value("CHOLESKY_LLT", KernelSolution::KernelSolvedBy::CHOLESKY_LLT)
-            .value("LU", KernelSolution::KernelSolvedBy::LU)
-            .value("EIGENVECTOR", KernelSolution::KernelSolvedBy::EIGENVECTOR)
-            .export_values();
+        py::enum_<KernelSolution::KernelSolvedBy>(cls, "KernelSolvedBy")
+                .value("NONE", KernelSolution::KernelSolvedBy::NONE)
+                .value("CHOLESKY_LDLT", KernelSolution::KernelSolvedBy::CHOLESKY_LDLT)
+                .value("CHOLESKY_LLT", KernelSolution::KernelSolvedBy::CHOLESKY_LLT)
+                .value("LU", KernelSolution::KernelSolvedBy::LU)
+                .value("EIGENVECTOR", KernelSolution::KernelSolvedBy::EIGENVECTOR)
+                .export_values();
 
-    py::enum_<KernelSolution::ConditionNumberType>(cls, "ConditionNumberType")
-            .value("EIGENVALUE", KernelSolution::ConditionNumberType::EIGENVALUE)
-            .value("SVD", KernelSolution::ConditionNumberType::SVD)
-            .export_values();
+        py::enum_<KernelSolution::ConditionNumberType>(cls, "ConditionNumberType")
+                .value("EIGENVALUE", KernelSolution::ConditionNumberType::EIGENVALUE)
+                .value("SVD", KernelSolution::ConditionNumberType::SVD)
+                .export_values();
 
-    cls.def("solve", (void (KernelSolution::*)()) & KernelSolution::solve);
-    cls.def("solve", (void (KernelSolution::*)(Eigen::MatrixXd const &, Eigen::VectorXd const &)) &
-                             KernelSolution::solve,
-            "mMat"_a, "bVec"_a);
-    cls.def("getSolvedBy", &KernelSolution::getSolvedBy);
-    cls.def("getConditionNumber", (double (KernelSolution::*)(KernelSolution::ConditionNumberType)) &
-                                          KernelSolution::getConditionNumber,
-            "conditionType"_a);
-    cls.def("getConditionNumber",
-            (double (KernelSolution::*)(Eigen::MatrixXd const &, KernelSolution::ConditionNumberType)) &
-                    KernelSolution::getConditionNumber,
-            "mMat"_a, "conditionType"_a);
-    cls.def("getM", &KernelSolution::getM, py::return_value_policy::copy);
-    cls.def("getB", &KernelSolution::getB, py::return_value_policy::copy);
-    cls.def("printM", &KernelSolution::printM);
-    cls.def("printB", &KernelSolution::printB);
-    cls.def("printA", &KernelSolution::printA);
-    cls.def("getId", &KernelSolution::getId);
+        cls.def("solve", (void (KernelSolution::*)()) &KernelSolution::solve);
+        cls.def("solve", (void (KernelSolution::*)(Eigen::MatrixXd const &, Eigen::VectorXd const &)) &
+                        KernelSolution::solve,
+                "mMat"_a, "bVec"_a);
+        cls.def("getSolvedBy", &KernelSolution::getSolvedBy);
+        cls.def("getConditionNumber", (double (KernelSolution::*)(KernelSolution::ConditionNumberType)) &
+                        KernelSolution::getConditionNumber,
+                "conditionType"_a);
+        cls.def("getConditionNumber",
+                (double (KernelSolution::*)(Eigen::MatrixXd const &, KernelSolution::ConditionNumberType)) &
+                        KernelSolution::getConditionNumber,
+                "mMat"_a, "conditionType"_a);
+        cls.def("getM", &KernelSolution::getM, py::return_value_policy::copy);
+        cls.def("getB", &KernelSolution::getB, py::return_value_policy::copy);
+        cls.def("printM", &KernelSolution::printM);
+        cls.def("printB", &KernelSolution::printB);
+        cls.def("printA", &KernelSolution::printA);
+        cls.def("getId", &KernelSolution::getId);
+    });
 }
 
 /**
@@ -90,20 +92,22 @@ void declareKernelSolution(py::module &mod) {
  * @param[in] suffix  Suffix associated with `InputT`, e.g. "F" for `float`
  */
 template <typename InputT>
-void declareStaticKernelSolution(py::module &mod, std::string const &suffix) {
-    py::class_<StaticKernelSolution<InputT>, std::shared_ptr<StaticKernelSolution<InputT>>, KernelSolution>
-            cls(mod, ("StaticKernelSolution" + suffix).c_str());
+void declareStaticKernelSolution(lsst::cpputils::python::WrapperCollection &wrappers, std::string const &suffix) {
+    using PyStaticKernelSolution =
+            py::class_<StaticKernelSolution<InputT>, std::shared_ptr<StaticKernelSolution<InputT>>, KernelSolution>;
+    std::string name = ("StaticKernelSolution" + suffix);
+    wrappers.wrapType(PyStaticKernelSolution(wrappers.module, name.c_str()), [](auto &mod, auto &cls) {
+        cls.def(py::init<lsst::afw::math::KernelList const &, bool>(), "basisList"_a, "fitForBackground"_a);
 
-    cls.def(py::init<lsst::afw::math::KernelList const &, bool>(), "basisList"_a, "fitForBackground"_a);
-
-    cls.def("solve", (void (StaticKernelSolution<InputT>::*)()) & StaticKernelSolution<InputT>::solve);
-    cls.def("build", &StaticKernelSolution<InputT>::build, "templateImage"_a, "scienceImage"_a,
-            "varianceEstimate"_a);
-    cls.def("getKernel", &StaticKernelSolution<InputT>::getKernel);
-    cls.def("makeKernelImage", &StaticKernelSolution<InputT>::makeKernelImage);
-    cls.def("getBackground", &StaticKernelSolution<InputT>::getBackground);
-    cls.def("getKsum", &StaticKernelSolution<InputT>::getKsum);
-    cls.def("getSolutionPair", &StaticKernelSolution<InputT>::getSolutionPair);
+        cls.def("solve", (void (StaticKernelSolution<InputT>::*)()) &StaticKernelSolution<InputT>::solve);
+        cls.def("build", &StaticKernelSolution<InputT>::build, "templateImage"_a, "scienceImage"_a,
+                "varianceEstimate"_a);
+        cls.def("getKernel", &StaticKernelSolution<InputT>::getKernel);
+        cls.def("makeKernelImage", &StaticKernelSolution<InputT>::makeKernelImage);
+        cls.def("getBackground", &StaticKernelSolution<InputT>::getBackground);
+        cls.def("getKsum", &StaticKernelSolution<InputT>::getKsum);
+        cls.def("getSolutionPair", &StaticKernelSolution<InputT>::getSolutionPair);
+    });
 }
 
 /**
@@ -114,19 +118,20 @@ void declareStaticKernelSolution(py::module &mod, std::string const &suffix) {
  * @param[in] suffix  Suffix associated with `InputT`, e.g. "F" for `float`
  */
 template <typename InputT>
-void declareMaskedKernelSolution(py::module &mod, std::string const &suffix) {
-    py::class_<MaskedKernelSolution<InputT>, std::shared_ptr<MaskedKernelSolution<InputT>>,
-               StaticKernelSolution<InputT>>
-            cls(mod, ("MaskedKernelSolution" + suffix).c_str());
+void declareMaskedKernelSolution(lsst::cpputils::python::WrapperCollection &wrappers, std::string const &suffix) {
+    using PyMaskedKernelSolution = py::class_<MaskedKernelSolution<InputT>, std::shared_ptr<MaskedKernelSolution<InputT>>,
+               StaticKernelSolution<InputT>>;
+    std::string name = "MaskedKernelSolution" + suffix;
+    wrappers.wrapType(PyMaskedKernelSolution(wrappers.module, name.c_str()), [](auto &mod, auto &cls) {
+        cls.def(py::init<lsst::afw::math::KernelList const &, bool>(), "basisList"_a, "fitForBackground"_a);
 
-    cls.def(py::init<lsst::afw::math::KernelList const &, bool>(), "basisList"_a, "fitForBackground"_a);
-
-    cls.def("buildOrig", &MaskedKernelSolution<InputT>::buildOrig, "templateImage"_a, "scienceImage"_a,
-            "varianceEstimate"_a, "pixelMask"_a);
-    cls.def("buildWithMask", &MaskedKernelSolution<InputT>::buildWithMask, "templateImage"_a,
-            "scienceImage"_a, "varianceEstimate"_a, "pixelMask"_a);
-    cls.def("buildSingleMaskOrig", &MaskedKernelSolution<InputT>::buildSingleMaskOrig, "templateImage"_a,
-            "scienceImage"_a, "varianceEstimate"_a, "maskBox"_a);
+        cls.def("buildOrig", &MaskedKernelSolution<InputT>::buildOrig, "templateImage"_a, "scienceImage"_a,
+                "varianceEstimate"_a, "pixelMask"_a);
+        cls.def("buildWithMask", &MaskedKernelSolution<InputT>::buildWithMask, "templateImage"_a,
+                "scienceImage"_a, "varianceEstimate"_a, "pixelMask"_a);
+        cls.def("buildSingleMaskOrig", &MaskedKernelSolution<InputT>::buildSingleMaskOrig, "templateImage"_a,
+                "scienceImage"_a, "varianceEstimate"_a, "maskBox"_a);
+    });
 }
 
 /**
@@ -137,53 +142,53 @@ void declareMaskedKernelSolution(py::module &mod, std::string const &suffix) {
  * @param[in] suffix  Suffix associated with `InputT`, e.g. "F" for `float`
  */
 template <typename InputT>
-void declareRegularizedKernelSolution(py::module &mod, std::string const &suffix) {
-    py::class_<RegularizedKernelSolution<InputT>, std::shared_ptr<RegularizedKernelSolution<InputT>>,
-               StaticKernelSolution<InputT>>
-            cls(mod, ("RegularizedKernelSolution" + suffix).c_str());
+void declareRegularizedKernelSolution(lsst::cpputils::python::WrapperCollection &wrappers, std::string const &suffix) {
+    using PyRegularizedKernelSolution =
+            py::class_<RegularizedKernelSolution<InputT>,
+                    std::shared_ptr<RegularizedKernelSolution<InputT>>,StaticKernelSolution<InputT>>;
 
-    cls.def(py::init<lsst::afw::math::KernelList const &, bool, Eigen::MatrixXd const &,
-                     daf::base::PropertySet const&>(),
-            "basisList"_a, "fitForBackground"_a, "hMat"_a, "ps"_a);
+    std::string name = "RegularizedKernelSolution" + suffix;
+    wrappers.wrapType(PyRegularizedKernelSolution(wrappers.module, "RegularizedKernelSolution"), [](auto &mod, auto &cls) {
+        cls.def(py::init<lsst::afw::math::KernelList const &, bool, Eigen::MatrixXd const &,
+                        daf::base::PropertySet const &>(),
+                "basisList"_a, "fitForBackground"_a, "hMat"_a, "ps"_a);
 
-    cls.def("solve",
-            (void (RegularizedKernelSolution<InputT>::*)()) & RegularizedKernelSolution<InputT>::solve);
-    cls.def("getLambda", &RegularizedKernelSolution<InputT>::getLambda);
-    cls.def("estimateRisk", &RegularizedKernelSolution<InputT>::estimateRisk, "maxCond"_a);
-    cls.def("getM", &RegularizedKernelSolution<InputT>::getM);
+        cls.def("solve",
+                (void (RegularizedKernelSolution<InputT>::*)()) &RegularizedKernelSolution<InputT>::solve);
+        cls.def("getLambda", &RegularizedKernelSolution<InputT>::getLambda);
+        cls.def("estimateRisk", &RegularizedKernelSolution<InputT>::estimateRisk, "maxCond"_a);
+        cls.def("getM", &RegularizedKernelSolution<InputT>::getM);
+    });
 }
 
 /**
  * Wrap SpatialKernelSolution
  */
-void declareSpatialKernelSolution(py::module &mod) {
-    py::class_<SpatialKernelSolution, std::shared_ptr<SpatialKernelSolution>, KernelSolution> cls(
-            mod, "SpatialKernelSolution");
+void declareSpatialKernelSolution(lsst::cpputils::python::WrapperCollection &wrappers) {
+    using PySpatialKernelSolution =
+            py::class_<SpatialKernelSolution, std::shared_ptr<SpatialKernelSolution>, KernelSolution> ;
 
-    cls.def(py::init<lsst::afw::math::KernelList const &, lsst::afw::math::Kernel::SpatialFunctionPtr,
-                     lsst::afw::math::Kernel::SpatialFunctionPtr, daf::base::PropertySet const&>(),
-            "basisList"_a, "spatialKernelFunction"_a, "background"_a, "ps"_a);
+    wrappers.wrapType(PySpatialKernelSolution(wrappers.module, "SpatialKernelSolution"), [](auto &mod, auto &cls) {
+        cls.def(py::init<lsst::afw::math::KernelList const &, lsst::afw::math::Kernel::SpatialFunctionPtr,
+                        lsst::afw::math::Kernel::SpatialFunctionPtr, daf::base::PropertySet const &>(),
+                "basisList"_a, "spatialKernelFunction"_a, "background"_a, "ps"_a);
 
-    cls.def("solve", (void (SpatialKernelSolution::*)()) & SpatialKernelSolution::solve);
-    cls.def("addConstraint", &SpatialKernelSolution::addConstraint, "xCenter"_a, "yCenter"_a, "qMat"_a,
-            "wVec"_a);
-    cls.def("makeKernelImage", &SpatialKernelSolution::makeKernelImage, "pos"_a);
-    cls.def("getSolutionPair", &SpatialKernelSolution::getSolutionPair);
+        cls.def("solve", (void (SpatialKernelSolution::*)()) &SpatialKernelSolution::solve);
+        cls.def("addConstraint", &SpatialKernelSolution::addConstraint, "xCenter"_a, "yCenter"_a, "qMat"_a,
+                "wVec"_a);
+        cls.def("makeKernelImage", &SpatialKernelSolution::makeKernelImage, "pos"_a);
+        cls.def("getSolutionPair", &SpatialKernelSolution::getSolutionPair);
+    });
 }
 
 }  // namespace lsst::ip::diffim::<anonymous>
 
-PYBIND11_MODULE(kernelSolution, mod) {
-    py::module::import("lsst.afw.geom");
-    py::module::import("lsst.afw.image");
-    py::module::import("lsst.afw.math");
-    py::module::import("lsst.daf.base");
-
-    declareKernelSolution(mod);
-    declareStaticKernelSolution<float>(mod, "F");
-    declareMaskedKernelSolution<float>(mod, "F");
-    declareRegularizedKernelSolution<float>(mod, "F");
-    declareSpatialKernelSolution(mod);
+void wrapKernelSolution(lsst::cpputils::python::WrapperCollection &wrappers) {
+    declareKernelSolution(wrappers);
+    declareStaticKernelSolution<float>(wrappers, "F");
+    declareMaskedKernelSolution<float>(wrappers, "F");
+    declareRegularizedKernelSolution<float>(wrappers, "F");
+    declareSpatialKernelSolution(wrappers);
 }
 
 }  // diffim

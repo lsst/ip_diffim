@@ -1,14 +1,18 @@
 ## -*- python -*-
 from lsst.sconsUtils import scripts
-scripts.BasicSConscript.pybind11([
-    "basisLists",
-    "findSetBits",
-    "imageStatistics",
-    "imageSubtract",
-    "kernelCandidate",
-    "kernelCandidateDetection",
-    "kernelSolution",
-], addUnderscore=False)
-
-# Plugin registration fails if this does not have an underscore
-scripts.BasicSConscript.pybind11(["dipoleAlgorithms"])
+scripts.BasicSConscript.python(['_ipdiffimLib'], [
+    '_ipdiffimLib.cc',
+    'basisLists.cc',
+    'dipoleAlgorithms.cc',
+    'findSetBits.cc',
+    'imageStatistics.cc',
+    'imageSubtract.cc',
+    'kernelCandidate.cc',
+    'kernelCandidateDetection.cc',
+    'kernelSolution.cc',
+    'detail/assessSpatialKernelVisitor.cc',
+    'detail/buildSingleKernelVisitor.cc',
+    'detail/buildSpatialKernelVisitor.cc',
+    'detail/kernelPca.cc',
+    'detail/kernelSumVisitor.cc'
+    ])

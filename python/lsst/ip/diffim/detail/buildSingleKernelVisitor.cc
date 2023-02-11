@@ -20,6 +20,7 @@
  * see <https://www.lsstcorp.org/LegalNotices/>.
  */
 #include "pybind11/pybind11.h"
+#include "lsst/cpputils/python.h"
 #include "pybind11/eigen.h"
 #include "pybind11/stl.h"
 
@@ -52,40 +53,40 @@ namespace {
  * @param[in] suffix  Class name suffix associated with PixeT, e.g. "F" for `float`
  */
 template <typename PixelT>
-void declareBuildSingleKernelVisitor(py::module& mod, std::string const& suffix) {
-    py::class_<BuildSingleKernelVisitor<PixelT>, std::shared_ptr<BuildSingleKernelVisitor<PixelT>>,
-               afw::math::CandidateVisitor>
-            cls(mod, ("BuildSingleKernelVisitor" + suffix).c_str());
+void declareBuildSingleKernelVisitor(lsst::cpputils::python::WrapperCollection &wrappers, std::string const& suffix) {
+    using PyClass = py::class_<BuildSingleKernelVisitor<PixelT>, std::shared_ptr<BuildSingleKernelVisitor<PixelT>>,
+               afw::math::CandidateVisitor>;
+    std::string name = "BuildSingleKernelVisitor" + suffix;
 
-    cls.def(py::init<afw::math::KernelList, daf::base::PropertySet const&>(), "basisList"_a, "ps"_a);
-    cls.def(py::init<afw::math::KernelList, daf::base::PropertySet const&, Eigen::MatrixXd const&>(), "basisList"_a,
-            "ps"_a, "hMat"_a);
+    wrappers.wrapType(PyClass(wrappers.module, name.c_str()), [](auto &mod, auto &cls) {
+        cls.def(py::init<afw::math::KernelList, daf::base::PropertySet const &>(), "basisList"_a, "ps"_a);
+        cls.def(py::init<afw::math::KernelList, daf::base::PropertySet const &, Eigen::MatrixXd const &>(),
+                "basisList"_a,
+                "ps"_a, "hMat"_a);
 
-    cls.def("setSkipBuilt", &BuildSingleKernelVisitor<PixelT>::setSkipBuilt, "skip"_a);
-    cls.def("getNRejected", &BuildSingleKernelVisitor<PixelT>::getNRejected);
-    cls.def("getNProcessed", &BuildSingleKernelVisitor<PixelT>::getNProcessed);
-    cls.def("reset", &BuildSingleKernelVisitor<PixelT>::reset);
-    cls.def("processCandidate", &BuildSingleKernelVisitor<PixelT>::processCandidate, "candidate"_a);
+        cls.def("setSkipBuilt", &BuildSingleKernelVisitor<PixelT>::setSkipBuilt, "skip"_a);
+        cls.def("getNRejected", &BuildSingleKernelVisitor<PixelT>::getNRejected);
+        cls.def("getNProcessed", &BuildSingleKernelVisitor<PixelT>::getNProcessed);
+        cls.def("reset", &BuildSingleKernelVisitor<PixelT>::reset);
+        cls.def("processCandidate", &BuildSingleKernelVisitor<PixelT>::processCandidate, "candidate"_a);
 
-    mod.def("makeBuildSingleKernelVisitor",
-            (std::shared_ptr<BuildSingleKernelVisitor<PixelT>>(*)(afw::math::KernelList const&,
-                                                                  daf::base::PropertySet const&)) &
-                    makeBuildSingleKernelVisitor<PixelT>,
-            "basisList"_a, "ps"_a);
-    mod.def("makeBuildSingleKernelVisitor",
-            (std::shared_ptr<BuildSingleKernelVisitor<PixelT>>(*)(
-                    afw::math::KernelList const&, daf::base::PropertySet const&, Eigen::MatrixXd const&)) &
-                    makeBuildSingleKernelVisitor<PixelT>,
-            "basisList"_a, "ps"_a, "hMat"_a);
+        mod.def("makeBuildSingleKernelVisitor",
+                (std::shared_ptr<BuildSingleKernelVisitor<PixelT>>(*)(afw::math::KernelList const &,
+                                                                      daf::base::PropertySet const &)) &
+                        makeBuildSingleKernelVisitor<PixelT>,
+                "basisList"_a, "ps"_a);
+        mod.def("makeBuildSingleKernelVisitor",
+                (std::shared_ptr<BuildSingleKernelVisitor<PixelT>>(*)(
+                        afw::math::KernelList const &, daf::base::PropertySet const &, Eigen::MatrixXd const &)) &
+                        makeBuildSingleKernelVisitor<PixelT>,
+                "basisList"_a, "ps"_a, "hMat"_a);
+    });
 }
 
 }  // namespace lsst::ip::diffim::detail::<anonymous>
 
-PYBIND11_MODULE(buildSingleKernelVisitor, mod) {
-    py::module::import("lsst.afw.math");
-    py::module::import("lsst.daf.base");
-
-    declareBuildSingleKernelVisitor<float>(mod, "F");
+void wrapBuildSingleKernelVisitor(lsst::cpputils::python::WrapperCollection &wrappers) {
+    declareBuildSingleKernelVisitor<float>(wrappers, "F");
 }
 
 }  // detail

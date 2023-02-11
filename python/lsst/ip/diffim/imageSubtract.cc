@@ -20,6 +20,7 @@
  * see <https://www.lsstcorp.org/LegalNotices/>.
  */
 #include "pybind11/pybind11.h"
+#include "lsst/cpputils/python.h"
 #include "pybind11/eigen.h"
 
 #include "ndarray/pybind11.h"
@@ -49,7 +50,8 @@ namespace {
  * @param mod  pybind11 module
  */
 template <typename PixelT, typename BackgroundT>
-void declareConvolveAndSubtract(py::module &mod) {
+void declareConvolveAndSubtract(lsst::cpputils::python::WrapperCollection &wrappers) {
+    auto &mod = wrappers.module;
     mod.def("convolveAndSubtract",
             (afw::image::MaskedImage<PixelT>(*)(afw::image::MaskedImage<PixelT> const &,
                                                 afw::image::MaskedImage<PixelT> const &,
@@ -69,12 +71,9 @@ void declareConvolveAndSubtract(py::module &mod) {
 
 }  // namespace lsst::ip::diffim::<anonymous>
 
-PYBIND11_MODULE(imageSubtract, mod) {
-    py::module::import("lsst.afw.image");
-    py::module::import("lsst.afw.math");
-
-    declareConvolveAndSubtract<float, double>(mod);
-    declareConvolveAndSubtract<float, afw::math::Function2<double> const &>(mod);
+void wrapImageSubtract(lsst::cpputils::python::WrapperCollection &wrappers) {
+    declareConvolveAndSubtract<float, double>(wrappers);
+    declareConvolveAndSubtract<float, afw::math::Function2<double> const &>(wrappers);
 }
 
 }  // diffim

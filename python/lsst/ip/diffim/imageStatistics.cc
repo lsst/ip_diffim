@@ -20,6 +20,7 @@
  * see <https://www.lsstcorp.org/LegalNotices/>.
  */
 #include "pybind11/pybind11.h"
+#include "lsst/cpputils/python.h"
 #include "pybind11/stl.h"
 
 #include <memory>
@@ -46,37 +47,36 @@ namespace {
  * @param[in] suffix  Class name suffix associated with PixeT, e.g. "F" for `float`
  */
 template <typename PixelT>
-void declareImageStatistics(py::module &mod, std::string const &suffix) {
-    py::class_<ImageStatistics<PixelT>, std::shared_ptr<ImageStatistics<PixelT>>> cls(
-            mod, ("ImageStatistics" + suffix).c_str());
+void declareImageStatistics(lsst::cpputils::python::WrapperCollection &wrappers, std::string const &suffix) {
+    using PyImageStatistics =  py::class_<ImageStatistics<PixelT>, std::shared_ptr<ImageStatistics<PixelT>>>;
 
-    cls.def(py::init<daf::base::PropertySet const &>(), "ps"_a);
+    std::string name = "ImageStatistics" + suffix;
+    wrappers.wrapType(PyImageStatistics(wrappers.module, name.c_str()), [](auto &mod, auto &cls) {
+        cls.def(py::init<daf::base::PropertySet const &>(), "ps"_a);
 
-    cls.def("reset", &ImageStatistics<PixelT>::reset);
-    cls.def("apply", (void (ImageStatistics<PixelT>::*)(afw::image::MaskedImage<PixelT> const &)) &
-                             ImageStatistics<PixelT>::apply,
-            "image"_a);
-    cls.def("apply", (void (ImageStatistics<PixelT>::*)(afw::image::MaskedImage<PixelT> const &, int)) &
-                             ImageStatistics<PixelT>::apply,
-            "image"_a, "core"_a);
-    cls.def("setBpMask", &ImageStatistics<PixelT>::setBpMask, "bpMask"_a);
-    cls.def("getBpMask", &ImageStatistics<PixelT>::getBpMask);
-    cls.def("getMean", &ImageStatistics<PixelT>::getMean);
-    cls.def("getVariance", &ImageStatistics<PixelT>::getVariance);
-    cls.def("getRms", &ImageStatistics<PixelT>::getRms);
-    cls.def("getNpix", &ImageStatistics<PixelT>::getNpix);
-    cls.def("evaluateQuality", &ImageStatistics<PixelT>::evaluateQuality, "ps"_a);
+        cls.def("reset", &ImageStatistics<PixelT>::reset);
+        cls.def("apply", (void (ImageStatistics<PixelT>::*)(afw::image::MaskedImage<PixelT> const &)) &
+                        ImageStatistics<PixelT>::apply,
+                "image"_a);
+        cls.def("apply", (void (ImageStatistics<PixelT>::*)(afw::image::MaskedImage<PixelT> const &, int)) &
+                        ImageStatistics<PixelT>::apply,
+                "image"_a, "core"_a);
+        cls.def("setBpMask", &ImageStatistics<PixelT>::setBpMask, "bpMask"_a);
+        cls.def("getBpMask", &ImageStatistics<PixelT>::getBpMask);
+        cls.def("getMean", &ImageStatistics<PixelT>::getMean);
+        cls.def("getVariance", &ImageStatistics<PixelT>::getVariance);
+        cls.def("getRms", &ImageStatistics<PixelT>::getRms);
+        cls.def("getNpix", &ImageStatistics<PixelT>::getNpix);
+        cls.def("evaluateQuality", &ImageStatistics<PixelT>::evaluateQuality, "ps"_a);
+    });
 }
 
 }  // namespace lsst::ip::diffim::<anonymous>
 
-PYBIND11_MODULE(imageStatistics, mod) {
-    py::module::import("lsst.daf.base");
-    py::module::import("lsst.afw.image");
-
-    declareImageStatistics<int>(mod, "I");
-    declareImageStatistics<float>(mod, "F");
-    declareImageStatistics<double>(mod, "D");
+void wrapImageStatistics(lsst::cpputils::python::WrapperCollection &wrappers) {
+    declareImageStatistics<int>(wrappers, "I");
+    declareImageStatistics<float>(wrappers, "F");
+    declareImageStatistics<double>(wrappers, "D");
 }
 
 }  // diffim

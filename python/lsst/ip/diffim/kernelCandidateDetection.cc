@@ -20,6 +20,7 @@
  * see <https://www.lsstcorp.org/LegalNotices/>.
  */
 #include "pybind11/pybind11.h"
+#include "lsst/cpputils/python.h"
 #include "pybind11/stl.h"
 
 #include <memory>
@@ -44,27 +45,26 @@ namespace {
  * @param[in] suffix  Class name suffix associated with PixeT, e.g. "F" for `float`
  */
 template <typename PixelT>
-void declareKernelCandidateDetection(py::module &mod, std::string const &suffix) {
-    py::class_<KernelCandidateDetection<PixelT>, std::shared_ptr<KernelCandidateDetection<PixelT>>> cls(
-            mod, ("KernelCandidateDetection" + suffix).c_str());
+void declareKernelCandidateDetection(lsst::cpputils::python::WrapperCollection &wrappers, std::string const &suffix) {
+    using PyKernelCandidateDetection =
+            py::class_<KernelCandidateDetection<PixelT>, std::shared_ptr<KernelCandidateDetection<PixelT>>>;
 
-    cls.def(py::init<daf::base::PropertySet const &>(), "ps"_a);
+    std::string name = "KernelCandidateDetection" + suffix;
+    wrappers.wrapType(PyKernelCandidateDetection(wrappers.module, name.c_str()), [](auto &mod, auto &cls) {
+        cls.def(py::init<daf::base::PropertySet const &>(), "ps"_a);
 
-    cls.def("apply", &KernelCandidateDetection<PixelT>::apply, "templateMaskedImage"_a,
-            "scienceMaskedImage"_a);
-    cls.def("growCandidate", &KernelCandidateDetection<PixelT>::growCandidate, "footprint"_a, "fpGrowPix"_a,
-            "templateMaskedImage"_a, "scienceMaskedImage"_a);
-    cls.def("getFootprints", &KernelCandidateDetection<PixelT>::getFootprints);
+        cls.def("apply", &KernelCandidateDetection<PixelT>::apply, "templateMaskedImage"_a,
+                "scienceMaskedImage"_a);
+        cls.def("growCandidate", &KernelCandidateDetection<PixelT>::growCandidate, "footprint"_a, "fpGrowPix"_a,
+                "templateMaskedImage"_a, "scienceMaskedImage"_a);
+        cls.def("getFootprints", &KernelCandidateDetection<PixelT>::getFootprints);
+    });
 }
 
 }  // namespace lsst::ip::diffim::<anonymous>
 
-PYBIND11_MODULE(kernelCandidateDetection, mod) {
-    py::module::import("lsst.afw.image");
-    py::module::import("lsst.afw.detection");
-    py::module::import("lsst.daf.base");
-
-    declareKernelCandidateDetection<float>(mod, "F");
+void wrapKernelCandidateDetection(lsst::cpputils::python::WrapperCollection &wrappers) {
+    declareKernelCandidateDetection<float>(wrappers, "F");
 }
 
 }  // diffim

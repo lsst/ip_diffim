@@ -24,11 +24,5 @@
 # hoist symbols lsst.ip.diffim.detail up into lsst.ip.diffim
 from .detail import *
 
-from .basisLists import *
-from ._dipoleAlgorithms import *
-from .findSetBits import *
-from .imageStatistics import *
-from .imageSubtract import *
-from .kernelCandidate import *
-from .kernelCandidateDetection import *
-from .kernelSolution import *
+from ._ipdiffimLib import *
+
