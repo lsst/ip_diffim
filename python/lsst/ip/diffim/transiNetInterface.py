@@ -66,8 +66,9 @@ class TransiNetInterface:
         """
 
         # Convert each cutout to a torch tensor
-        template = torch.from_numpy(template)
-        science = torch.from_numpy(science)
+        # TODO: is getMaskedImage() the right method to use here?
+        template = torch.from_numpy(template.getMaskedImage().getImage().getArray())
+        science = torch.from_numpy(science.getMaskedImage().getImage().getArray())
 
         # Stack the components to create a single blob
         blob = torch.stack((template, science), dim=0)
@@ -76,19 +77,28 @@ class TransiNetInterface:
         return blob
 
     def infer(self, template, science):
-        """Return the score of this cutout.
+        """Pass template, science through the model and return the result.
 
         Parameters
         ----------
-        inputs : `list` [`CutoutInputs`]
-            Inputs to be scored.
+        inputs :
+            template: `lsst.afw.image.Exposure`
+                The template image.
+            science: `lsst.afw.image.Exposure`
+                The science image.
 
         Returns
         -------
         difference : `lsst.afw.Exposure`
         """
+
+        # stack the template and science images into a single blob
         blob = self.prepare_input(template, science)
+
+        # Run the model
         result = self.model(blob)
+
+        # Convert the result to an Exposure
         difference = Exposure(result.detach().numpy())
 
         return difference
