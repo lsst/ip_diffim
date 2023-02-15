@@ -750,6 +750,7 @@ class DipoleFitAlgorithm:
             # "psf, rel_weight, footprint, modelObj" all become pass-through kwargs for makeModel.
             warnings.filterwarnings("ignore", "The keyword argument .* does not match", UserWarning)
             result = gmod.fit(z, weights=weights, x=in_x, max_nfev=250,
+                              method="leastsq",  # TODO: try using `least_squares` here for speed/robustness
                               verbose=verbose,
                               fit_kws={'ftol': tol, 'xtol': tol, 'gtol': tol},  # see scipy docs
                               psf=self.diffim.getPsf(),  # hereon: kwargs that get passed to makeModel()
