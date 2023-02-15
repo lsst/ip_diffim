@@ -44,6 +44,7 @@ from .detectAndMeasure import *
 from .imageDecorrelation import *
 from .imageMapReduce import *
 from .subtractImages import *
+from .subtractImagesTransiNet import *
 from .zogy import *
 from .version import *
 
