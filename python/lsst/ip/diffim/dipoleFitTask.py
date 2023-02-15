@@ -178,7 +178,7 @@ class DipoleFitTask(measBase.SingleFrameMeasurementTask):
             self.dipoleFitter.measure(source, exposure, posExp, negExp)
 
 
-class DipoleModel(object):
+class DipoleModel:
     """Lightweight class containing methods for generating a dipole model for fitting
     to sources in diffims, used by DipoleFitAlgorithm.
 
@@ -396,14 +396,10 @@ class DipoleModel(object):
             which to compute the background gradient model.
         flux : `float`
             Desired flux of the positive lobe of the dipole
-        xcenPos : `float`
-            Desired x-centroid of the positive lobe of the dipole
-        ycenPos : `float`
-            Desired y-centroid of the positive lobe of the dipole
-        xcenNeg : `float`
-            Desired x-centroid of the negative lobe of the dipole
-        ycenNeg : `float`
-            Desired y-centroid of the negative lobe of the dipole
+        xcenPos, ycenPos : `float`
+            Desired x,y-centroid of the positive lobe of the dipole
+        xcenNeg, ycenNeg : `float`
+            Desired x,y-centroid of the negative lobe of the dipole
         fluxNeg : `float`, optional
             Desired flux of the negative lobe of the dipole, set to 'flux' if None
         b, x1, y1, xy, x2, y2 : `float`
@@ -412,7 +408,7 @@ class DipoleModel(object):
             Gradient parameters for negative lobe.
             They are set to the corresponding positive values if None.
 
-        **kwargs
+        **kwargs : `dict` [`str`]
             Keyword arguments passed through ``lmfit`` and
             used by this function. These must include:
 
@@ -428,7 +424,7 @@ class DipoleModel(object):
             contains the dipole model with given centroids and flux(es). If
             ``rel_weight`` = 0, this is a 2-d array with dimensions matching
             those of bbox; otherwise a stack of three such arrays,
-            representing the dipole (diffim), positive and negative images
+            representing the dipole (diffim), positive, and negative images
             respectively.
         """
 
@@ -482,7 +478,7 @@ class DipoleModel(object):
         return zout
 
 
-class DipoleFitAlgorithm(object):
+class DipoleFitAlgorithm:
     """Fit a dipole model using an image difference.
 
     See also:
@@ -624,7 +620,6 @@ class DipoleFitAlgorithm(object):
         # Create the lmfit model (lmfit uses scipy 'leastsq' option by default - Levenberg-Marquardt)
         # Note we can also tell it to drop missing values from the data.
         gmod = lmfit.Model(modelFunctor, verbose=verbose, missing='drop')
-        # independent_vars=independent_vars) #, param_names=param_names)
 
         # Add the constraints for centroids, fluxes.
         # starting constraint - near centroid of footprint
