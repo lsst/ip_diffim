@@ -752,7 +752,10 @@ class DipoleFitAlgorithm:
             result = gmod.fit(z, weights=weights, x=in_x, max_nfev=250,
                               method="leastsq",  # TODO: try using `least_squares` here for speed/robustness
                               verbose=verbose,
-                              fit_kws={'ftol': tol, 'xtol': tol, 'gtol': tol},  # see scipy docs
+                              # see scipy docs for the meaning of these keywords
+                              fit_kws={'ftol': tol, 'xtol': tol, 'gtol': tol,
+                                       # Our model is float32 internally, so we need a larger epsfcn.
+                                       'epsfcn': 1e-10},
                               psf=self.diffim.getPsf(),  # hereon: kwargs that get passed to makeModel()
                               rel_weight=rel_weight,
                               footprint=fp,
