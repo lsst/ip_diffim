@@ -23,8 +23,8 @@ __all__ = ["TransiNetInterface"]
 
 import torch
 
-from lsst.meas.nnModelPackage import NNModelPackage
-from lsst.afw import Exposure
+from lsst.meas.transiNet.modelPackages import NNModelPackage
+from lsst.afw.image import Exposure
 
 
 class TransiNetInterface:
@@ -33,15 +33,16 @@ class TransiNetInterface:
     end2end TransiNet.
     """
 
-    def __init__(self, model_package_name, device='cpu'):
+    def __init__(self, model_package_name, package_storage_mode, device='cpu'):
         self.model_package_name = model_package_name
+        self.package_storage_mode = package_storage_mode
         self.device = device
         self.init_model()
 
     def init_model(self):
         """Create and initialize an NN model
         """
-        model_package = NNModelPackage(self.model_package_name)
+        model_package = NNModelPackage(self.model_package_name, self.package_storage_mode)
         self.model = model_package.load(self.device)
 
         # Put the model in evaluation mode instead of training model.
