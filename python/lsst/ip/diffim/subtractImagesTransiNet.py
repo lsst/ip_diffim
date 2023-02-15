@@ -29,6 +29,8 @@ import lsst.pipe.base
 from lsst.pipe.base import connectionTypes
 from lsst.utils.timer import timeMethod
 
+from lsst.ip.diffim.transiNetInterface import TransiNetInterface
+
 __all__ = ["TransiNetSubtractConfig", "TransiNetSubtractTask"]
 
 _dimensions = ("instrument", "visit", "detector")
@@ -96,6 +98,8 @@ class TransiNetSubtractTask(lsst.pipe.base.PipelineTask):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
+        self.transiNetInterface = TransiNetInterface('temp_var', 'neighbor')
+
     @timeMethod
     def run(self, template, science):
         """ Subtract two images.
@@ -131,7 +135,7 @@ class TransiNetSubtractTask(lsst.pipe.base.PipelineTask):
             self.log.info("Applying photometric calibration to template: %f", photoCalib.getCalibrationMean())
             template.maskedImage = photoCalib.calibrateImage(template.maskedImage)
 
-        subtractResults = self.transiNetInterface.subtract(template, science)
+        subtractResults = self.transiNetInterface.infer(template, science)
 
         return subtractResults
 
