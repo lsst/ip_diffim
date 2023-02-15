@@ -24,7 +24,7 @@ __all__ = ["TransiNetInterface"]
 import torch
 
 from lsst.meas.transiNet.modelPackages import NNModelPackage
-from lsst.afw.image import Exposure
+from lsst.afw.image import ExposureF
 
 
 class TransiNetInterface:
@@ -72,7 +72,7 @@ class TransiNetInterface:
 
         # Stack the components to create a single blob
         blob = torch.stack((template, science), dim=0)
-        blob = torch.unsquash(blob, 0)
+        blob = torch.unsqueeze(blob, dim=0)
 
         return blob
 
@@ -96,9 +96,10 @@ class TransiNetInterface:
         blob = self.prepare_input(template, science)
 
         # Run the model
-        result = self.model(blob)
+        result = self.model(blob)[0].detach().numpy().squeeze()
 
         # Convert the result to an Exposure
-        difference = Exposure(result.detach().numpy())
+        difference = science.clone()
+        difference.image.array = result
 
         return difference

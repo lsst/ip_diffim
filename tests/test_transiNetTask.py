@@ -22,15 +22,13 @@
 import unittest
 
 import lsst.afw.math as afwMath
-import lsst.afw.table as afwTable
 import lsst.geom
 import lsst.ip.diffim.imagePsfMatch
 import lsst.utils.tests
 import numpy as np
 from lsst.ip.diffim import subtractImagesTransiNet as subtractImages
 from lsst.ip.diffim.utils import (computeRobustStatistics,
-                                   getPsfFwhm, makeStats, makeTestImage)
-from lsst.pex.exceptions import InvalidParameterError
+                                  makeStats, makeTestImage)
 
 
 class TransiNetSubtractTest(lsst.utils.tests.TestCase):
@@ -83,10 +81,8 @@ class TransiNetSubtractTest(lsst.utils.tests.TestCase):
             template, _ = makeTestImage(psfSize=3.0, noiseLevel=templateNoiseLevel, noiseSeed=7,
                                         templateBorderSize=20, doApplyCalibration=True)
             config = subtractImages.TransiNetSubtractTask.ConfigClass()
-            config.doSubtractBackground = False
-            config.mode = "convolveScience"
             task = subtractImages.TransiNetSubtractTask(config=config)
-            output = task.run(template, science, sources)
+            output = task.run(template, science)
             self.assertFloatsAlmostEqual(task.metadata["scaleTemplateVarianceFactor"], 1., atol=.05)
             self.assertFloatsAlmostEqual(task.metadata["scaleScienceVarianceFactor"], 1., atol=.05)
             # Mean of difference image should be close to zero.
@@ -146,20 +142,6 @@ class TransiNetSubtractTest(lsst.utils.tests.TestCase):
         _run_and_check_images(statsCtrl, statsCtrlDetect, scienceNoiseLevel=1., templateNoiseLevel=1.)
         _run_and_check_images(statsCtrl, statsCtrlDetect, scienceNoiseLevel=1., templateNoiseLevel=.1)
         _run_and_check_images(statsCtrl, statsCtrlDetect, scienceNoiseLevel=.1, templateNoiseLevel=.1)
-
-    def test_few_sources(self):
-        """Test with only 1 source, to check that we get a useful error.
-        """
-        xSize = 256
-        ySize = 256
-        science, sources = makeTestImage(psfSize=2.4, nSrc=10, xSize=xSize, ySize=ySize)
-        template, _ = makeTestImage(psfSize=2.0, nSrc=10, xSize=xSize, ySize=ySize, doApplyCalibration=True)
-        config = subtractImages.TransiNetSubtractTask.ConfigClass()
-        task = subtractImages.TransiNetSubtractTask(config=config)
-        sources = sources[0:1]
-        with self.assertRaisesRegex(RuntimeError,
-                                    "Cannot compute PSF matching kernel: too few sources selected."):
-            task.run(template, science, sources)
 
     def test_scale_variance_convolve_science(self):
         """Check variance scaling of the image difference.
@@ -230,55 +212,6 @@ class TransiNetSubtractTest(lsst.utils.tests.TestCase):
                               doDecorrelation=False, doScaleVariance=True, scaleFactor=scaleFactor)
         _run_and_check_images(science, template, sources, statsCtrl,
                               doDecorrelation=False, doScaleVariance=False, scaleFactor=scaleFactor)
-
-    def test_exposure_properties_convolve_template(self):
-        """Check that all necessary exposure metadata is included
-        when the template is convolved.
-        """
-        noiseLevel = 1.
-        seed = 37
-        rng = np.random.RandomState(seed)
-        science, sources = makeTestImage(psfSize=3.0, noiseLevel=noiseLevel, noiseSeed=6)
-        psf = science.psf
-        psfAvgPos = psf.getAveragePosition()
-        psfSize = getPsfFwhm(science.psf)
-        psfImg = psf.computeKernelImage(psfAvgPos)
-        template, _ = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=7,
-                                    templateBorderSize=20, doApplyCalibration=True)
-
-        # Generate a random aperture correction map
-        apCorrMap = lsst.afw.image.ApCorrMap()
-        for name in ("a", "b", "c"):
-            apCorrMap.set(name, lsst.afw.math.ChebyshevBoundedField(science.getBBox(), rng.randn(3, 3)))
-        science.info.setApCorrMap(apCorrMap)
-
-        config = subtractImages.TransiNetSubtractTask.ConfigClass()
-        config.mode = "convolveTemplate"
-
-        def _run_and_check_images(doDecorrelation):
-            """Check that the metadata is correct with or without decorrelation.
-            """
-            config.doDecorrelation = doDecorrelation
-            task = subtractImages.TransiNetSubtractTask(config=config)
-            output = task.run(template.clone(), science.clone(), sources)
-            psfOut = output.difference.psf
-            psfAvgPos = psfOut.getAveragePosition()
-            if doDecorrelation:
-                # Decorrelation requires recalculating the PSF,
-                #  so it will not be the same as the input
-                psfOutSize = getPsfFwhm(science.psf)
-                self.assertFloatsAlmostEqual(psfSize, psfOutSize)
-            else:
-                psfOutImg = psfOut.computeKernelImage(psfAvgPos)
-                self.assertImagesAlmostEqual(psfImg, psfOutImg)
-
-            # check PSF, WCS, bbox, filterLabel, photoCalib, aperture correction
-            self._compare_apCorrMaps(apCorrMap, output.difference.info.getApCorrMap())
-            self.assertWcsAlmostEqualOverBBox(science.wcs, output.difference.wcs, science.getBBox())
-            self.assertEqual(science.filter, output.difference.filter)
-            self.assertEqual(science.photoCalib, output.difference.photoCalib)
-        _run_and_check_images(doDecorrelation=True)
-        _run_and_check_images(doDecorrelation=False)
 
 
 def setup_module(module):

@@ -135,60 +135,14 @@ class TransiNetSubtractTask(lsst.pipe.base.PipelineTask):
             self.log.info("Applying photometric calibration to template: %f", photoCalib.getCalibrationMean())
             template.maskedImage = photoCalib.calibrateImage(template.maskedImage)
 
-        subtractResults = self.transiNetInterface.infer(template, science)
+        # Crop the template to the science image's bounding box
+        template = template[science.getBBox()]
 
-        return subtractResults
+        difference = self.transiNetInterface.infer(template, science)
 
-    def runConvolveTemplate(self, template, science, selectSources):
-        """Convolve the template image with a PSF-matching kernel and subtract
-        from the science image.
-
-        Parameters
-        ----------
-        template : `lsst.afw.image.ExposureF`
-            Template exposure, warped to match the science exposure.
-        science : `lsst.afw.image.ExposureF`
-            Science exposure to subtract from the template.
-        selectSources : `lsst.afw.table.SourceCatalog`
-            Identified sources on the science exposure. This catalog is used to
-            select sources in order to perform the AL PSF matching on stamp
-            images around them.
-
-        Returns
-        -------
-        results : `lsst.pipe.base.Struct`
-
-            ``difference`` : `lsst.afw.image.ExposureF`
-                Result of subtracting template and science.
-            ``matchedTemplate`` : `lsst.afw.image.ExposureF`
-                Warped template exposure.
-            ``backgroundModel`` : `lsst.afw.math.Function2D`
-                Background model that was fit while solving for the PSF-matching kernel
-            ``psfMatchingKernel`` : `lsst.afw.math.Kernel`
-                Kernel used to PSF-match the template to the science image.
-        """
-        kernelSources = self.makeKernel.selectKernelSources(template, science,
-                                                            candidateList=selectSources,
-                                                            preconvolved=False)
-        kernelResult = self.makeKernel.run(template, science, kernelSources,
-                                           preconvolved=False)
-
-        matchedTemplate = self._convolveExposure(template, kernelResult.psfMatchingKernel,
-                                                 self.convolutionControl,
-                                                 bbox=science.getBBox(),
-                                                 psf=science.psf,
-                                                 photoCalib=science.getPhotoCalib())
-        difference = _subtractImages(science, matchedTemplate,
-                                     backgroundModel=(kernelResult.backgroundModel
-                                                      if self.config.doSubtractBackground else None))
-        correctedExposure = self.finalize(template, science, difference, kernelResult.psfMatchingKernel,
-                                          templateMatched=True)
-
-        return lsst.pipe.base.Struct(difference=correctedExposure,
-                                     matchedTemplate=matchedTemplate,
-                                     matchedScience=science,
-                                     backgroundModel=kernelResult.backgroundModel,
-                                     psfMatchingKernel=kernelResult.psfMatchingKernel)
+        return lsst.pipe.base.Struct(difference=difference,
+                                     matchedTemplate=template,
+                                     matchedScience=science)
 
     @staticmethod
     def _validateExposures(template, science):
@@ -216,47 +170,6 @@ class TransiNetSubtractTask(lsst.pipe.base.PipelineTask):
 
         assert templateBBox.contains(scienceBBox),\
             "Template bbox does not contain all of the science image."
-
-    @staticmethod
-    def _convolveExposure(exposure, kernel, convolutionControl,
-                          bbox=None,
-                          psf=None,
-                          photoCalib=None):
-        """Convolve an exposure with the given kernel.
-
-        Parameters
-        ----------
-        exposure : `lsst.afw.Exposure`
-            exposure to convolve.
-        kernel : `lsst.afw.math.LinearCombinationKernel`
-            PSF matching kernel computed in the ``makeKernel`` subtask.
-        convolutionControl : `lsst.afw.math.ConvolutionControl`
-            Configuration for convolve algorithm.
-        bbox : `lsst.geom.Box2I`, optional
-            Bounding box to trim the convolved exposure to.
-        psf : `lsst.afw.detection.Psf`, optional
-            Point spread function (PSF) to set for the convolved exposure.
-        photoCalib : `lsst.afw.image.PhotoCalib`, optional
-            Photometric calibration of the convolved exposure.
-
-        Returns
-        -------
-        convolvedExp : `lsst.afw.Exposure`
-            The convolved image.
-        """
-        convolvedExposure = exposure.clone()
-        if psf is not None:
-            convolvedExposure.setPsf(psf)
-        if photoCalib is not None:
-            convolvedExposure.setPhotoCalib(photoCalib)
-        convolvedImage = lsst.afw.image.MaskedImageF(exposure.getBBox())
-        lsst.afw.math.convolve(convolvedImage, exposure.maskedImage, kernel, convolutionControl)
-        convolvedExposure.setMaskedImage(convolvedImage)
-        if bbox is None:
-            return convolvedExposure
-        else:
-            return convolvedExposure[bbox]
-
 
 def checkTemplateIsSufficient(templateExposure, logger, requiredTemplateFraction=0.):
     """Raise NoWorkFound if template coverage < requiredTemplateFraction
@@ -291,27 +204,3 @@ def checkTemplateIsSufficient(templateExposure, logger, requiredTemplateFraction
                        100*pixGood/templateExposure.getBBox().getArea(),
                        100*requiredTemplateFraction))
         raise lsst.pipe.base.NoWorkFound(message)
-
-
-def _subtractImages(science, template, backgroundModel=None):
-    """Subtract template from science, propagating relevant metadata.
-
-    Parameters
-    ----------
-    science : `lsst.afw.Exposure`
-        The input science image.
-    template : `lsst.afw.Exposure`
-        The template to subtract from the science image.
-    backgroundModel : `lsst.afw.MaskedImage`, optional
-        Differential background model
-
-    Returns
-    -------
-    difference : `lsst.afw.Exposure`
-        The subtracted image.
-    """
-    difference = science.clone()
-    if backgroundModel is not None:
-        difference.maskedImage -= backgroundModel
-    difference.maskedImage -= template.maskedImage
-    return difference
