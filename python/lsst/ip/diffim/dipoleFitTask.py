@@ -751,12 +751,14 @@ class DipoleFitAlgorithm(object):
         # since we set their param_hint's above.
         # Can add "method" param to not use 'leastsq' (==levenberg-marquardt), e.g. "method='nelder'"
         with warnings.catch_warnings():
-            warnings.simplefilter("ignore")  # temporarily turn off silly lmfit warnings
+            # Ignore lmfit unknown argument warnings:
+            # "psf, rel_weight, footprint, modelObj" all become pass-through kwargs for makeModel.
+            warnings.filterwarnings("ignore", "The keyword argument .* does not match", UserWarning)
             result = gmod.fit(z, weights=weights, x=in_x,
                               verbose=verbose,
                               fit_kws={'ftol': tol, 'xtol': tol, 'gtol': tol,
                                        'maxfev': 250},  # see scipy docs
-                              psf=self.diffim.getPsf(),  # hereon: kwargs that get passed to genDipoleModel()
+                              psf=self.diffim.getPsf(),  # hereon: kwargs that get passed to makeModel()
                               rel_weight=rel_weight,
                               footprint=fp,
                               modelObj=dipoleModel)
