@@ -21,38 +21,33 @@
 
 import unittest
 
-import numpy as np
-
 from lsst.ip.diffim.transiNetInterface import TransiNetInterface
 from lsst.afw.image import ExposureF
-from lsst.ip.diffim.utils import makeTestImage
 
 
 class TestTNInterface(unittest.TestCase):
     def setUp(self):
-        self.interface = TransiNetInterface('temp_var', 'neighbor')
+        self.interface = TransiNetInterface('temp_var', 'neighbor', batch_size=128)
 
     def test_single_cutout(self):
         """Test running infer on a single empty cutout.
         """
 
         # Create a pair of empty lsst expsure images
-        template = ExposureF(256,256)
+        template = ExposureF(256, 256)
         science = template.clone()
         result = self.interface.infer(template, science)
-        
+
         # Test that the result has the correct shape.
         self.assertEqual(result.getDimensions(), science.getDimensions())
-        
+
     def test_single_visit(self):
         """Test running infer on a pair of images with as large as a single visit.
         """
         # Create a pair of empty lsst expsure images
-        template = ExposureF(4000,4000)
+        template = ExposureF(4000, 4000)
         science = template.clone()
         result = self.interface.infer(template, science)
-        
+
         # Test that the result has the correct shape.
         self.assertEqual(result.getDimensions(), science.getDimensions())
-        
-
