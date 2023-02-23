@@ -1073,8 +1073,8 @@ class DipoleTestImage(object):
 
         # Now do the merge.
         if doMerge:
-            fpSet = catalog.fpSets.positive
-            fpSet.merge(catalog.fpSets.negative, grow, grow, False)
+            fpSet = catalog.positive
+            fpSet.merge(catalog.negative, grow, grow, False)
             sources = afwTable.SourceCatalog(table)
             fpSet.makeSources(sources)
 
