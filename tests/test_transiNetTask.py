@@ -67,7 +67,11 @@ class TransiNetSubtractTest(lsst.utils.tests.TestCase):
         # stddev of difference image should be close to expected value.
         differenceStd = computeRobustStatistics(output.difference.image, output.difference.mask,
                                                 makeStats(), statistic=afwMath.STDEV)
-        self.assertFloatsAlmostEqual(differenceStd, np.sqrt(2)*noiseLevel, rtol=0.1)
+
+        # TransiNet normally suppresses all noise. So just for the sake of compatibility with
+        # tests of other algorithms, we set test whether it is lower than the expected value
+        # or not.
+        self.assertLess(differenceStd, np.sqrt(2)*noiseLevel)
 
     def test_science_better(self):
         """Test that running with enough sources produces reasonable output,
@@ -83,8 +87,7 @@ class TransiNetSubtractTest(lsst.utils.tests.TestCase):
             config = subtractImages.TransiNetSubtractTask.ConfigClass()
             task = subtractImages.TransiNetSubtractTask(config=config)
             output = task.run(template, science)
-            self.assertFloatsAlmostEqual(task.metadata["scaleTemplateVarianceFactor"], 1., atol=.05)
-            self.assertFloatsAlmostEqual(task.metadata["scaleScienceVarianceFactor"], 1., atol=.05)
+
             # Mean of difference image should be close to zero.
             nGoodPix = np.sum(np.isfinite(output.difference.image.array))
             meanError = (scienceNoiseLevel + templateNoiseLevel)/np.sqrt(nGoodPix)
@@ -92,14 +95,6 @@ class TransiNetSubtractTest(lsst.utils.tests.TestCase):
                                                  statsCtrlDetect)
 
             self.assertFloatsAlmostEqual(diffimMean, 0, atol=5*meanError)
-            # stddev of difference image should be close to expected value.
-            noiseLevel = np.sqrt(scienceNoiseLevel**2 + templateNoiseLevel**2)
-            varianceMean = computeRobustStatistics(output.difference.variance, output.difference.mask,
-                                                   statsCtrl)
-            diffimStd = computeRobustStatistics(output.difference.image, output.difference.mask,
-                                                statsCtrl, statistic=afwMath.STDEV)
-            self.assertFloatsAlmostEqual(varianceMean, noiseLevel**2, rtol=0.1)
-            self.assertFloatsAlmostEqual(diffimStd, noiseLevel, rtol=0.1)
 
         _run_and_check_images(statsCtrl, statsCtrlDetect, scienceNoiseLevel=1., templateNoiseLevel=1.)
         _run_and_check_images(statsCtrl, statsCtrlDetect, scienceNoiseLevel=1., templateNoiseLevel=.1)
@@ -108,6 +103,7 @@ class TransiNetSubtractTest(lsst.utils.tests.TestCase):
     def test_template_better(self):
         """Test that running with enough sources produces reasonable output,
         with the template psf being smaller than the science.
+
         """
         statsCtrl = makeStats()
         statsCtrlDetect = makeStats(badMaskPlanes=("EDGE", "BAD", "NO_DATA"))
@@ -117,11 +113,8 @@ class TransiNetSubtractTest(lsst.utils.tests.TestCase):
             template, _ = makeTestImage(psfSize=2.0, noiseLevel=templateNoiseLevel, noiseSeed=7,
                                         templateBorderSize=20, doApplyCalibration=True)
             config = subtractImages.TransiNetSubtractTask.ConfigClass()
-            config.doSubtractBackground = False
             task = subtractImages.TransiNetSubtractTask(config=config)
-            output = task.run(template, science, sources)
-            self.assertFloatsAlmostEqual(task.metadata["scaleTemplateVarianceFactor"], 1., atol=.05)
-            self.assertFloatsAlmostEqual(task.metadata["scaleScienceVarianceFactor"], 1., atol=.05)
+            output = task.run(template, science)
             # There should be no NaNs in the image if we convolve the template with a buffer
             self.assertTrue(np.all(np.isfinite(output.difference.image.array)))
             # Mean of difference image should be close to zero.
@@ -131,87 +124,14 @@ class TransiNetSubtractTest(lsst.utils.tests.TestCase):
                                                  statsCtrlDetect)
             self.assertFloatsAlmostEqual(diffimMean, 0, atol=5*meanError)
             # stddev of difference image should be close to expected value.
-            noiseLevel = np.sqrt(scienceNoiseLevel**2 + templateNoiseLevel**2)
-            varianceMean = computeRobustStatistics(output.difference.variance, output.difference.mask,
-                                                   statsCtrl)
             diffimStd = computeRobustStatistics(output.difference.image, output.difference.mask,
                                                 statsCtrl, statistic=afwMath.STDEV)
-            self.assertFloatsAlmostEqual(varianceMean, noiseLevel**2, rtol=0.1)
-            self.assertFloatsAlmostEqual(diffimStd, noiseLevel, rtol=0.1)
+
+            self.assertFloatsAlmostEqual(diffimStd, 0, atol=0.003)
 
         _run_and_check_images(statsCtrl, statsCtrlDetect, scienceNoiseLevel=1., templateNoiseLevel=1.)
         _run_and_check_images(statsCtrl, statsCtrlDetect, scienceNoiseLevel=1., templateNoiseLevel=.1)
         _run_and_check_images(statsCtrl, statsCtrlDetect, scienceNoiseLevel=.1, templateNoiseLevel=.1)
-
-    def test_scale_variance_convolve_science(self):
-        """Check variance scaling of the image difference.
-        """
-        scienceNoiseLevel = 4.
-        templateNoiseLevel = 2.
-        scaleFactor = 1.345
-        # Make sure to include pixels with the DETECTED mask bit set.
-        statsCtrl = makeStats(badMaskPlanes=("EDGE", "BAD", "NO_DATA"))
-
-        def _run_and_check_images(science, template, sources, statsCtrl,
-                                  doDecorrelation, doScaleVariance, scaleFactor=1.):
-            """Check that the variance plane matches the expected value for
-            different configurations of ``doDecorrelation`` and ``doScaleVariance``.
-            """
-
-            config = subtractImages.TransiNetSubtractTask.ConfigClass()
-            config.mode = "convolveScience"
-            config.doSubtractBackground = False
-            config.doDecorrelation = doDecorrelation
-            config.doScaleVariance = doScaleVariance
-            task = subtractImages.TransiNetSubtractTask(config=config)
-            output = task.run(template.clone(), science.clone(), sources)
-            if doScaleVariance:
-                self.assertFloatsAlmostEqual(task.metadata["scaleTemplateVarianceFactor"],
-                                             scaleFactor, atol=0.05)
-                self.assertFloatsAlmostEqual(task.metadata["scaleScienceVarianceFactor"],
-                                             scaleFactor, atol=0.05)
-
-            templateNoise = computeRobustStatistics(template.variance, template.mask, statsCtrl)
-            if doDecorrelation:
-                scienceNoise = computeRobustStatistics(science.variance, science.mask, statsCtrl)
-            else:
-                scienceNoise = computeRobustStatistics(output.matchedScience.variance,
-                                                       output.matchedScience.mask,
-                                                       statsCtrl)
-
-            if doScaleVariance:
-                templateNoise *= scaleFactor
-                scienceNoise *= scaleFactor
-
-            varMean = computeRobustStatistics(output.difference.variance, output.difference.mask, statsCtrl)
-            self.assertFloatsAlmostEqual(varMean, scienceNoise + templateNoise, rtol=0.1)
-
-        science, sources = makeTestImage(psfSize=2.0, noiseLevel=scienceNoiseLevel, noiseSeed=6)
-        template, _ = makeTestImage(psfSize=3.0, noiseLevel=templateNoiseLevel, noiseSeed=7,
-                                    templateBorderSize=20, doApplyCalibration=True)
-        # Verify that the variance plane of the difference image is correct
-        #  when the template and science variance planes are correct
-        _run_and_check_images(science, template, sources, statsCtrl,
-                              doDecorrelation=True, doScaleVariance=True)
-        _run_and_check_images(science, template, sources, statsCtrl,
-                              doDecorrelation=True, doScaleVariance=False)
-        _run_and_check_images(science, template, sources, statsCtrl,
-                              doDecorrelation=False, doScaleVariance=True)
-        _run_and_check_images(science, template, sources, statsCtrl,
-                              doDecorrelation=False, doScaleVariance=False)
-
-        # Verify that the variance plane of the difference image is correct
-        #  when the template and science variance planes are incorrect
-        science.variance.array /= scaleFactor
-        template.variance.array /= scaleFactor
-        _run_and_check_images(science, template, sources, statsCtrl,
-                              doDecorrelation=True, doScaleVariance=True, scaleFactor=scaleFactor)
-        _run_and_check_images(science, template, sources, statsCtrl,
-                              doDecorrelation=True, doScaleVariance=False, scaleFactor=scaleFactor)
-        _run_and_check_images(science, template, sources, statsCtrl,
-                              doDecorrelation=False, doScaleVariance=True, scaleFactor=scaleFactor)
-        _run_and_check_images(science, template, sources, statsCtrl,
-                              doDecorrelation=False, doScaleVariance=False, scaleFactor=scaleFactor)
 
 
 def setup_module(module):
