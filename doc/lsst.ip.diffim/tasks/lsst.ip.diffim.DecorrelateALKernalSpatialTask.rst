@@ -26,3 +26,24 @@ performing the decorrelation.
 This task has no standalone example, however it is applied as a
 subtask of pipe.tasks.imageDifference.ImageDifferenceTask.
 There is also an example of its use in `tests/testImageDecorrelation.py`.
+
+.. _lsst.ip.diffim.DecorrelateALKernelSpatialTask-api:
+
+Python API summary
+==================
+
+.. lsst-task-api-summary:: lsst.ip.diffim.DecorrelateALKernelSpatialTask
+
+.. _lsst.ip.diffim.DecorrelateALKernelSpatialTask-subtasks:
+
+Retargetable subtasks
+=====================
+
+.. lsst-task-config-subtasks:: lsst.ip.diffim.DecorrelateALKernelSpatialTask
+
+.. _lsst.ip.diffim.DecorrelateALKernelSpatialTask-configs:
+
+Configuration fields
+====================
+
+.. lsst-task-config-fields:: lsst.ip.diffim.DecorrelateALKernelSpatialTask

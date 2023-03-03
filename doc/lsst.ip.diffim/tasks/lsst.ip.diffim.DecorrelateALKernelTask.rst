@@ -33,3 +33,24 @@ in detail in [DMTN-021](http://dmtn-021.lsst.io).
 
 This task has no standalone example, however it is applied as a
 subtask of pipe.tasks.imageDifference.ImageDifferenceTask.
+
+.. _lsst.ip.diffim.DecorrelateALKernelTask-api:
+
+Python API summary
+==================
+
+.. lsst-task-api-summary:: lsst.ip.diffim.DecorrelateALKernelTask
+
+.. _lsst.ip.diffim.DecorrelateALKernelTask-subtasks:
+
+Retargetable subtasks
+=====================
+
+.. lsst-task-config-subtasks:: lsst.ip.diffim.DecorrelateALKernelTask
+
+.. _lsst.ip.diffim.DecorrelateALKernelTask-configs:
+
+Configuration fields
+====================
+
+.. lsst-task-config-fields:: lsst.ip.diffim.DecorrelateALKernelTask
