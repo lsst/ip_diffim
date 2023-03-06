@@ -304,15 +304,15 @@ class DipoleMeasurementTask(SingleFrameMeasurementTask):
     .. code-block:: py
 
         # Merge the positve and negative sources
-        fpSet = results.fpSets.positive
+        fpSet = results.positive
         growFootprint = 2
-        fpSet.merge(results.fpSets.negative, growFootprint, growFootprint, False)
+        fpSet.merge(results.negative, growFootprint, growFootprint, False)
         diaSources = afwTable.SourceCatalog(tab)
         fpSet.makeSources(diaSources)
         print("Merged %s Sources into %d diaSources (from %d +ve, %d -ve)" % (len(results.sources),
                                                                           len(diaSources),
-                                                                          results.fpSets.numPos,
-                                                                          results.fpSets.numNeg))
+                                                                          results.numPos,
+                                                                          results.numNeg))
 
     Finally, perform measurement (both standard and dipole-specialized) on the merged sources:
 

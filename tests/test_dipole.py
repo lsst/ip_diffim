@@ -112,8 +112,8 @@ def createDipole(w, h, xc, yc, scaling=100.0, fracOffset=1.2):
 
     # Merge them together
     assert(len(results.sources) == 2)
-    fpSet = results.fpSets.positive
-    fpSet.merge(results.fpSets.negative, 0, 0, False)
+    fpSet = results.positive
+    fpSet.merge(results.negative, 0, 0, False)
     sources = afwTable.SourceCatalog(table)
     fpSet.makeSources(sources)
     assert(len(sources) == 1)

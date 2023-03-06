@@ -155,8 +155,8 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
         # catalog = detectResult.sources
         # deblendTask.run(self.dipole, catalog, psf=self.dipole.getPsf())
 
-        fpSet = detectResult.fpSets.positive
-        fpSet.merge(detectResult.fpSets.negative, 2, 2, False)
+        fpSet = detectResult.positive
+        fpSet.merge(detectResult.negative, 2, 2, False)
         sources = afwTable.SourceCatalog(table)
         fpSet.makeSources(sources)
 
