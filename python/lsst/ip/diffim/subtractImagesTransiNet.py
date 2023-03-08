@@ -64,13 +64,6 @@ class SubtractImageOutputConnections(lsst.pipe.base.PipelineTaskConnections,
         name="{fakesType}{coaddName}Diff_differenceTempExp",
     )
 
-    warpedTemplate = connectionTypes.Output(
-        doc="Warped template used to create `subtractedExposure`.",
-        dimensions=("instrument", "visit", "detector"),
-        storageClass="ExposureF",
-        name="{fakesType}{coaddName}Diff_matchedExp",
-    )
-
 
 class TransiNetSubtractConnections(SubtractInputConnections, SubtractImageOutputConnections):
 
@@ -140,9 +133,7 @@ class TransiNetSubtractTask(lsst.pipe.base.PipelineTask):
 
         difference = self.transiNetInterface.infer(template, science)
 
-        return lsst.pipe.base.Struct(difference=difference,
-                                     matchedTemplate=template,
-                                     matchedScience=science)
+        return lsst.pipe.base.Struct(difference=difference)
 
     @staticmethod
     def _validateExposures(template, science):
@@ -170,6 +161,7 @@ class TransiNetSubtractTask(lsst.pipe.base.PipelineTask):
 
         assert templateBBox.contains(scienceBBox),\
             "Template bbox does not contain all of the science image."
+
 
 def checkTemplateIsSufficient(templateExposure, logger, requiredTemplateFraction=0.):
     """Raise NoWorkFound if template coverage < requiredTemplateFraction
