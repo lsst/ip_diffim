@@ -61,7 +61,7 @@ class SubtractImageOutputConnections(lsst.pipe.base.PipelineTaskConnections,
         doc="Result of subtracting convolved template from science image.",
         dimensions=("instrument", "visit", "detector"),
         storageClass="ExposureF",
-        name="{fakesType}{coaddName}Diff_differenceTempExp",
+        name="{fakesType}{coaddName}TNDiff_differenceTempExp",
     )
 
 
