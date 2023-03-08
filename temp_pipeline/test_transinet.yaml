@@ -1,0 +1,25 @@
+description: A minimal pipeline for demonstrating the usage of (rb)TransiNetTask on DC2 data
+
+instrument: lsst.obs.lsst.LsstCamImSim
+imports:
+  - location: $AP_PIPE_DIR/pipelines/LsstCamImSim/ApPipe.yaml
+    exclude:
+      - isr
+      - characterizeImage
+      - calibrate
+      - retrieveTemplate
+      - subtractImages
+      - detectAndMeasure
+      - transformDiaSrcCat
+      - diaPipe
+
+tasks:
+  subtractImages1:
+    class: lsst.ip.diffim.subtractImages.AlardLuptonSubtractTask
+    config:
+      connections.coaddName: parameters.coaddName
+      doApplyFinalizedPsf: False
+  subtractImages2:
+    class: lsst.ip.diffim.subtractImagesTransiNet.TransiNetSubtractTask
+    config:
+      connections.coaddName: parameters.coaddName
