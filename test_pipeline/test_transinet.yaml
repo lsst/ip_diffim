@@ -14,12 +14,13 @@ imports:
       - diaPipe
 
 tasks:
-  subtractImages1:
-    class: lsst.ip.diffim.subtractImages.AlardLuptonSubtractTask
-    config:
-      connections.coaddName: parameters.coaddName
-      doApplyFinalizedPsf: False
+  # subtractImages1:
+  #   class: lsst.ip.diffim.subtractImages.AlardLuptonSubtractTask
+  #   config:
+  #     connections.coaddName: parameters.coaddName
+  #     doApplyFinalizedPsf: False
   subtractImages2:
     class: lsst.ip.diffim.subtractImagesTransiNet.TransiNetSubtractTask
     config:
+      modelPackageName: TN_39b
       connections.coaddName: parameters.coaddName
