@@ -32,6 +32,13 @@ from lsst.ip.diffim.utils import (computeRobustStatistics,
 
 
 class TransiNetSubtractTest(lsst.utils.tests.TestCase):
+
+    def setUp(self):
+        """Set up the test.
+        """
+        self.config = subtractImages.TransiNetSubtractTask.ConfigClass()
+        self.config.modelPackageName = "TN_39b"
+
     def test_mismatched_template(self):
         """Test that an error is raised if the template
         does not fully contain the science image.
@@ -40,8 +47,7 @@ class TransiNetSubtractTest(lsst.utils.tests.TestCase):
         ySize = 200
         science, sources = makeTestImage(psfSize=2.4, xSize=xSize + 20, ySize=ySize + 20)
         template, _ = makeTestImage(psfSize=2.4, xSize=xSize, ySize=ySize, doApplyCalibration=True)
-        config = subtractImages.TransiNetSubtractTask.ConfigClass()
-        task = subtractImages.TransiNetSubtractTask(config=config)
+        task = subtractImages.TransiNetSubtractTask(config=self.config)
         with self.assertRaises(AssertionError):
             task.run(template, science)
 
@@ -53,8 +59,7 @@ class TransiNetSubtractTest(lsst.utils.tests.TestCase):
         science, sources = makeTestImage(psfSize=2.4, noiseLevel=noiseLevel, noiseSeed=6)
         template, _ = makeTestImage(psfSize=2.4, noiseLevel=noiseLevel, noiseSeed=7,
                                     templateBorderSize=20, doApplyCalibration=True)
-        config = subtractImages.TransiNetSubtractTask.ConfigClass()
-        task = subtractImages.TransiNetSubtractTask(config=config)
+        task = subtractImages.TransiNetSubtractTask(config=self.config)
         output = task.run(template, science)
         # There shoud be no NaN values in the difference image
         self.assertTrue(np.all(np.isfinite(output.difference.image.array)))
@@ -84,8 +89,7 @@ class TransiNetSubtractTest(lsst.utils.tests.TestCase):
             science, sources = makeTestImage(psfSize=2.0, noiseLevel=scienceNoiseLevel, noiseSeed=6)
             template, _ = makeTestImage(psfSize=3.0, noiseLevel=templateNoiseLevel, noiseSeed=7,
                                         templateBorderSize=20, doApplyCalibration=True)
-            config = subtractImages.TransiNetSubtractTask.ConfigClass()
-            task = subtractImages.TransiNetSubtractTask(config=config)
+            task = subtractImages.TransiNetSubtractTask(config=self.config)
             output = task.run(template, science)
 
             # Mean of difference image should be close to zero.
@@ -112,8 +116,7 @@ class TransiNetSubtractTest(lsst.utils.tests.TestCase):
             science, sources = makeTestImage(psfSize=3.0, noiseLevel=scienceNoiseLevel, noiseSeed=6)
             template, _ = makeTestImage(psfSize=2.0, noiseLevel=templateNoiseLevel, noiseSeed=7,
                                         templateBorderSize=20, doApplyCalibration=True)
-            config = subtractImages.TransiNetSubtractTask.ConfigClass()
-            task = subtractImages.TransiNetSubtractTask(config=config)
+            task = subtractImages.TransiNetSubtractTask(config=self.config)
             output = task.run(template, science)
             # There should be no NaNs in the image if we convolve the template with a buffer
             self.assertTrue(np.all(np.isfinite(output.difference.image.array)))
