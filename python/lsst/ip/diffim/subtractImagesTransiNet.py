@@ -79,6 +79,18 @@ class TransiNetSubtractConfig(lsst.pipe.base.PipelineTaskConfig,
         doc="Abort task if template covers less than this fraction of pixels."
         " Setting to 0 will always attempt image subtraction."
     )
+    modelPackageName = lsst.pex.config.Field(
+        dtype=str,
+        doc=("A path-like unique identifier of a model package. ")
+    )
+    modelPackageStorageMode = lsst.pex.config.ChoiceField(
+        dtype=str,
+        doc=("A string that indicates _where_ and _how_ the model package is stored."
+             "Currently supports the two modes: 'local' for packages stored in the meas_transiNet repository "
+             "and 'neighbor' for packages stored in the rbClassifier_data repository."),
+        allowed={'local': 'local', 'neighbor': 'neighbor'},
+        default='neighbor',
+    )
 
 
 class TransiNetSubtractTask(lsst.pipe.base.PipelineTask):
@@ -91,7 +103,8 @@ class TransiNetSubtractTask(lsst.pipe.base.PipelineTask):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        self.transiNetInterface = TransiNetInterface('temp_var', 'neighbor')
+        self.transiNetInterface = TransiNetInterface(self.config.modelPackageName,
+                                                     'neighbor')
 
     @timeMethod
     def run(self, template, science):
