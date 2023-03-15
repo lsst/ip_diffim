@@ -179,7 +179,7 @@ class TransiNetInterface:
                 cimg1 = img1[y0:self.model_input_shape[1]+y0, x0:self.model_input_shape[0]+x0]
 
                 # TODO: decide how to handle near-edge cases
-                if cimg0.shape < tuple(self.model_input_shape):
+                if cimg0.shape < tuple(self.model_input_shape[:2]):
                     print('Skipping patch with size:', cimg0.shape, 'at:', x0, y0)
                     continue
 
