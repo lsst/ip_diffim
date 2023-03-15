@@ -39,6 +39,13 @@ class TransiNetSubtractTest(lsst.utils.tests.TestCase):
         self.config = subtractImages.TransiNetSubtractTask.ConfigClass()
         self.config.modelPackageName = "TN_39b"
 
+    def test_correct_interface_init(self):
+        """Test that task is initialized with the correct interface.
+        """
+        task = subtractImages.TransiNetSubtractTask(config=self.config)
+        self.assertEqual(task.transiNetInterface.model_package_name,
+                         self.config.modelPackageName)
+
     def test_mismatched_template(self):
         """Test that an error is raised if the template
         does not fully contain the science image.
