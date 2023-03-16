@@ -23,6 +23,9 @@ __all__ = ["TransiNetInterface"]
 
 import numpy as np
 import torch
+import logging
+logging.basicConfig(level=logging.DEBUG, format="{name} {levelname}: {message}", style="{")
+logger = logging.getLogger("TransiNetInterface")
 
 from lsst.meas.transiNet.modelPackages import NNModelPackage
 
@@ -180,7 +183,7 @@ class TransiNetInterface:
 
                 # TODO: decide how to handle near-edge cases
                 if cimg0.shape < tuple(self.model_input_shape[:2]):
-                    print('Skipping patch with size:', cimg0.shape, 'at:', x0, y0)
+                    logger.debug(f'Skipping patch with size: {cimg0.shape} at: {x0}, {y0}')
                     continue
 
                 # Append to the list of crops
@@ -257,6 +260,7 @@ class TransiNetInterface:
 
         # Sweep over images, create crops, and pass them through the network.
         scanning_stride = self.model_input_shape[0]//1 - 2*5
+        logger.debug(f'Scanning stride: {scanning_stride}')
         output, weight_map = self.__test_one_pair(template_, science_,
                                                   batch_size=self.batch_size,
                                                   scanning_stride=scanning_stride)
