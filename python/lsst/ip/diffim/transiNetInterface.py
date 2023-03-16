@@ -36,7 +36,10 @@ class TransiNetInterface:
     end2end TransiNet.
     """
 
-    def __init__(self, model_package_name, package_storage_mode, device='cpu',
+    def __init__(self, model_package_name, package_storage_mode,
+                 # Auto-detect the fastest device available, if not specified.
+                 # In case of multiple GPUs, choose the last one.
+                 device=torch.device(f"cuda:{torch.cuda.device_count()-1}" if torch.cuda.is_available() else "cpu"),
                  batch_size=12):
         self.model_package_name = model_package_name
         self.package_storage_mode = package_storage_mode
