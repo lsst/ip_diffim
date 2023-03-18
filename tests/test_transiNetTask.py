@@ -85,6 +85,45 @@ class TransiNetSubtractTest(lsst.utils.tests.TestCase):
         # or not.
         self.assertLess(differenceStd, np.sqrt(2)*noiseLevel)
 
+    def test_real_dc2_image_pair(self):
+        """A test on two "real" images fetched from dc2 through the butler.
+        """
+        from lsst.daf.butler import Butler
+        butler = Butler('/repo/apv')
+        template = butler.get('goodSeeingDiff_templateExp', collections='ap_verify-output/20230307T235531Z',
+                              dataId={"instrument": "LSSTCam-imSim",
+                                      "visit": 943296,
+                                      "detector": 168})
+        science = butler.get('calexp', collections='ap_verify-output/20230307T235531Z',
+                             dataId={"instrument": "LSSTCam-imSim",
+                                     "visit": 943296,
+                                     "detector": 168})
+        task = subtractImages.TransiNetSubtractTask(config=self.config)
+
+        task.transiNetInterface.logger.setLevel("DEBUG")
+
+        output = task.run(template, science).difference
+
+        # Load a reference diff image from disk and compare the results to.
+        import lsst.afw.image as afwImage
+        offline_tn_diff = afwImage.ImageF("/home/nima/transinet4lsst/eval/results/"
+                                          + "results-MODEL__39b__epoch0030476_iter0975189-apv/"
+                                          + "calexp_LSSTCam-imSim_r_r_sim_1_4"
+                                          + "_943296_R41_S20_ap_verify-output_20230307T235531Z/"
+                                          + "output_big_wcs.fits").array
+
+        # # Compare visually
+        # import matplotlib.pyplot as plt
+        # plt.figure()
+        # ax1 = plt.subplot(221)
+        # ax1.imshow(offline_tn_diff, origin='lower', vmin=-1, vmax=1)
+        # plt.subplot(222, sharex=ax1, sharey=ax1)
+        # plt.imshow(output.image.array, origin='lower', vmin=-1, vmax=1)
+        # plt.subplot(223, sharex=ax1, sharey=ax1)
+        # plt.imshow(offline_tn_diff - output.image.array, origin='lower', vmin=-1, vmax=1)
+
+        self.assertFloatsAlmostEqual(output.image.array, offline_tn_diff, atol=1e-5, rtol=1e-5)
+
     def test_science_better(self):
         """Test that running with enough sources produces reasonable output,
         with the science psf being smaller than the template.
