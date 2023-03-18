@@ -24,8 +24,6 @@ __all__ = ["TransiNetInterface"]
 import numpy as np
 import torch
 import logging
-logging.basicConfig(level=logging.DEBUG, format="{name} {levelname}: {message}", style="{")
-logger = logging.getLogger("TransiNetInterface")
 
 from lsst.meas.transiNet.modelPackages import NNModelPackage
 
@@ -41,6 +39,11 @@ class TransiNetInterface:
                  # In case of multiple GPUs, choose the last one.
                  device=torch.device(f"cuda:{torch.cuda.device_count()-1}" if torch.cuda.is_available() else "cpu"),
                  batch_size=12):
+
+        logging.basicConfig(format="{name} {levelname}: {message}", style="{")
+        torch.set_printoptions(precision=10)
+        self.logger = logging.getLogger("TransiNetInterface")
+
         self.model_package_name = model_package_name
         self.package_storage_mode = package_storage_mode
         self.device = device
@@ -186,7 +189,7 @@ class TransiNetInterface:
 
                 # TODO: decide how to handle near-edge cases
                 if cimg0.shape < tuple(self.model_input_shape[:2]):
-                    logger.debug(f'Skipping patch with size: {cimg0.shape} at: {x0}, {y0}')
+                    self.logger.debug(f'Skipping patch with size: {cimg0.shape} at: {x0}, {y0}')
                     continue
 
                 # Append to the list of crops
@@ -263,7 +266,7 @@ class TransiNetInterface:
 
         # Sweep over images, create crops, and pass them through the network.
         scanning_stride = self.model_input_shape[0]//1 - 2*5
-        logger.debug(f'Scanning stride: {scanning_stride}')
+        self.logger.debug(f'Scanning stride: {scanning_stride}')
         output, weight_map = self.__test_one_pair(template_, science_,
                                                   batch_size=self.batch_size,
                                                   scanning_stride=scanning_stride)
