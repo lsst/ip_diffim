@@ -263,6 +263,77 @@ class TransiNetInterface:
         # Convert the images to torch tensors.
         template_, science_ = self.__prepare_input(template, science)
 
+        # Debugging stuff
+        import matplotlib.pyplot as plt
+        from scipy.ndimage import binary_dilation
+        _tmp = np.load('/home/nima/transinet4lsst/eval/template.npy')
+        _sci = np.load('/home/nima/transinet4lsst/eval/science.npy')
+        discrepancy_threshold = 1e-20
+
+        self.logger.debug(f"Template: {template_}")
+        self.logger.debug(f"_tmp: {_tmp}")
+        self.logger.debug(f"Template - _tmp: {template_.numpy() - _tmp}")
+        discripancy = template_.numpy() - _tmp
+        binary_disc = abs(discripancy) > discrepancy_threshold
+        binary_disc = binary_dilation(binary_disc, iterations=5)
+        plt.figure()
+        ax1 = plt.subplot(1, 2, 1)
+        ax1.imshow(discripancy)
+        ax2 = plt.subplot(1, 2, 2, sharex=ax1, sharey=ax1)
+        ax2.imshow(binary_disc)
+        ax1.set_title('Discripancy')
+        ax2.set_title('Dilated Discripancy')
+        plt.title(f'Template -- discrepancy_threshold:{discrepancy_threshold}')
+
+        self.logger.debug(f"Science: {science_}")
+        self.logger.debug(f"_sci: {_sci}")
+        self.logger.debug(f"Science - _sci: {science_.numpy() - _sci}")
+        # Do the above discripancy visualization for science too.
+        discripancy = science_.numpy() - _sci
+        binary_disc = abs(discripancy) > discrepancy_threshold
+        binary_disc = binary_dilation(binary_disc, iterations=5)
+        plt.figure()
+        ax1 = plt.subplot(1, 2, 1)
+        ax1.imshow(discripancy)
+        ax2 = plt.subplot(1, 2, 2, sharex=ax1, sharey=ax1)
+        ax2.imshow(binary_disc)
+        ax1.set_title('Discripancy')
+        ax2.set_title('Dilated Discripancy')
+        plt.title(f'Science -- discrepancy_threshold:{discrepancy_threshold}')
+        plt.show()
+
+        self.logger.debug("")
+        self.logger.debug(f"Template mean: {template_.mean()}")
+        self.logger.debug(f"Template std: {template_.std()}")
+        self.logger.debug(f"Template min: {template_.min()}")
+        self.logger.debug(f"Template max: {template_.max()}")
+        self.logger.debug("")
+        self.logger.debug(f"Science mean: {science_.mean()}")
+        self.logger.debug(f"Science std: {science_.std()}")
+        self.logger.debug(f"Science min: {science_.min()}")
+        self.logger.debug(f"Science max: {science_.max()}")
+        self.logger.debug("")
+
+        self.logger.debug(f"_tmp mean: {_tmp.mean()}")
+        self.logger.debug(f"_tmp std: {_tmp.std()}")
+        self.logger.debug(f"_tmp min: {_tmp.min()}")
+        self.logger.debug(f"_tmp max: {_tmp.max()}")
+        self.logger.debug("")
+        self.logger.debug(f"_sci mean: {_sci.mean()}")
+        self.logger.debug(f"_sci std: {_sci.std()}")
+        self.logger.debug(f"_sci min: {_sci.min()}")
+        self.logger.debug(f"_sci max: {_sci.max()}")
+
+        # print the maximum difference between the elements of
+        # two templates and also two sciences.
+        self.logger.debug(f"Max diff between template: {np.max(np.abs(_tmp - template_.numpy()))}")
+        self.logger.debug(f"Max diff between science: {np.max(np.abs(_sci - science_.numpy()))}")
+        self.logger.debug("")
+
+        assert np.allclose(_tmp, template_.numpy(), atol=1e-12)
+        assert np.allclose(_sci, science_.numpy(), atol=1e-12)
+        exit()
+
         # Sweep over images, create crops, and pass them through the network.
         scanning_stride = self.model_input_shape[0]//1 - 2*5
         self.logger.debug(f'Scanning stride: {scanning_stride}')
