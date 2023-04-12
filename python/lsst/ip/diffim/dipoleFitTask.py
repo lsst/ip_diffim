@@ -755,7 +755,7 @@ class DipoleFitAlgorithm:
                               # see scipy docs for the meaning of these keywords
                               fit_kws={'ftol': tol, 'xtol': tol, 'gtol': tol,
                                        # Our model is float32 internally, so we need a larger epsfcn.
-                                       'epsfcn': 1e-10},
+                                       'epsfcn': 1e-8},
                               psf=self.diffim.getPsf(),  # hereon: kwargs that get passed to makeModel()
                               rel_weight=rel_weight,
                               footprint=fp,
