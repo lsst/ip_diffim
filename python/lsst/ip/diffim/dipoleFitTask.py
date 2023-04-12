@@ -92,6 +92,11 @@ class DipoleFitPluginConfig(measBase.SingleFramePluginConfig):
         Default value means \"Choose a chi2DoF corresponding to a significance level of at most 0.05\"
         (note this is actually a significance, not a chi2 value).""")
 
+    maxFootprintArea = pexConfig.Field(
+        dtype=int, default=5_000,
+        doc=("Maximum area for footprints before they are ignored as large; "
+             "non-positive means no threshold applied"))
+
 
 class DipoleFitTaskConfig(measBase.SingleFrameMeasurementConfig):
     """Measurement of detected diaSources as dipoles
@@ -755,7 +760,7 @@ class DipoleFitAlgorithm:
                               # see scipy docs for the meaning of these keywords
                               fit_kws={'ftol': tol, 'xtol': tol, 'gtol': tol,
                                        # Our model is float32 internally, so we need a larger epsfcn.
-                                       'epsfcn': 1e-10},
+                                       'epsfcn': 1e-8},
                               psf=self.diffim.getPsf(),  # hereon: kwargs that get passed to makeModel()
                               rel_weight=rel_weight,
                               footprint=fp,
@@ -1089,9 +1094,13 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
 
         # Check if the footprint consists of a putative dipole - else don't fit it.
         if (
-                (len(pks) <= 1)  # one peak in the footprint - not a dipole
+                # One peak in the footprint (not a dipole)
+                (len(pks) <= 1)
+                # Peaks are the same sign (not a dipole)
                 or (len(pks) > 1 and (np.sign(pks[0].getPeakValue())
-                    == np.sign(pks[-1].getPeakValue())))  # peaks are same sign - not a dipole
+                    == np.sign(pks[-1].getPeakValue())))
+                # Footprint is too large (not a dipole)
+                or (measRecord.getFootprint().getArea() > self.config.maxFootprintArea)
         ):
             measRecord.set(self.classificationFlagKey, False)
             measRecord.set(self.classificationAttemptedFlagKey, False)

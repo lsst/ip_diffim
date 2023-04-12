@@ -119,7 +119,7 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
             self.assertFloatsAlmostEqual(result.negCentroidX, dipoleTestImage.xc[i] - offsets[i], rtol=rtol)
             self.assertFloatsAlmostEqual(result.negCentroidY, dipoleTestImage.yc[i] - offsets[i], rtol=rtol)
 
-    def _runDetection(self, dipoleTestImage):
+    def _runDetection(self, dipoleTestImage, maxFootprintArea=None):
         """Run 'diaSource' detection on the diffim, including merging of
         positive and negative sources.
 
@@ -149,6 +149,9 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
 
         # Here is where we make the dipole fitting task. It can run the other measurements as well.
         measureTask = DipoleFitTask(config=measureConfig, schema=schema)
+
+        if maxFootprintArea:
+            measureTask.config.plugins["ip_diffim_DipoleFit"].maxFootprintArea = maxFootprintArea
 
         table = afwTable.SourceTable.make(schema)
         detectResult = detectTask.run(table, testImage.diffim)
@@ -305,6 +308,15 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
         for i, s in enumerate(sources):
             result = s.extract("ip_diffim_DipoleFit*")
             self.assertTrue(result.get("ip_diffim_DipoleFit_flag"))
+
+    def testDipoleFootprintTooLarge(self):
+        """Test that the footprint area cut flags sources."""
+
+        dipoleTestImage = DipoleTestImage()
+        # This area is smaller than the area of the test sources (~750).
+        sources = self._runDetection(dipoleTestImage, maxFootprintArea=500)
+
+        self.assertTrue(np.all(sources["ip_diffim_DipoleFit_flag"]))
 
 
 class TestMemory(lsst.utils.tests.MemoryTestCase):
