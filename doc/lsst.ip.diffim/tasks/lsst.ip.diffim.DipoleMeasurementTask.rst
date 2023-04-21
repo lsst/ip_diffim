@@ -1,8 +1,8 @@
 .. lsst-task-topic:: lsst.ip.diffim.DipoleMeasurementTask
 
-##########################
+#####################
 DipoleMeasurementTask
-##########################
+#####################
 
 DipoleMeasurementTask measures sources on images to identify likely dipoles.
 This task is purely a configuration wrapper around `~lsst.meas.base.SingleFrameMeasurementTask`, with helpers to performe dipole-specific measurements.
@@ -10,9 +10,9 @@ This task is purely a configuration wrapper around `~lsst.meas.base.SingleFrameM
 .. _lsst.ip.diffim.DipoleMeasurementTask-description:
 
 Description
-==================
+===========
 
-These plugins enabled by default allow the user to test the hypothesis that the
+The plugins used by this task by default allow the user to test the hypothesis that the
 Source is a dipole. This includes a set of measurements derived from
 intermediate base classes DipoleCentroidAlgorithm and DipoleFluxAlgorithm.
 Their respective algorithm control classes are defined in

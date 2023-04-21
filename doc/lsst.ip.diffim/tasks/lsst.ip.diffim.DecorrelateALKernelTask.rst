@@ -1,8 +1,8 @@
 .. lsst-task-topic:: lsst.ip.diffim.DecorrelateALKernelTask
 
-##########################
+#######################
 DecorrelateALKernelTask
-##########################
+#######################
 
 Pipe-task that removes the neighboring-pixel covariance in an
 image difference that are added when the template image is
@@ -11,11 +11,10 @@ convolved with the Alard-Lupton PSF matching kernel.
 .. _lsst.ip.diffim.DecorrelateALKernelTask-description:
 
 Description
-==================
+===========
 
-The image differencing pipeline task @link
-ip.diffim.psfMatch.PsfMatchTask PSFMatchTask@endlink and @link
-ip.diffim.psfMatch.PsfMatchConfigAL PSFMatchConfigAL@endlink uses
+The image differencing pipeline task `~ip.diffim.psfMatch.PsfMatchTask` and
+`~ip.diffim.psfMatch.PsfMatchConfigAL` uses
 the Alard and Lupton (1998) method for matching the PSFs of the
 template and science exposures prior to subtraction. The
 Alard-Lupton method identifies a matching kernel, which is then
@@ -32,7 +31,7 @@ convolving the image difference with it. This process is described
 in detail in [DMTN-021](http://dmtn-021.lsst.io).
 
 This task has no standalone example, however it is applied as a
-subtask of pipe.tasks.imageDifference.ImageDifferenceTask.
+subtask of `~pipe.tasks.imageDifference.ImageDifferenceTask`.
 
 .. _lsst.ip.diffim.DecorrelateALKernelTask-api:
 

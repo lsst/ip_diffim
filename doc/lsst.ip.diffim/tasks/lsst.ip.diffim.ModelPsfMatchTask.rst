@@ -1,8 +1,8 @@
 .. lsst-task-topic:: lsst.ip.diffim.ModelPsfMatchTask
 
-##########################
+#################
 ModelPsfMatchTask
-##########################
+#################
 
 ImagePsfMatchTask creates a PSF-matching kernel for two models.
 
@@ -22,7 +22,7 @@ a 21x21 matrix).  When the Psf-matching kernel is being solved for, the
 Psf "image" is convolved with each kernel basis function, leading to a loss of
 information around the borders. This pixel loss will be problematic for the
 numerical stability of the kernel solution if the size of the convolution
-kernel(set by ModelPsfMatchConfig.kernelSize) is much bigger than: psfSize//2.
+kernel(set by ``ModelPsfMatchConfig.kernelSize``) is much bigger than: psfSize//2.
 Thus the sizes of Psf-model matching kernels are typically smaller than their
 image-matching counterparts.  If the size of the kernel is too small, the
 convolved stars will look "boxy"; if the kernel is too large, the kernel
@@ -33,7 +33,7 @@ The primary use case for this Task is in matching an Exposure to a
 constant-across-the-sky Psf model for the purposes of image coaddition. It is
 important to note that in the code, the "template" Psf is the Psf that the
 science image gets matched to.  In this sense the order of template and
-science image are reversed, compared to ImagePsfMatchTask, which operates on
+science image are reversed, compared to ``ImagePsfMatchTask``, which operates on
 the template image.
 
 .. _lsst.ip.diffim.ModelPsfMatchTask-api:
@@ -62,9 +62,9 @@ Configuration fields
 Debugging
 =========
 
-The ``pipetask`` command line interface supports a flag ``--debug`` to import
-ref:  supports a flag ``--debug`` to import debug.py from your PYTHONPATH;
-see :ref:`lsstDebug` for more about debug.py files.
+The ``pipetask`` command line interface supports a ``--debug`` flag to import
+``debug.py`` from your PYTHONPATH; see :ref:`lsstDebug` for more about ``debug.py``
+files.
 The available variables in ModelsPsfMatchTask include:
 
 display : `bool`

@@ -1,15 +1,15 @@
 .. lsst-task-topic:: lsst.ip.diffim.DiaCatalogSourceSelectorTask
 
-##########################
+############################
 DiaCatalogSourceSelectorTask
-##########################
+############################
 
 A task that selects sources for Kernel candidates.
 
 .. _lsst.ip.diffim.DiaCatalogSourceSelectorTask-description:
 
 Description
-==================
+===========
 
 A naive star selector based on second moments. Use with caution.
 
@@ -39,7 +39,10 @@ Configuration fields
 Debugging
 =========
 
-DiaCatalogSourceSelectorTask has a debug dictionary with the following keys:
+The ``pipetask`` command line interface supports a ``--debug`` flag to import
+``debug.py`` from your PYTHONPATH; see :ref:`lsstDebug` for more about ``debug.py``
+files.
+The available variables in DiaCatalogSourceSelectorTask include:
 
 display : `bool`
     if True display debug information

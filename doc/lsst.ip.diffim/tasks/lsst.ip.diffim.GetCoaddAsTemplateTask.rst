@@ -1,8 +1,8 @@
 .. lsst-task-topic:: lsst.ip.diffim.GetCoaddAsTemplateTask
 
-##########################
+######################
 GetCoaddAsTemplateTask
-##########################
+######################
 
 From the given skymap, the closest tract is selected; multiple tracts are
 not supported. The assembled template inherits the WCS of the selected
