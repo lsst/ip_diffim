@@ -58,33 +58,6 @@ class DecorrelateALKernelConfig(pexConfig.Config):
 class DecorrelateALKernelTask(pipeBase.Task):
     """Decorrelate the effect of convolution by Alard-Lupton matching kernel in image difference
 
-    Notes
-    -----
-
-    Pipe-task that removes the neighboring-pixel covariance in an
-    image difference that are added when the template image is
-    convolved with the Alard-Lupton PSF matching kernel.
-
-    The image differencing pipeline task @link
-    ip.diffim.psfMatch.PsfMatchTask PSFMatchTask@endlink and @link
-    ip.diffim.psfMatch.PsfMatchConfigAL PSFMatchConfigAL@endlink uses
-    the Alard and Lupton (1998) method for matching the PSFs of the
-    template and science exposures prior to subtraction. The
-    Alard-Lupton method identifies a matching kernel, which is then
-    (typically) convolved with the template image to perform PSF
-    matching. This convolution has the effect of adding covariance
-    between neighboring pixels in the template image, which is then
-    added to the image difference by subtraction.
-
-    The pixel covariance may be corrected by whitening the noise of
-    the image difference. This task performs such a decorrelation by
-    computing a decorrelation kernel (based upon the A&L matching
-    kernel and variances in the template and science images) and
-    convolving the image difference with it. This process is described
-    in detail in [DMTN-021](http://dmtn-021.lsst.io).
-
-    This task has no standalone example, however it is applied as a
-    subtask of pipe.tasks.imageDifference.ImageDifferenceTask.
     """
     ConfigClass = DecorrelateALKernelConfig
     _DefaultName = "ip_diffim_decorrelateALKernel"
@@ -789,26 +762,6 @@ class DecorrelateALKernelSpatialConfig(pexConfig.Config):
 class DecorrelateALKernelSpatialTask(pipeBase.Task):
     """Decorrelate the effect of convolution by Alard-Lupton matching kernel in image difference
 
-    Notes
-    -----
-
-    Pipe-task that removes the neighboring-pixel covariance in an
-    image difference that are added when the template image is
-    convolved with the Alard-Lupton PSF matching kernel.
-
-    This task is a simple wrapper around @ref DecorrelateALKernelTask,
-    which takes a `spatiallyVarying` parameter in its `run` method. If
-    it is `False`, then it simply calls the `run` method of @ref
-    DecorrelateALKernelTask. If it is True, then it uses the @ref
-    ImageMapReduceTask framework to break the exposures into
-    subExposures on a grid, and performs the `run` method of @ref
-    DecorrelateALKernelTask on each subExposure. This enables it to
-    account for spatially-varying PSFs and noise in the exposures when
-    performing the decorrelation.
-
-    This task has no standalone example, however it is applied as a
-    subtask of pipe.tasks.imageDifference.ImageDifferenceTask.
-    There is also an example of its use in `tests/testImageDecorrelation.py`.
     """
     ConfigClass = DecorrelateALKernelSpatialConfig
     _DefaultName = "ip_diffim_decorrelateALKernelSpatial"
