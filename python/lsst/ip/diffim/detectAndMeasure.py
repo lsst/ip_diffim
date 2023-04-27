@@ -19,10 +19,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+from deprecated.sphinx import deprecated
+
 import lsst.afw.table as afwTable
 import lsst.daf.base as dafBase
 from lsst.meas.algorithms import SkyObjectsTask, SourceDetectionTask
-from lsst.meas.base import ForcedMeasurementTask, ApplyApCorrTask
+from lsst.meas.base import ForcedMeasurementTask, ApplyApCorrTask, DetectorVisitIdGeneratorConfig
 import lsst.meas.extensions.trailedSources  # noqa: F401
 import lsst.meas.extensions.shapeHSM
 from lsst.obs.base import ExposureIdInfo
@@ -138,6 +140,7 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         target=SkyObjectsTask,
         doc="Generate sky sources",
     )
+    idGenerator = DetectorVisitIdGeneratorConfig.make_field()
 
     def setDefaults(self):
         # DiaSource Detection
@@ -215,6 +218,14 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         self.outputSchema.getTable().setMetadata(self.algMetadata)
 
     @staticmethod
+    @deprecated(
+        reason=(
+            "ID factory construction now depends on configuration; use the "
+            "idGenerator config field. Will be removed after v27."
+        ),
+        version="v26.0",
+        category=FutureWarning,
+    )
     def makeIdFactory(expId, expBits):
         """Create IdFactory instance for unique 64 bit diaSource id-s.
 
@@ -242,10 +253,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                    inputRefs: pipeBase.InputQuantizedConnection,
                    outputRefs: pipeBase.OutputQuantizedConnection):
         inputs = butlerQC.get(inputRefs)
-        expId, expBits = butlerQC.quantum.dataId.pack("visit_detector",
-                                                      returnMaxBits=True)
-        idFactory = self.makeIdFactory(expId=expId, expBits=expBits)
-
+        idGenerator = self.config.idGenerator.apply(butlerQC.quantum.dataId)
+        idFactory = idGenerator.make_table_id_factory()
         outputs = self.run(**inputs, idFactory=idFactory)
         butlerQC.put(outputs, outputRefs)
 
