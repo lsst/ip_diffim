@@ -512,8 +512,17 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         mask = difference.mask
         mask &= ~(mask.getPlaneBitMask("DETECTED") | mask.getPlaneBitMask("DETECTED_NEGATIVE"))
 
+        # We have cleared the template mask plane, so copy the mask plane of
+        # the image difference so that we can calculate correct statistics
+        # during decorrelation. Do this regardless of whether decorrelation is
+        # used for consistency.
+        template[science.getBBox()].mask.array[...] = difference.mask.array[...]
         if self.config.doDecorrelation:
             self.log.info("Decorrelating image difference.")
+            # We have cleared the template mask plane, so copy the mask plane of
+            # the image difference so that we can calculate correct statistics
+            # during decorrelation
+            template[science.getBBox()].mask.array[...] = difference.mask.array[...]
             correctedExposure = self.decorrelate.run(science, template[science.getBBox()], difference, kernel,
                                                      templateMatched=templateMatched,
                                                      preConvMode=preConvMode,

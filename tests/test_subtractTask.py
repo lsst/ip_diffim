@@ -281,7 +281,7 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         # Don't include a border for the template, in order to make the results
         #  comparable when we swap which image is treated as the "science" image.
         science, sources = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel,
-                                         noiseSeed=6, templateBorderSize=0)
+                                         noiseSeed=6, templateBorderSize=0, doApplyCalibration=True)
         template, _ = makeTestImage(psfSize=3.0, noiseLevel=noiseLevel,
                                     noiseSeed=7, templateBorderSize=0, doApplyCalibration=True)
         config = subtractImages.AlardLuptonSubtractTask.ConfigClass()
@@ -329,18 +329,22 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         noiseLevel = .1
         seed1 = 6
         seed2 = 7
-        science1, sources1 = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=seed1)
+        science1, sources1 = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=seed1,
+                                           clearEdgeMask=True)
         template1, _ = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=seed2,
-                                     templateBorderSize=0, doApplyCalibration=True)
+                                     templateBorderSize=0, doApplyCalibration=True,
+                                     clearEdgeMask=True)
         config1 = subtractImages.AlardLuptonSubtractTask.ConfigClass()
         config1.mode = "convolveTemplate"
         config1.doSubtractBackground = False
         task1 = subtractImages.AlardLuptonSubtractTask(config=config1)
         results_convolveTemplate = task1.run(template1, science1, sources1)
 
-        science2, sources2 = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=seed1)
+        science2, sources2 = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=seed1,
+                                           clearEdgeMask=True)
         template2, _ = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=seed2,
-                                     templateBorderSize=0, doApplyCalibration=True)
+                                     templateBorderSize=0, doApplyCalibration=True,
+                                     clearEdgeMask=True)
         config2 = subtractImages.AlardLuptonSubtractTask.ConfigClass()
         config2.mode = "convolveScience"
         config2.doSubtractBackground = False
