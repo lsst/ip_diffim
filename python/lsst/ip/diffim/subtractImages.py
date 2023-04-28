@@ -153,7 +153,7 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
     detectionThreshold = lsst.pex.config.Field(
         dtype=float,
         default=10,
-        doc="Minimum signal to noise ration of detected sources "
+        doc="Minimum signal to noise ratio of detected sources "
         "to use for calculating the PSF matching kernel."
     )
     badSourceFlags = lsst.pex.config.ListField(
@@ -167,6 +167,11 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
         dtype=str,
         default=("NO_DATA", "BAD", "SAT", "EDGE"),
         doc="Mask planes to exclude when selecting sources for PSF matching."
+    )
+    preserveTemplateMask = lsst.pex.config.ListField(
+        dtype=str,
+        default=("NO_DATA", "BAD", "SAT"),
+        doc="Mask planes from the template to propagate to the image difference."
     )
 
     def setDefaults(self):
@@ -692,6 +697,23 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             self.metadata.add("scaleTemplateVarianceFactor", templateVarFactor)
             self.log.info("Science variance scaling factor: %.2f", sciVarFactor)
             self.metadata.add("scaleScienceVarianceFactor", sciVarFactor)
+        self._clearMask(template)
+
+    def _clearMask(self, template):
+        """Clear the mask plane of the template.
+
+        Parameters
+        ----------
+        template : `lsst.afw.image.ExposureF`
+            Template exposure, warped to match the science exposure.
+            The mask plane will be modified in place.
+        """
+        mask = template.mask
+        clearMaskPlanes = [maskplane for maskplane in mask.getMaskPlaneDict().keys()
+                           if maskplane not in self.config.preserveTemplateMask]
+
+        bitMaskToClear = mask.getPlaneBitMask(clearMaskPlanes)
+        mask &= ~bitMaskToClear
 
 
 class AlardLuptonPreconvolveSubtractConnections(SubtractInputConnections,
