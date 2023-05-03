@@ -31,6 +31,8 @@ import lsst.utils.logging as logUtils
 import lsst.pex.config as pexConfig
 import numpy as num
 
+from lsst.ip.diffim import PsfMatchConfigDF
+
 verbosity = 0
 logUtils.trace_set_at("lsst.ip.diffim", verbosity)
 
@@ -38,9 +40,8 @@ logUtils.trace_set_at("lsst.ip.diffim", verbosity)
 class DiffimTestCases(unittest.TestCase):
 
     def setUp(self):
-        self.config = ipDiffim.ImagePsfMatchTask.ConfigClass()
-        self.subconfig = self.config.kernel["DF"]
-        self.ps = pexConfig.makePropertySet(self.subconfig)
+        self.config = PsfMatchConfigDF()
+        self.ps = pexConfig.makePropertySet(self.config)
 
     def tearDown(self):
         del self.ps

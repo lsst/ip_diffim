@@ -11,23 +11,23 @@ import lsst.ip.diffim as ipDiffim
 import lsst.utils.logging as logUtils
 import lsst.pex.config as pexConfig
 
+from lsst.ip.diffim import PsfMatchConfigAL
+
 logUtils.trace_set_at("lsst.ip.diffim", 4)
 
 
 class DiffimTestCases(lsst.utils.tests.TestCase):
 
     def setUp(self):
-        self.config = ipDiffim.ImagePsfMatchTask.ConfigClass()
-        self.config.kernel.name = "AL"
-        self.subconfig = self.config.kernel.active
+        self.config = PsfMatchConfigAL()
 
         # Test was put together before the min size went to 21
-        self.subconfig.kernelSize = 19
+        self.config.kernelSize = 19
 
-        self.subconfig.scaleByFwhm = False
-        self.subconfig.fitForBackground = True
-        self.subconfig.spatialModelType = "polynomial"
-        self.ps = pexConfig.makePropertySet(self.subconfig)
+        self.config.scaleByFwhm = False
+        self.config.fitForBackground = True
+        self.config.spatialModelType = "polynomial"
+        self.ps = pexConfig.makePropertySet(self.config)
 
         self.smi = afwImage.MaskedImageF('tests/compareToHotpants/scienceMI.fits')
         self.tmi = afwImage.MaskedImageF('tests/compareToHotpants/templateMI.fits')
@@ -35,7 +35,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         self.tmi.setXY0(0, 0)
 
         # Run detection
-        # detConfig = self.subconfig.detectionConfig
+        # detConfig = self.config.detectionConfig
         # Note here regarding detConfig:
         #
         # If I set detThresholdType = "pixel_stdev", I get slightly
@@ -68,10 +68,10 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         nGauss = 1
         sGauss = [3.]
         dGauss = [3]
-        self.subconfig.alardNGauss = nGauss
-        self.subconfig.alardSigGauss = sGauss
-        self.subconfig.alardDegGauss = dGauss
-        basisList0 = ipDiffim.makeKernelBasisList(self.subconfig)
+        self.config.alardNGauss = nGauss
+        self.config.alardSigGauss = sGauss
+        self.config.alardDegGauss = dGauss
+        basisList0 = ipDiffim.makeKernelBasisList(self.config)
 
         # HP does things in a different order, and with different normalization, so reorder list
         order = [0, 2, 5, 9, 1, 4, 8, 3, 7, 6]

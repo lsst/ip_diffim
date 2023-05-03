@@ -24,7 +24,6 @@ import unittest
 import lsst.afw.math as afwMath
 import lsst.afw.table as afwTable
 import lsst.geom
-import lsst.ip.diffim.imagePsfMatch
 import lsst.meas.algorithms as measAlg
 from lsst.ip.diffim import subtractImages
 from lsst.pex.config import FieldValidationError
