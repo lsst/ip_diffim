@@ -492,16 +492,3 @@ class GetDcrTemplateTask(GetTemplateTask):
 def _selectDataRef(coaddRef, tract, patch):
     condition = (coaddRef.dataId['tract'] == tract) & (coaddRef.dataId['patch'] == patch)
     return condition
-
-
-class GetMultiTractCoaddTemplateConfig(GetTemplateConfig):
-    pass
-
-
-class GetMultiTractCoaddTemplateTask(GetTemplateTask):
-    ConfigClass = GetMultiTractCoaddTemplateConfig
-    _DefaultName = "getMultiTractCoaddTemplate"
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.log.warning("GetMultiTractCoaddTemplateTask is deprecated. Use GetTemplateTask instead.")
