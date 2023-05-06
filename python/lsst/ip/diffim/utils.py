@@ -1239,6 +1239,7 @@ def makeTestImage(seed=5, nSrc=20, psfSize=2., noiseLevel=5.,
                   xLoc=None,
                   yLoc=None,
                   flux=None,
+                  clearEdgeMask=False,
                   ):
     """Make a reproduceable PSF-convolved exposure for testing.
 
@@ -1278,6 +1279,8 @@ def makeTestImage(seed=5, nSrc=20, psfSize=2., noiseLevel=5.,
     flux : `list` of `float`, optional
         User-specified fluxes of the simulated sources.
         If specified, must have length equal to ``nSrc``
+    clearEdgeMask : `bool`, optional
+        Clear the "EDGE" mask plane after source detection.
 
     Returns
     -------
@@ -1285,6 +1288,11 @@ def makeTestImage(seed=5, nSrc=20, psfSize=2., noiseLevel=5.,
         The model image, with the mask and variance planes.
     sourceCat : `lsst.afw.table.SourceCatalog`
         Catalog of sources detected on the model image.
+
+    Raises
+    ------
+    ValueError
+        If `xloc`, `yloc`, or `flux` are supplied with inconsistant lengths.
     """
     # Distance from the inner edge of the bounding box to avoid placing test
     # sources in the model images.
@@ -1327,6 +1335,8 @@ def makeTestImage(seed=5, nSrc=20, psfSize=2., noiseLevel=5.,
 
     # Run source detection to set up the mask plane
     sourceCat = detectTestSources(modelExposure)
+    if clearEdgeMask:
+        modelExposure.mask &= ~modelExposure.mask.getPlaneBitMask("EDGE")
     modelExposure.setPhotoCalib(afwImage.PhotoCalib(calibration, 0., bbox))
     if background is not None:
         modelExposure.image += background

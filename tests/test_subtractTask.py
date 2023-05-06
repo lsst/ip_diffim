@@ -68,6 +68,47 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         with self.assertRaises(AssertionError):
             task.run(template, science, sources)
 
+    def test_clear_template_mask(self):
+        noiseLevel = 1.
+        science, sources = makeTestImage(psfSize=3.0, noiseLevel=noiseLevel, noiseSeed=6)
+        template, _ = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=7,
+                                    templateBorderSize=20, doApplyCalibration=True)
+        diffimEmptyMaskPlanes = ["DETECTED", "DETECTED_NEGATIVE"]
+        config = subtractImages.AlardLuptonSubtractTask.ConfigClass()
+        config.doSubtractBackground = False
+        config.mode = "convolveTemplate"
+        # Ensure that each each mask plane is set for some pixels
+        mask = template.mask
+        x0 = 50
+        x1 = 75
+        y0 = 150
+        y1 = 175
+        scienceMaskCheck = {}
+        for maskPlane in mask.getMaskPlaneDict().keys():
+            scienceMaskCheck[maskPlane] = np.sum(science.mask.array & mask.getPlaneBitMask(maskPlane) > 0)
+            mask.array[x0: x1, y0: y1] |= mask.getPlaneBitMask(maskPlane)
+            self.assertTrue(np.sum(mask.array & mask.getPlaneBitMask(maskPlane) > 0))
+
+        task = subtractImages.AlardLuptonSubtractTask(config=config)
+        output = task.run(template, science, sources)
+        # Verify that the template mask has been modified in place
+        for maskPlane in mask.getMaskPlaneDict().keys():
+            if maskPlane in diffimEmptyMaskPlanes:
+                self.assertTrue(np.sum(mask.array & mask.getPlaneBitMask(maskPlane) == 0))
+            elif maskPlane in config.preserveTemplateMask:
+                self.assertTrue(np.sum(mask.array & mask.getPlaneBitMask(maskPlane) > 0))
+            else:
+                self.assertTrue(np.sum(mask.array & mask.getPlaneBitMask(maskPlane) == 0))
+        # Mask planes set in the science image should also be set in the difference
+        # Except the "DETECTED" planes should have been cleared
+        diffimMask = output.difference.mask
+        for maskPlane, scienceSum in scienceMaskCheck.items():
+            diffimSum = np.sum(diffimMask.array & mask.getPlaneBitMask(maskPlane) > 0)
+            if maskPlane in diffimEmptyMaskPlanes:
+                self.assertEqual(diffimSum, 0)
+            else:
+                self.assertTrue(diffimSum >= scienceSum)
+
     def test_equal_images(self):
         """Test that running with enough sources produces reasonable output,
         with the same size psf in the template and science.
@@ -281,7 +322,7 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         # Don't include a border for the template, in order to make the results
         #  comparable when we swap which image is treated as the "science" image.
         science, sources = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel,
-                                         noiseSeed=6, templateBorderSize=0)
+                                         noiseSeed=6, templateBorderSize=0, doApplyCalibration=True)
         template, _ = makeTestImage(psfSize=3.0, noiseLevel=noiseLevel,
                                     noiseSeed=7, templateBorderSize=0, doApplyCalibration=True)
         config = subtractImages.AlardLuptonSubtractTask.ConfigClass()
@@ -329,18 +370,22 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         noiseLevel = .1
         seed1 = 6
         seed2 = 7
-        science1, sources1 = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=seed1)
+        science1, sources1 = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=seed1,
+                                           clearEdgeMask=True)
         template1, _ = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=seed2,
-                                     templateBorderSize=0, doApplyCalibration=True)
+                                     templateBorderSize=0, doApplyCalibration=True,
+                                     clearEdgeMask=True)
         config1 = subtractImages.AlardLuptonSubtractTask.ConfigClass()
         config1.mode = "convolveTemplate"
         config1.doSubtractBackground = False
         task1 = subtractImages.AlardLuptonSubtractTask(config=config1)
         results_convolveTemplate = task1.run(template1, science1, sources1)
 
-        science2, sources2 = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=seed1)
+        science2, sources2 = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=seed1,
+                                           clearEdgeMask=True)
         template2, _ = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=seed2,
-                                     templateBorderSize=0, doApplyCalibration=True)
+                                     templateBorderSize=0, doApplyCalibration=True,
+                                     clearEdgeMask=True)
         config2 = subtractImages.AlardLuptonSubtractTask.ConfigClass()
         config2.mode = "convolveScience"
         config2.doSubtractBackground = False
@@ -714,6 +759,45 @@ class AlardLuptonPreconvolveSubtractTest(lsst.utils.tests.TestCase):
         scoreStd = computeRobustStatistics(output.scoreExposure.image, output.scoreExposure.mask,
                                            statsCtrl=statsCtrl, statistic=afwMath.STDEV)
         self.assertFloatsAlmostEqual(scoreStd, np.sqrt(2)*noiseLevel/np.sqrt(nea), rtol=0.1)
+
+    def test_clear_template_mask(self):
+        noiseLevel = 1.
+        science, sources = makeTestImage(psfSize=3.0, noiseLevel=noiseLevel, noiseSeed=6)
+        template, _ = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=7,
+                                    templateBorderSize=20, doApplyCalibration=True)
+        diffimEmptyMaskPlanes = ["DETECTED", "DETECTED_NEGATIVE"]
+        config = subtractImages.AlardLuptonPreconvolveSubtractTask.ConfigClass()
+        config.doSubtractBackground = False        # Ensure that each each mask plane is set for some pixels
+        mask = template.mask
+        x0 = 50
+        x1 = 75
+        y0 = 150
+        y1 = 175
+        scienceMaskCheck = {}
+        for maskPlane in mask.getMaskPlaneDict().keys():
+            scienceMaskCheck[maskPlane] = np.sum(science.mask.array & mask.getPlaneBitMask(maskPlane) > 0)
+            mask.array[x0: x1, y0: y1] |= mask.getPlaneBitMask(maskPlane)
+            self.assertTrue(np.sum(mask.array & mask.getPlaneBitMask(maskPlane) > 0))
+
+        task = subtractImages.AlardLuptonPreconvolveSubtractTask(config=config)
+        output = task.run(template, science, sources)
+        # Verify that the template mask has been modified in place
+        for maskPlane in mask.getMaskPlaneDict().keys():
+            if maskPlane in diffimEmptyMaskPlanes:
+                self.assertTrue(np.sum(mask.array & mask.getPlaneBitMask(maskPlane) == 0))
+            elif maskPlane in config.preserveTemplateMask:
+                self.assertTrue(np.sum(mask.array & mask.getPlaneBitMask(maskPlane) > 0))
+            else:
+                self.assertTrue(np.sum(mask.array & mask.getPlaneBitMask(maskPlane) == 0))
+        # Mask planes set in the science image should also be set in the difference
+        # Except the "DETECTED" planes should have been cleared
+        diffimMask = output.scoreExposure.mask
+        for maskPlane, scienceSum in scienceMaskCheck.items():
+            diffimSum = np.sum(diffimMask.array & mask.getPlaneBitMask(maskPlane) > 0)
+            if maskPlane in diffimEmptyMaskPlanes:
+                self.assertEqual(diffimSum, 0)
+            else:
+                self.assertTrue(diffimSum >= scienceSum)
 
     def test_agnostic_template_psf(self):
         """Test that the Score image is the same whether the template PSF is
