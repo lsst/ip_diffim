@@ -408,6 +408,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
         results = self.getOverlappingExposures(inputs)
         inputs["coaddExposures"] = results.coaddExposures
         inputs["dataIds"] = results.dataIds
+        inputs["physical_filter"] = butlerQC.quantum.dataId["physical_filter"]
         outputs = self.run(**inputs)
         butlerQC.put(outputs, outputRefs)
 
@@ -481,7 +482,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
         return pipeBase.Struct(coaddExposures=coaddExposureList,
                                dataIds=dataIds)
 
-    def run(self, coaddExposures, bbox, wcs, dataIds, **kwargs):
+    def run(self, coaddExposures, bbox, wcs, dataIds, physical_filter=None, **kwargs):
         """Warp coadds from multiple tracts to form a template for image diff.
 
         Where the tracts overlap, the resulting template image is averaged.
@@ -499,6 +500,8 @@ class GetTemplateTask(pipeBase.PipelineTask):
             Template WCS onto which to resample the ``coaddExposures``.
         dataIds : `list` [`lsst.daf.butler.DataCoordinate`]
             Record of the tract and patch of each coaddExposure.
+        physical_filter : `str`, optional
+            The physical filter of the science image.
         **kwargs
             Any additional keyword parameters.
 
@@ -510,6 +513,13 @@ class GetTemplateTask(pipeBase.PipelineTask):
            ``template``
                A template coadd exposure assembled out of patches
                (`lsst.afw.image.ExposureF`).
+
+        Raises
+        ------
+        NoWorkFound
+            If no coadds are found with sufficient un-masked pixels.
+        RuntimeError
+            If the PSF of the template can't be calculated.
         """
         # Table for CoaddPSF
         tractsSchema = afwTable.ExposureTable.makeMinimalSchema()
@@ -583,7 +593,12 @@ class GetTemplateTask(pipeBase.PipelineTask):
             raise RuntimeError("CoaddPsf could not be constructed")
 
         templateExposure.setPsf(coaddPsf)
-        templateExposure.setFilter(coaddExposure.getFilter())
+        # Coadds do not have a physical filter, so fetch it from the butler to prevent downstream warnings.
+        if physical_filter is None:
+            filterLabel = coaddExposure.getFilter()
+        else:
+            filterLabel = afwImage.FilterLabel(dataId['band'], physical_filter)
+        templateExposure.setFilter(filterLabel)
         templateExposure.setPhotoCalib(coaddExposure.getPhotoCalib())
         return pipeBase.Struct(template=templateExposure)
 
