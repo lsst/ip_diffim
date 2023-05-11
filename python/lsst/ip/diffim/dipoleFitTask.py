@@ -860,7 +860,7 @@ class DipoleFitAlgorithm:
         def computeSumVariance(exposure, footprint):
             box = footprint.getBBox()
             subim = afwImage.MaskedImageF(exposure.getMaskedImage(), box, origin=afwImage.PARENT)
-            return np.sqrt(np.nansum(subim.getArrays()[1][:, :]))
+            return np.sqrt(np.nansum(subim.getArrays()[2][:, :]))
 
         fluxVal = fluxVar = fitParams['flux']
         fluxErr = fluxErrNeg = fitResult.params['flux'].stderr
