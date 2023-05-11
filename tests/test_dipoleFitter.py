@@ -295,19 +295,13 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
         singleFramePlugin.
 
         Test that the dipoles which are too close to the edge are
-        flagged as such in the catalog and do not raise an error that is
-        not caught. Make sure both diaSources are actually detected,
-        if not measured.
+        not detected.
         """
 
         dipoleTestImage = DipoleTestImage(xc=[5.3, 4.8], yc=[4.6, 96.5])
         sources = self._runDetection(dipoleTestImage)
 
-        self.assertTrue(len(sources) == 2)
-
-        for i, s in enumerate(sources):
-            result = s.extract("ip_diffim_DipoleFit*")
-            self.assertTrue(result.get("ip_diffim_DipoleFit_flag"))
+        self.assertTrue(len(sources) == 0)
 
     def testDipoleFootprintTooLarge(self):
         """Test that the footprint area cut flags sources."""
