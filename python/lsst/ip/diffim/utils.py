@@ -197,10 +197,10 @@ def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadC
 
             # Difference image with original basis
             if resids:
-                var = resid.getVariance()
+                var = resid.variance
                 var = var.Factory(var, True)
-                np.sqrt(var.getArray(), var.getArray())  # inplace sqrt
-                resid = resid.getImage()
+                np.sqrt(var.array, var.array)  # inplace sqrt
+                resid = resid.image
                 resid /= var
                 bbox = kernel.shrinkBBox(resid.getBBox())
                 resid = resid.Factory(resid, bbox, deep=True)
@@ -219,7 +219,7 @@ def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadC
             sresid = cand.getDifferenceImage(sk, sbg)
             resid = sresid
             if resids:
-                resid = sresid.getImage()
+                resid = sresid.image
                 resid /= var
                 bbox = kernel.shrinkBBox(resid.getBBox())
                 resid = resid.Factory(resid, bbox, deep=True)
@@ -237,7 +237,7 @@ def showKernelCandidates(kernelCellSet, kernel, background, frame=None, showBadC
 
             if False and np.isnan(rchi2):
                 disp = afwDisplay.Display(frame=1)
-                disp.mtv(cand.getScienceMaskedImage.getImage(), title="candidate")
+                disp.mtv(cand.getScienceMaskedImage.image, title="candidate")
                 print("rating", cand.getCandidateRating())
 
             im = cand.getScienceMaskedImage()
@@ -702,22 +702,22 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
             tsdiffim = sdiffim.Factory(sdiffim, bbox)
 
             if origVariance:
-                candidateResids.append(np.ravel(tdiffim.getImage().getArray()
-                                                / np.sqrt(torig.getVariance().getArray())))
-                spatialResids.append(np.ravel(tsdiffim.getImage().getArray()
-                                              / np.sqrt(torig.getVariance().getArray())))
+                candidateResids.append(np.ravel(tdiffim.image.array
+                                                / np.sqrt(torig.variance.array)))
+                spatialResids.append(np.ravel(tsdiffim.image.array
+                                              / np.sqrt(torig.variance.array)))
             else:
-                candidateResids.append(np.ravel(tdiffim.getImage().getArray()
-                                                / np.sqrt(tdiffim.getVariance().getArray())))
-                spatialResids.append(np.ravel(tsdiffim.getImage().getArray()
-                                              / np.sqrt(tsdiffim.getVariance().getArray())))
+                candidateResids.append(np.ravel(tdiffim.image.array
+                                                / np.sqrt(tdiffim.variance.array)))
+                spatialResids.append(np.ravel(tsdiffim.image.array
+                                              / np.sqrt(tsdiffim.variance.array)))
 
-    fullIm = diffExposure.getMaskedImage().getImage().getArray()
-    fullMask = diffExposure.getMaskedImage().getMask().getArray()
+    fullIm = diffExposure.image.array
+    fullMask = diffExposure.mask.array
     if origVariance:
-        fullVar = exposure.getMaskedImage().getVariance().getArray()
+        fullVar = exposure.variance.array
     else:
-        fullVar = diffExposure.getMaskedImage().getVariance().getArray()
+        fullVar = diffExposure.variance.array
 
     bitmaskBad = 0
     bitmaskBad |= afwImage.Mask.getPlaneBitMask('NO_DATA')
@@ -732,12 +732,12 @@ def plotPixelResiduals(exposure, warpedTemplateExposure, diffExposure, kernelCel
                                                        _LOG.getChild("plotPixelResiduals"))
     for fp in testFootprints:
         subexp = diffExposure.Factory(diffExposure, fp["footprint"].getBBox())
-        subim = subexp.getMaskedImage().getImage()
+        subim = subexp.image
         if origVariance:
-            subvar = afwImage.ExposureF(exposure, fp["footprint"].getBBox()).getMaskedImage().getVariance()
+            subvar = afwImage.ExposureF(exposure, fp["footprint"].getBBox()).variance
         else:
-            subvar = subexp.getMaskedImage().getVariance()
-        nonfitResids.append(np.ravel(subim.getArray()/np.sqrt(subvar.getArray())))
+            subvar = subexp.variance
+        nonfitResids.append(np.ravel(subim.array/np.sqrt(subvar.array)))
 
     candidateResids = np.ravel(np.array(candidateResids))
     spatialResids = np.ravel(np.array(spatialResids))
@@ -966,12 +966,12 @@ class DipoleTestImage(object):
         di -= negImage.getMaskedImage()
 
         # Carry through pos/neg detection masks to new planes in diffim
-        dm = di.getMask()
-        posDetectedBits = posImage.getMaskedImage().getMask().getArray() == dm.getPlaneBitMask("DETECTED")
-        negDetectedBits = negImage.getMaskedImage().getMask().getArray() == dm.getPlaneBitMask("DETECTED")
+        dm = di.mask
+        posDetectedBits = posImage.mask.array == dm.getPlaneBitMask("DETECTED")
+        negDetectedBits = negImage.mask.array == dm.getPlaneBitMask("DETECTED")
         pos_det = dm.addMaskPlane("DETECTED_POS")  # new mask plane -- different from "DETECTED"
         neg_det = dm.addMaskPlane("DETECTED_NEG")  # new mask plane -- different from "DETECTED_NEGATIVE"
-        dma = dm.getArray()
+        dma = dm.array
         # set the two custom mask planes to these new masks
         dma[:, :] = posDetectedBits*pos_det + negDetectedBits*neg_det
         self.diffim, self.posImage, self.posCatalog, self.negImage, self.negCatalog \
@@ -997,7 +997,7 @@ class DipoleTestImage(object):
             gradient = gp[0] + gp[1]*x + gp[2]*y
             if len(self.gradientParams) > 3:  # it includes a set of 2nd-order polynomial params
                 gradient += gp[3]*x*y + gp[4]*x*x + gp[5]*y*y
-            imgArr = exposure.getMaskedImage().getArrays()[0]
+            imgArr = exposure.image.array
             imgArr += gradient
 
         return exposure, catalog

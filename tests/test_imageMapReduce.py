@@ -126,10 +126,10 @@ class AddAmountImageMapper(ImageMapper):
         copy of `subExposure` to which `addAmount` has been added
         """
         subExp = subExposure.clone()
-        img = subExp.getMaskedImage()
+        img = subExp.maskedImage
         img += self.config.addAmount
         if addNans:
-            img.getImage().getArray()[0, 0] = np.nan
+            img.image.array[0, 0] = np.nan
         return pipeBase.Struct(subExposure=subExp)
 
 
@@ -170,7 +170,7 @@ class GetMeanImageMapper(ImageMapper):
         test in `testNotNoneReduceWithNonExposureMapper`. In real
         operations, use something like 'mean' for the name.
         """
-        subMI = subExposure.getMaskedImage()
+        subMI = subExposure.maskedImage
         statObj = afwMath.makeStatistics(subMI, afwMath.MEAN)
         return pipeBase.Struct(subExposure=statObj.getValue())
 
@@ -197,7 +197,7 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
     def _makeImage(self):
         self.exposure = afwImage.ExposureF(128, 128)
         self.exposure.setPsf(measAlg.DoubleGaussianPsf(11, 11, 2.0, 3.7))
-        mi = self.exposure.getMaskedImage()
+        mi = self.exposure.maskedImage
         mi.set(0.)
         self.exposure.setWcs(makeWcs())  # required for PSF construction via CoaddPsf
 
@@ -216,14 +216,14 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
         config.mapper.addAmount = 5.
         config.reducer.reduceOperation = reduceOp
         newExp = task.run(self.exposure, addNans=withNaNs).exposure
-        newMI = newExp.getMaskedImage()
-        newArr = newMI.getImage().getArray()
+        newMI = newExp.maskedImage
+        newArr = newMI.image.array
         isnan = np.isnan(newArr)
         if not withNaNs:
             self.assertEqual(np.sum(isnan), 0,
                              msg='Failed on withNaNs: %s' % str(withNaNs))
 
-        mi = self.exposure.getMaskedImage().getImage().getArray()
+        mi = self.exposure.image.array
         if reduceOp != 'sum':
             self.assertFloatsAlmostEqual(mi[~isnan], newArr[~isnan] - 5.,
                                          msg='Failed on withNaNs: %s' % str(withNaNs))
@@ -244,15 +244,15 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
         task = ImageMapReduceTask(config)
         config.mapper.addAmount = 5.
         newExp = task.run(self.exposure, addNans=withNaNs).exposure
-        newMI = newExp.getMaskedImage()
-        newArr = newMI.getImage().getArray()
-        mi = self.exposure.getMaskedImage()
+        newMI = newExp.maskedImage
+        newArr = newMI.image.array
+        mi = self.exposure.maskedImage
         isnan = np.isnan(newArr)
         if not withNaNs:
             self.assertEqual(np.sum(isnan), 0,
                              msg='Failed on withNaNs: %s' % str(withNaNs))
 
-        mi = self.exposure.getMaskedImage().getImage().getArray()
+        mi = self.exposure.image.array
         self.assertFloatsAlmostEqual(mi[~isnan], newArr[~isnan] - 5.,
                                      msg='Failed on withNaNs: %s' % str(withNaNs))
         self._testCoaddPsf(newExp)
@@ -270,8 +270,8 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
         for x in np.linspace(extentX, self.exposure.getWidth()-extentX, 10):
             for y in np.linspace(extentY, self.exposure.getHeight()-extentY, 10):
                 point = geom.Point2D(np.rint(x), np.rint(y))
-                oPsf = origPsf.computeImage(point).getArray()
-                nPsf = newPsf.computeImage(point).getArray()
+                oPsf = origPsf.computeImage(point).array
+                nPsf = newPsf.computeImage(point).array
                 if oPsf.shape[0] < nPsf.shape[0]:  # sometimes CoaddPsf does this.
                     oPsf = np.pad(oPsf, ((1, 1), (0, 0)), mode='constant')
                 elif oPsf.shape[0] > nPsf.shape[0]:
@@ -297,7 +297,7 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
         identical (within between 'copy' and 'average' reduceOperation.
         """
         exposure1 = self.exposure.clone()
-        img = exposure1.getMaskedImage().getImage()
+        img = exposure1.image
         afwMath.randomGaussianImage(img, afwMath.Random())
         exposure2 = exposure1.clone()
 
@@ -305,19 +305,19 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
         task = ImageMapReduceTask(config)
         config.mapper.addAmount = 5.
         newExp = task.run(exposure1, addNans=withNaNs).exposure
-        newMI1 = newExp.getMaskedImage()
+        newMI1 = newExp.maskedImage
 
         config.gridStepX = config.gridStepY = 8.
         config.reducer.reduceOperation = 'average'
         task = ImageMapReduceTask(config)
         newExp = task.run(exposure2, addNans=withNaNs).exposure
-        newMI2 = newExp.getMaskedImage()
+        newMI2 = newExp.maskedImage
 
-        newMA1 = newMI1.getImage().getArray()
+        newMA1 = newMI1.image.array
         isnan = np.isnan(newMA1)
         if not withNaNs:
             self.assertEqual(np.sum(isnan), 0)
-        newMA2 = newMI2.getImage().getArray()
+        newMA2 = newMI2.image.array
 
         # Because the average uses a float accumulator, we can have differences, set a tolerance.
         # Turns out (in practice for this test), only 7 pixels seem to have a small difference.
@@ -331,12 +331,12 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
         config.reducer.reduceOperation = 'none'
         task = ImageMapReduceTask(config)
         testExposure = self.exposure.clone()
-        testExposure.getMaskedImage().set(1.234)
+        testExposure.maskedImage.set(1.234)
         subMeans = task.run(testExposure).result
         subMeans = [x.subExposure for x in subMeans]
 
         self.assertEqual(len(subMeans), len(task.boxes0))
-        firstPixel = testExposure.getMaskedImage().getImage().getArray()[0, 0]
+        firstPixel = testExposure.image.array[0, 0]
         self.assertFloatsAlmostEqual(np.array(subMeans), firstPixel)
 
     def testCellCentroids(self):
@@ -351,12 +351,12 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
         config.cellCentroidsY = config.cellCentroidsX
         task = ImageMapReduceTask(config)
         testExposure = self.exposure.clone()
-        testExposure.getMaskedImage().set(1.234)
+        testExposure.maskedImage.set(1.234)
         subMeans = task.run(testExposure).result
         subMeans = [x.subExposure for x in subMeans]
 
         self.assertEqual(len(subMeans), len(config.cellCentroidsX))
-        firstPixel = testExposure.getMaskedImage().getImage().getArray()[0, 0]
+        firstPixel = testExposure.image.array[0, 0]
         self.assertFloatsAlmostEqual(np.array(subMeans), firstPixel)
 
     def testCellCentroidsWrongLength(self):
@@ -388,19 +388,19 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
         task = ImageMapReduceTask(config)
         config.mapper.addAmount = 5.
         newExp = task.run(self.exposure).exposure
-        newMI = newExp.getMaskedImage()
-        newArr = newMI.getImage().getArray()
-        mi = self.exposure.getMaskedImage()
+        newMI = newExp.maskedImage
+        newArr = newMI.image.array
+        mi = self.exposure.maskedImage
         isnan = np.isnan(newArr)
         self.assertGreater(np.sum(isnan), 1000)
 
-        mi = self.exposure.getMaskedImage().getImage().getArray()
+        mi = self.exposure.image.array
         self.assertFloatsAlmostEqual(mi[~isnan], newArr[~isnan] - 5.)
 
-        mask = newMI.getMask()  # Now check the mask
+        mask = newMI.mask  # Now check the mask
         self.assertGreater(mask.getMaskPlane('INVALID_MAPREDUCE'), 0)
         maskBit = mask.getPlaneBitMask('INVALID_MAPREDUCE')
-        nMasked = np.sum(np.bitwise_and(mask.getArray(), maskBit) != 0)
+        nMasked = np.sum(np.bitwise_and(mask.array, maskBit) != 0)
         self.assertGreater(nMasked, 1000)
         self.assertEqual(np.sum(np.isnan(newArr)), nMasked)
 
@@ -479,13 +479,13 @@ class ImageMapReduceTest(lsst.utils.tests.TestCase):
             ind = 0 if scaleByFwhm else 1
             lenBoxes[ind] = len(task.boxes0)
             newExp = task.run(self.exposure).exposure
-            newMI = newExp.getMaskedImage()
-            newArr = newMI.getImage().getArray()
+            newMI = newExp.maskedImage
+            newArr = newMI.image.array
             isnan = np.isnan(newArr)
             self.assertEqual(np.sum(isnan), 0, msg='Failed NaN (%d), on config: %s' %
                              (np.sum(isnan), str(config)))
 
-            mi = self.exposure.getMaskedImage().getImage().getArray()
+            mi = self.exposure.image.array
             self.assertFloatsAlmostEqual(mi[~isnan], newArr[~isnan] - expectedVal,
                                          msg='Failed on config: %s' % str(config))
 

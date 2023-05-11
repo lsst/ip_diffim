@@ -249,11 +249,11 @@ class ImageReducer(pipeBase.Task):
         reduceOp = self.config.reduceOperation
         if reduceOp == 'copy':
             weights = None
-            newMI.getImage()[:, :] = np.nan
-            newMI.getVariance()[:, :] = np.nan
+            newMI.image.array[:, :] = np.nan
+            newMI.variance.array[:, :] = np.nan
         else:
-            newMI.getImage()[:, :] = 0.
-            newMI.getVariance()[:, :] = 0.
+            newMI.image.array[:, :] = 0.
+            newMI.variance.array[:, :] = 0.
             if reduceOp == 'average':  # make an array to keep track of weights
                 weights = afwImage.ImageI(newMI.getBBox())
 
@@ -266,35 +266,35 @@ class ImageReducer(pipeBase.Task):
             subExp = newExp.Factory(newExp, item.getBBox())
             subMI = subExp.getMaskedImage()
             patchMI = item.getMaskedImage()
-            isValid = ~np.isnan(patchMI.getImage().getArray() * patchMI.getVariance().getArray())
+            isValid = ~np.isnan(patchMI.image.array * patchMI.variance.array)
 
             if reduceOp == 'copy':
-                subMI.getImage().getArray()[isValid] = patchMI.getImage().getArray()[isValid]
-                subMI.getVariance().getArray()[isValid] = patchMI.getVariance().getArray()[isValid]
-                subMI.getMask().getArray()[:, :] |= patchMI.getMask().getArray()
+                subMI.image.array[isValid] = patchMI.image.array[isValid]
+                subMI.variance.array[isValid] = patchMI.variance.array[isValid]
+                subMI.mask.array[:, :] |= patchMI.mask.array
 
             if reduceOp == 'sum' or reduceOp == 'average':  # much of these two options is the same
-                subMI.getImage().getArray()[isValid] += patchMI.getImage().getArray()[isValid]
-                subMI.getVariance().getArray()[isValid] += patchMI.getVariance().getArray()[isValid]
-                subMI.getMask().getArray()[:, :] |= patchMI.getMask().getArray()
+                subMI.image.array[isValid] += patchMI.image.array[isValid]
+                subMI.variance.array[isValid] += patchMI.variance.array[isValid]
+                subMI.mask.array[:, :] |= patchMI.mask.array
                 if reduceOp == 'average':
                     # wtsView is a view into the `weights` Image
                     wtsView = afwImage.ImageI(weights, item.getBBox())
-                    wtsView.getArray()[isValid] += 1
+                    wtsView.array[isValid] += 1
 
         # New mask plane - for debugging map-reduced images
-        mask = newMI.getMask()
+        mask = newMI.mask
         for m in self.config.badMaskPlanes:
             mask.addMaskPlane(m)
         bad = mask.getPlaneBitMask(self.config.badMaskPlanes)
 
-        isNan = np.where(np.isnan(newMI.getImage().getArray() * newMI.getVariance().getArray()))
+        isNan = np.where(np.isnan(newMI.image.array * newMI.variance.array))
         if len(isNan[0]) > 0:
             # set mask to INVALID for pixels where produced exposure is NaN
-            mask.getArray()[isNan[0], isNan[1]] |= bad
+            mask.array[isNan[0], isNan[1]] |= bad
 
         if reduceOp == 'average':
-            wts = weights.getArray().astype(float)
+            wts = weights.array.astype(float)
             self.log.info('AVERAGE: Maximum overlap: %f', np.nanmax(wts))
             self.log.info('AVERAGE: Average overlap: %f', np.nanmean(wts))
             self.log.info('AVERAGE: Minimum overlap: %f', np.nanmin(wts))
@@ -304,16 +304,16 @@ class ImageReducer(pipeBase.Task):
             self.log.info('AVERAGE: Number of zero pixels: %f (%f%%)', wtsZeroSum,
                           wtsZeroSum * 100. / wtsZero.size)
             notWtsZero = ~wtsZero
-            tmp = newMI.getImage().getArray()
+            tmp = newMI.image.array
             np.divide(tmp, wts, out=tmp, where=notWtsZero)
-            tmp = newMI.getVariance().getArray()
+            tmp = newMI.variance.array
             np.divide(tmp, wts, out=tmp, where=notWtsZero)
             if len(wtsZeroInds[0]) > 0:
-                newMI.getImage().getArray()[wtsZeroInds] = np.nan
-                newMI.getVariance().getArray()[wtsZeroInds] = np.nan
+                newMI.image.array[wtsZeroInds] = np.nan
+                newMI.variance.array[wtsZeroInds] = np.nan
                 # set mask to something for pixels where wts == 0.
                 # happens sometimes if operation failed on a certain subexposure
-                mask.getArray()[wtsZeroInds] |= bad
+                mask.array[wtsZeroInds] |= bad
 
         # Not sure how to construct a PSF when reduceOp=='copy'...
         if reduceOp == 'sum' or reduceOp == 'average':

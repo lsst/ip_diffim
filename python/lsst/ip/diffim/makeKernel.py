@@ -245,8 +245,8 @@ class MakeKernelTask(PsfMatchTask):
             table = lsst.afw.table.SourceTable.make(self.selectSchema)
         mi = exposure.getMaskedImage()
 
-        imArr = mi.getImage().getArray()
-        maskArr = mi.getMask().getArray()
+        imArr = mi.image.array
+        maskArr = mi.mask.array
         miArr = np.ma.masked_array(imArr, mask=maskArr)
         try:
             fitBg = self.background.fitBackground(mi)

@@ -201,7 +201,7 @@ def makeFakeImages(size=(256, 256), svar=0.04, tvar=0.04, psf1=3.3, psf2=2.2, of
         psf = afwImage.ImageD(psfBox)
         psfBox.shift(geom.Extent2I(-(-size[0]//2), -(-size[1]//2)))  # -N//2 != -(N//2) for odd numbers
         im1_psf_sub = psfArray[psfBox.getMinY():psfBox.getMaxY() + 1, psfBox.getMinX():psfBox.getMaxX() + 1]
-        psf.getArray()[:, :] = im1_psf_sub
+        psf.array[:, :] = im1_psf_sub
         psfK = afwMath.FixedKernel(psf)
         psfNew = measAlg.KernelPsf(psfK)
         im1ex.setPsf(psfNew)
@@ -241,8 +241,8 @@ class ZogyTest(lsst.utils.tests.TestCase):
                                                        "NO_DATA", "DETECTED_NEGATIVE"]))
 
     def _computeVarianceMean(self, maskedIm):
-        statObj = afwMath.makeStatistics(maskedIm.getVariance(),
-                                         maskedIm.getMask(), afwMath.MEANCLIP,
+        statObj = afwMath.makeStatistics(maskedIm.variance,
+                                         maskedIm.mask, afwMath.MEANCLIP,
                                          self.statsControl)
         mn = statObj.getValue(afwMath.MEANCLIP)
         return mn

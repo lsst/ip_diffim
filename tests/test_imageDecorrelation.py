@@ -218,13 +218,13 @@ def makeFakeImages(size=(256, 256), svar=0.04, tvar=0.04, psf1=3.3, psf2=2.2, of
         # All this code to convert the template image array/psf array into an exposure.
         bbox = geom.Box2I(geom.Point2I(0, 0), geom.Point2I(imgArray.shape[1]-1, imgArray.shape[0]-1))
         im1ex = afwImage.ExposureD(bbox)
-        im1ex.getMaskedImage().getImage().getArray()[:, :] = imgArray
-        im1ex.getMaskedImage().getVariance().getArray()[:, :] = imgVariance
+        im1ex.image.array[:, :] = imgArray
+        im1ex.variance.array[:, :] = imgVariance
         psfBox = geom.Box2I(geom.Point2I(-12, -12), geom.Point2I(12, 12))  # a 25x25 pixel psf
         psf = afwImage.ImageD(psfBox)
         psfBox.shift(geom.Extent2I(size[0]//2, size[1]//2))
         im1_psf_sub = psfArray[psfBox.getMinX():psfBox.getMaxX()+1, psfBox.getMinY():psfBox.getMaxY()+1]
-        psf.getArray()[:, :] = im1_psf_sub
+        psf.array[:, :] = im1_psf_sub
         psfK = afwMath.FixedKernel(psf)
         psfNew = measAlg.KernelPsf(psfK)
         im1ex.setPsf(psfNew)
@@ -317,8 +317,8 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
             n_sources=0, seed=22, varSourceChange=0, psf_yvary_factor=0)
 
     def _computeVarianceMean(self, maskedIm):
-        statObj = afwMath.makeStatistics(maskedIm.getVariance(),
-                                         maskedIm.getMask(), afwMath.MEANCLIP,
+        statObj = afwMath.makeStatistics(maskedIm.variance,
+                                         maskedIm.mask, afwMath.MEANCLIP,
                                          self.statsControl)
         mn = statObj.getValue(afwMath.MEANCLIP)
         return mn
@@ -352,7 +352,7 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
         x0im, y0im = np.meshgrid(x0, y0)
         matchingKernel = singleGaussian2d(x0im, y0im, -1., -1., sigma_x=sig_match, sigma_y=sig_match)
         kernelImg = afwImage.ImageD(matchingKernel.shape[0], matchingKernel.shape[1])
-        kernelImg.getArray()[:, :] = matchingKernel
+        kernelImg.array[:, :] = matchingKernel
         mKernel = afwMath.FixedKernel(kernelImg)
 
         # Create the matched template by convolving the template with the matchingKernel
@@ -451,9 +451,9 @@ class DiffimCorrectionTest(lsst.utils.tests.TestCase):
         diffExp, mKernel, expected_var = self._makeAndTestUncorrectedDiffim()
         corrected_diffExp = self._runDecorrelationTask(diffExp.clone(), mKernel)
 
-        rho_sci = estimatePixelCorrelation(self.im1ex.getImage().getArray())
-        rho_rawdiff = estimatePixelCorrelation(diffExp.getImage().getArray())
-        rho_corrdiff = estimatePixelCorrelation(corrected_diffExp.getImage().getArray())
+        rho_sci = estimatePixelCorrelation(self.im1ex.image.array)
+        rho_rawdiff = estimatePixelCorrelation(diffExp.image.array)
+        rho_corrdiff = estimatePixelCorrelation(corrected_diffExp.image.array)
 
         # Autocorrelation sanity check
         self.assertFloatsAlmostEqual(rho_sci[0], 1., atol=0.1, rtol=None)

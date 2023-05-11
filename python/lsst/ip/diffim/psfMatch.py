@@ -856,7 +856,7 @@ class PsfMatchTask(pipeBase.Task, abc.ABC):
             # Check for NaNs?
             kimage = afwImage.ImageD(pcaBasisList[j].getDimensions())
             pcaBasisList[j].computeImage(kimage, False)
-            if not (True in np.isnan(kimage.getArray())):
+            if not (True in np.isnan(kimage.array)):
                 trimBasisList.append(pcaBasisList[j])
 
         # Put all the power in the first kernel, which will not vary spatially

@@ -75,8 +75,8 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             bbox = fp.getBBox()
             tmi = afwImage.MaskedImageF(self.templateImage, bbox, origin=afwImage.LOCAL)
             smi = afwImage.MaskedImageF(self.scienceImage, bbox, origin=afwImage.LOCAL)
-            tmask = tmi.getMask()
-            smask = smi.getMask()
+            tmask = tmi.mask
+            smask = smi.mask
 
             for j in range(tmask.getHeight()):
                 for i in range(tmask.getWidth()):

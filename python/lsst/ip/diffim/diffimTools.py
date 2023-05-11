@@ -50,8 +50,8 @@ from .makeKernelBasisList import makeKernelBasisList
 
 
 def makeFlatNoiseImage(mi, seedStat=afwMath.MAX):
-    img = mi.getImage()
-    seed = int(10.*afwMath.makeStatistics(mi.getImage(), seedStat).getValue() + 1)
+    img = mi.image
+    seed = int(10.*afwMath.makeStatistics(mi.image, seedStat).getValue() + 1)
     rdm = afwMath.Random(afwMath.Random.MT19937, seed)
     rdmImage = img.Factory(img.getDimensions())
     afwMath.randomGaussianImage(rdmImage, rdm)
@@ -80,9 +80,9 @@ def makePoissonNoiseImage(im):
     - Uses numpy.random; you may wish to call numpy.random.seed first.
     """
     import numpy.random as rand
-    imArr = im.getArray()
+    imArr = im.array
     noiseIm = im.Factory(im.getBBox())
-    noiseArr = noiseIm.getArray()
+    noiseArr = noiseIm.array
 
     intNoiseArr = rand.poisson(np.where(np.isfinite(imArr), imArr, 0.0))
 
@@ -234,7 +234,7 @@ def makeFakeKernelSet(sizeCell=128, nCell=3,
     sim += bgValue
 
     # Watch out for negative values
-    tim += 2*np.abs(np.min(tim.getArray()))
+    tim += 2*np.abs(np.min(tim.array))
 
     # Add noise?
     if addNoise:
@@ -315,7 +315,7 @@ def backgroundSubtract(config, maskedImages):
     for maskedImage in maskedImages:
         bctrl.setNxSample(maskedImage.getWidth()//binsize + 1)
         bctrl.setNySample(maskedImage.getHeight()//binsize + 1)
-        image = maskedImage.getImage()
+        image = maskedImage.image
         backobj = afwMath.makeBackground(image, bctrl)
 
         image -= backobj.getImageF()
@@ -459,9 +459,9 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, ke
 
         kbbox = geom.Box2I(geom.Point2I(xmin, ymin), geom.Point2I(xmax, ymax))
         try:
-            fsb.apply(afwImage.MaskedImageF(templateExposure.getMaskedImage(), kbbox, deep=False).getMask())
+            fsb.apply(afwImage.MaskedImageF(templateExposure.maskedImage, kbbox, deep=False).getMask())
             bm1 = fsb.getBits()
-            fsb.apply(afwImage.MaskedImageF(scienceExposure.getMaskedImage(), kbbox, deep=False).getMask())
+            fsb.apply(afwImage.MaskedImageF(scienceExposure.maskedImage, kbbox, deep=False).getMask())
             bm2 = fsb.getBits()
         except Exception:
             pass
@@ -517,8 +517,8 @@ def sourceTableToCandidateList(sourceTable, templateExposure, scienceExposure, k
     ps = pexConfig.makePropertySet(kConfig)
     for cand in footprintList:
         bbox = cand['footprint'].getBBox()
-        tmi = afwImage.MaskedImageF(templateExposure.getMaskedImage(), bbox)
-        smi = afwImage.MaskedImageF(scienceExposure.getMaskedImage(), bbox)
+        tmi = afwImage.MaskedImageF(templateExposure.maskedImage, bbox)
+        smi = afwImage.MaskedImageF(scienceExposure.maskedImage, bbox)
         kCand = diffimLib.makeKernelCandidate(cand['source'], tmi, smi, ps)
         if doBuild:
             visitor.processCandidate(kCand)
@@ -566,7 +566,7 @@ class NbasisEvaluator(object):
                             bbox = cand.getKernel(diffimLib.KernelCandidateF.RECENT).shrinkBBox(
                                 diffIm.getBBox(afwImage.LOCAL))
                             diffIm = type(diffIm)(diffIm, bbox, True)
-                            chi2 = diffIm.getImage().getArray()**2/diffIm.getVariance().getArray()
+                            chi2 = diffIm.image.array**2/diffIm.variance.array
                             n = chi2.shape[0]*chi2.shape[1]
                             bic = np.sum(chi2) + k*np.log(n)
                             if cand.getId() not in bicArray:

@@ -283,7 +283,7 @@ class DipoleModel:
             bbox.grow(grow)
 
         subim2 = afwImage.ImageF(bbox, badfill)
-        fp.getSpans().unflatten(subim2.getArray(), fp.getImageArray(), bbox.getCorners()[0])
+        fp.getSpans().unflatten(subim2.array, fp.getImageArray(), bbox.getCorners()[0])
         return subim2
 
     def fitFootprintBackground(self, source, posImage, order=1):
@@ -312,7 +312,7 @@ class DipoleModel:
         fp = source.getFootprint()
         bbox = fp.getBBox()
         bbox.grow(3)
-        posImg = afwImage.ImageF(posImage.getMaskedImage().getImage(), bbox, afwImage.PARENT)
+        posImg = afwImage.ImageF(posImage.image, bbox, afwImage.PARENT)
 
         # This code constructs the footprint image so that we can identify the pixels that are
         # outside the footprint (but within the bounding box). These are the pixels used for
@@ -320,9 +320,9 @@ class DipoleModel:
         posHfp = afwDet.HeavyFootprintF(fp, posImage.getMaskedImage())
         posFpImg = self._getHeavyFootprintSubimage(posHfp, grow=3)
 
-        isBg = np.isnan(posFpImg.getArray()).ravel()
+        isBg = np.isnan(posFpImg.array).ravel()
 
-        data = posImg.getArray().ravel()
+        data = posImg.array.ravel()
         data = data[isBg]
         B = data
 
@@ -369,7 +369,7 @@ class DipoleModel:
 
         # Generate the psf image, normalize to flux
         psf_img = psf.computeImage(geom.Point2D(xcen, ycen)).convertF()
-        psf_img_sum = np.nansum(psf_img.getArray())
+        psf_img_sum = np.nansum(psf_img.array)
         psf_img *= (flux/psf_img_sum)
 
         # Clip the PSF image bounding box to fall within the footprint bounding box
@@ -468,17 +468,17 @@ class DipoleModel:
             else:
                 gradientNeg = gradient
 
-            posIm.getArray()[:, :] += gradient
-            negIm.getArray()[:, :] += gradientNeg
+            posIm.array[:, :] += gradient
+            negIm.array[:, :] += gradientNeg
 
         # Generate the diffIm model
         diffIm = afwImage.ImageF(bbox)
         diffIm += posIm
         diffIm -= negIm
 
-        zout = diffIm.getArray()
+        zout = diffIm.array
         if rel_weight > 0.:
-            zout = np.append([zout], [posIm.getArray(), negIm.getArray()], axis=0)
+            zout = np.append([zout], [posIm.array, negIm.array], axis=0)
 
         return zout
 
@@ -578,8 +578,8 @@ class DipoleFitAlgorithm:
         bbox = fp.getBBox()
         subim = afwImage.MaskedImageF(self.diffim.getMaskedImage(), bbox=bbox, origin=afwImage.PARENT)
 
-        z = diArr = subim.getArrays()[0]
-        weights = 1. / subim.getArrays()[2]  # get the weights (=1/variance)
+        z = diArr = subim.image.array
+        weights = 1. / subim.variance.array  # get the weights (=1/variance)
 
         if rel_weight > 0. and ((self.posImage is not None) or (self.negImage is not None)):
             if self.negImage is not None:
@@ -593,11 +593,11 @@ class DipoleFitAlgorithm:
                 negSubim = posSubim.clone()
                 negSubim -= subim
 
-            z = np.append([z], [posSubim.getArrays()[0],
-                                negSubim.getArrays()[0]], axis=0)
+            z = np.append([z], [posSubim.image.array,
+                                negSubim.image.array], axis=0)
             # Weight the pos/neg images by rel_weight relative to the diffim
-            weights = np.append([weights], [1. / posSubim.getArrays()[2] * rel_weight,
-                                            1. / negSubim.getArrays()[2] * rel_weight], axis=0)
+            weights = np.append([weights], [1. / posSubim.variance.array * rel_weight,
+                                            1. / negSubim.variance.array * rel_weight], axis=0)
         else:
             rel_weight = 0.  # a short-cut for "don't include the pre-subtraction data"
 
@@ -858,9 +858,7 @@ class DipoleFitAlgorithm:
         # Exctract flux value, compute signalToNoise from flux/variance_within_footprint
         # Also extract the stderr of flux estimate.
         def computeSumVariance(exposure, footprint):
-            box = footprint.getBBox()
-            subim = afwImage.MaskedImageF(exposure.getMaskedImage(), box, origin=afwImage.PARENT)
-            return np.sqrt(np.nansum(subim.getArrays()[2][:, :]))
+            return np.sqrt(np.nansum(exposure[footprint.getBBox(), afwImage.PARENT].variance.array))
 
         fluxVal = fluxVar = fitParams['flux']
         fluxErr = fluxErrNeg = fitResult.params['flux'].stderr
