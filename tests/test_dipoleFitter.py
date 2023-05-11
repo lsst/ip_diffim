@@ -155,9 +155,6 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
 
         table = afwTable.SourceTable.make(schema)
         detectResult = detectTask.run(table, testImage.diffim)
-        # catalog = detectResult.sources
-        # deblendTask.run(self.dipole, catalog, psf=self.dipole.getPsf())
-
         fpSet = detectResult.positive
         fpSet.merge(detectResult.negative, 2, 2, False)
         sources = afwTable.SourceCatalog(table)

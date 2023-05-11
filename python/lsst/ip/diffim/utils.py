@@ -1042,9 +1042,6 @@ class DipoleTestImage(object):
         detectConfig = measAlg.SourceDetectionConfig()
         detectConfig.returnOriginalFootprints = False  # should be the default
 
-        diffimPsf = diffim.getPsf()
-        psfSigma = diffimPsf.computeShape(diffimPsf.getAveragePosition()).getDeterminantRadius()
-
         # code from imageDifference.py:
         detectConfig.thresholdPolarity = "both"
         detectConfig.thresholdValue = detectSigma
@@ -1060,7 +1057,7 @@ class DipoleTestImage(object):
         detectTask = measAlg.SourceDetectionTask(schema, config=detectConfig)
 
         table = afwTable.SourceTable.make(schema)
-        catalog = detectTask.run(table, diffim, sigma=psfSigma)
+        catalog = detectTask.run(table, diffim)
 
         # Now do the merge.
         if doMerge:
