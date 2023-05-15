@@ -18,7 +18,7 @@ class PixelOffsetTest(unittest.TestCase):
         # Make image
         image = afwImage.MaskedImageF(w, h)
         image.set(0)
-        array = image.getImage().getArray()
+        array = image.image.array
         if set_peak:
             # set the peak value
             array[300][300] = 1000

@@ -120,7 +120,7 @@ class DiffimTestCases(unittest.TestCase):
         self.assertAlmostEqual(imstat.getRms(), numArray.std(), 1)
         self.assertEqual(imstat.getNpix(), 20 * 20)
 
-        afwStat = afwMath.makeStatistics(mi.getImage(), afwMath.MEAN | afwMath.STDEV)
+        afwStat = afwMath.makeStatistics(mi.image, afwMath.MEAN | afwMath.STDEV)
         self.assertAlmostEqual(imstat.getMean(), afwStat.getValue(afwMath.MEAN))
         # even though these do
         self.assertAlmostEqual(imstat.getRms(), afwStat.getValue(afwMath.STDEV))

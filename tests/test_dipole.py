@@ -63,7 +63,7 @@ def createDipole(w, h, xc, yc, scaling=100.0, fracOffset=1.2):
     # Make random noise image: set image plane to normal distribution
     image = afwImage.MaskedImageF(w, h)
     image.set(0)
-    array = image.getImage().getArray()
+    array = image.image.array
     array[:, :] = np.random.randn(w, h)
     # Set variance to 1.0
     var = image.getVariance()
@@ -81,18 +81,18 @@ def createDipole(w, h, xc, yc, scaling=100.0, fracOffset=1.2):
     psfim = psf.computeImage(pos).convertF()
     psfim *= scaling/psf.computePeak(pos)
     psfw, psfh = psfim.getDimensions()
-    psfSum = np.sum(psfim.getArray())
+    psfSum = np.sum(psfim.array)
 
     # Create the dipole, offset by fracOffset of the Psf FWHM (pixels)
     offset = fracOffset*psfFwhmPix//2
-    array = image.getImage().getArray()
+    array = image.image.array
     xp = int(xc - psfw//2 + offset)
     yp = int(yc - psfh//2 + offset)
-    array[yp:yp + psfh, xp:xp + psfw] += psfim.getArray()
+    array[yp:yp + psfh, xp:xp + psfw] += psfim.array
 
     xn = int(xc - psfw//2 - offset)
     yn = int(yc - psfh//2 - offset)
-    array[yn:yn + psfh, xn:xn + psfw] -= psfim.getArray()
+    array[yn:yn + psfh, xn:xn + psfw] -= psfim.array
 
     if display:
         afwDisplay.Display(frame=3).mtv(image, title="With dipole")
@@ -226,19 +226,19 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
         modelSubim += posPsfSubim
         posModelSubim += posPsfSubim
 
-        data = afwImage.ImageF(exposure.getMaskedImage().getImage(), fp.getBBox())
-        var = afwImage.ImageF(exposure.getMaskedImage().getVariance(), fp.getBBox())
-        matrixNorm = 1./np.sqrt(np.median(var.getArray()))
+        data = afwImage.ImageF(exposure.image, fp.getBBox())
+        var = afwImage.ImageF(exposure.variance, fp.getBBox())
+        matrixNorm = 1./np.sqrt(np.median(var.array))
 
         if display:
             afwDisplay.Display(frame=5).mtv(model, title="Unfitted model")
             afwDisplay.Display(frame=6).mtv(data, title="Data")
 
-        posPsfSum = np.sum(posPsf.getArray())
-        negPsfSum = np.sum(negPsf.getArray())
+        posPsfSum = np.sum(posPsf.array)
+        negPsfSum = np.sum(negPsf.array)
 
-        M = np.array((np.ravel(negModel.getArray()), np.ravel(posModel.getArray()))).T.astype(np.float64)
-        B = np.array((np.ravel(data.getArray()))).astype(np.float64)
+        M = np.array((np.ravel(negModel.array), np.ravel(posModel.array))).T.astype(np.float64)
+        B = np.array((np.ravel(data.array))).astype(np.float64)
         M *= matrixNorm
         B *= matrixNorm
 

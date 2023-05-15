@@ -140,15 +140,15 @@ class KernelCandidateQa(object):
     @staticmethod
     def _calculateStats(di, dof=0.):
         """Calculate the core QA statistics on a difference image"""
-        mask = di.getMask()
-        maskArr = di.getMask().getArray()
+        mask = di.mask
+        maskArr = mask.array
 
         # Create a mask using BAD, SAT, NO_DATA, EDGE bits.  Keep detections
         maskArr &= mask.getPlaneBitMask(["BAD", "SAT", "NO_DATA", "EDGE"])
 
         # Mask out values based on maskArr
-        diArr = ma.array(di.getImage().getArray(), mask=maskArr)
-        varArr = ma.array(di.getVariance().getArray(), mask=maskArr)
+        diArr = ma.array(di.image.array, mask=maskArr)
+        varArr = ma.array(di.variance.array, mask=maskArr)
 
         # Normalize by sqrt variance, units are in sigma
         diArr /= np.sqrt(varArr)
@@ -213,8 +213,8 @@ class KernelCandidateQa(object):
                 kernelValues = np.asarray(kernelValues)
 
                 lkim = kernelCandidate.getKernelImage(kType)
-                centx, centy = calcCentroid(lkim.getArray())
-                stdx, stdy = calcWidth(lkim.getArray(), centx, centy)
+                centx, centy = calcCentroid(lkim.array)
+                stdx, stdy = calcWidth(lkim.array, centx, centy)
                 # NOTE
                 # What is the difference between kernelValues and solution?
 
@@ -253,8 +253,8 @@ class KernelCandidateQa(object):
             skim = afwImage.ImageD(spatialKernel.getDimensions())
             spatialKernel.computeImage(skim, False, kernelCandidate.getXCenter(),
                                        kernelCandidate.getYCenter())
-            centx, centy = calcCentroid(skim.getArray())
-            stdx, stdy = calcWidth(skim.getArray(), centx, centy)
+            centx, centy = calcCentroid(skim.array)
+            stdx, stdy = calcWidth(skim.array, centx, centy)
 
             sk = afwMath.FixedKernel(skim)
             sbg = spatialBackground(kernelCandidate.getXCenter(), kernelCandidate.getYCenter())
@@ -264,8 +264,8 @@ class KernelCandidateQa(object):
             # Kernel mse
             if lkim is not None:
                 skim -= lkim
-                bias = np.mean(skim.getArray())
-                variance = np.mean(np.power(skim.getArray(), 2.))
+                bias = np.mean(skim.array)
+                variance = np.mean(np.power(skim.array, 2.))
                 mseKernel = bias**2 + variance
             else:
                 mseKernel = -99.999

@@ -132,8 +132,8 @@ class ZogyTask(pipeBase.Task):
     def _computeVarianceMean(self, exposure):
         """Compute the sigma-clipped mean of the variance image of ``exposure``.
         """
-        statObj = afwMath.makeStatistics(exposure.getMaskedImage().getVariance(),
-                                         exposure.getMaskedImage().getMask(),
+        statObj = afwMath.makeStatistics(exposure.variance,
+                                         exposure.mask,
                                          afwMath.MEANCLIP, self.statsControl)
         var = statObj.getValue(afwMath.MEANCLIP)
         return var

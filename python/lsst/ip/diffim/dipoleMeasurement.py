@@ -354,8 +354,8 @@ class DipoleDeblender(object):
                 self.log.debug('Peak %i', pki)
                 deblendBaseline._fitPsf(fp, fmask, pk, pkF, pkres, fbb, dpeaks, peaksF, self.log,
                                         cpsf, psfFwhmPix,
-                                        subimage.getMaskedImage().getImage(),
-                                        subimage.getMaskedImage().getVariance(),
+                                        subimage.image,
+                                        subimage.variance,
                                         self.psfChisqCut1, self.psfChisqCut2, self.psfChisqCut2b)
 
         deblendedSource = source.getTable().copyRecord(source)
@@ -374,6 +374,6 @@ class DipoleDeblender(object):
             self.log.info("deblended.chi2dof.dipole.%s %f",
                           suffix, peak.psfFitChisq / peak.psfFitDof)
             self.log.info("deblended.flux.dipole.psf.%s %f",
-                          suffix, peak.psfFitFlux * np.sum(peak.templateImage.getArray()))
+                          suffix, peak.psfFitFlux * np.sum(peak.templateImage.array))
             peakList.append(peak.peak)
         return deblendedSource

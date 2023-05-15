@@ -80,8 +80,8 @@ class DecorrelateALKernelTask(pipeBase.Task):
         self.statsControl.setAndMask(afwImage.Mask.getPlaneBitMask(self.config.ignoreMaskPlanes))
 
     def computeVarianceMean(self, exposure):
-        statObj = afwMath.makeStatistics(exposure.getMaskedImage().getVariance(),
-                                         exposure.getMaskedImage().getMask(),
+        statObj = afwMath.makeStatistics(exposure.variance,
+                                         exposure.mask,
                                          afwMath.MEANCLIP, self.statsControl)
         var = statObj.getValue(afwMath.MEANCLIP)
         return var
@@ -788,8 +788,8 @@ class DecorrelateALKernelSpatialTask(pipeBase.Task):
     def computeVarianceMean(self, exposure):
         """Compute the mean of the variance plane of `exposure`.
         """
-        statObj = afwMath.makeStatistics(exposure.getMaskedImage().getVariance(),
-                                         exposure.getMaskedImage().getMask(),
+        statObj = afwMath.makeStatistics(exposure.variance,
+                                         exposure.mask,
                                          afwMath.MEANCLIP, self.statsControl)
         var = statObj.getValue(afwMath.MEANCLIP)
         return var
@@ -860,7 +860,7 @@ class DecorrelateALKernelSpatialTask(pipeBase.Task):
 
             # Make sure masks of input image are propagated to diffim
             def gm(exp):
-                return exp.getMaskedImage().getMask()
+                return exp.mask
             gm(results.correctedExposure)[:, :] = gm(subtractedExposure)
 
             var = self.computeVarianceMean(results.correctedExposure)

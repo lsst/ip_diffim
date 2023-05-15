@@ -101,7 +101,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             self.templateExposure2 = afwImage.ExposureF(templateExposure, bbox2, origin=afwImage.LOCAL)
 
     def addNoise(self, mi):
-        img = mi.getImage()
+        img = mi.image
         seed = int(afwMath.makeStatistics(mi.getVariance(), afwMath.MEDIAN).getValue())
         rdm = afwMath.Random(afwMath.Random.MT19937, seed)
         rdmImage = img.Factory(img.getDimensions())
