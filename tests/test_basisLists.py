@@ -10,8 +10,6 @@ import lsst.utils.logging as logUtils
 import lsst.pex.config as pexConfig
 import lsst.pex.exceptions
 
-from lsst.ip.diffim import PsfMatchConfigAL, PsfMatchConfigDF
-
 # Increase the number for more verbose messages
 logUtils.trace_set_at("lsst.ip.diffim", 0)
 
@@ -19,9 +17,9 @@ logUtils.trace_set_at("lsst.ip.diffim", 0)
 class DiffimTestCases(unittest.TestCase):
 
     def setUp(self):
-        self.configAL = PsfMatchConfigAL()
+        self.configAL = ipDiffim.PsfMatchConfigAL()
 
-        self.configDF = PsfMatchConfigDF()
+        self.configDF = ipDiffim.PsfMatchConfigDF()
 
         self.psAL = pexConfig.makePropertySet(self.configAL)
         self.psDF = pexConfig.makePropertySet(self.configDF)

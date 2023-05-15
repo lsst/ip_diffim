@@ -32,8 +32,6 @@ import lsst.pex.config as pexConfig
 import lsst.utils.logging as logUtils
 import lsst.afw.table as afwTable
 
-from lsst.ip.diffim import PsfMatchConfigDF
-
 logUtils.trace_set_at("lsst.ip.diffim", 4)
 
 # known input images
@@ -65,7 +63,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         self.table.defineCentroid("Centroid")
         self.ss = afwTable.SourceCatalog(self.table)
 
-        self.config = PsfMatchConfigDF()
+        self.config = ipDiffim.PsfMatchConfigDF()
 
         self.ps = pexConfig.makePropertySet(self.config)
         self.ps['fitForBackground'] = True  # we are testing known background recovery here

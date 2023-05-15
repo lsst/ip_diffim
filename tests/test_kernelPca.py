@@ -10,15 +10,13 @@ import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.utils.logging as logUtils
 import lsst.pex.config as pexConfig
 
-from lsst.ip.diffim import PsfMatchConfigDF
-
 logUtils.trace_set_at("lsst.ip.diffim", 4)
 
 
 class DiffimTestCases(lsst.utils.tests.TestCase):
 
     def setUp(self):
-        self.config = PsfMatchConfigDF()
+        self.config = ipDiffim.PsfMatchConfigDF()
 
         self.kList = ipDiffim.makeKernelBasisList(self.config)
         self.ps = pexConfig.makePropertySet(self.config)

@@ -11,15 +11,13 @@ import lsst.ip.diffim as ipDiffim
 import lsst.utils.logging as logUtils
 import lsst.pex.config as pexConfig
 
-from lsst.ip.diffim import PsfMatchConfigAL
-
 logUtils.trace_set_at("lsst.ip.diffim", 4)
 
 
 class DiffimTestCases(lsst.utils.tests.TestCase):
 
     def setUp(self):
-        self.config = PsfMatchConfigAL()
+        self.config = ipDiffim.PsfMatchConfigAL()
 
         # Test was put together before the min size went to 21
         self.config.kernelSize = 19

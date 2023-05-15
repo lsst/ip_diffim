@@ -5,13 +5,10 @@ import numpy as num
 import lsst.utils.tests
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
+import lsst.ip.diffim as ipDiffim
 import lsst.geom as geom
 import lsst.utils.logging as logUtils
 import lsst.pex.config as pexConfig
-
-from lsst.ip.diffim import (makeKernelBasisList, renormalizeKernelList, KernelCandidateF,
-                            BuildSingleKernelVisitorF, AssessSpatialKernelVisitorF, PsfMatchConfigAL,
-                            )
 
 # Increase the number for more verbose messages; decrease for fewer messages
 logUtils.trace_set_at("lsst.ip.diffim", 4)
@@ -20,10 +17,10 @@ logUtils.trace_set_at("lsst.ip.diffim", 4)
 class DiffimTestCases(unittest.TestCase):
 
     def setUp(self):
-        config = PsfMatchConfigAL()
+        config = ipDiffim.PsfMatchConfigAL()
 
         self.ps = pexConfig.makePropertySet(config)
-        self.kList = makeKernelBasisList(config)
+        self.kList = ipDiffim.makeKernelBasisList(config)
 
         self.ksize = self.ps['kernelSize']
 
@@ -37,7 +34,7 @@ class DiffimTestCases(unittest.TestCase):
         basisList = []
         basisList.append(basicKernel1)
         basisList.append(basicKernel2)
-        basisList = renormalizeKernelList(basisList)
+        basisList = ipDiffim.renormalizeKernelList(basisList)
 
         spatialKernelFunction = afwMath.PolynomialFunction2D(order)
         spatialKernel = afwMath.LinearCombinationKernel(basisList, spatialKernelFunction)
@@ -65,18 +62,18 @@ class DiffimTestCases(unittest.TestCase):
                           geom.Point2I(75, 75))
         si = afwImage.MaskedImageF(si, bbox, origin=afwImage.LOCAL)
         ti = afwImage.MaskedImageF(ti, bbox, origin=afwImage.LOCAL)
-        kc = KernelCandidateF(50., 50., ti, si, self.ps)
+        kc = ipDiffim.KernelCandidateF(50., 50., ti, si, self.ps)
 
         sBg = afwMath.PolynomialFunction2D(1)
         bgCoeffs = [0., 0., 0.]
         sBg.setParameters(bgCoeffs)
 
         # must be initialized
-        bskv = BuildSingleKernelVisitorF(self.kList, self.ps)
+        bskv = ipDiffim.BuildSingleKernelVisitorF(self.kList, self.ps)
         bskv.processCandidate(kc)
         self.assertEqual(kc.isInitialized(), True)
 
-        askv = AssessSpatialKernelVisitorF(sKernel, sBg, self.ps)
+        askv = ipDiffim.AssessSpatialKernelVisitorF(sKernel, sBg, self.ps)
         askv.processCandidate(kc)
 
         self.assertEqual(askv.getNProcessed(), 1)
@@ -97,7 +94,7 @@ class DiffimTestCases(unittest.TestCase):
                           geom.Point2I(75, 75))
         si = afwImage.MaskedImageF(si, bbox, origin=afwImage.LOCAL)
         ti = afwImage.MaskedImageF(ti, bbox, origin=afwImage.LOCAL)
-        kc = KernelCandidateF(50., 50., ti, si, self.ps)
+        kc = ipDiffim.KernelCandidateF(50., 50., ti, si, self.ps)
 
         badGaussian = afwMath.GaussianFunction2D(1., 1., 0.)
         badKernel = afwMath.AnalyticKernel(self.ksize, self.ksize, badGaussian)
@@ -112,11 +109,11 @@ class DiffimTestCases(unittest.TestCase):
         sBg.setParameters(bgCoeffs)
 
         # must be initialized
-        bskv = BuildSingleKernelVisitorF(self.kList, self.ps)
+        bskv = ipDiffim.BuildSingleKernelVisitorF(self.kList, self.ps)
         bskv.processCandidate(kc)
         self.assertEqual(kc.isInitialized(), True)
 
-        askv = AssessSpatialKernelVisitorF(badSpatialKernel, sBg, self.ps)
+        askv = ipDiffim.AssessSpatialKernelVisitorF(badSpatialKernel, sBg, self.ps)
         askv.processCandidate(kc)
 
         self.assertEqual(askv.getNProcessed(), 1)
