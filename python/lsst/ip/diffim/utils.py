@@ -965,15 +965,6 @@ class DipoleTestImage(object):
         di = dipole.getMaskedImage()
         di -= negImage.getMaskedImage()
 
-        # Carry through pos/neg detection masks to new planes in diffim
-        dm = di.mask
-        posDetectedBits = posImage.mask.array == dm.getPlaneBitMask("DETECTED")
-        negDetectedBits = negImage.mask.array == dm.getPlaneBitMask("DETECTED")
-        pos_det = dm.addMaskPlane("DETECTED_POS")  # new mask plane -- different from "DETECTED"
-        neg_det = dm.addMaskPlane("DETECTED_NEG")  # new mask plane -- different from "DETECTED_NEGATIVE"
-        dma = dm.array
-        # set the two custom mask planes to these new masks
-        dma[:, :] = posDetectedBits*pos_det + negDetectedBits*neg_det
         self.diffim, self.posImage, self.posCatalog, self.negImage, self.negCatalog \
             = dipole, posImage, posCatalog, negImage, negCatalog
 
@@ -1051,9 +1042,6 @@ class DipoleTestImage(object):
         detectConfig = measAlg.SourceDetectionConfig()
         detectConfig.returnOriginalFootprints = False  # should be the default
 
-        diffimPsf = diffim.getPsf()
-        psfSigma = diffimPsf.computeShape(diffimPsf.getAveragePosition()).getDeterminantRadius()
-
         # code from imageDifference.py:
         detectConfig.thresholdPolarity = "both"
         detectConfig.thresholdValue = detectSigma
@@ -1069,7 +1057,7 @@ class DipoleTestImage(object):
         detectTask = measAlg.SourceDetectionTask(schema, config=detectConfig)
 
         table = afwTable.SourceTable.make(schema)
-        catalog = detectTask.run(table, diffim, sigma=psfSigma)
+        catalog = detectTask.run(table, diffim)
 
         # Now do the merge.
         if doMerge:

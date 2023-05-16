@@ -504,13 +504,9 @@ class DetectAndMeasureScoreTask(DetectAndMeasureTask):
 
         table = afwTable.SourceTable.make(self.schema, idFactory)
         table.setMetadata(self.algMetadata)
-        # Exclude the edge of the CCD from detection.
-        # This operation would be performed in the detection subtask if doSmooth=True
-        #  but we need to apply the cut here since we are using a preconvolved image.
-        goodBBox = scoreExposure.getPsf().getKernel().shrinkBBox(scoreExposure.getBBox())
         results = self.detection.run(
             table=table,
-            exposure=scoreExposure[goodBBox],
+            exposure=scoreExposure,
             doSmooth=False,
         )
         # Copy the detection mask from the Score image to the difference image

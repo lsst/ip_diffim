@@ -203,12 +203,13 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase):
 
         # Configure the detection Task
         detectionTask = self._setup_detection()
+        kwargs["seed"] = transientSeed
+        kwargs["nSrc"] = 10
+        kwargs["fluxLevel"] = 1000
 
         # Run detection and check the results
         def _detection_wrapper(positive=True):
-            transients, transientSources = makeTestImage(seed=transientSeed, psfSize=2.4,
-                                                         nSrc=10, fluxLevel=1000.,
-                                                         noiseLevel=noiseLevel, noiseSeed=8)
+            transients, transientSources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=8, **kwargs)
             difference = science.clone()
             difference.maskedImage -= matchedTemplate.maskedImage
             if positive:
@@ -233,9 +234,17 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase):
         fluxRange = 1.5
         nSources = 10
         offset = 1
+        xSize = 300
+        ySize = 300
+        kernelSize = 32
+        # Avoid placing sources near the edge for this test, so that we can
+        # easily check that the correct number of sources are detected.
+        templateBorderSize = kernelSize//2
         dipoleFlag = "ip_diffim_DipoleFit_flag_classification"
         kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel, "fluxRange": fluxRange,
-                  "nSrc": nSources}
+                  "nSrc": nSources, "templateBorderSize": templateBorderSize, "kernelSize": kernelSize,
+                  "xSize": xSize, "ySize": ySize}
+        dipoleFlag = "ip_diffim_DipoleFit_flag_classification"
         science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
         matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
         difference = science.clone()
@@ -312,28 +321,57 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase):
             self._check_diaSource(transientSources, skySource, matchDistance=1000, scale=0.,
                                   atol=np.sqrt(transientFluxRange*transientFluxLevel))
 
-    def _check_diaSource(self, refSources, diaSource, refIds=None,
-                         matchDistance=1., scale=1., usePsfFlux=True,
-                         rtol=0.02, atol=None):
-        """Match a diaSource with a source in a reference catalog
-        and compare properties.
+    def test_edge_detections(self):
+        """Sources with certain bad mask planes set should not be detected.
         """
-        distance = np.sqrt((diaSource.getX() - refSources.getX())**2
-                           + (diaSource.getY() - refSources.getY())**2)
-        self.assertLess(min(distance), matchDistance)
-        src = refSources[np.argmin(distance)]
-        if refIds is not None:
-            # Check that the same source was not previously associated
-            self.assertNotIn(src.getId(), refIds)
-            refIds.append(src.getId())
-        if atol is None:
-            atol = rtol*src.getPsfInstFlux() if usePsfFlux else rtol*src.getApInstFlux()
-        if usePsfFlux:
-            self.assertFloatsAlmostEqual(src.getPsfInstFlux()*scale, diaSource.getPsfInstFlux(),
-                                         rtol=rtol, atol=atol)
-        else:
-            self.assertFloatsAlmostEqual(src.getApInstFlux()*scale, diaSource.getApInstFlux(),
-                                         rtol=rtol, atol=atol)
+        # Set up the simulated images
+        noiseLevel = 1.
+        staticSeed = 1
+        transientSeed = 6
+        fluxLevel = 500
+        radius = 2
+        kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel}
+        science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
+        matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
+
+        _checkMask = subtractImages.AlardLuptonSubtractTask._checkMask
+        # Configure the detection Task
+        detectionTask = self._setup_detection()
+        excludeMaskPlanes = detectionTask.config.detection.excludeMaskPlanes
+        nBad = len(excludeMaskPlanes)
+        self.assertGreater(nBad, 0)
+        kwargs["seed"] = transientSeed
+        kwargs["nSrc"] = nBad
+        kwargs["fluxLevel"] = 1000
+
+        # Run detection and check the results
+        def _detection_wrapper(setFlags=True):
+            transients, transientSources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=8, **kwargs)
+            difference = science.clone()
+            difference.maskedImage -= matchedTemplate.maskedImage
+            difference.maskedImage += transients.maskedImage
+            if setFlags:
+                for src, badMask in zip(transientSources, excludeMaskPlanes):
+                    srcX = int(src.getX())
+                    srcY = int(src.getY())
+                    srcBbox = lsst.geom.Box2I(lsst.geom.Point2I(srcX - radius, srcY - radius),
+                                              lsst.geom.Extent2I(2*radius + 1, 2*radius + 1))
+                    difference[srcBbox].mask.array |= lsst.afw.image.Mask.getPlaneBitMask(badMask)
+            output = detectionTask.run(science, matchedTemplate, difference)
+            refIds = []
+            goodSrcFlags = _checkMask(difference.mask, transientSources, excludeMaskPlanes)
+            if setFlags:
+                self.assertEqual(np.sum(~goodSrcFlags), nBad)
+            else:
+                self.assertEqual(np.sum(~goodSrcFlags), 0)
+            for diaSource, goodSrcFlag in zip(output.diaSources, goodSrcFlags):
+                if ~goodSrcFlag:
+                    with self.assertRaises(AssertionError):
+                        self._check_diaSource(transientSources, diaSource, refIds=refIds)
+                else:
+                    self._check_diaSource(transientSources, diaSource, refIds=refIds)
+        _detection_wrapper(setFlags=False)
+        _detection_wrapper(setFlags=True)
 
 
 class DetectAndMeasureScoreTest(DetectAndMeasureTestBase):
@@ -425,6 +463,9 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase):
 
         # Configure the detection Task
         detectionTask = self._setup_detection()
+        kwargs["seed"] = transientSeed
+        kwargs["nSrc"] = 10
+        kwargs["fluxLevel"] = 1000
 
         # Run detection and check the results
         def _detection_wrapper(positive=True):
@@ -435,9 +476,8 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase):
             positive : `bool`, optional
                 If set, use positive transient sources.
             """
-            transients, transientSources = makeTestImage(seed=transientSeed, psfSize=2.4,
-                                                         nSrc=10, fluxLevel=1000.,
-                                                         noiseLevel=noiseLevel, noiseSeed=8)
+
+            transients, transientSources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=8, **kwargs)
             difference = science.clone()
             difference.maskedImage -= matchedTemplate.maskedImage
             if positive:
@@ -448,8 +488,14 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase):
             output = detectionTask.run(science, matchedTemplate, difference, score)
             refIds = []
             scale = 1. if positive else -1.
-            for diaSource in output.diaSources:
-                self._check_diaSource(transientSources, diaSource, refIds=refIds, scale=scale)
+            goodSrcFlags = subtractTask._checkMask(score.mask, transientSources,
+                                                   subtractTask.config.badMaskPlanes)
+            for diaSource, goodSrcFlag in zip(output.diaSources, goodSrcFlags):
+                if ~goodSrcFlag:
+                    with self.assertRaises(AssertionError):
+                        self._check_diaSource(transientSources, diaSource, refIds=refIds, scale=scale)
+                else:
+                    self._check_diaSource(transientSources, diaSource, refIds=refIds, scale=scale)
         _detection_wrapper(positive=True)
         _detection_wrapper(positive=False)
 
@@ -463,9 +509,16 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase):
         fluxRange = 1.5
         nSources = 10
         offset = 1
+        xSize = 300
+        ySize = 300
+        kernelSize = 32
+        # Avoid placing sources near the edge for this test, so that we can
+        # easily check that the correct number of sources are detected.
+        templateBorderSize = kernelSize//2
         dipoleFlag = "ip_diffim_DipoleFit_flag_classification"
         kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel, "fluxRange": fluxRange,
-                  "nSrc": nSources}
+                  "nSrc": nSources, "templateBorderSize": templateBorderSize, "kernelSize": kernelSize,
+                  "xSize": xSize, "ySize": ySize}
         science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
         matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
         difference = science.clone()
@@ -550,6 +603,60 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase):
             # The sky sources should have low flux levels.
             self._check_diaSource(transientSources, skySource, matchDistance=1000, scale=0.,
                                   atol=np.sqrt(transientFluxRange*transientFluxLevel))
+
+    def test_edge_detections(self):
+        """Sources with certain bad mask planes set should not be detected.
+        """
+        # Set up the simulated images
+        noiseLevel = 1.
+        staticSeed = 1
+        transientSeed = 6
+        fluxLevel = 500
+        radius = 2
+        kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel}
+        science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
+        matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
+
+        subtractTask = subtractImages.AlardLuptonPreconvolveSubtractTask()
+        scienceKernel = science.psf.getKernel()
+        # Configure the detection Task
+        detectionTask = self._setup_detection()
+        excludeMaskPlanes = detectionTask.config.detection.excludeMaskPlanes
+        nBad = len(excludeMaskPlanes)
+        self.assertGreater(nBad, 0)
+        kwargs["seed"] = transientSeed
+        kwargs["nSrc"] = nBad
+        kwargs["fluxLevel"] = 1000
+
+        # Run detection and check the results
+        def _detection_wrapper(setFlags=True):
+            transients, transientSources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=8, **kwargs)
+            difference = science.clone()
+            difference.maskedImage -= matchedTemplate.maskedImage
+            difference.maskedImage += transients.maskedImage
+            if setFlags:
+                for src, badMask in zip(transientSources, excludeMaskPlanes):
+                    srcX = int(src.getX())
+                    srcY = int(src.getY())
+                    srcBbox = lsst.geom.Box2I(lsst.geom.Point2I(srcX - radius, srcY - radius),
+                                              lsst.geom.Extent2I(2*radius + 1, 2*radius + 1))
+                    difference[srcBbox].mask.array |= lsst.afw.image.Mask.getPlaneBitMask(badMask)
+            score = subtractTask._convolveExposure(difference, scienceKernel, subtractTask.convolutionControl)
+            output = detectionTask.run(science, matchedTemplate, difference, score)
+            refIds = []
+            goodSrcFlags = subtractTask._checkMask(difference.mask, transientSources, excludeMaskPlanes)
+            if setFlags:
+                self.assertEqual(np.sum(~goodSrcFlags), nBad)
+            else:
+                self.assertEqual(np.sum(~goodSrcFlags), 0)
+            for diaSource, goodSrcFlag in zip(output.diaSources, goodSrcFlags):
+                if ~goodSrcFlag:
+                    with self.assertRaises(AssertionError):
+                        self._check_diaSource(transientSources, diaSource, refIds=refIds)
+                else:
+                    self._check_diaSource(transientSources, diaSource, refIds=refIds)
+        _detection_wrapper(setFlags=False)
+        _detection_wrapper(setFlags=True)
 
 
 def setup_module(module):
