@@ -1,12 +1,12 @@
-.. lsst-task-topic:: lsst.ip.diffim.ImagePsfMatchTask
+.. lsst-task-topic:: lsst.ip.diffim.MakeKernelTask
 
-#################
-ImagePsfMatchTask
-#################
+##############
+MakeKernelTask
+##############
 
-ImagePsfMatchTask creates a PSF-matching kernel for two images.
+MakeKernelTask creates a PSF-matching kernel for two images.
 
-.. _lsst.ip.diffim.ImagePsfMatchTask-description:
+.. _lsst.ip.diffim.MakeKernelTask-description:
 
 Description
 ===========
@@ -57,51 +57,28 @@ currently-acceptable candidates, and the spatial model used to derive a second
 set of (spatial) residuals which are again used to reject bad candidates,
 using the same thresholds as above.
 
-.. _lsst.ip.diffim.ImagePsfMatchTask-invoke:
-
-Invoking the Task
------------------
-
-There is no run() method for this Task.  Instead there are 4 methods that
-may be used to invoke the Psf-matching.  These are
-`~lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask.matchMaskedImages`,
-`~lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask.subtractMaskedImages`,
-`~lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask.matchExposures`, and
-`~lsst.ip.diffim.imagePsfMatch.ImagePsfMatchTask.subtractExposures`.
-
-The methods that operate on `~lsst.afw.image.MaskedImage` require that the images
-already be astrometrically aligned, and are the same shape.  The methods that
-operate on `~lsst.afw.image.Exposure` allow for the input images to be
-misregistered and potentially be different sizes; by default a
-`~lsst.afw.math.LanczosWarpingKernel` is used to perform the astrometric
-alignment.  The methods that "match" images return a Psf-matched image, while
-the methods that "subtract" images return a Psf-matched and template
-subtracted image.
-
-See each method's returned `~lsst.pipe.base.Struct` for more details.
-
-.. _lsst.ip.diffim.ImagePsfMatchTask-api:
+.. _lsst.ip.diffim.MakeKernelTask-api:
 
 Python API summary
 ==================
 
-.. lsst-task-api-summary:: lsst.ip.diffim.ImagePsfMatchTask
+.. lsst-task-api-summary:: lsst.ip.diffim.MakeKernelTask
 
-.. _lsst.ip.diffim.ImagePsfMatchTask-subtasks:
+.. _lsst.ip.diffim.MakeKernelTask-subtasks:
 
 Retargetable subtasks
 =====================
 
-.. lsst-task-config-subtasks:: lsst.ip.diffim.ImagePsfMatchTask
+.. lsst-task-config-subtasks:: lsst.ip.diffim.MakeKernelTask
 
-.. _lsst.ip.diffim.ImagePsfMatchTask-config:
+.. _lsst.ip.diffim.MakeKernelTask-config:
 
 Configuration fields
 ====================
 
-.. lsst-task-config-fields:: lsst.ip.diffim.ModelPsfMatchTask
+.. lsst-task-config-fields:: lsst.ip.diffim.MakeKernelTask
 
-.. _lsst.ip.diffim.ImagePsfMatchTask-debug:
+.. _lsst.ip.diffim.MakeKernelTask-debug:
 
 Debugging
 =========
@@ -109,7 +86,7 @@ Debugging
 The ``pipetask`` command line interface supports a ``--debug`` flag to import
 ``debug.py`` from your PYTHONPATH; see :ref:`lsstDebug` for more about ``debug.py``
 files.
-The available variables in ImagePsfMatchTask include:
+The available variables in MakeKernelTask include:
 
 display : `bool`
     Enable debug display output.
