@@ -24,9 +24,8 @@ except Exception:
 class DiffimTestCases(lsst.utils.tests.TestCase):
 
     def setUp(self):
-        self.config = ipDiffim.ImagePsfMatchTask.ConfigClass()
-        self.subconfig = self.config.kernel.active
-        self.ps = pexConfig.makePropertySet(self.subconfig)
+        self.config = ipDiffim.PsfMatchConfigAL()
+        self.ps = pexConfig.makePropertySet(self.config)
         self.kSize = self.ps['kernelSize']
 
         # gaussian reference kernel
@@ -58,10 +57,10 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
     def testGetCollection(self):
         # NOTE - you need to subtract off background from the image
         # you run detection on.  Here it is the template.
-        bgConfig = self.subconfig.afwBackgroundConfig
+        bgConfig = self.config.afwBackgroundConfig
         diffimTools.backgroundSubtract(bgConfig, [self.templateImage, ])
 
-        detConfig = self.subconfig.detectionConfig
+        detConfig = self.config.detectionConfig
         maskPlane = detConfig.badMaskPlanes[0]
         maskVal = afwImage.Mask.getPlaneBitMask(maskPlane)
 

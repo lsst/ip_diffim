@@ -5,8 +5,8 @@ import numpy as num
 import lsst.utils.tests
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
-import lsst.geom as geom
 import lsst.ip.diffim as ipDiffim
+import lsst.geom as geom
 import lsst.utils.logging as logUtils
 import lsst.pex.config as pexConfig
 
@@ -17,12 +17,10 @@ logUtils.trace_set_at("lsst.ip.diffim", 4)
 class DiffimTestCases(unittest.TestCase):
 
     def setUp(self):
-        self.config = ipDiffim.ImagePsfMatchTask.ConfigClass()
-        self.config.kernel.name = "AL"
-        self.subconfig = self.config.kernel.active
+        config = ipDiffim.PsfMatchConfigAL()
 
-        self.ps = pexConfig.makePropertySet(self.subconfig)
-        self.kList = ipDiffim.makeKernelBasisList(self.subconfig)
+        self.ps = pexConfig.makePropertySet(config)
+        self.kList = ipDiffim.makeKernelBasisList(config)
 
         self.ksize = self.ps['kernelSize']
 

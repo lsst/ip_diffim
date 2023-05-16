@@ -15,16 +15,14 @@ logUtils.trace_set_at("lsst.ip.diffim", 4)
 class DiffimTestCases(unittest.TestCase):
 
     def setUp(self):
-        self.config = ipDiffim.ImagePsfMatchTask.ConfigClass()
-        self.config.kernel.name = "DF"
-        self.subconfig = self.config.kernel.active
+        self.config = ipDiffim.PsfMatchConfigDF()
 
-        self.ps = pexConfig.makePropertySet(self.subconfig)
+        self.ps = pexConfig.makePropertySet(self.config)
 
         self.ps["useRegularization"] = False
         self.ps["checkConditionNumber"] = False  # I am making shady kernels by hand
         self.ps["useCoreStats"] = False  # I am making off-center resids
-        self.kList = ipDiffim.makeKernelBasisList(self.subconfig)
+        self.kList = ipDiffim.makeKernelBasisList(self.config)
         self.size = 51
 
     def makeCandidate(self, kSum, x, y):

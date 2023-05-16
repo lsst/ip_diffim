@@ -15,12 +15,10 @@ logUtils.trace_set_at("lsst.ip.diffim", 2)
 class DiffimTestCases(lsst.utils.tests.TestCase):
 
     def setUp(self):
-        self.config = ipDiffim.ImagePsfMatchTask.ConfigClass()
-        self.config.kernel.name = "DF"
-        self.subconfig = self.config.kernel.active
+        self.config = ipDiffim.PsfMatchConfigDF()
 
-        self.ps = pexConfig.makePropertySet(self.subconfig)
-        self.kList = ipDiffim.makeKernelBasisList(self.subconfig)
+        self.ps = pexConfig.makePropertySet(self.config)
+        self.kList = ipDiffim.makeKernelBasisList(self.config)
 
     def makeCandidate(self, kSum, x, y, size=51):
         mi1 = afwImage.MaskedImageF(geom.Extent2I(size, size))

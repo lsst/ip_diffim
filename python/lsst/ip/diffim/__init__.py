@@ -27,9 +27,7 @@ from .diffimLib import *
 # Python code
 from .dcrModel import *
 from .psfMatch import *
-from .imagePsfMatch import *
 from .modelPsfMatch import *
-from .snapPsfMatch import *
 from .makeKernel import *
 from .makeKernelBasisList import *
 from .diaCatalogSourceSelector import *
@@ -44,7 +42,6 @@ from .detectAndMeasure import *
 from .imageDecorrelation import *
 from .imageMapReduce import *
 from .subtractImages import *
-from .zogy import *
 from .version import *
 
 # automatically register ip_diffim Algorithms

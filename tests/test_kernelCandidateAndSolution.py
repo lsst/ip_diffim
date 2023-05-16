@@ -63,11 +63,9 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         self.table.defineCentroid("Centroid")
         self.ss = afwTable.SourceCatalog(self.table)
 
-        self.config = ipDiffim.ImagePsfMatchTask.ConfigClass()
-        self.config.kernel.name = "DF"
-        self.subconfig = self.config.kernel.active
+        self.config = ipDiffim.PsfMatchConfigDF()
 
-        self.ps = pexConfig.makePropertySet(self.subconfig)
+        self.ps = pexConfig.makePropertySet(self.config)
         self.ps['fitForBackground'] = True  # we are testing known background recovery here
         self.ps['checkConditionNumber'] = False  # just in case
         self.ps["useRegularization"] = False
@@ -84,7 +82,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             scienceExposure.setXY0(geom.Point2I(0, 0))
             templateExposure.setXY0(geom.Point2I(0, 0))
             # do the warping first so we don't have any masked pixels in the postage stamps
-            warper = afwMath.Warper.fromConfig(self.subconfig.warpingConfig)
+            warper = afwMath.Warper.fromConfig(self.config.warpingConfig)
             templateExposure = warper.warpExposure(scienceExposure.getWcs(), templateExposure,
                                                    destBBox=scienceExposure.getBBox())
 
@@ -199,7 +197,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                                        self.templateExposure2.getMaskedImage(),
                                        self.scienceImage2.getMaskedImage(),
                                        self.ps)
-        kList = ipDiffim.makeKernelBasisList(self.subconfig)
+        kList = ipDiffim.makeKernelBasisList(self.config)
 
         kc.build(kList)
         self.assertEqual(kc.isInitialized(), True)
@@ -266,7 +264,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         else:
             self.fail()
 
-        kList = ipDiffim.makeKernelBasisList(self.subconfig)
+        kList = ipDiffim.makeKernelBasisList(self.config)
 
         kc.build(kList)
         self.assertEqual(kc.isInitialized(), True)
@@ -280,7 +278,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                                        sIm,
                                        self.ps)
 
-        kList = ipDiffim.makeKernelBasisList(self.subconfig)
+        kList = ipDiffim.makeKernelBasisList(self.config)
         kc.build(kList)
         self.verifyDeltaFunctionSolution(kc.getKernelSolution(ipDiffim.KernelCandidateF.RECENT),
                                          kSum=scaling)
@@ -292,7 +290,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                                        sIm,
                                        self.ps)
 
-        kList = ipDiffim.makeKernelBasisList(self.subconfig)
+        kList = ipDiffim.makeKernelBasisList(self.config)
         kc.build(kList)
         self.verifyDeltaFunctionSolution(kc.getKernelSolution(ipDiffim.KernelCandidateF.RECENT),
                                          bg=bg)
@@ -306,7 +304,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                                        self.templateExposure2.getMaskedImage(),
                                        self.ps)
 
-        kList = ipDiffim.makeKernelBasisList(self.subconfig)
+        kList = ipDiffim.makeKernelBasisList(self.config)
 
         kc.build(kList)
         self.assertEqual(kc.isInitialized(), True)
@@ -378,7 +376,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         smi2 = afwImage.MaskedImageF(smi, bbox, origin=afwImage.LOCAL)
 
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02, tmi2, smi2, self.ps)
-        kList = ipDiffim.makeKernelBasisList(self.subconfig)
+        kList = ipDiffim.makeKernelBasisList(self.config)
         kc.build(kList)
         self.assertEqual(kc.isInitialized(), True)
         kImageOut = kc.getImage()
@@ -403,7 +401,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         # now repeat with noise added; decrease precision of comparison
         self.addNoise(smi2)
         kc = ipDiffim.KernelCandidateF(self.x02, self.y02, tmi2, smi2, self.ps)
-        kList = ipDiffim.makeKernelBasisList(self.subconfig)
+        kList = ipDiffim.makeKernelBasisList(self.config)
         kc.build(kList)
         self.assertEqual(kc.isInitialized(), True)
         kImageOut = kc.getImage()
@@ -459,7 +457,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
                 self.assertEqual(smi2.mask[i, j, afwImage.LOCAL], 0)
 
         kc = ipDiffim.KernelCandidateF(0.0, 0.0, tmi2, smi2, self.ps)
-        kList = ipDiffim.makeKernelBasisList(self.subconfig)
+        kList = ipDiffim.makeKernelBasisList(self.config)
         kc.build(kList)
         self.assertEqual(kc.isInitialized(), True)
         kImageOut = kc.getImage()
@@ -485,7 +483,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         smi.set(0, 0x0, 1.0)
         smi[cpix, cpix, afwImage.LOCAL] = (1, 0x0, 0.0)
 
-        kList = ipDiffim.makeKernelBasisList(self.subconfig)
+        kList = ipDiffim.makeKernelBasisList(self.config)
         self.ps["constantVarianceWeighting"] = False
         kc = ipDiffim.KernelCandidateF(0.0, 0.0, tmi, smi, self.ps)
         try:
