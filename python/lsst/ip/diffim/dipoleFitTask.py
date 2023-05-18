@@ -93,9 +93,10 @@ class DipoleFitPluginConfig(measBase.SingleFramePluginConfig):
         (note this is actually a significance, not a chi2 value).""")
 
     maxFootprintArea = pexConfig.Field(
-        dtype=int, default=5_000,
+        dtype=int, default=1_200,
         doc=("Maximum area for footprints before they are ignored as large; "
-             "non-positive means no threshold applied"))
+             "non-positive means no threshold applied"
+             "Threshold chosen for HSC and DECam data, see DM-38741 for details."))
 
 
 class DipoleFitTaskConfig(measBase.SingleFrameMeasurementConfig):
