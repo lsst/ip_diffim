@@ -836,7 +836,7 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
         bbox = science.getBBox()
         innerBBox = preConvKernel.shrinkBBox(bbox)
 
-        kernelSources = self.makeKernel.selectKernelSources(template[innerBBox], science[innerBBox],
+        kernelSources = self.makeKernel.selectKernelSources(template[innerBBox], matchedScience[innerBBox],
                                                             candidateList=selectSources,
                                                             preconvolved=True)
         kernelResult = self.makeKernel.run(template[innerBBox], matchedScience[innerBBox], kernelSources,
