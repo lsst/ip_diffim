@@ -736,9 +736,13 @@ class AlardLuptonPreconvolveSubtractTest(lsst.utils.tests.TestCase):
         with the same size psf in the template and science.
         """
         noiseLevel = 1.
-        science, sources = makeTestImage(psfSize=2.4, noiseLevel=noiseLevel, noiseSeed=6)
+        xSize = 400
+        ySize = 400
+        science, sources = makeTestImage(psfSize=2.4, noiseLevel=noiseLevel, noiseSeed=6,
+                                         xSize=xSize, ySize=ySize)
         template, _ = makeTestImage(psfSize=2.4, noiseLevel=noiseLevel, noiseSeed=7,
-                                    templateBorderSize=20, doApplyCalibration=True)
+                                    templateBorderSize=20, doApplyCalibration=True,
+                                    xSize=xSize, ySize=ySize)
         config = subtractImages.AlardLuptonPreconvolveSubtractTask.ConfigClass()
         config.doSubtractBackground = False
         task = subtractImages.AlardLuptonPreconvolveSubtractTask(config=config)
@@ -761,9 +765,13 @@ class AlardLuptonPreconvolveSubtractTest(lsst.utils.tests.TestCase):
 
     def test_clear_template_mask(self):
         noiseLevel = 1.
-        science, sources = makeTestImage(psfSize=3.0, noiseLevel=noiseLevel, noiseSeed=6)
+        xSize = 400
+        ySize = 400
+        science, sources = makeTestImage(psfSize=3.0, noiseLevel=noiseLevel, noiseSeed=6,
+                                         xSize=xSize, ySize=ySize)
         template, _ = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=7,
-                                    templateBorderSize=20, doApplyCalibration=True)
+                                    templateBorderSize=20, doApplyCalibration=True,
+                                    xSize=xSize, ySize=ySize)
         diffimEmptyMaskPlanes = ["DETECTED", "DETECTED_NEGATIVE"]
         config = subtractImages.AlardLuptonPreconvolveSubtractTask.ConfigClass()
         config.doSubtractBackground = False        # Ensure that each each mask plane is set for some pixels
@@ -803,12 +811,17 @@ class AlardLuptonPreconvolveSubtractTest(lsst.utils.tests.TestCase):
         larger or smaller than the science image PSF.
         """
         noiseLevel = .3
+        xSize = 400
+        ySize = 400
         science, sources = makeTestImage(psfSize=2.4, noiseLevel=noiseLevel,
-                                         noiseSeed=6, templateBorderSize=0)
+                                         noiseSeed=6, templateBorderSize=0,
+                                         xSize=xSize, ySize=ySize)
         template1, _ = makeTestImage(psfSize=3.0, noiseLevel=noiseLevel,
-                                     noiseSeed=7, doApplyCalibration=True)
+                                     noiseSeed=7, doApplyCalibration=True,
+                                     xSize=xSize, ySize=ySize)
         template2, _ = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel,
-                                     noiseSeed=8, doApplyCalibration=True)
+                                     noiseSeed=8, doApplyCalibration=True,
+                                     xSize=xSize, ySize=ySize)
         config = subtractImages.AlardLuptonPreconvolveSubtractTask.ConfigClass()
         config.doSubtractBackground = False
         task = subtractImages.AlardLuptonPreconvolveSubtractTask(config=config)
@@ -901,6 +914,8 @@ class AlardLuptonPreconvolveSubtractTest(lsst.utils.tests.TestCase):
         scienceNoiseLevel = 4.
         templateNoiseLevel = 2.
         scaleFactor = 1.345
+        xSize = 400
+        ySize = 400
         # Make sure to include pixels with the DETECTED mask bit set.
         statsCtrl = makeStats(badMaskPlanes=("EDGE", "BAD", "NO_DATA"))
 
@@ -943,9 +958,11 @@ class AlardLuptonPreconvolveSubtractTest(lsst.utils.tests.TestCase):
                                               statsCtrl)
             self.assertFloatsAlmostEqual(varMean, scienceNoise + templateNoise, rtol=0.1)
 
-        science, sources = makeTestImage(psfSize=3.0, noiseLevel=scienceNoiseLevel, noiseSeed=6)
+        science, sources = makeTestImage(psfSize=3.0, noiseLevel=scienceNoiseLevel, noiseSeed=6,
+                                         xSize=xSize, ySize=ySize)
         template, _ = makeTestImage(psfSize=2.0, noiseLevel=templateNoiseLevel, noiseSeed=7,
-                                    templateBorderSize=20, doApplyCalibration=True)
+                                    templateBorderSize=20, doApplyCalibration=True,
+                                    xSize=xSize, ySize=ySize)
         # Verify that the variance plane of the Score image is correct
         #  when the template and science variance planes are correct
         _run_and_check_images(science, template, sources, statsCtrl,
@@ -975,13 +992,17 @@ class AlardLuptonPreconvolveSubtractTest(lsst.utils.tests.TestCase):
         with the Score image.
         """
         noiseLevel = 1.
-        science, sources = makeTestImage(psfSize=3.0, noiseLevel=noiseLevel, noiseSeed=6)
+        xSize = 400
+        ySize = 400
+        science, sources = makeTestImage(psfSize=3.0, noiseLevel=noiseLevel, noiseSeed=6,
+                                         xSize=xSize, ySize=ySize)
         psf = science.psf
         psfAvgPos = psf.getAveragePosition()
         psfSize = getPsfFwhm(science.psf)
         psfImg = psf.computeKernelImage(psfAvgPos)
         template, _ = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=7,
-                                    templateBorderSize=20, doApplyCalibration=True)
+                                    templateBorderSize=20, doApplyCalibration=True,
+                                    xSize=xSize, ySize=ySize)
 
         config = subtractImages.AlardLuptonPreconvolveSubtractTask.ConfigClass()
 
