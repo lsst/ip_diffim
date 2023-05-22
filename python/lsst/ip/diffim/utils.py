@@ -1048,6 +1048,7 @@ class DipoleTestImage(object):
         # detectConfig.nSigmaToGrow = psfSigma
         detectConfig.reEstimateBackground = True  # if False, will fail often for faint sources on gradients?
         detectConfig.thresholdType = "pixel_stdev"
+        detectConfig.excludeMaskPlanes = ["EDGE"]
         # Test images are often quite small, so may need to adjust background binSize
         while ((min(diffim.getWidth(), diffim.getHeight()))//detectConfig.background.binSize
                < detectConfig.background.approxOrderX and detectConfig.background.binSize > minBinSize):
