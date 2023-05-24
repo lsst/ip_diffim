@@ -75,6 +75,7 @@ class MakeKernelConfig(PsfMatchConfig):
         # High sigma detections only
         self.selectDetection.reEstimateBackground = False
         self.selectDetection.thresholdValue = 10.0
+        self.selectDetection.excludeMaskPlanes = ["EDGE"]
 
         # Minimal set of measurments for star selection
         self.selectMeasurement.algorithms.names.clear()
