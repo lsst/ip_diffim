@@ -214,7 +214,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         self.convolutionControl.setDoCopyEdge(True)
 
     def _applyExternalCalibrations(self, exposure, finalizedPsfApCorrCatalog):
-        """Replace calibrations (psf, and ApCorrMap) on this exposure with external ones.".
+        """Replace calibrations (psf, and ApCorrMap) on this exposure with
+        external ones.".
 
         Parameters
         ----------
@@ -280,7 +281,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             ``matchedTemplate`` : `lsst.afw.image.ExposureF`
                 Warped and PSF-matched template exposure.
             ``backgroundModel`` : `lsst.afw.math.Function2D`
-                Background model that was fit while solving for the PSF-matching kernel
+                Background model that was fit while solving for the
+                PSF-matching kernel
             ``psfMatchingKernel`` : `lsst.afw.math.Kernel`
                 Kernel used to PSF-match the convolved image.
 
@@ -679,15 +681,16 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         Parameters
         ----------
         template : `lsst.afw.image.ExposureF`
-            Template exposure, warped to match the science exposure.
-            The variance plane of the template image is modified in place.
+            Template exposure, warped to match the science exposure. The
+            variance plane of the template image is modified in place.
         science : `lsst.afw.image.ExposureF`
-            Science exposure to subtract from the template.
-            The variance plane of the science image is modified in place.
+            Science exposure to subtract from the template. The variance plane
+            of the science image is modified in place.
         finalizedPsfApCorrCatalog : `lsst.afw.table.ExposureCatalog`, optional
             Exposure catalog with finalized psf models and aperture correction
-            maps to be applied if config.doApplyFinalizedPsf=True.  Catalog uses
-            the detector id for the catalog id, sorted on id for fast lookup.
+            maps to be applied if config.doApplyFinalizedPsf=True.  Catalog
+            uses the detector id for the catalog id, sorted on id for fast
+            lookup.
         """
         self._validateExposures(template, science)
         if self.config.doApplyFinalizedPsf:
@@ -751,9 +754,9 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
         Parameters
         ----------
         template : `lsst.afw.image.ExposureF`
-            The template image, which has previously been warped to
-            the science image. The template bbox will be padded by a few pixels
-            compared to the science bbox.
+            The template image, which has previously been warped to the science
+            image. The template bbox will be padded by a few pixels compared to
+            the science bbox.
         science : `lsst.afw.image.ExposureF`
             The science exposure.
         sources : `lsst.afw.table.SourceCatalog`
@@ -769,18 +772,20 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
         -------
         results : `lsst.pipe.base.Struct`
             ``scoreExposure`` : `lsst.afw.image.ExposureF`
-                Result of subtracting the convolved template and science images.
-                Attached PSF is that of the original science image.
+                Result of subtracting the convolved template and science
+                images. Attached PSF is that of the original science image.
             ``matchedTemplate`` : `lsst.afw.image.ExposureF`
-                Warped and PSF-matched template exposure.
-                Attached PSF is that of the original science image.
+                Warped and PSF-matched template exposure. Attached PSF is that
+                of the original science image.
             ``matchedScience`` : `lsst.afw.image.ExposureF`
                 The science exposure after convolving with its own PSF.
                 Attached PSF is that of the original science image.
             ``backgroundModel`` : `lsst.afw.math.Function2D`
-                Background model that was fit while solving for the PSF-matching kernel
+                Background model that was fit while solving for the
+                PSF-matching kernel
             ``psfMatchingKernel`` : `lsst.afw.math.Kernel`
-                Final kernel used to PSF-match the template to the science image.
+                Final kernel used to PSF-match the template to the science
+                image.
         """
         self._prepareInputs(template, science,
                             finalizedPsfApCorrCatalog=finalizedPsfApCorrCatalog)
@@ -796,7 +801,8 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
 
     def runPreconvolve(self, template, science, matchedScience, selectSources, preConvKernel):
         """Convolve the science image with its own PSF, then convolve the
-        template with a matching kernel and subtract to form the Score exposure.
+        template with a matching kernel and subtract to form the Score
+        exposure.
 
         Parameters
         ----------
@@ -811,27 +817,28 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
             select sources in order to perform the AL PSF matching on stamp
             images around them.
         preConvKernel : `lsst.afw.math.Kernel`
-            The reflection of the kernel that was used to preconvolve
-            the `science` exposure.
-            Must be normalized to sum to 1.
+            The reflection of the kernel that was used to preconvolve the
+            `science` exposure. Must be normalized to sum to 1.
 
         Returns
         -------
         results : `lsst.pipe.base.Struct`
 
             ``scoreExposure`` : `lsst.afw.image.ExposureF`
-                Result of subtracting the convolved template and science images.
-                Attached PSF is that of the original science image.
+                Result of subtracting the convolved template and science
+                images. Attached PSF is that of the original science image.
             ``matchedTemplate`` : `lsst.afw.image.ExposureF`
-                Warped and PSF-matched template exposure.
-                Attached PSF is that of the original science image.
+                Warped and PSF-matched template exposure. Attached PSF is that
+                of the original science image.
             ``matchedScience`` : `lsst.afw.image.ExposureF`
                 The science exposure after convolving with its own PSF.
                 Attached PSF is that of the original science image.
             ``backgroundModel`` : `lsst.afw.math.Function2D`
-                Background model that was fit while solving for the PSF-matching kernel
+                Background model that was fit while solving for the
+                PSF-matching kernel
             ``psfMatchingKernel`` : `lsst.afw.math.Kernel`
-                Final kernel used to PSF-match the template to the science image.
+                Final kernel used to PSF-match the template to the science
+                image.
         """
         bbox = science.getBBox()
         innerBBox = preConvKernel.shrinkBBox(bbox)
