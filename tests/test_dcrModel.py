@@ -184,7 +184,7 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         elevation : `lsst.geom.Angle`
             Elevation angle of the simulated observation.
         exposureId : `int`, optional
-            Unique integer identifier for this observation.
+            Unique integer identifier for this observation (detector+visit id).
         randomizeTime : `bool`, optional
             Add a random offset to the observation time.
 
