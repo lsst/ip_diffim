@@ -580,6 +580,8 @@ class DipoleFitAlgorithm:
         subim = afwImage.MaskedImageF(self.diffim.getMaskedImage(), bbox=bbox, origin=afwImage.PARENT)
 
         z = diArr = subim.image.array
+        # Make sure we don't overwrite buffers.
+        z = z.copy()
         weights = 1. / subim.variance.array  # get the weights (=1/variance)
 
         if rel_weight > 0. and ((self.posImage is not None) or (self.negImage is not None)):
@@ -624,8 +626,8 @@ class DipoleFitAlgorithm:
 
         modelFunctor = dipoleModelFunctor  # dipoleModel.makeModel does not work for now.
         # Create the lmfit model (lmfit uses scipy 'leastsq' option by default - Levenberg-Marquardt)
-        # Note we can also tell it to drop missing values from the data.
-        gmod = lmfit.Model(modelFunctor, verbose=verbose, missing='drop')
+        # We have to (later) filter out the nans by hand in our input to gmod.fit().
+        gmod = lmfit.Model(modelFunctor, verbose=verbose)
 
         # Add the constraints for centroids, fluxes.
         # starting constraint - near centroid of footprint
@@ -747,6 +749,16 @@ class DipoleFitAlgorithm:
         # Set the weights to zero if mask is False
         if np.any(~mask):
             weights[~mask] = 0.
+
+        # Filter out any nans, and make the weights 0.
+        nans = (np.isnan(z) | np.isnan(weights))
+        nNans = nans.sum()
+        if nNans > 0:
+            if nNans < len(z):
+                z[nans] = np.nanmedian(z)
+            else:
+                z[nans] = 0
+        weights[nans] = 0
 
         # Note that although we can, we're not required to set initial values for params here,
         # since we set their param_hint's above.
