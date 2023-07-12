@@ -612,7 +612,10 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
     def _convolveExposure(exposure, kernel, convolutionControl,
                           bbox=None,
                           psf=None,
-                          photoCalib=None):
+                          photoCalib=None,
+                          interpolateBadMaskPlanes=False,
+                          badMaskPlanes=None,
+                          ):
         """Convolve an exposure with the given kernel.
 
         Parameters
@@ -640,8 +643,11 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             convolvedExposure.setPsf(psf)
         if photoCalib is not None:
             convolvedExposure.setPhotoCalib(photoCalib)
-        convolvedImage = lsst.afw.image.MaskedImageF(exposure.getBBox())
-        lsst.afw.math.convolve(convolvedImage, exposure.maskedImage, kernel, convolutionControl)
+        if interpolateBadMaskPlanes and badMaskPlanes is not None:
+            _interpolateImage(convolvedExposure.maskedImage,
+                              badMaskPlanes)
+        convolvedImage = lsst.afw.image.MaskedImageF(convolvedExposure.getBBox())
+        lsst.afw.math.convolve(convolvedImage, convolvedExposure.maskedImage, kernel, convolutionControl)
         convolvedExposure.setMaskedImage(convolvedImage)
         if bbox is None:
             return convolvedExposure
@@ -849,7 +855,9 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
 
         # TODO: DM-37212 we need to mirror the kernel in order to get correct cross correlation
         scienceKernel = science.psf.getKernel()
-        matchedScience = self._convolveExposure(science, scienceKernel, self.convolutionControl)
+        matchedScience = self._convolveExposure(science, scienceKernel, self.convolutionControl,
+                                                badMaskPlanes=self.config.badMaskPlanes,
+                                                interpolateBadMaskPlanes=True)
         selectSources = self._sourceSelector(sources, matchedScience.mask)
 
         subtractResults = self.runPreconvolve(template, science, matchedScience, selectSources, scienceKernel)
@@ -910,6 +918,8 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
                                                  self.convolutionControl,
                                                  bbox=bbox,
                                                  psf=science.psf,
+                                                 badMaskPlanes=self.config.badMaskPlanes,
+                                                 interpolateBadMaskPlanes=True,
                                                  photoCalib=science.photoCalib)
         score = _subtractImages(matchedScience, matchedTemplate,
                                 backgroundModel=(kernelResult.backgroundModel
@@ -1025,3 +1035,25 @@ def _shapeTest(exp1, exp2, fwhmExposureBuffer, fwhmExposureGrid):
     xTest = shape1[0] <= shape2[0]
     yTest = shape1[1] <= shape2[1]
     return xTest | yTest
+
+
+def _interpolateImage(maskedImage, badMaskPlanes, fallbackValue=None):
+    """Replace masked image pixels with interpolated values.
+
+    Parameters
+    ----------
+    maskedImage : `lsst.afw.image.MaskedImage`
+        Image on which to perform interpolation.
+    badMaskPlanes : `list` of `str`
+        List of mask planes to interpolate over.
+    fallbackValue : `float`, optional
+        Value to set when interpolation fails.
+    """
+    image = maskedImage.image.array
+    badPixels = (maskedImage.mask.array & maskedImage.mask.getPlaneBitMask(badMaskPlanes)) > 0
+    image[badPixels] = np.nan
+    if fallbackValue is None:
+        fallbackValue = np.nanmedian(image)
+    # For this initial implementation, skip the interpolation and just fill with
+    # the median value.
+    image[badPixels] = fallbackValue
