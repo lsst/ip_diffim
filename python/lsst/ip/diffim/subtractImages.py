@@ -243,7 +243,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         self.convolutionControl.setDoNormalize(False)
         self.convolutionControl.setDoCopyEdge(True)
 
-    def _applyExternalCalibrations(self, exposure, calibrationsCatalog):
+    def _applyExternalCalibrations(self, exposure, visitSummary):
         """Replace calibrations (psf, and ApCorrMap) on this exposure with
         external ones.".
 
@@ -251,7 +251,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         ----------
         exposure : `lsst.afw.image.exposure.Exposure`
             Input exposure to adjust calibrations.
-        calibrationsCatalog : `lsst.afw.table.ExposureCatalog`
+        visitSummary : `lsst.afw.table.ExposureCatalog`
             Exposure catalog with external calibrations to be applied. Catalog
             uses the detector id for the catalog id, sorted on id for fast
             lookup.
@@ -263,7 +263,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         """
         detectorId = exposure.info.getDetector().getId()
 
-        row = calibrationsCatalog.find(detectorId)
+        row = visitSummary.find(detectorId)
         if row is None:
             self.log.warning("Detector id %s not found in external calibrations catalog; "
                              "Using original calibrations.", detectorId)
@@ -286,7 +286,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
 
     @timeMethod
     def run(self, template, science, sources, finalizedPsfApCorrCatalog=None,
-            calibrationsCatalog=None):
+            visitSummary=None):
         """PSF match, subtract, and decorrelate two images.
 
         Parameters
@@ -303,8 +303,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             Exposure catalog with finalized psf models and aperture correction
             maps to be applied.  Catalog uses the detector id for the catalog
             id, sorted on id for fast lookup. Deprecated in favor of
-            ``calibrationsCatalog``, and will be removed after v27.
-        calibrationsCatalog : `lsst.afw.table.ExposureCatalog`, optional
+            ``visitSummary``, and will be removed after v26.
+        visitSummary : `lsst.afw.table.ExposureCatalog`, optional
             Exposure catalog with external calibrations to be applied. Catalog
             uses the detector id for the catalog id, sorted on id for fast
             lookup. Ignored (for temporary backwards compatibility) if
@@ -336,14 +336,14 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
 
         if finalizedPsfApCorrCatalog is not None:
             warnings.warn(
-                "The finalizedPsfApCorrCatalog argument is deprecated in favor of the calibrationsCatalog "
-                "argument, and will be removed after v27.",
+                "The finalizedPsfApCorrCatalog argument is deprecated in favor of the visitSummary "
+                "argument, and will be removed after v26.",
                 FutureWarning,
                 stacklevel=find_outside_stacklevel("lsst.ip.diffim"),
             )
-            calibrationsCatalog = finalizedPsfApCorrCatalog
+            visitSummary = finalizedPsfApCorrCatalog
 
-        self._prepareInputs(template, science, calibrationsCatalog=calibrationsCatalog)
+        self._prepareInputs(template, science, visitSummary=visitSummary)
 
         # In the event that getPsfFwhm fails, evaluate the PSF on a grid.
         fwhmExposureBuffer = self.config.makeKernel.fwhmExposureBuffer
@@ -720,7 +720,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         flags = np.bitwise_and(mv, badPixelMask) == 0
         return flags
 
-    def _prepareInputs(self, template, science, calibrationsCatalog=None):
+    def _prepareInputs(self, template, science, visitSummary=None):
         """Perform preparatory calculations common to all Alard&Lupton Tasks.
 
         Parameters
@@ -731,14 +731,14 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         science : `lsst.afw.image.ExposureF`
             Science exposure to subtract from the template. The variance plane
             of the science image is modified in place.
-        calibrationsCatalog : `lsst.afw.table.ExposureCatalog`, optional
+        visitSummary : `lsst.afw.table.ExposureCatalog`, optional
             Exposure catalog with external calibrations to be applied.  Catalog
             uses the detector id for the catalog id, sorted on id for fast
             lookup.
         """
         self._validateExposures(template, science)
-        if calibrationsCatalog is not None:
-            self._applyExternalCalibrations(science, calibrationsCatalog=calibrationsCatalog)
+        if visitSummary is not None:
+            self._applyExternalCalibrations(science, visitSummary=visitSummary)
         checkTemplateIsSufficient(template, self.log,
                                   requiredTemplateFraction=self.config.requiredTemplateFraction)
 
@@ -789,8 +789,7 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
     ConfigClass = AlardLuptonPreconvolveSubtractConfig
     _DefaultName = "alardLuptonPreconvolveSubtract"
 
-    def run(self, template, science, sources, finalizedPsfApCorrCatalog=None,
-            calibrationsCatalog=None):
+    def run(self, template, science, sources, finalizedPsfApCorrCatalog=None, visitSummary=None):
         """Preconvolve the science image with its own PSF,
         convolve the template image with a PSF-matching kernel and subtract
         from the preconvolved science image.
@@ -811,8 +810,8 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
             Exposure catalog with finalized psf models and aperture correction
             maps to be applied.  Catalog uses the detector id for the catalog
             id, sorted on id for fast lookup. Deprecated in favor of
-            ``calibrationsCatalog``, and will be removed after v27.
-        calibrationsCatalog : `lsst.afw.table.ExposureCatalog`, optional
+            ``visitSummary``, and will be removed after v27.
+        visitSummary : `lsst.afw.table.ExposureCatalog`, optional
             Exposure catalog with complete external calibrations. Catalog uses
             the detector id for the catalog id, sorted on id for fast lookup.
             Ignored (for temporary backwards compatibility) if
@@ -839,14 +838,14 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
         """
         if finalizedPsfApCorrCatalog is not None:
             warnings.warn(
-                "The finalizedPsfApCorrCatalog argument is deprecated in favor of the calibrationsCatalog "
+                "The finalizedPsfApCorrCatalog argument is deprecated in favor of the visitSummary "
                 "argument, and will be removed after v27.",
                 FutureWarning,
                 stacklevel=find_outside_stacklevel("lsst.ip.diffim"),
             )
-            calibrationsCatalog = finalizedPsfApCorrCatalog
+            visitSummary = finalizedPsfApCorrCatalog
 
-        self._prepareInputs(template, science, calibrationsCatalog=calibrationsCatalog)
+        self._prepareInputs(template, science, visitSummary=visitSummary)
 
         # TODO: DM-37212 we need to mirror the kernel in order to get correct cross correlation
         scienceKernel = science.psf.getKernel()
