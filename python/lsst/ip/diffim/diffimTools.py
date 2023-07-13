@@ -466,7 +466,7 @@ def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, ke
         except Exception:
             pass
         else:
-            if not((bm1 & badBitMask) or (bm2 & badBitMask)):
+            if not ((bm1 & badBitMask) or (bm2 & badBitMask)):
                 candidateOutList.append({'source': kernelCandidate,
                                          'footprint': afwDetect.Footprint(afwGeom.SpanSet(kbbox))})
     log.info("Selected %d / %d sources for KernelCandidacy", len(candidateOutList), len(candidateInList))

@@ -111,14 +111,14 @@ def createDipole(w, h, xc, yc, scaling=100.0, fracOffset=1.2):
         afwDisplay.Display(frame=4).mtv(image, title="Detection plane")
 
     # Merge them together
-    assert(len(results.sources) == 2)
+    assert len(results.sources) == 2
     fpSet = results.positive
     fpSet.merge(results.negative, 0, 0, False)
     sources = afwTable.SourceCatalog(table)
     fpSet.makeSources(sources)
-    assert(len(sources) == 1)
+    assert len(sources) == 1
     s = sources[0]
-    assert(len(s.getFootprint().getPeaks()) == 2)
+    assert len(s.getFootprint().getPeaks()) == 2
 
     return psf, psfSum, exp, s
 
