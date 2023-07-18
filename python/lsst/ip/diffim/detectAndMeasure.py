@@ -404,10 +404,14 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         # In the future we may wish to persist the matchedScience image.
         self.measurement.run(diaSources, difference, science, matchedTemplate)
         if self.config.doApCorr:
-            self.applyApCorr.run(
-                catalog=diaSources,
-                apCorrMap=difference.getInfo().getApCorrMap()
-            )
+            apCorrMap = difference.getInfo().getApCorrMap()
+            if apCorrMap is None:
+                self.log.warning("Difference image does not have valid aperture correction; skipping.")
+            else:
+                self.applyApCorr.run(
+                    catalog=diaSources,
+                    apCorrMap=apCorrMap,
+                )
 
     def measureForcedSources(self, diaSources, science, wcs):
         """Perform forced measurement of the diaSources on the science image.
