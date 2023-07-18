@@ -169,7 +169,7 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
         # TODO: remove on DM-39854.
         deprecated=(
             "Deprecated in favor of doApplyExternalCalibrations.  "
-            "Will be removed after v27."
+            "Will be removed after v26."
         )
     )
     doApplyExternalCalibrations = lsst.pex.config.Field(
@@ -810,7 +810,7 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
             Exposure catalog with finalized psf models and aperture correction
             maps to be applied.  Catalog uses the detector id for the catalog
             id, sorted on id for fast lookup. Deprecated in favor of
-            ``visitSummary``, and will be removed after v27.
+            ``visitSummary``, and will be removed after v26.
         visitSummary : `lsst.afw.table.ExposureCatalog`, optional
             Exposure catalog with complete external calibrations. Catalog uses
             the detector id for the catalog id, sorted on id for fast lookup.
@@ -839,7 +839,7 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
         if finalizedPsfApCorrCatalog is not None:
             warnings.warn(
                 "The finalizedPsfApCorrCatalog argument is deprecated in favor of the visitSummary "
-                "argument, and will be removed after v27.",
+                "argument, and will be removed after v26.",
                 FutureWarning,
                 stacklevel=find_outside_stacklevel("lsst.ip.diffim"),
             )
