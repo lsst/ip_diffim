@@ -219,6 +219,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         self.outputSchema = afwTable.SourceCatalog(self.schema)
         self.outputSchema.getTable().setMetadata(self.algMetadata)
 
+    # TODO: remove on DM-38687.
     @staticmethod
     @deprecated(
         reason=(
