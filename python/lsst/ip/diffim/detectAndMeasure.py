@@ -219,11 +219,12 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         self.outputSchema = afwTable.SourceCatalog(self.schema)
         self.outputSchema.getTable().setMetadata(self.algMetadata)
 
+    # TODO: remove on DM-38687.
     @staticmethod
     @deprecated(
         reason=(
             "ID factory construction now depends on configuration; use the "
-            "idGenerator config field. Will be removed after v27."
+            "idGenerator config field. Will be removed after v26."
         ),
         version="v26.0",
         category=FutureWarning,
