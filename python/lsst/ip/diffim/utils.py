@@ -1116,7 +1116,7 @@ def getPsfFwhm(psf, average=True, position=None):
 
 def evaluateMeanPsfFwhm(exposure: afwImage.Exposure,
                         fwhmExposureBuffer: float, fwhmExposureGrid: int) -> float:
-    """Get the median PSF FWHM by evaluating it on a grid within an exposure.
+    """Get the mean PSF FWHM by evaluating it on a grid within an exposure.
 
     Parameters
     ----------
@@ -1142,7 +1142,8 @@ def evaluateMeanPsfFwhm(exposure: afwImage.Exposure,
 
     See Also
     --------
-    getPsfFwhm
+    `getPsfFwhm`
+    `computeAveragePsf`
     """
 
     psf = exposure.psf
@@ -1171,6 +1172,71 @@ def evaluateMeanPsfFwhm(exposure: afwImage.Exposure,
         raise ValueError("Unable to compute PSF FWHM at any position on the exposure.")
 
     return np.nanmean(width)
+
+
+def computeAveragePsf(exposure: afwImage.Exposure,
+                      psfExposureBuffer: float, psfExposureGrid: int) -> afwImage.ImageD:
+    """Get the average PSF by evaluating it on a grid within an exposure.
+
+    Parameters
+    ----------
+    exposure : `~lsst.afw.image.Exposure`
+        The exposure for which the average PSF is to be computed.
+        The exposure must contain a `psf` attribute.
+    psfExposureBuffer : `float`
+        Fractional buffer margin to be left out of all sides of the image
+        during the construction of the grid to compute average PSF in an
+        exposure.
+    psfExposureGrid : `int`
+        Grid size to compute the average PSF in an exposure.
+
+    Returns
+    -------
+    psfImage : `~lsst.afw.image.Image`
+        The average PSF across the exposure.
+
+    Raises
+    ------
+    ValueError
+        Raised if the PSF cannot be computed at any of the grid points.
+
+    See Also
+    --------
+    `evaluateMeanPsfFwhm`
+    """
+
+    psf = exposure.psf
+
+    bbox = exposure.getBBox()
+    xmax, ymax = bbox.getMax()
+    xmin, ymin = bbox.getMin()
+
+    xbuffer = psfExposureBuffer*(xmax-xmin)
+    ybuffer = psfExposureBuffer*(ymax-ymin)
+
+    nImg = 0
+    psfArray = None
+    for (x, y) in itertools.product(np.linspace(xmin+xbuffer, xmax-xbuffer, psfExposureGrid),
+                                    np.linspace(ymin+ybuffer, ymax-ybuffer, psfExposureGrid)
+                                    ):
+        pos = geom.Point2D(x, y)
+        try:
+            singleImage = psf.computeKernelImage(pos)
+        except InvalidParameterError:
+            _LOG.debug("Unable to compute PSF image at position (%f, %f).", x, y)
+            continue
+
+        if psfArray is None:
+            psfArray = singleImage.array
+        else:
+            psfArray += singleImage.array
+        nImg += 1
+
+    if psfArray is None:
+        raise ValueError("Unable to compute PSF image at any position on the exposure.")
+
+    psfImage = afwImage.ImageD(psfArray/nImg)
+    return psfImage
 
 
 def detectTestSources(exposure):
