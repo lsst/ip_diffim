@@ -28,10 +28,12 @@ import lsst.geom as geom
 import lsst.meas.algorithms as measAlg
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
+from lsst.pex.exceptions import InvalidParameterError
 from lsst.utils.timer import timeMethod
 
 from .imageMapReduce import (ImageMapReduceConfig, ImageMapReduceTask,
                              ImageMapper)
+from .utils import computeAveragePsf
 
 __all__ = ("DecorrelateALKernelTask", "DecorrelateALKernelConfig",
            "DecorrelateALKernelMapper", "DecorrelateALKernelMapReduceConfig",
@@ -224,6 +226,9 @@ class DecorrelateALKernelTask(pipeBase.Task):
             variance = scienceExposure.variance.array
             # Variance plane of the convolved image, before convolution.
             targetVariance = templateExposure.variance.array
+            # If the template is convolved, the PSF of the difference image is
+            # that of the science image
+            psfImg = scienceExposure.getPsf().computeKernelImage(geom.Point2D(xcen, ycen))
         else:
             # We convolved the science image
             self.log.info("Decorrelation after science image convolution")
@@ -233,6 +238,15 @@ class DecorrelateALKernelTask(pipeBase.Task):
             variance = templateExposure.variance.array
             # Variance plane of the convolved image, before convolution.
             targetVariance = scienceExposure.variance.array
+            # If the science image is convolved, the PSF of the difference image
+            # is that of the template image, and will be a CoaddPsf which might
+            # not be defined for the entire image.
+            # Try the simple calculation first, and fall back on a slower method
+            # if the PSF of the template is not defined in the center.
+            try:
+                psfImg = templateExposure.getPsf().computeKernelImage(geom.Point2D(xcen, ycen))
+            except InvalidParameterError:
+                psfImg = computeAveragePsf(templateExposure, psfExposureBuffer=0.05, psfExposureGrid=100)
 
         # The maximal correction value converges to sqrt(targetVarianceMean/varianceMean).
         # Correction divergence warning if the correction exceeds 4 orders of magnitude.
@@ -247,7 +261,6 @@ class DecorrelateALKernelTask(pipeBase.Task):
 
         kArr = kimg.array
         diffimShape = subtractedExposure.image.array.shape
-        psfImg = subtractedExposure.getPsf().computeKernelImage(geom.Point2D(xcen, ycen))
         psfShape = psfImg.array.shape
 
         if preConvMode:
