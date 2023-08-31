@@ -30,6 +30,7 @@ import lsst.pipe.base as pipeBase
 from lsst.skymap import BaseSkyMap
 from lsst.ip.diffim.dcrModel import DcrModel
 from lsst.meas.algorithms import CoaddPsf, CoaddPsfConfig
+from lsst.utils.timer import timeMethod
 
 __all__ = ["GetTemplateTask", "GetTemplateConfig",
            "GetDcrTemplateTask", "GetDcrTemplateConfig"]
@@ -185,6 +186,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
         return pipeBase.Struct(coaddExposures=coaddExposureList,
                                dataIds=dataIds)
 
+    @timeMethod
     def run(self, coaddExposures, bbox, wcs, dataIds, physical_filter=None, **kwargs):
         """Warp coadds from multiple tracts to form a template for image diff.
 
