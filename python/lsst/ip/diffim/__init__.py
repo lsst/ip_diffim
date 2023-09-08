@@ -42,10 +42,11 @@ from .detectAndMeasure import *
 from .imageDecorrelation import *
 from .imageMapReduce import *
 from .subtractImages import *
+from .subtractImagesTransiNet import *
+from .zogy import *
 from .version import *
 
 # automatically register ip_diffim Algorithms
 wrapSimpleAlgorithm(NaiveDipoleCentroid, Control=DipoleCentroidControl, executionOrder=0.0)
 wrapSimpleAlgorithm(NaiveDipoleFlux, Control=DipoleFluxControl, executionOrder=2.0)
 wrapSimpleAlgorithm(PsfDipoleFlux, Control=PsfDipoleFluxControl, executionOrder=2.0)
-
