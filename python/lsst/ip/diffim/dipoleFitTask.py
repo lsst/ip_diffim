@@ -860,7 +860,8 @@ class DipoleFitAlgorithm:
                          negCentroidX=np.nan, negCentroidY=np.nan,
                          posFlux=np.nan, negFlux=np.nan, posFluxErr=np.nan, negFluxErr=np.nan,
                          centroidX=np.nan, centroidY=np.nan, orientation=np.nan,
-                         signalToNoise=np.nan, chi2=np.nan, redChi2=np.nan)
+                         signalToNoise=np.nan, chi2=np.nan, redChi2=np.nan,
+                         nData=np.nan)
             return out, fitResult
 
         centroid = ((fitParams['xcenPos'] + fitParams['xcenNeg']) / 2.,
@@ -896,7 +897,8 @@ class DipoleFitAlgorithm:
                      negCentroidX=fitParams['xcenNeg'], negCentroidY=fitParams['ycenNeg'],
                      posFlux=fluxVal, negFlux=-fluxValNeg, posFluxErr=fluxErr, negFluxErr=fluxErrNeg,
                      centroidX=centroid[0], centroidY=centroid[1], orientation=angle,
-                     signalToNoise=signalToNoise, chi2=fitResult.chisqr, redChi2=fitResult.redchi)
+                     signalToNoise=signalToNoise, chi2=fitResult.chisqr, redChi2=fitResult.redchi,
+                     nData=fitResult.ndata)
 
         # fitResult may be returned for debugging
         return out, fitResult
@@ -1047,7 +1049,11 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
 
         self.chi2dofKey = schema.addField(
             schema.join(name, "chi2dof"), type=float,
-            doc="Chi2 per degree of freedom of dipole fit")
+            doc="Chi2 per degree of freedom (chi2/(nData-nVariables)) of dipole fit")
+
+        self.nDataKey = schema.addField(
+            schema.join(name, "nData"), type=np.int64,
+            doc="Number of data points in the dipole fit")
 
         self.signalToNoiseKey = schema.addField(
             schema.join(name, "signalToNoise"), type=float,
@@ -1166,6 +1172,11 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
 
         measRecord[self.signalToNoiseKey] = result.signalToNoise
         measRecord[self.chi2dofKey] = result.redChi2
+
+        if result.nData >= 1:
+            measRecord[self.nDataKey] = result.nData
+        else:
+            measRecord[self.nDataKey] = 0
 
         self.doClassify(measRecord, result.chi2)
 
