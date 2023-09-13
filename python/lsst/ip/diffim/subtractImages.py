@@ -1088,8 +1088,8 @@ def _interpolateImage(maskedImage, badMaskPlanes, fallbackValue=None):
         The number of masked pixels that were replaced.
     """
     imgBadMaskPlanes = [
-            maskPlane for maskPlane in badMaskPlanes if maskPlane in maskedImage.mask.getMaskPlaneDict()
-        ]
+        maskPlane for maskPlane in badMaskPlanes if maskPlane in maskedImage.mask.getMaskPlaneDict()
+    ]
 
     image = maskedImage.image.array
     badPixels = (maskedImage.mask.array & maskedImage.mask.getPlaneBitMask(imgBadMaskPlanes)) > 0
