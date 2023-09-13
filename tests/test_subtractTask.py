@@ -715,6 +715,64 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
             self.assertFloatsAlmostEqual(
                 value.getCoefficients(), value2.getCoefficients(), rtol=0.0)
 
+    def test_fake_mask_plane_propagation(self):
+        """Test that we have the mask planes related to fakes in diffim images.
+        This is testing method called updateMasks
+        """
+        xSize = 200
+        ySize = 200
+        science, sources = makeTestImage(psfSize=2.4, xSize=xSize, ySize=ySize)
+        science_fake_img, science_fake_sources = makeTestImage(
+            psfSize=2.4, xSize=xSize, ySize=ySize, seed=7, nSrc=2, noiseLevel=0.25, fluxRange=1
+        )
+        template, _ = makeTestImage(psfSize=2.4, xSize=xSize, ySize=ySize, doApplyCalibration=True)
+        tmplt_fake_img, tmplt_fake_sources = makeTestImage(
+            psfSize=2.4, xSize=xSize, ySize=ySize, seed=9, nSrc=2, noiseLevel=0.25, fluxRange=1
+        )
+        # created fakes and added them to the images
+        science.image.array += science_fake_img.image.array
+        template.image.array += tmplt_fake_img.image.array
+
+        # TODO: DM-40796 update to INJECTED names when source injection gets refactored
+        # adding mask planes to both science and template images
+        science_mask_planes = science.mask.addMaskPlane("FAKE")
+        template_mask_planes = template.mask.addMaskPlane("FAKE")
+
+        for a_science_source in science_fake_sources:
+            # 3 x 3 masking of the source locations is fine
+            bbox = lsst.geom.Box2I(
+                lsst.geom.Point2I(a_science_source.getX(), a_science_source.getY()), lsst.geom.Extent2I(3, 3)
+            )
+            science[bbox].mask.array |= science_mask_planes
+
+        for a_template_source in tmplt_fake_sources:
+            # 3 x 3 masking of the source locations is fine
+            bbox = lsst.geom.Box2I(
+                lsst.geom.Point2I(a_template_source.getX(), a_template_source.getY()),
+                lsst.geom.Extent2I(3, 3)
+            )
+            template[bbox].mask.array |= template_mask_planes
+
+        science_fake_masked = (science.mask.array & science.mask.getPlaneBitMask("FAKE")) > 0
+        template_fake_masked = (template.mask.array & template.mask.getPlaneBitMask("FAKE")) > 0
+
+        config = subtractImages.AlardLuptonSubtractTask.ConfigClass()
+        config.mode = "convolveTemplate"
+        task = subtractImages.AlardLuptonSubtractTask(config=config)
+        subtraction = task.run(template, science, sources)
+
+        # check subtraction mask plane is set where we set the previous masks
+        diff_mask = subtraction.difference.mask
+
+        # science mask should be now in INJECTED
+        inj_masked = (diff_mask.array & diff_mask.getPlaneBitMask("INJECTED")) > 0
+
+        # template mask should be now in INJECTED_TEMPLATE
+        injTmplt_masked = (diff_mask.array & diff_mask.getPlaneBitMask("INJECTED_TEMPLATE")) > 0
+
+        self.assertEqual(np.sum(inj_masked.astype(int)-science_fake_masked.astype(int)), 0)
+        self.assertEqual(np.sum(injTmplt_masked.astype(int)-template_fake_masked.astype(int)), 0)
+
 
 class AlardLuptonPreconvolveSubtractTest(lsst.utils.tests.TestCase):
 

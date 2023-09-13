@@ -195,12 +195,12 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
     )
     badMaskPlanes = lsst.pex.config.ListField(
         dtype=str,
-        default=("NO_DATA", "BAD", "SAT", "EDGE"),
+        default=("NO_DATA", "BAD", "SAT", "EDGE", "FAKE"),
         doc="Mask planes to exclude when selecting sources for PSF matching."
     )
     preserveTemplateMask = lsst.pex.config.ListField(
         dtype=str,
-        default=("NO_DATA", "BAD", "SAT", "INJECTED", "INJECTED_CORE"),
+        default=("NO_DATA", "BAD", "SAT", "FAKE", "INJECTED", "INJECTED_CORE"),
         doc="Mask planes from the template to propagate to the image difference."
     )
 
@@ -461,7 +461,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                                      psfMatchingKernel=kernelResult.psfMatchingKernel)
 
     def runConvolveScience(self, template, science, selectSources):
-        """Convolve the science image with a PSF-matching kernel and subtract the template image.
+        """Convolve the science image with a PSF-matching kernel and subtract
+        the template image.
 
         Parameters
         ----------
@@ -561,20 +562,14 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         """
         # Erase existing detection mask planes.
         #  We don't want the detection mask from the science image
-        mask = difference.mask
-        mask &= ~(mask.getPlaneBitMask("DETECTED") | mask.getPlaneBitMask("DETECTED_NEGATIVE"))
 
-        # We have cleared the template mask plane, so copy the mask plane of
-        # the image difference so that we can calculate correct statistics
-        # during decorrelation. Do this regardless of whether decorrelation is
-        # used for consistency.
-        template[science.getBBox()].mask.array[...] = difference.mask.array[...]
+        self.updateMasks(template, science, difference)
+
         if self.config.doDecorrelation:
             self.log.info("Decorrelating image difference.")
             # We have cleared the template mask plane, so copy the mask plane of
             # the image difference so that we can calculate correct statistics
             # during decorrelation
-            template[science.getBBox()].mask.array[...] = difference.mask.array[...]
             correctedExposure = self.decorrelate.run(science, template[science.getBBox()], difference, kernel,
                                                      templateMatched=templateMatched,
                                                      preConvMode=preConvMode,
@@ -584,6 +579,36 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             self.log.info("NOT decorrelating image difference.")
             correctedExposure = difference
         return correctedExposure
+
+    def updateMasks(self, template, science, difference):
+        """Update the mask planes on images for finalizing."""
+
+        bbox = science.getBBox()
+        mask = difference.mask
+        mask &= ~(mask.getPlaneBitMask("DETECTED") | mask.getPlaneBitMask("DETECTED_NEGATIVE"))
+
+        if "FAKE" in science.mask.getMaskPlaneDict().keys():
+            # propagate the mask plane related to Fake source injection
+            # NOTE: the fake source injection sets FAKE plane, but it should be INJECTED
+            # NOTE: This can be removed in DM-40796
+
+            self.log.info("Adding injected mask planes")
+            mask.addMaskPlane("INJECTED")
+            diffInjectedBitMask = mask.getPlaneBitMask("INJECTED")
+
+            mask.addMaskPlane("INJECTED_TEMPLATE")
+            diffInjTmpltBitMask = mask.getPlaneBitMask("INJECTED_TEMPLATE")
+
+            scienceFakeBitMask = science.mask.getPlaneBitMask('FAKE')
+            tmpltFakeBitMask = template[bbox].mask.getPlaneBitMask('FAKE')
+
+            injScienceMaskArray = ((science.mask.array & scienceFakeBitMask) > 0) * diffInjectedBitMask
+            injTemplateMaskArray = ((template[bbox].mask.array & tmpltFakeBitMask) > 0) * diffInjTmpltBitMask
+
+            mask.array |= injScienceMaskArray
+            mask.array |= injTemplateMaskArray
+
+        template[bbox].mask.array[...] = difference.mask.array[...]
 
     @staticmethod
     def _validateExposures(template, science):
@@ -722,7 +747,12 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             kept (True) or rejected (False) based on the value of the
             mask plane at its location.
         """
-        badPixelMask = lsst.afw.image.Mask.getPlaneBitMask(badMaskPlanes)
+        setBadMaskPlanes = [
+            maskPlane for maskPlane in badMaskPlanes if maskPlane in mask.getMaskPlaneDict()
+        ]
+
+        badPixelMask = mask.getPlaneBitMask(setBadMaskPlanes)
+
         xv = np.rint(sources.getX() - mask.getX0())
         yv = np.rint(sources.getY() - mask.getY0())
 
