@@ -200,7 +200,7 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
     )
     preserveTemplateMask = lsst.pex.config.ListField(
         dtype=str,
-        default=("NO_DATA", "BAD", "SAT"),
+        default=("NO_DATA", "BAD", "SAT", "INJECTED", "INJECTED_CORE"),
         doc="Mask planes from the template to propagate to the image difference."
     )
 
