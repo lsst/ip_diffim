@@ -372,6 +372,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                                                  )
         self.log.info("Science PSF FWHM: %f pixels", sciencePsfSize)
         self.log.info("Template PSF FWHM: %f pixels", templatePsfSize)
+        self.metadata.add("sciencePsfSize", sciencePsfSize)
+        self.metadata.add("templatePsfSize", templatePsfSize)
         selectSources = self._sourceSelector(sources, science.mask)
 
         if self.config.mode == "auto":
@@ -397,8 +399,10 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             raise RuntimeError("Cannot handle AlardLuptonSubtract mode: %s", self.config.mode)
 
         if convolveTemplate:
+            self.metadata.add("convolvedExposure", "Template")
             subtractResults = self.runConvolveTemplate(template, science, selectSources)
         else:
+            self.metadata.add("convolvedExposure", "Science")
             subtractResults = self.runConvolveScience(template, science, selectSources)
 
         return subtractResults
@@ -608,13 +612,11 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         assert templateBBox.contains(scienceBBox),\
             "Template bbox does not contain all of the science image."
 
-    @staticmethod
-    def _convolveExposure(exposure, kernel, convolutionControl,
+    def _convolveExposure(self, exposure, kernel, convolutionControl,
                           bbox=None,
                           psf=None,
                           photoCalib=None,
                           interpolateBadMaskPlanes=False,
-                          badMaskPlanes=None,
                           ):
         """Convolve an exposure with the given kernel.
 
@@ -643,9 +645,10 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             convolvedExposure.setPsf(psf)
         if photoCalib is not None:
             convolvedExposure.setPhotoCalib(photoCalib)
-        if interpolateBadMaskPlanes and badMaskPlanes is not None:
-            _interpolateImage(convolvedExposure.maskedImage,
-                              badMaskPlanes)
+        if interpolateBadMaskPlanes and self.config.badMaskPlanes is not None:
+            nInterp = _interpolateImage(convolvedExposure.maskedImage,
+                                        self.config.badMaskPlanes)
+            self.metadata.add("nInterpolated", nInterp)
         convolvedImage = lsst.afw.image.MaskedImageF(convolvedExposure.getBBox())
         lsst.afw.math.convolve(convolvedImage, convolvedExposure.maskedImage, kernel, convolutionControl)
         convolvedExposure.setMaskedImage(convolvedImage)
@@ -694,6 +697,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                            "%i selected but %i needed for the calculation.",
                            len(selectSources), self.config.makeKernel.nStarPerCell)
             raise RuntimeError("Cannot compute PSF matching kernel: too few sources selected.")
+        self.metadata.add("nPsfSources", len(selectSources))
 
         return selectSources.copy(deep=True)
 
@@ -856,9 +860,9 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
         # TODO: DM-37212 we need to mirror the kernel in order to get correct cross correlation
         scienceKernel = science.psf.getKernel()
         matchedScience = self._convolveExposure(science, scienceKernel, self.convolutionControl,
-                                                badMaskPlanes=self.config.badMaskPlanes,
                                                 interpolateBadMaskPlanes=True)
         selectSources = self._sourceSelector(sources, matchedScience.mask)
+        self.metadata.add("convolvedExposure", "Preconvolution")
 
         subtractResults = self.runPreconvolve(template, science, matchedScience, selectSources, scienceKernel)
 
@@ -918,7 +922,6 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
                                                  self.convolutionControl,
                                                  bbox=bbox,
                                                  psf=science.psf,
-                                                 badMaskPlanes=self.config.badMaskPlanes,
                                                  interpolateBadMaskPlanes=True,
                                                  photoCalib=science.photoCalib)
         score = _subtractImages(matchedScience, matchedTemplate,
@@ -1048,6 +1051,11 @@ def _interpolateImage(maskedImage, badMaskPlanes, fallbackValue=None):
         List of mask planes to interpolate over.
     fallbackValue : `float`, optional
         Value to set when interpolation fails.
+
+    Returns
+    -------
+    result: `float`
+        The number of masked pixels that were replaced.
     """
     image = maskedImage.image.array
     badPixels = (maskedImage.mask.array & maskedImage.mask.getPlaneBitMask(badMaskPlanes)) > 0
@@ -1057,3 +1065,4 @@ def _interpolateImage(maskedImage, badMaskPlanes, fallbackValue=None):
     # For this initial implementation, skip the interpolation and just fill with
     # the median value.
     image[badPixels] = fallbackValue
+    return np.sum(badPixels)
