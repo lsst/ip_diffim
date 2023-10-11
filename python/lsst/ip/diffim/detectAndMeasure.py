@@ -20,6 +20,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from deprecated.sphinx import deprecated
+import numpy as np
 
 import lsst.afw.table as afwTable
 import lsst.daf.base as dafBase
@@ -347,6 +348,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             ``diaSources``  : `lsst.afw.table.SourceCatalog`
                 The catalog of detected sources.
         """
+        self.metadata.add("nUnmergedDiaSources", len(sources))
         if self.config.doMerge:
             fpSet = positiveFootprints
             fpSet.merge(negativeFootprints, self.config.growFootprint,
@@ -356,6 +358,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             self.log.info("Merging detections into %d sources", len(diaSources))
         else:
             diaSources = sources
+        self.metadata.add("nMergedDiaSources", len(diaSources))
 
         if self.config.doSkySources:
             self.addSkySources(diaSources, difference.mask, difference.info.id)
@@ -369,6 +372,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             subtractedMeasuredExposure=difference,
             diaSources=diaSources,
         )
+        self.calculateMetrics(difference)
 
         return measurementResults
 
@@ -452,6 +456,27 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                           "ip_diffim_forced_PsfFlux_flag_edge", True)
         for diaSource, forcedSource in zip(diaSources, forcedSources):
             diaSource.assign(forcedSource, mapper)
+
+    def calculateMetrics(self, difference):
+        """Add image QA metrics to the Task metadata.
+
+        Parameters
+        ----------
+        difference : `lsst.afw.image.Exposure`
+            The target image to calculate metrics for.
+        """
+        mask = difference.mask
+        badPix = (mask.array & mask.getPlaneBitMask(self.config.detection.excludeMaskPlanes)) > 0
+        self.metadata.add("nGoodPixels", np.sum(~badPix))
+        self.metadata.add("nBadPixels", np.sum(badPix))
+        detPosPix = (mask.array & mask.getPlaneBitMask("DETECTED")) > 0
+        detNegPix = (mask.array & mask.getPlaneBitMask("DETECTED_NEGATIVE")) > 0
+        self.metadata.add("nPixelsDetectedPositive", np.sum(detPosPix))
+        self.metadata.add("nPixelsDetectedNegative", np.sum(detNegPix))
+        detPosPix &= badPix
+        detNegPix &= badPix
+        self.metadata.add("nBadPixelsDetectedPositive", np.sum(detPosPix))
+        self.metadata.add("nBadPixelsDetectedNegative", np.sum(detNegPix))
 
 
 class DetectAndMeasureScoreConnections(DetectAndMeasureConnections):
