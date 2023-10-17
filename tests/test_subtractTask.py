@@ -757,7 +757,6 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         template_fake_masked = (template.mask.array & template.mask.getPlaneBitMask("FAKE")) > 0
 
         config = subtractImages.AlardLuptonSubtractTask.ConfigClass()
-        config.mode = "convolveTemplate"
         task = subtractImages.AlardLuptonSubtractTask(config=config)
         subtraction = task.run(template, science, sources)
 

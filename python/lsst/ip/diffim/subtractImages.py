@@ -1087,8 +1087,12 @@ def _interpolateImage(maskedImage, badMaskPlanes, fallbackValue=None):
     result: `float`
         The number of masked pixels that were replaced.
     """
+    imgBadMaskPlanes = [
+            maskPlane for maskPlane in badMaskPlanes if maskPlane in maskedImage.mask.getMaskPlaneDict()
+        ]
+
     image = maskedImage.image.array
-    badPixels = (maskedImage.mask.array & maskedImage.mask.getPlaneBitMask(badMaskPlanes)) > 0
+    badPixels = (maskedImage.mask.array & maskedImage.mask.getPlaneBitMask(imgBadMaskPlanes)) > 0
     image[badPixels] = np.nan
     if fallbackValue is None:
         fallbackValue = np.nanmedian(image)
