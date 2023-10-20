@@ -31,7 +31,7 @@ from lsst.ip.diffim.utils import evaluateMeanPsfFwhm, getPsfFwhm
 from lsst.meas.algorithms import ScaleVarianceTask
 import lsst.pex.config
 import lsst.pipe.base
-from lsst.pex.exceptions import InvalidParameterError
+import lsst.pex.exceptions
 from lsst.pipe.base import connectionTypes
 from . import MakeKernelTask, DecorrelateALKernelTask
 from lsst.utils.timer import timeMethod
@@ -144,8 +144,15 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
     requiredTemplateFraction = lsst.pex.config.Field(
         dtype=float,
         default=0.1,
-        doc="Abort task if template covers less than this fraction of pixels."
-        " Setting to 0 will always attempt image subtraction."
+        doc="Raise NoWorkFound and do not attempt image subtraction if template covers less than this "
+        " fraction of pixels. Setting to 0 will always attempt image subtraction."
+    )
+    minTemplateFractionForExpectedSuccess = lsst.pex.config.Field(
+        dtype=float,
+        default=0.2,
+        doc="Raise NoWorkFound if PSF-matching fails and template covers less than this fraction of pixels."
+        " If the fraction of pixels covered by the template is less than this value (and greater than"
+        " requiredTemplateFraction) this task is attempted but failure is anticipated and tolerated."
     )
     doScaleVariance = lsst.pex.config.Field(
         dtype=bool,
@@ -358,7 +365,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         try:
             templatePsfSize = getPsfFwhm(template.psf)
             sciencePsfSize = getPsfFwhm(science.psf)
-        except InvalidParameterError:
+        except lsst.pex.exceptions.InvalidParameterError:
             self.log.info("Unable to evaluate PSF at the average position. "
                           "Evaluting PSF on a grid of points."
                           )
@@ -398,12 +405,23 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         else:
             raise RuntimeError("Cannot handle AlardLuptonSubtract mode: %s", self.config.mode)
 
-        if convolveTemplate:
-            self.metadata.add("convolvedExposure", "Template")
-            subtractResults = self.runConvolveTemplate(template, science, selectSources)
-        else:
-            self.metadata.add("convolvedExposure", "Science")
-            subtractResults = self.runConvolveScience(template, science, selectSources)
+        try:
+            if convolveTemplate:
+                self.metadata.add("convolvedExposure", "Template")
+                subtractResults = self.runConvolveTemplate(template, science, selectSources)
+            else:
+                self.metadata.add("convolvedExposure", "Science")
+                subtractResults = self.runConvolveScience(template, science, selectSources)
+
+        except (RuntimeError, lsst.pex.exceptions.Exception) as e:
+            self.log.warn("Failed to match template. Checking coverage")
+            #  Raise NoWorkFound if template fraction is insufficient
+            checkTemplateIsSufficient(template, self.log,
+                                      self.config.minTemplateFractionForExpectedSuccess,
+                                      exceptionMessage="Template coverage lower than expected to succeed."
+                                      f" Failure is tolerable: {e}")
+            #  checkTemplateIsSufficient did not raise NoWorkFound, so raise original exception
+            raise e
 
         return subtractResults
 
@@ -780,7 +798,9 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         if visitSummary is not None:
             self._applyExternalCalibrations(science, visitSummary=visitSummary)
         checkTemplateIsSufficient(template, self.log,
-                                  requiredTemplateFraction=self.config.requiredTemplateFraction)
+                                  requiredTemplateFraction=self.config.requiredTemplateFraction,
+                                  exceptionMessage="Not attempting subtraction. To force subtraction,"
+                                  " set config requiredTemplateFraction=0")
 
         if self.config.doScaleVariance:
             # Scale the variance of the template and science images before
@@ -969,7 +989,8 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
                                      psfMatchingKernel=kernelResult.psfMatchingKernel)
 
 
-def checkTemplateIsSufficient(templateExposure, logger, requiredTemplateFraction=0.):
+def checkTemplateIsSufficient(templateExposure, logger, requiredTemplateFraction=0.,
+                              exceptionMessage=""):
     """Raise NoWorkFound if template coverage < requiredTemplateFraction
 
     Parameters
@@ -981,12 +1002,15 @@ def checkTemplateIsSufficient(templateExposure, logger, requiredTemplateFraction
     requiredTemplateFraction : `float`, optional
         Fraction of pixels of the science image required to have coverage
         in the template.
+    exceptionMessage : `str`, optional
+        Message to include in the exception raised if the template coverage
+        is insufficient.
 
     Raises
     ------
     lsst.pipe.base.NoWorkFound
         Raised if fraction of good pixels, defined as not having NO_DATA
-        set, is less then the configured requiredTemplateFraction
+        set, is less than the requiredTemplateFraction
     """
     # Count the number of pixels with the NO_DATA mask bit set
     # counting NaN pixels is insufficient because pixels without data are often intepolated over)
@@ -997,11 +1021,10 @@ def checkTemplateIsSufficient(templateExposure, logger, requiredTemplateFraction
                 100*pixGood/templateExposure.getBBox().getArea())
 
     if pixGood/templateExposure.getBBox().getArea() < requiredTemplateFraction:
-        message = ("Insufficient Template Coverage. (%.1f%% < %.1f%%) Not attempting subtraction. "
-                   "To force subtraction, set config requiredTemplateFraction=0." % (
-                       100*pixGood/templateExposure.getBBox().getArea(),
-                       100*requiredTemplateFraction))
-        raise lsst.pipe.base.NoWorkFound(message)
+        message = ("Insufficient Template Coverage. (%.1f%% < %.1f%%)" % (
+                   100*pixGood/templateExposure.getBBox().getArea(),
+                   100*requiredTemplateFraction))
+        raise lsst.pipe.base.NoWorkFound(message + " " + exceptionMessage)
 
 
 def _subtractImages(science, template, backgroundModel=None):
@@ -1053,7 +1076,7 @@ def _shapeTest(exp1, exp2, fwhmExposureBuffer, fwhmExposureGrid):
     try:
         shape1 = getPsfFwhm(exp1.psf, average=False)
         shape2 = getPsfFwhm(exp2.psf, average=False)
-    except InvalidParameterError:
+    except lsst.pex.exceptions.InvalidParameterError:
         shape1 = evaluateMeanPsfFwhm(exp1,
                                      fwhmExposureBuffer=fwhmExposureBuffer,
                                      fwhmExposureGrid=fwhmExposureGrid
