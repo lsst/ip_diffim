@@ -220,9 +220,9 @@ class PsfMatchConfig(pexConfig.Config):
     )
     nStarPerCell = pexConfig.Field(
         dtype=int,
-        doc="Number of KernelCandidates in each SpatialCell to use in the spatial fitting",
-        default=3,
-        check=lambda x: x >= 1
+        doc="Maximum number of KernelCandidates in each SpatialCell to use in the spatial fitting. "
+            "Set to -1 to use all candidates in each cell.",
+        default=5,
     )
     maxSpatialIterations = pexConfig.Field(
         dtype=int,
