@@ -168,6 +168,10 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         self.forcedMeasurement.slots.centroid = "base_TransformedCentroid"
         self.forcedMeasurement.slots.shape = None
 
+        # Keep track of which footprints contain streaks
+        self.measurement.plugins['base_PixelFlags'].masksFpAnywhere = ['STREAK']
+        self.measurement.plugins['base_PixelFlags'].masksFpCenter = ['STREAK']
+
 
 class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
     """Detect and measure sources on a difference image.

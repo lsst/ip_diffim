@@ -1265,6 +1265,7 @@ def detectTestSources(exposure):
         sigma=None,  # The appropriate sigma is calculated from the PSF
         doSmooth=True
     )
+    exposure.mask.addMaskPlane("STREAK")  # add empty streak mask plane in lieu of maskStreaksTask
     selectSources = detRet.sources
     selectMeasurement.run(measCat=selectSources, exposure=exposure)
 
