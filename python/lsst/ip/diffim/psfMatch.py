@@ -934,7 +934,7 @@ class PsfMatchTask(pipeBase.Task, abc.ABC):
                 nRejectedSkf = -1
                 while (nRejectedSkf != 0):
                     trace_loggers[1].debug("Building single kernels...")
-                    kernelCellSet.visitCandidates(singlekv, nStarPerCell)
+                    kernelCellSet.visitCandidates(singlekv, nStarPerCell, ignoreExceptions=True)
                     nRejectedSkf = singlekv.getNRejected()
                     trace_loggers[1].debug(
                         "Iteration %d, rejected %d candidates due to initial kernel fit",
@@ -944,10 +944,10 @@ class PsfMatchTask(pipeBase.Task, abc.ABC):
                 # Reject outliers in kernel sum
                 ksv.resetKernelSum()
                 ksv.setMode(diffimLib.KernelSumVisitorF.AGGREGATE)
-                kernelCellSet.visitCandidates(ksv, nStarPerCell)
+                kernelCellSet.visitCandidates(ksv, nStarPerCell, ignoreExceptions=True)
                 ksv.processKsumDistribution()
                 ksv.setMode(diffimLib.KernelSumVisitorF.REJECT)
-                kernelCellSet.visitCandidates(ksv, nStarPerCell)
+                kernelCellSet.visitCandidates(ksv, nStarPerCell, ignoreExceptions=True)
 
                 nRejectedKsum = ksv.getNRejected()
                 trace_loggers[1].debug(
