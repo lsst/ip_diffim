@@ -210,6 +210,12 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
         default=("NO_DATA", "BAD", "SAT", "FAKE", "INJECTED", "INJECTED_CORE"),
         doc="Mask planes from the template to propagate to the image difference."
     )
+    allowKernelSourceDetection = lsst.pex.config.Field(
+        dtype=bool,
+        default=False,
+        doc="Re-run source detection for kernel candidates if an error is"
+        " encountered while calculating the matching kernel."
+    )
 
     def setDefaults(self):
         self.makeKernel.kernel.name = "AL"
@@ -453,11 +459,23 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             ``psfMatchingKernel`` : `lsst.afw.math.Kernel`
                 Kernel used to PSF-match the template to the science image.
         """
-        kernelSources = self.makeKernel.selectKernelSources(template, science,
-                                                            candidateList=selectSources,
-                                                            preconvolved=False)
-        kernelResult = self.makeKernel.run(template, science, kernelSources,
-                                           preconvolved=False)
+        try:
+            kernelSources = self.makeKernel.selectKernelSources(template, science,
+                                                                candidateList=selectSources,
+                                                                preconvolved=False)
+            kernelResult = self.makeKernel.run(template, science, kernelSources,
+                                               preconvolved=False)
+        except Exception as e:
+            if self.config.allowKernelSourceDetection:
+                self.log.warning("Error encountered trying to construct the matching kernel"
+                                 f" Running source detection and retrying. {e}")
+                kernelSources = self.makeKernel.selectKernelSources(template, science,
+                                                                    candidateList=None,
+                                                                    preconvolved=False)
+                kernelResult = self.makeKernel.run(template, science, kernelSources,
+                                                   preconvolved=False)
+            else:
+                raise e
 
         matchedTemplate = self._convolveExposure(template, kernelResult.psfMatchingKernel,
                                                  self.convolutionControl,
