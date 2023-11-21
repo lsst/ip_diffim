@@ -141,6 +141,12 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         target=SkyObjectsTask,
         doc="Generate sky sources",
     )
+    badSourceFlags = lsst.pex.config.ListField(
+        dtype=str,
+        doc="Do not include sources with any of these flags set in the output catalog.",
+        default=("base_PixelFlags_flag_offimage",
+                 ),
+    )
     idGenerator = DetectorVisitIdGeneratorConfig.make_field()
 
     def setDefaults(self):
@@ -364,6 +370,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             self.addSkySources(diaSources, difference.mask, difference.info.id)
 
         self.measureDiaSources(diaSources, science, difference, matchedTemplate)
+        diaSources = self.removeBadSources(diaSources)
 
         if self.config.doForcedMeasurement:
             self.measureForcedSources(diaSources, science, difference.getWcs())
@@ -375,6 +382,33 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         self.calculateMetrics(difference)
 
         return measurementResults
+
+    def removeBadSources(self, diaSources):
+        """Remove bad diaSources from the catalog.
+
+        Parameters
+        ----------
+        diaSources : `lsst.afw.table.SourceCatalog`
+            The catalog of detected sources.
+
+        Returns
+        -------
+        diaSources : `lsst.afw.table.SourceCatalog`
+            The updated catalog of detected sources, with any source that has a
+            flag in ``config.badSourceFlags`` set removed.
+        """
+        flags = np.ones(len(diaSources), dtype=bool)
+        for flag in self.config.badSourceFlags:
+            try:
+                flags &= ~diaSources[flag]
+            except Exception as e:
+                self.log.warning("Could not apply source flag: %s", e)
+        nBad = np.count_nonzero(~flags)
+        if nBad > 0:
+            self.log.warning(f"Found and removed {nBad} unphysical sources.")
+        diaSources = diaSources[flags].copy(deep=True)
+        self.metadata.add("nRemovedBadFlaggedSources", nBad)
+        return diaSources
 
     def addSkySources(self, diaSources, mask, seed):
         """Add sources in empty regions of the difference image
