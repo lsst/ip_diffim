@@ -422,7 +422,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         except (RuntimeError, lsst.pex.exceptions.Exception) as e:
             self.log.warn("Failed to match template. Checking coverage")
             #  Raise NoWorkFound if template fraction is insufficient
-            checkTemplateIsSufficient(template, self.log,
+            checkTemplateIsSufficient(template[science.getBBox()], self.log,
                                       self.config.minTemplateFractionForExpectedSuccess,
                                       exceptionMessage="Template coverage lower than expected to succeed."
                                       f" Failure is tolerable: {e}")
@@ -815,7 +815,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         self._validateExposures(template, science)
         if visitSummary is not None:
             self._applyExternalCalibrations(science, visitSummary=visitSummary)
-        checkTemplateIsSufficient(template, self.log,
+        checkTemplateIsSufficient(template[science.getBBox()], self.log,
                                   requiredTemplateFraction=self.config.requiredTemplateFraction,
                                   exceptionMessage="Not attempting subtraction. To force subtraction,"
                                   " set config requiredTemplateFraction=0")
@@ -938,7 +938,7 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
         except (RuntimeError, lsst.pex.exceptions.Exception) as e:
             self.log.warn("Failed to match template. Checking coverage")
             #  Raise NoWorkFound if template fraction is insufficient
-            checkTemplateIsSufficient(template, self.log,
+            checkTemplateIsSufficient(template[science.getBBox()], self.log,
                                       self.config.minTemplateFractionForExpectedSuccess,
                                       exceptionMessage="Template coverage lower than expected to succeed."
                                       f" Failure is tolerable: {e}")
