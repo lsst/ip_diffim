@@ -931,8 +931,19 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
                                                 interpolateBadMaskPlanes=True)
         selectSources = self._sourceSelector(sources, matchedScience.mask)
         self.metadata.add("convolvedExposure", "Preconvolution")
+        try:
+            subtractResults = self.runPreconvolve(template, science, matchedScience,
+                                                  selectSources, scienceKernel)
 
-        subtractResults = self.runPreconvolve(template, science, matchedScience, selectSources, scienceKernel)
+        except (RuntimeError, lsst.pex.exceptions.Exception) as e:
+            self.log.warn("Failed to match template. Checking coverage")
+            #  Raise NoWorkFound if template fraction is insufficient
+            checkTemplateIsSufficient(template, self.log,
+                                      self.config.minTemplateFractionForExpectedSuccess,
+                                      exceptionMessage="Template coverage lower than expected to succeed."
+                                      f" Failure is tolerable: {e}")
+            #  checkTemplateIsSufficient did not raise NoWorkFound, so raise original exception
+            raise e
 
         return subtractResults
 
