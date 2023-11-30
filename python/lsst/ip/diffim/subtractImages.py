@@ -387,7 +387,6 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         self.log.info("Template PSF FWHM: %f pixels", templatePsfSize)
         self.metadata.add("sciencePsfSize", sciencePsfSize)
         self.metadata.add("templatePsfSize", templatePsfSize)
-        selectSources = self._sourceSelector(sources, science.mask)
 
         if self.config.mode == "auto":
             convolveTemplate = _shapeTest(template,
@@ -412,6 +411,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             raise RuntimeError("Cannot handle AlardLuptonSubtract mode: %s", self.config.mode)
 
         try:
+            selectSources = self._sourceSelector(sources, science.mask)
             if convolveTemplate:
                 self.metadata.add("convolvedExposure", "Template")
                 subtractResults = self.runConvolveTemplate(template, science, selectSources)
@@ -929,9 +929,9 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
         scienceKernel = science.psf.getKernel()
         matchedScience = self._convolveExposure(science, scienceKernel, self.convolutionControl,
                                                 interpolateBadMaskPlanes=True)
-        selectSources = self._sourceSelector(sources, matchedScience.mask)
         self.metadata.add("convolvedExposure", "Preconvolution")
         try:
+            selectSources = self._sourceSelector(sources, matchedScience.mask)
             subtractResults = self.runPreconvolve(template, science, matchedScience,
                                                   selectSources, scienceKernel)
 
