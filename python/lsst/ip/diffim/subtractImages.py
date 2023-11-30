@@ -420,7 +420,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                 subtractResults = self.runConvolveScience(template, science, selectSources)
 
         except (RuntimeError, lsst.pex.exceptions.Exception) as e:
-            self.log.warn("Failed to match template. Checking coverage")
+            self.log.warning("Failed to match template. Checking coverage")
             #  Raise NoWorkFound if template fraction is insufficient
             checkTemplateIsSufficient(template[science.getBBox()], self.log,
                                       self.config.minTemplateFractionForExpectedSuccess,
@@ -936,7 +936,7 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
                                                   selectSources, scienceKernel)
 
         except (RuntimeError, lsst.pex.exceptions.Exception) as e:
-            self.log.warn("Failed to match template. Checking coverage")
+            self.log.warning("Failed to match template. Checking coverage")
             #  Raise NoWorkFound if template fraction is insufficient
             checkTemplateIsSufficient(template[science.getBBox()], self.log,
                                       self.config.minTemplateFractionForExpectedSuccess,
