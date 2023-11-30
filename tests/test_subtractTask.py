@@ -27,6 +27,7 @@ import lsst.geom
 import lsst.meas.algorithms as measAlg
 from lsst.ip.diffim import subtractImages
 from lsst.pex.config import FieldValidationError
+from lsst.pipe.base import NoWorkFound
 import lsst.utils.tests
 import numpy as np
 from lsst.ip.diffim.utils import (computeRobustStatistics, computePSFNoiseEquivalentArea,
@@ -66,6 +67,45 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         task = subtractImages.AlardLuptonSubtractTask(config=config)
         with self.assertRaises(AssertionError):
             task.run(template, science, sources)
+
+    def test_incomplete_template_coverage(self):
+        noiseLevel = 1.
+        border = 20
+        xSize = 400
+        ySize = 400
+        science, sources = makeTestImage(psfSize=3.0, noiseLevel=noiseLevel, noiseSeed=6, nSrc=50,
+                                         xSize=xSize, ySize=ySize)
+        template, _ = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=7, nSrc=50,
+                                    templateBorderSize=border, doApplyCalibration=True,
+                                    xSize=xSize, ySize=ySize)
+
+        science_height = science.getBBox().getDimensions().getY()
+
+        def _run_and_check_coverage(template_coverage,
+                                    requiredTemplateFraction=0.1,
+                                    minTemplateFractionForExpectedSuccess=0.2):
+            template_cut = template.clone()
+            template_height = int(science_height*template_coverage + border)
+            template_cut.image.array[:, template_height:] = 0
+            template_cut.mask.array[:, template_height:] = template_cut.mask.getPlaneBitMask('NO_DATA')
+            config = subtractImages.AlardLuptonSubtractTask.ConfigClass()
+            config.requiredTemplateFraction = requiredTemplateFraction
+            config.minTemplateFractionForExpectedSuccess = minTemplateFractionForExpectedSuccess
+            if template_coverage < requiredTemplateFraction:
+                doRaise = True
+            elif template_coverage < minTemplateFractionForExpectedSuccess:
+                doRaise = True
+            else:
+                doRaise = False
+            task = subtractImages.AlardLuptonSubtractTask(config=config)
+            if doRaise:
+                with self.assertRaises(NoWorkFound):
+                    task.run(template_cut, science.clone(), sources.copy(deep=True))
+            else:
+                task.run(template_cut, science.clone(), sources.copy(deep=True))
+        _run_and_check_coverage(template_coverage=0.09)
+        _run_and_check_coverage(template_coverage=0.19)
+        _run_and_check_coverage(template_coverage=0.7)
 
     def test_clear_template_mask(self):
         noiseLevel = 1.
@@ -819,6 +859,41 @@ class AlardLuptonPreconvolveSubtractTest(lsst.utils.tests.TestCase):
         scoreStd = computeRobustStatistics(output.scoreExposure.image, output.scoreExposure.mask,
                                            statsCtrl=statsCtrl, statistic=afwMath.STDEV)
         self.assertFloatsAlmostEqual(scoreStd, np.sqrt(2)*noiseLevel/np.sqrt(nea), rtol=0.1)
+
+    def test_incomplete_template_coverage(self):
+        noiseLevel = 1.
+        border = 20
+        xSize = 400
+        ySize = 400
+        science, sources = makeTestImage(psfSize=3.0, noiseLevel=noiseLevel, noiseSeed=6,
+                                         xSize=xSize, ySize=ySize)
+        template, _ = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=7,
+                                    templateBorderSize=border, doApplyCalibration=True,
+                                    xSize=xSize, ySize=ySize)
+
+        science_height = science.getBBox().getDimensions().getY()
+
+        def _run_and_check_coverage(template_coverage):
+            template_cut = template.clone()
+            template_height = int(science_height*template_coverage + border)
+            template_cut.image.array[:, template_height:] = 0
+            template_cut.mask.array[:, template_height:] = template_cut.mask.getPlaneBitMask('NO_DATA')
+            config = subtractImages.AlardLuptonPreconvolveSubtractTask.ConfigClass()
+            if template_coverage < config.requiredTemplateFraction:
+                doRaise = True
+            elif template_coverage < config.minTemplateFractionForExpectedSuccess:
+                doRaise = True
+            else:
+                doRaise = False
+            task = subtractImages.AlardLuptonPreconvolveSubtractTask(config=config)
+            if doRaise:
+                with self.assertRaises(NoWorkFound):
+                    task.run(template_cut, science.clone(), sources.copy(deep=True))
+            else:
+                task.run(template_cut, science.clone(), sources.copy(deep=True))
+        _run_and_check_coverage(template_coverage=0.09)
+        _run_and_check_coverage(template_coverage=0.19)
+        _run_and_check_coverage(template_coverage=.7)
 
     def test_clear_template_mask(self):
         noiseLevel = 1.
