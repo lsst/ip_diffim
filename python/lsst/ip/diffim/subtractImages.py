@@ -387,7 +387,6 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         self.log.info("Template PSF FWHM: %f pixels", templatePsfSize)
         self.metadata.add("sciencePsfSize", sciencePsfSize)
         self.metadata.add("templatePsfSize", templatePsfSize)
-        selectSources = self._sourceSelector(sources, science.mask)
 
         if self.config.mode == "auto":
             convolveTemplate = _shapeTest(template,
@@ -412,6 +411,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             raise RuntimeError("Cannot handle AlardLuptonSubtract mode: %s", self.config.mode)
 
         try:
+            selectSources = self._sourceSelector(sources, science.mask)
             if convolveTemplate:
                 self.metadata.add("convolvedExposure", "Template")
                 subtractResults = self.runConvolveTemplate(template, science, selectSources)
@@ -420,9 +420,9 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                 subtractResults = self.runConvolveScience(template, science, selectSources)
 
         except (RuntimeError, lsst.pex.exceptions.Exception) as e:
-            self.log.warn("Failed to match template. Checking coverage")
+            self.log.warning("Failed to match template. Checking coverage")
             #  Raise NoWorkFound if template fraction is insufficient
-            checkTemplateIsSufficient(template, self.log,
+            checkTemplateIsSufficient(template[science.getBBox()], self.log,
                                       self.config.minTemplateFractionForExpectedSuccess,
                                       exceptionMessage="Template coverage lower than expected to succeed."
                                       f" Failure is tolerable: {e}")
@@ -815,7 +815,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         self._validateExposures(template, science)
         if visitSummary is not None:
             self._applyExternalCalibrations(science, visitSummary=visitSummary)
-        checkTemplateIsSufficient(template, self.log,
+        checkTemplateIsSufficient(template[science.getBBox()], self.log,
                                   requiredTemplateFraction=self.config.requiredTemplateFraction,
                                   exceptionMessage="Not attempting subtraction. To force subtraction,"
                                   " set config requiredTemplateFraction=0")
@@ -929,10 +929,21 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
         scienceKernel = science.psf.getKernel()
         matchedScience = self._convolveExposure(science, scienceKernel, self.convolutionControl,
                                                 interpolateBadMaskPlanes=True)
-        selectSources = self._sourceSelector(sources, matchedScience.mask)
         self.metadata.add("convolvedExposure", "Preconvolution")
+        try:
+            selectSources = self._sourceSelector(sources, matchedScience.mask)
+            subtractResults = self.runPreconvolve(template, science, matchedScience,
+                                                  selectSources, scienceKernel)
 
-        subtractResults = self.runPreconvolve(template, science, matchedScience, selectSources, scienceKernel)
+        except (RuntimeError, lsst.pex.exceptions.Exception) as e:
+            self.log.warning("Failed to match template. Checking coverage")
+            #  Raise NoWorkFound if template fraction is insufficient
+            checkTemplateIsSufficient(template[science.getBBox()], self.log,
+                                      self.config.minTemplateFractionForExpectedSuccess,
+                                      exceptionMessage="Template coverage lower than expected to succeed."
+                                      f" Failure is tolerable: {e}")
+            #  checkTemplateIsSufficient did not raise NoWorkFound, so raise original exception
+            raise e
 
         return subtractResults
 
