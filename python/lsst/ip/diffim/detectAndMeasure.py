@@ -143,7 +143,7 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
     )
     badSourceFlags = lsst.pex.config.ListField(
         dtype=str,
-        doc="Do not include sources with any of these flags set in the output catalog.",
+        doc="Sources with any of these flags set are removed before writing the output catalog.",
         default=("base_PixelFlags_flag_offimage",
                  ),
     )
@@ -397,17 +397,21 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             The updated catalog of detected sources, with any source that has a
             flag in ``config.badSourceFlags`` set removed.
         """
-        flags = np.ones(len(diaSources), dtype=bool)
+        nBadTotal = 0
+        selector = np.ones(len(diaSources), dtype=bool)
         for flag in self.config.badSourceFlags:
             try:
-                flags &= ~diaSources[flag]
-            except Exception as e:
+                flags = diaSources[flag]
+            except KeyError as e:
                 self.log.warning("Could not apply source flag: %s", e)
-        nBad = np.count_nonzero(~flags)
-        if nBad > 0:
-            self.log.warning(f"Found and removed {nBad} unphysical sources.")
-        diaSources = diaSources[flags].copy(deep=True)
-        self.metadata.add("nRemovedBadFlaggedSources", nBad)
+                continue
+            nBad = np.count_nonzero(flags)
+            if nBad > 0:
+                self.log.info("Found and removed %d unphysical sources with flag %s.", nBad, flag)
+                selector &= ~flags
+                nBadTotal += nBad
+        diaSources = diaSources[selector].copy(deep=True)
+        self.metadata.add("nRemovedBadFlaggedSources", nBadTotal)
         return diaSources
 
     def addSkySources(self, diaSources, mask, seed):
