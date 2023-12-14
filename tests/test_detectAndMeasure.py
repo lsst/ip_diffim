@@ -229,6 +229,55 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase):
         self.assertEqual(nBad2, 0)
         self.assertEqual(len(diaSources2), len(diaSources) - nSetBad)
 
+    def test_remove_nan_centroid(self):
+        """Check that sources with non-finite centroids are removed from the catalog.
+        """
+        # Set up the simulated images
+        noiseLevel = 1.
+        staticSeed = 1
+        xSize = 256
+        ySize = 256
+        kwargs = {"psfSize": 2.4, "xSize": xSize, "ySize": ySize}
+        science, sources = makeTestImage(seed=staticSeed, noiseLevel=noiseLevel, noiseSeed=6,
+                                         nSrc=1, **kwargs)
+        matchedTemplate, _ = makeTestImage(seed=staticSeed, noiseLevel=noiseLevel/4, noiseSeed=7,
+                                           nSrc=1, **kwargs)
+        difference = science.clone()
+        bbox = difference.getBBox()
+        difference.maskedImage -= matchedTemplate.maskedImage
+
+        # Configure the detection Task, and do not remove unphysical sources
+        detectionTask = self._setup_detection(doForcedMeasurement=False, doSkySources=True, nSkySources=20,
+                                              badSourceFlags=["base_PixelFlags_flag_offimage", ])
+
+        # Run detection and check the results
+        diaSources = detectionTask.run(science, matchedTemplate, difference).diaSources
+        badDiaSrc0 = ~bbox.contains(diaSources.getX(), diaSources.getY())
+        nBad0 = np.count_nonzero(badDiaSrc0)
+        # Verify that all sources are physical
+        self.assertEqual(nBad0, 0)
+        # Set a few centroids outside the image bounding box
+        nSetBad = 5
+        for i, src in enumerate(diaSources[0: nSetBad]):
+            if i % 3 == 0:
+                src["slot_Centroid_x"] = np.nan
+            elif i % 3 == 1:
+                src["slot_Centroid_y"] = np.nan
+            elif i % 3 == 2:
+                src["slot_Centroid_x"] = np.nan
+                src["slot_Centroid_y"] = np.nan
+        # Verify that these sources are outside the image
+        badDiaSrc1 = ~bbox.contains(diaSources.getX(), diaSources.getY())
+        nBad1 = np.count_nonzero(badDiaSrc1)
+        self.assertEqual(nBad1, nSetBad)
+        diaSources2 = detectionTask.removeBadSources(diaSources)
+        badDiaSrc2 = ~bbox.contains(diaSources2.getX(), diaSources2.getY())
+        nBad2 = np.count_nonzero(badDiaSrc2)
+
+        # Verify that no sources outside the image bounding box remain
+        self.assertEqual(nBad2, 0)
+        self.assertEqual(len(diaSources2), len(diaSources) - nSetBad)
+
     def test_detect_transients(self):
         """Run detection on a difference image containing transients.
         """

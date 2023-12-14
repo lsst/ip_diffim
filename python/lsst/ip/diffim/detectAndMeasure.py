@@ -410,9 +410,17 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                 self.log.info("Found and removed %d unphysical sources with flag %s.", nBad, flag)
                 selector &= ~flags
                 nBadTotal += nBad
-        diaSources = diaSources[selector].copy(deep=True)
         self.metadata.add("nRemovedBadFlaggedSources", nBadTotal)
-        return diaSources
+        # Use slot_Centroid_x/y here instead of getX() method, since the former
+        #  works on non-contiguous source tables and the latter does not.
+        centroidFlag = np.isfinite(diaSources["slot_Centroid_x"]) & np.isfinite(diaSources["slot_Centroid_y"])
+        nBad = np.count_nonzero(~centroidFlag)
+        if nBad > 0:
+            self.log.info("Found and removed %d unphysical sources with non-finite centroid.", nBad)
+            self.metadata.add("nRemovedBadCentroidSources", nBadTotal)
+            nBadTotal += nBad
+            selector &= centroidFlag
+        return diaSources[selector].copy(deep=True)
 
     def addSkySources(self, diaSources, mask, seed):
         """Add sources in empty regions of the difference image
