@@ -200,10 +200,15 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
         default=("sky_source", "slot_Centroid_flag",
                  "slot_ApFlux_flag", "slot_PsfFlux_flag", ),
     )
-    badMaskPlanes = lsst.pex.config.ListField(
+    excludeMaskPlanes = lsst.pex.config.ListField(
         dtype=str,
         default=("NO_DATA", "BAD", "SAT", "EDGE", "FAKE"),
         doc="Mask planes to exclude when selecting sources for PSF matching."
+    )
+    badMaskPlanes = lsst.pex.config.ListField(
+        dtype=str,
+        default=("NO_DATA", "BAD", "SAT", "EDGE"),
+        doc="Mask planes to interpolate over."
     )
     preserveTemplateMask = lsst.pex.config.ListField(
         dtype=str,
@@ -749,7 +754,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                 self.log.warning("Could not apply source flag: %s", e)
         sToNFlag = (sources.getPsfInstFlux()/sources.getPsfInstFluxErr()) > self.config.detectionThreshold
         flags *= sToNFlag
-        flags *= self._checkMask(mask, sources, self.config.badMaskPlanes)
+        flags *= self._checkMask(mask, sources, self.config.excludeMaskPlanes)
         selectSources = sources[flags]
         self.log.info("%i/%i=%.1f%% of sources selected for PSF matching from the input catalog",
                       len(selectSources), len(sources), 100*len(selectSources)/len(sources))
@@ -763,7 +768,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         return selectSources.copy(deep=True)
 
     @staticmethod
-    def _checkMask(mask, sources, badMaskPlanes):
+    def _checkMask(mask, sources, excludeMaskPlanes):
         """Exclude sources that are located on masked pixels.
 
         Parameters
@@ -773,7 +778,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             based on the location of their centroid on the ccd.
         sources : `lsst.afw.table.SourceCatalog`
             The source catalog to evaluate.
-        badMaskPlanes : `list` of `str`
+        excludeMaskPlanes : `list` of `str`
             List of the names of the mask planes to exclude.
 
         Returns
@@ -783,17 +788,17 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             kept (True) or rejected (False) based on the value of the
             mask plane at its location.
         """
-        setBadMaskPlanes = [
-            maskPlane for maskPlane in badMaskPlanes if maskPlane in mask.getMaskPlaneDict()
+        setExcludeMaskPlanes = [
+            maskPlane for maskPlane in excludeMaskPlanes if maskPlane in mask.getMaskPlaneDict()
         ]
 
-        badPixelMask = mask.getPlaneBitMask(setBadMaskPlanes)
+        excludePixelMask = mask.getPlaneBitMask(setExcludeMaskPlanes)
 
         xv = np.rint(sources.getX() - mask.getX0())
         yv = np.rint(sources.getY() - mask.getY0())
 
         mv = mask.array[yv.astype(int), xv.astype(int)]
-        flags = np.bitwise_and(mv, badPixelMask) == 0
+        flags = np.bitwise_and(mv, excludePixelMask) == 0
         return flags
 
     def _prepareInputs(self, template, science, visitSummary=None):
