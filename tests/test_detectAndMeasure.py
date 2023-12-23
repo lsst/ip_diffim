@@ -203,14 +203,25 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase):
 
         # Configure the detection Task, and do not remove unphysical sources
         detectionTask = self._setup_detection(doForcedMeasurement=False, doSkySources=True, nSkySources=20,
+                                              badSourceFlags=[])
+
+        # Run detection and check the results
+        diaSources = detectionTask.run(science, matchedTemplate, difference).diaSources
+        badDiaSrcNoRemove = ~bbox.contains(diaSources.getX(), diaSources.getY())
+        nBadNoRemove = np.count_nonzero(badDiaSrcNoRemove)
+        # Verify that unphysical sources exist
+        self.assertGreater(nBadNoRemove, 0)
+
+        # Configure the detection Task, and remove unphysical sources
+        detectionTask = self._setup_detection(doForcedMeasurement=False, doSkySources=True, nSkySources=20,
                                               badSourceFlags=["base_PixelFlags_flag_offimage", ])
 
         # Run detection and check the results
         diaSources = detectionTask.run(science, matchedTemplate, difference).diaSources
-        badDiaSrc0 = ~bbox.contains(diaSources.getX(), diaSources.getY())
-        nBad0 = np.count_nonzero(badDiaSrc0)
+        badDiaSrcDoRemove = ~bbox.contains(diaSources.getX(), diaSources.getY())
+        nBadDoRemove = np.count_nonzero(badDiaSrcDoRemove)
         # Verify that all sources are physical
-        self.assertEqual(nBad0, 0)
+        self.assertEqual(nBadDoRemove, 0)
         # Set a few centroids outside the image bounding box
         nSetBad = 5
         for src in diaSources[0: nSetBad]:
@@ -218,16 +229,15 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase):
             src["slot_Centroid_y"] += ySize
             src["base_PixelFlags_flag_offimage"] = True
         # Verify that these sources are outside the image
-        badDiaSrc1 = ~bbox.contains(diaSources.getX(), diaSources.getY())
-        nBad1 = np.count_nonzero(badDiaSrc1)
-        self.assertEqual(nBad1, nSetBad)
-        diaSources2 = detectionTask.removeBadSources(diaSources)
-        badDiaSrc2 = ~bbox.contains(diaSources2.getX(), diaSources2.getY())
-        nBad2 = np.count_nonzero(badDiaSrc2)
+        badDiaSrc = ~bbox.contains(diaSources.getX(), diaSources.getY())
+        nBad = np.count_nonzero(badDiaSrc)
+        self.assertEqual(nBad, nSetBad)
+        diaSourcesNoBad = detectionTask._removeBadSources(diaSources)
+        badDiaSrcNoBad = ~bbox.contains(diaSourcesNoBad.getX(), diaSourcesNoBad.getY())
 
         # Verify that no sources outside the image bounding box remain
-        self.assertEqual(nBad2, 0)
-        self.assertEqual(len(diaSources2), len(diaSources) - nSetBad)
+        self.assertEqual(np.count_nonzero(badDiaSrcNoBad), 0)
+        self.assertEqual(len(diaSourcesNoBad), len(diaSources) - nSetBad)
 
     def test_remove_nan_centroid(self):
         """Check that sources with non-finite centroids are removed from the catalog.
@@ -246,7 +256,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase):
         bbox = difference.getBBox()
         difference.maskedImage -= matchedTemplate.maskedImage
 
-        # Configure the detection Task, and do not remove unphysical sources
+        # Configure the detection Task, and remove unphysical sources
         detectionTask = self._setup_detection(doForcedMeasurement=False, doSkySources=True, nSkySources=20,
                                               badSourceFlags=["base_PixelFlags_flag_offimage", ])
 
@@ -270,7 +280,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase):
         badDiaSrc1 = ~bbox.contains(diaSources.getX(), diaSources.getY())
         nBad1 = np.count_nonzero(badDiaSrc1)
         self.assertEqual(nBad1, nSetBad)
-        diaSources2 = detectionTask.removeBadSources(diaSources)
+        diaSources2 = detectionTask._removeBadSources(diaSources)
         badDiaSrc2 = ~bbox.contains(diaSources2.getX(), diaSources2.getY())
         nBad2 = np.count_nonzero(badDiaSrc2)
 

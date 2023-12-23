@@ -359,18 +359,18 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             fpSet = positiveFootprints
             fpSet.merge(negativeFootprints, self.config.growFootprint,
                         self.config.growFootprint, False)
-            diaSources = afwTable.SourceCatalog(table)
-            fpSet.makeSources(diaSources)
-            self.log.info("Merging detections into %d sources", len(diaSources))
+            initialDiaSources = afwTable.SourceCatalog(table)
+            fpSet.makeSources(initialDiaSources)
+            self.log.info("Merging detections into %d sources", len(initialDiaSources))
         else:
-            diaSources = sources
-        self.metadata.add("nMergedDiaSources", len(diaSources))
+            initialDiaSources = sources
+        self.metadata.add("nMergedDiaSources", len(initialDiaSources))
 
         if self.config.doSkySources:
-            self.addSkySources(diaSources, difference.mask, difference.info.id)
+            self.addSkySources(initialDiaSources, difference.mask, difference.info.id)
 
-        self.measureDiaSources(diaSources, science, difference, matchedTemplate)
-        diaSources = self.removeBadSources(diaSources)
+        self.measureDiaSources(initialDiaSources, science, difference, matchedTemplate)
+        diaSources = self._removeBadSources(initialDiaSources)
 
         if self.config.doForcedMeasurement:
             self.measureForcedSources(diaSources, science, difference.getWcs())
@@ -383,7 +383,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
         return measurementResults
 
-    def removeBadSources(self, diaSources):
+    def _removeBadSources(self, diaSources):
         """Remove bad diaSources from the catalog.
 
         Parameters
