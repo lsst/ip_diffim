@@ -228,6 +228,10 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             self.makeSubtask("skySources")
             self.skySourceKey = self.schema.addField("sky_source", type="Flag", doc="Sky objects.")
 
+        # Check that the schema and config are consistent
+        for flag in self.config.badSourceFlags:
+            if flag not in self.schema:
+                raise pipeBase.InvalidQuantumError("Field %s not in schema" % flag)
         # initialize InitOutputs
         self.outputSchema = afwTable.SourceCatalog(self.schema)
         self.outputSchema.getTable().setMetadata(self.algMetadata)
@@ -400,11 +404,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         nBadTotal = 0
         selector = np.ones(len(diaSources), dtype=bool)
         for flag in self.config.badSourceFlags:
-            try:
-                flags = diaSources[flag]
-            except KeyError as e:
-                self.log.warning("Could not apply source flag: %s", e)
-                continue
+            flags = diaSources[flag]
             nBad = np.count_nonzero(flags)
             if nBad > 0:
                 self.log.info("Found and removed %d unphysical sources with flag %s.", nBad, flag)

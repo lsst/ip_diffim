@@ -25,6 +25,7 @@ import unittest
 import lsst.geom
 from lsst.ip.diffim import detectAndMeasure, subtractImages
 from lsst.ip.diffim.utils import makeTestImage
+from lsst.pipe.base import InvalidQuantumError
 import lsst.utils.tests
 
 
@@ -183,6 +184,13 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase):
         self._check_values(output.diaSources.getX(), minValue=0, maxValue=xSize)
         self._check_values(output.diaSources.getY(), minValue=0, maxValue=ySize)
         self._check_values(output.diaSources.getPsfInstFlux())
+
+    def test_raise_config_schema_mismatch(self):
+        """Check that sources with specified flags are removed from the catalog.
+        """
+        # Configure the detection Task, and and set a config that is not in the schema
+        with self.assertRaises(InvalidQuantumError):
+            self._setup_detection(badSourceFlags=["Bogus_flag_42"])
 
     def test_remove_unphysical(self):
         """Check that sources with specified flags are removed from the catalog.
