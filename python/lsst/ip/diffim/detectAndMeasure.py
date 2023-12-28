@@ -19,7 +19,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from deprecated.sphinx import deprecated
 import numpy as np
 
 import lsst.afw.table as afwTable
@@ -28,7 +27,6 @@ from lsst.meas.algorithms import SkyObjectsTask, SourceDetectionTask
 from lsst.meas.base import ForcedMeasurementTask, ApplyApCorrTask, DetectorVisitIdGeneratorConfig
 import lsst.meas.extensions.trailedSources  # noqa: F401
 import lsst.meas.extensions.shapeHSM
-from lsst.obs.base import ExposureIdInfo
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 import lsst.utils
@@ -235,39 +233,6 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         # initialize InitOutputs
         self.outputSchema = afwTable.SourceCatalog(self.schema)
         self.outputSchema.getTable().setMetadata(self.algMetadata)
-
-    # TODO: remove on DM-38687.
-    @staticmethod
-    @deprecated(
-        reason=(
-            "ID factory construction now depends on configuration; use the "
-            "idGenerator config field. Will be removed after v26."
-        ),
-        version="v26.0",
-        category=FutureWarning,
-    )
-    def makeIdFactory(expId, expBits):
-        """Create IdFactory instance for unique 64 bit diaSource id-s.
-
-        Parameters
-        ----------
-        expId : `int`
-            Exposure id.
-
-        expBits: `int`
-            Number of used bits in ``expId``.
-
-        Notes
-        -----
-        The diasource id-s consists of the ``expId`` stored fixed in the highest value
-        ``expBits`` of the 64-bit integer plus (bitwise or) a generated sequence number in the
-        low value end of the integer.
-
-        Returns
-        -------
-        idFactory: `lsst.afw.table.IdFactory`
-        """
-        return ExposureIdInfo(expId, expBits).makeSourceIdFactory()
 
     def runQuantum(self, butlerQC: pipeBase.ButlerQuantumContext,
                    inputRefs: pipeBase.InputQuantizedConnection,
