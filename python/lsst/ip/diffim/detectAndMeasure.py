@@ -234,7 +234,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         self.outputSchema = afwTable.SourceCatalog(self.schema)
         self.outputSchema.getTable().setMetadata(self.algMetadata)
 
-    def runQuantum(self, butlerQC: pipeBase.ButlerQuantumContext,
+    def runQuantum(self, butlerQC: pipeBase.QuantumContext,
                    inputRefs: pipeBase.InputQuantizedConnection,
                    outputRefs: pipeBase.OutputQuantizedConnection):
         inputs = butlerQC.get(inputRefs)
