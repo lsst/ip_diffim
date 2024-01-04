@@ -141,6 +141,12 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         target=SkyObjectsTask,
         doc="Generate sky sources",
     )
+    badSourceFlags = lsst.pex.config.ListField(
+        dtype=str,
+        doc="Sources with any of these flags set are removed before writing the output catalog.",
+        default=("base_PixelFlags_flag_offimage",
+                 ),
+    )
     idGenerator = DetectorVisitIdGeneratorConfig.make_field()
 
     def setDefaults(self):
@@ -222,6 +228,10 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             self.makeSubtask("skySources")
             self.skySourceKey = self.schema.addField("sky_source", type="Flag", doc="Sky objects.")
 
+        # Check that the schema and config are consistent
+        for flag in self.config.badSourceFlags:
+            if flag not in self.schema:
+                raise pipeBase.InvalidQuantumError("Field %s not in schema" % flag)
         # initialize InitOutputs
         self.outputSchema = afwTable.SourceCatalog(self.schema)
         self.outputSchema.getTable().setMetadata(self.algMetadata)
@@ -353,17 +363,18 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             fpSet = positiveFootprints
             fpSet.merge(negativeFootprints, self.config.growFootprint,
                         self.config.growFootprint, False)
-            diaSources = afwTable.SourceCatalog(table)
-            fpSet.makeSources(diaSources)
-            self.log.info("Merging detections into %d sources", len(diaSources))
+            initialDiaSources = afwTable.SourceCatalog(table)
+            fpSet.makeSources(initialDiaSources)
+            self.log.info("Merging detections into %d sources", len(initialDiaSources))
         else:
-            diaSources = sources
-        self.metadata.add("nMergedDiaSources", len(diaSources))
+            initialDiaSources = sources
+        self.metadata.add("nMergedDiaSources", len(initialDiaSources))
 
         if self.config.doSkySources:
-            self.addSkySources(diaSources, difference.mask, difference.info.id)
+            self.addSkySources(initialDiaSources, difference.mask, difference.info.id)
 
-        self.measureDiaSources(diaSources, science, difference, matchedTemplate)
+        self.measureDiaSources(initialDiaSources, science, difference, matchedTemplate)
+        diaSources = self._removeBadSources(initialDiaSources)
 
         if self.config.doForcedMeasurement:
             self.measureForcedSources(diaSources, science, difference.getWcs())
@@ -375,6 +386,32 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         self.calculateMetrics(difference)
 
         return measurementResults
+
+    def _removeBadSources(self, diaSources):
+        """Remove bad diaSources from the catalog.
+
+        Parameters
+        ----------
+        diaSources : `lsst.afw.table.SourceCatalog`
+            The catalog of detected sources.
+
+        Returns
+        -------
+        diaSources : `lsst.afw.table.SourceCatalog`
+            The updated catalog of detected sources, with any source that has a
+            flag in ``config.badSourceFlags`` set removed.
+        """
+        nBadTotal = 0
+        selector = np.ones(len(diaSources), dtype=bool)
+        for flag in self.config.badSourceFlags:
+            flags = diaSources[flag]
+            nBad = np.count_nonzero(flags)
+            if nBad > 0:
+                self.log.info("Found and removed %d unphysical sources with flag %s.", nBad, flag)
+                selector &= ~flags
+                nBadTotal += nBad
+        self.metadata.add("nRemovedBadFlaggedSources", nBadTotal)
+        return diaSources[selector].copy(deep=True)
 
     def addSkySources(self, diaSources, mask, seed):
         """Add sources in empty regions of the difference image

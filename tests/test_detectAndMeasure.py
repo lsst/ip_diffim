@@ -25,6 +25,7 @@ import unittest
 import lsst.geom
 from lsst.ip.diffim import detectAndMeasure, subtractImages
 from lsst.ip.diffim.utils import makeTestImage
+from lsst.pipe.base import InvalidQuantumError
 import lsst.utils.tests
 
 
@@ -92,20 +93,17 @@ class DetectAndMeasureTestBase(lsst.utils.tests.TestCase):
         if maxValue is not None:
             self.assertTrue(np.all(values <= maxValue))
 
-    def _setup_detection(self, doApCorr=False, doMerge=False,
-                         doSkySources=False, doForcedMeasurement=False):
+    def _setup_detection(self, doSkySources=False, nSkySources=5, **kwargs):
         """Setup and configure the detection and measurement PipelineTask.
 
         Parameters
         ----------
-        doApCorr : `bool`, optional
-            Run subtask to apply aperture corrections.
-        doMerge : `bool`, optional
-            Merge positive and negative diaSources.
         doSkySources : `bool`, optional
             Generate sky sources.
-        doForcedMeasurement : `bool`, optional
-            Force photometer diaSource locations on PVI.
+        nSkySources : `int`, optional
+            The number of sky sources to add in isolated background regions.
+        **kwargs
+            Any additional config parameters to set.
 
         Returns
         -------
@@ -113,12 +111,10 @@ class DetectAndMeasureTestBase(lsst.utils.tests.TestCase):
             The configured Task to use for detection and measurement.
         """
         config = self.detectionTask.ConfigClass()
-        config.doApCorr = doApCorr
-        config.doMerge = doMerge
         config.doSkySources = doSkySources
-        config.doForcedMeasurement = doForcedMeasurement
         if doSkySources:
-            config.skySources.nSources = 5
+            config.skySources.nSources = nSkySources
+        config.update(**kwargs)
         return self.detectionTask(config=config)
 
 
@@ -189,6 +185,68 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase):
         self._check_values(output.diaSources.getY(), minValue=0, maxValue=ySize)
         self._check_values(output.diaSources.getPsfInstFlux())
 
+    def test_raise_config_schema_mismatch(self):
+        """Check that sources with specified flags are removed from the catalog.
+        """
+        # Configure the detection Task, and and set a config that is not in the schema
+        with self.assertRaises(InvalidQuantumError):
+            self._setup_detection(badSourceFlags=["Bogus_flag_42"])
+
+    def test_remove_unphysical(self):
+        """Check that sources with specified flags are removed from the catalog.
+        """
+        # Set up the simulated images
+        noiseLevel = 1.
+        staticSeed = 1
+        xSize = 256
+        ySize = 256
+        kwargs = {"psfSize": 2.4, "xSize": xSize, "ySize": ySize}
+        science, sources = makeTestImage(seed=staticSeed, noiseLevel=noiseLevel, noiseSeed=6,
+                                         nSrc=1, **kwargs)
+        matchedTemplate, _ = makeTestImage(seed=staticSeed, noiseLevel=noiseLevel/4, noiseSeed=7,
+                                           nSrc=1, **kwargs)
+        difference = science.clone()
+        bbox = difference.getBBox()
+        difference.maskedImage -= matchedTemplate.maskedImage
+
+        # Configure the detection Task, and do not remove unphysical sources
+        detectionTask = self._setup_detection(doForcedMeasurement=False, doSkySources=True, nSkySources=20,
+                                              badSourceFlags=[])
+
+        # Run detection and check the results
+        diaSources = detectionTask.run(science, matchedTemplate, difference).diaSources
+        badDiaSrcNoRemove = ~bbox.contains(diaSources.getX(), diaSources.getY())
+        nBadNoRemove = np.count_nonzero(badDiaSrcNoRemove)
+        # Verify that unphysical sources exist
+        self.assertGreater(nBadNoRemove, 0)
+
+        # Configure the detection Task, and remove unphysical sources
+        detectionTask = self._setup_detection(doForcedMeasurement=False, doSkySources=True, nSkySources=20,
+                                              badSourceFlags=["base_PixelFlags_flag_offimage", ])
+
+        # Run detection and check the results
+        diaSources = detectionTask.run(science, matchedTemplate, difference).diaSources
+        badDiaSrcDoRemove = ~bbox.contains(diaSources.getX(), diaSources.getY())
+        nBadDoRemove = np.count_nonzero(badDiaSrcDoRemove)
+        # Verify that all sources are physical
+        self.assertEqual(nBadDoRemove, 0)
+        # Set a few centroids outside the image bounding box
+        nSetBad = 5
+        for src in diaSources[0: nSetBad]:
+            src["slot_Centroid_x"] += xSize
+            src["slot_Centroid_y"] += ySize
+            src["base_PixelFlags_flag_offimage"] = True
+        # Verify that these sources are outside the image
+        badDiaSrc = ~bbox.contains(diaSources.getX(), diaSources.getY())
+        nBad = np.count_nonzero(badDiaSrc)
+        self.assertEqual(nBad, nSetBad)
+        diaSourcesNoBad = detectionTask._removeBadSources(diaSources)
+        badDiaSrcNoBad = ~bbox.contains(diaSourcesNoBad.getX(), diaSourcesNoBad.getY())
+
+        # Verify that no sources outside the image bounding box remain
+        self.assertEqual(np.count_nonzero(badDiaSrcNoBad), 0)
+        self.assertEqual(len(diaSourcesNoBad), len(diaSources) - nSetBad)
+
     def test_detect_transients(self):
         """Run detection on a difference image containing transients.
         """
@@ -202,7 +260,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase):
         matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
 
         # Configure the detection Task
-        detectionTask = self._setup_detection()
+        detectionTask = self._setup_detection(doMerge=False)
         kwargs["seed"] = transientSeed
         kwargs["nSrc"] = 10
         kwargs["fluxLevel"] = 1000
@@ -254,7 +312,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase):
         difference.maskedImage -= matchedTemplate.maskedImage[science.getBBox()]
 
         # Configure the detection Task
-        detectionTask = self._setup_detection()
+        detectionTask = self._setup_detection(doMerge=False)
 
         # Run detection and check the results
         output = detectionTask.run(science, matchedTemplate, difference)
@@ -462,7 +520,7 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase):
         subtractTask = subtractImages.AlardLuptonPreconvolveSubtractTask()
 
         # Configure the detection Task
-        detectionTask = self._setup_detection()
+        detectionTask = self._setup_detection(doMerge=False)
         kwargs["seed"] = transientSeed
         kwargs["nSrc"] = 10
         kwargs["fluxLevel"] = 1000
@@ -532,7 +590,7 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase):
         score = subtractTask._convolveExposure(difference, scienceKernel, subtractTask.convolutionControl)
 
         # Configure the detection Task
-        detectionTask = self._setup_detection()
+        detectionTask = self._setup_detection(doMerge=False)
 
         # Run detection and check the results
         output = detectionTask.run(science, matchedTemplate, difference, score)
