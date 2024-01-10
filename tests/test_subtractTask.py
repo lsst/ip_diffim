@@ -402,6 +402,52 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
                                     "Cannot compute PSF matching kernel: too few sources selected."):
             task.run(template, science, sources)
 
+    def test_kernel_source_selector(self):
+        """Check that kernel source selection behaves as expected.
+        """
+        xSize = 256
+        ySize = 256
+        nSourcesSimulated = 20
+        science, sources = makeTestImage(psfSize=2.4, nSrc=nSourcesSimulated,
+                                         xSize=xSize, ySize=ySize)
+        template, _ = makeTestImage(psfSize=2.0, nSrc=nSourcesSimulated,
+                                    xSize=xSize, ySize=ySize, doApplyCalibration=True)
+        badSourceFlag = "slot_Centroid_flag"
+
+        def _run_and_check_sources(sourcesIn, maxKernelSources=1000, minKernelSources=3):
+            sources = sourcesIn.copy(deep=True)
+            # Verify that source flags are not set in the input catalog
+            self.assertEqual(np.sum(sources[badSourceFlag]), 0)
+            config = subtractImages.AlardLuptonSubtractTask.ConfigClass()
+            config.badSourceFlags = [badSourceFlag, ]
+            config.maxKernelSources = maxKernelSources
+            config.minKernelSources = minKernelSources
+
+            task = subtractImages.AlardLuptonSubtractTask(config=config)
+            nSources = len(sources)
+            # Flag a third of the sources
+            sources[0:: 3][badSourceFlag] = True
+            nBadSources = np.sum(sources[badSourceFlag])
+            if maxKernelSources > 0:
+                nGoodSources = np.minimum(nSources - nBadSources, maxKernelSources)
+            else:
+                nGoodSources = nSources - nBadSources
+
+            signalToNoise = sources.getPsfInstFlux()/sources.getPsfInstFluxErr()
+            signalToNoise = signalToNoise[~sources[badSourceFlag]]
+            signalToNoise.sort()
+            selectSources = task._sourceSelector(sources, science.mask)
+            self.assertEqual(nGoodSources, len(selectSources))
+            signalToNoiseOut = selectSources.getPsfInstFlux()/selectSources.getPsfInstFluxErr()
+            signalToNoiseOut.sort()
+            self.assertFloatsAlmostEqual(signalToNoise[-nGoodSources:], signalToNoiseOut)
+
+        _run_and_check_sources(sources)
+        _run_and_check_sources(sources, maxKernelSources=len(sources)//3)
+        _run_and_check_sources(sources, maxKernelSources=-1)
+        with self.assertRaises(RuntimeError):
+            _run_and_check_sources(sources, minKernelSources=1000)
+
     def test_order_equal_images(self):
         """Verify that the result is the same regardless of convolution mode
         if the images are equivalent.

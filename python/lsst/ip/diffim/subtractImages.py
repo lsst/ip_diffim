@@ -193,12 +193,33 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
         doc="Minimum signal to noise ratio of detected sources "
         "to use for calculating the PSF matching kernel."
     )
+    detectionThresholdMax = lsst.pex.config.Field(
+        dtype=float,
+        default=500,
+        doc="Maximum signal to noise ratio of detected sources "
+        "to use for calculating the PSF matching kernel."
+    )
+    maxKernelSources = lsst.pex.config.Field(
+        dtype=int,
+        default=1000,
+        doc="Maximum number of sources to use for calculating the PSF matching kernel."
+        "Set to -1 to disable."
+    )
+    minKernelSources = lsst.pex.config.Field(
+        dtype=int,
+        default=3,
+        doc="Minimum number of sources needed for calculating the PSF matching kernel."
+    )
     badSourceFlags = lsst.pex.config.ListField(
         dtype=str,
         doc="Flags that, if set, the associated source should not "
         "be used to determine the PSF matching kernel.",
         default=("sky_source", "slot_Centroid_flag",
-                 "slot_ApFlux_flag", "slot_PsfFlux_flag", ),
+                 "slot_ApFlux_flag", "slot_PsfFlux_flag",
+                 "base_PixelFlags_flag_interpolated",
+                 "base_PixelFlags_flag_saturated",
+                 "base_PixelFlags_flag_bad",
+                 ),
     )
     excludeMaskPlanes = lsst.pex.config.ListField(
         dtype=str,
@@ -416,7 +437,9 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             raise RuntimeError("Cannot handle AlardLuptonSubtract mode: %s", self.config.mode)
 
         try:
-            selectSources = self._sourceSelector(sources, science.mask)
+            sourceMask = science.mask.clone()
+            sourceMask.array |= template[science.getBBox()].mask.array
+            selectSources = self._sourceSelector(sources, sourceMask)
             if convolveTemplate:
                 self.metadata.add("convolvedExposure", "Template")
                 subtractResults = self.runConvolveTemplate(template, science, selectSources)
@@ -752,20 +775,31 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                 flags *= ~sources[flag]
             except Exception as e:
                 self.log.warning("Could not apply source flag: %s", e)
-        sToNFlag = (sources.getPsfInstFlux()/sources.getPsfInstFluxErr()) > self.config.detectionThreshold
+        signalToNoise = sources.getPsfInstFlux()/sources.getPsfInstFluxErr()
+        sToNFlag = signalToNoise > self.config.detectionThreshold
         flags *= sToNFlag
+        sToNFlagMax = signalToNoise < self.config.detectionThresholdMax
+        flags *= sToNFlagMax
         flags *= self._checkMask(mask, sources, self.config.excludeMaskPlanes)
-        selectSources = sources[flags]
+        selectSources = sources[flags].copy(deep=True)
+        if (len(selectSources) > self.config.maxKernelSources) & (self.config.maxKernelSources > 0):
+            signalToNoise = selectSources.getPsfInstFlux()/selectSources.getPsfInstFluxErr()
+            indices = np.argsort(signalToNoise)
+            indices = indices[-self.config.maxKernelSources:]
+            flags = np.zeros(len(selectSources), dtype=bool)
+            flags[indices] = True
+            selectSources = selectSources[flags].copy(deep=True)
+
         self.log.info("%i/%i=%.1f%% of sources selected for PSF matching from the input catalog",
                       len(selectSources), len(sources), 100*len(selectSources)/len(sources))
-        if len(selectSources) < self.config.makeKernel.nStarPerCell:
+        if len(selectSources) < self.config.minKernelSources:
             self.log.error("Too few sources to calculate the PSF matching kernel: "
                            "%i selected but %i needed for the calculation.",
-                           len(selectSources), self.config.makeKernel.nStarPerCell)
+                           len(selectSources), self.config.minKernelSources)
             raise RuntimeError("Cannot compute PSF matching kernel: too few sources selected.")
         self.metadata.add("nPsfSources", len(selectSources))
 
-        return selectSources.copy(deep=True)
+        return selectSources
 
     @staticmethod
     def _checkMask(mask, sources, excludeMaskPlanes):
