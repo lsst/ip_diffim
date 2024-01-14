@@ -431,6 +431,84 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase):
         _detection_wrapper(setFlags=False)
         _detection_wrapper(setFlags=True)
 
+    def test_fake_mask_plane_propagation(self):
+        """Test that we have the mask planes related to fakes in diffim images.
+        This is testing method called updateMasks
+        """
+        xSize = 256
+        ySize = 256
+        science, sources = makeTestImage(psfSize=2.4, xSize=xSize, ySize=ySize, doApplyCalibration=True)
+        science_fake_img, science_fake_sources = makeTestImage(
+            psfSize=2.4, xSize=xSize, ySize=ySize, seed=5, nSrc=3, noiseLevel=0.25, fluxRange=1
+        )
+        template, _ = makeTestImage(psfSize=2.4, xSize=xSize, ySize=ySize, doApplyCalibration=True)
+        tmplt_fake_img, tmplt_fake_sources = makeTestImage(
+            psfSize=2.4, xSize=xSize, ySize=ySize, seed=9, nSrc=3, noiseLevel=0.25, fluxRange=1
+        )
+        # created fakes and added them to the images
+        science.image += science_fake_img.image
+        template.image += tmplt_fake_img.image
+
+        # TODO: DM-40796 update to INJECTED names when source injection gets refactored
+        # adding mask planes to both science and template images
+        science.mask.addMaskPlane("FAKE")
+        science_fake_bitmask = science.mask.getPlaneBitMask("FAKE")
+        template.mask.addMaskPlane("FAKE")
+        template_fake_bitmask = template.mask.getPlaneBitMask("FAKE")
+
+        for a_science_source in science_fake_sources:
+            bbox = a_science_source.getFootprint().getBBox()
+            science[bbox].mask.array |= science_fake_bitmask
+
+        for a_template_source in tmplt_fake_sources:
+            bbox = a_template_source.getFootprint().getBBox()
+            template[bbox].mask.array |= template_fake_bitmask
+
+        science_fake_masked = (science.mask.array & science_fake_bitmask) > 0
+        template_fake_masked = (template.mask.array & template_fake_bitmask) > 0
+
+        subtractConfig = subtractImages.AlardLuptonSubtractTask.ConfigClass()
+        subtractTask = subtractImages.AlardLuptonSubtractTask(config=subtractConfig)
+        subtraction = subtractTask.run(template, science, sources)
+
+        # check subtraction mask plane is set where we set the previous masks
+        diff_mask = subtraction.difference.mask
+
+        # science mask should be now in INJECTED
+        inj_masked = (diff_mask.array & diff_mask.getPlaneBitMask("INJECTED")) > 0
+
+        # template mask should be now in INJECTED_TEMPLATE
+        injTmplt_masked = (diff_mask.array & diff_mask.getPlaneBitMask("INJECTED_TEMPLATE")) > 0
+
+        self.assertFloatsEqual(inj_masked.astype(int), science_fake_masked.astype(int))
+        self.assertFloatsEqual(injTmplt_masked.astype(int), template_fake_masked.astype(int))
+
+        # Now check that detection of fakes have the correct flag for injections
+        detectionTask = self._setup_detection()
+        excludeMaskPlanes = detectionTask.config.detection.excludeMaskPlanes
+        nBad = len(excludeMaskPlanes)
+        self.assertEqual(nBad, 1)
+
+        output = detectionTask.run(subtraction.matchedScience,
+                                   subtraction.matchedTemplate,
+                                   subtraction.difference)
+
+        sci_refIds = []
+        tmpl_refIds = []
+        for diaSrc in output.diaSources:
+            if diaSrc['base_PsfFlux_instFlux'] > 0:
+                self._check_diaSource(science_fake_sources, diaSrc, scale=1, refIds=sci_refIds)
+                self.assertTrue(diaSrc['base_PixelFlags_flag_injected'])
+                self.assertTrue(diaSrc['base_PixelFlags_flag_injectedCenter'])
+                self.assertFalse(diaSrc['base_PixelFlags_flag_injected_template'])
+                self.assertFalse(diaSrc['base_PixelFlags_flag_injected_templateCenter'])
+            else:
+                self._check_diaSource(tmplt_fake_sources, diaSrc, scale=-1, refIds=tmpl_refIds)
+                self.assertTrue(diaSrc['base_PixelFlags_flag_injected_template'])
+                self.assertTrue(diaSrc['base_PixelFlags_flag_injected_templateCenter'])
+                self.assertFalse(diaSrc['base_PixelFlags_flag_injected'])
+                self.assertFalse(diaSrc['base_PixelFlags_flag_injectedCenter'])
+
 
 class DetectAndMeasureScoreTest(DetectAndMeasureTestBase):
     detectionTask = detectAndMeasure.DetectAndMeasureScoreTask
