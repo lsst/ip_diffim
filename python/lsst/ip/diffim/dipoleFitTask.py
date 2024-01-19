@@ -1004,40 +1004,29 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
         self._setupSchema(config, name, schema, metadata)
 
     def _setupSchema(self, config, name, schema, metadata):
-        # Get a FunctorKey that can quickly look up the "blessed" centroid value.
-        self.centroidKey = afwTable.Point2DKey(schema["slot_Centroid"])
+        """Add fields for the outputs, and save the keys for fast assignment.
+        """
+        self.posFluxKey = measBase.FluxResultKey.addFields(schema,
+                                                           schema.join(name, "pos"),
+                                                           "Dipole positive lobe instrumental flux.")
+        self.negFluxKey = measBase.FluxResultKey.addFields(schema,
+                                                           schema.join(name, "neg"),
+                                                           "Dipole negative lobe instrumental flux.")
+        doc = "Dipole overall instrumental flux (mean of absolute value of positive and negative lobes)."
+        self.fluxKey = measBase.FluxResultKey.addFields(schema, name, doc)
 
-        # Add some fields for our outputs, and save their Keys.
-        # Use setattr() to programmatically set the pos/neg named attributes to values, e.g.
-        # self.posCentroidKeyX = 'ip_diffim_DipoleFit_pos_centroid_x'
-
-        for pos_neg in ['pos', 'neg']:
-
-            key = schema.addField(
-                schema.join(name, pos_neg, "instFlux"), type=float, units="count",
-                doc="Dipole {0} lobe flux".format(pos_neg))
-            setattr(self, ''.join((pos_neg, 'FluxKey')), key)
-
-            key = schema.addField(
-                schema.join(name, pos_neg, "instFluxErr"), type=float, units="count",
-                doc="1-sigma uncertainty for {0} dipole flux".format(pos_neg))
-            setattr(self, ''.join((pos_neg, 'FluxErrKey')), key)
-
-            for x_y in ['x', 'y']:
-                key = schema.addField(
-                    schema.join(name, pos_neg, "centroid", x_y), type=float, units="pixel",
-                    doc="Dipole {0} lobe centroid".format(pos_neg))
-                setattr(self, ''.join((pos_neg, 'CentroidKey', x_y.upper())), key)
-
-        for x_y in ['x', 'y']:
-            key = schema.addField(
-                schema.join(name, "centroid", x_y), type=float, units="pixel",
-                doc="Dipole centroid")
-            setattr(self, ''.join(('centroidKey', x_y.upper())), key)
-
-        self.fluxKey = schema.addField(
-            schema.join(name, "instFlux"), type=float, units="count",
-            doc="Dipole overall flux")
+        self.posCentroidKey = measBase.CentroidResultKey.addFields(schema,
+                                                                   schema.join(name, "pos", "centroid"),
+                                                                   "Dipole positive lobe centroid position.",
+                                                                   measBase.UncertaintyEnum.NO_UNCERTAINTY)
+        self.negCentroidKey = measBase.CentroidResultKey.addFields(schema,
+                                                                   schema.join(name, "neg", "centroid"),
+                                                                   "Dipole negative lobe centroid position.",
+                                                                   measBase.UncertaintyEnum.NO_UNCERTAINTY)
+        self.centroidKey = measBase.CentroidResultKey.addFields(schema,
+                                                                schema.join(name, "centroid"),
+                                                                "Dipole centroid position.",
+                                                                measBase.UncertaintyEnum.NO_UNCERTAINTY)
 
         self.orientationKey = schema.addField(
             schema.join(name, "orientation"), type=float, units="deg",
@@ -1152,23 +1141,23 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
 
         # add chi2, coord/flux uncertainties (TBD), dipole classification
         # Add the relevant values to the measRecord
-        measRecord[self.posFluxKey] = result.posFlux
-        measRecord[self.posFluxErrKey] = result.signalToNoise   # to be changed to actual sigma!
-        measRecord[self.posCentroidKeyX] = result.posCentroidX
-        measRecord[self.posCentroidKeyY] = result.posCentroidY
+        measRecord[self.posFluxKey.getInstFlux()] = result.posFlux
+        measRecord[self.posFluxKey.getInstFluxErr()] = result.signalToNoise   # to be changed to actual sigma!
+        measRecord[self.posCentroidKey.getX()] = result.posCentroidX
+        measRecord[self.posCentroidKey.getY()] = result.posCentroidY
 
-        measRecord[self.negFluxKey] = result.negFlux
-        measRecord[self.negFluxErrKey] = result.signalToNoise   # to be changed to actual sigma!
-        measRecord[self.negCentroidKeyX] = result.negCentroidX
-        measRecord[self.negCentroidKeyY] = result.negCentroidY
+        measRecord[self.negFluxKey.getInstFlux()] = result.negFlux
+        measRecord[self.negFluxKey.getInstFluxErr()] = result.signalToNoise   # to be changed to actual sigma!
+        measRecord[self.negCentroidKey.getX()] = result.negCentroidX
+        measRecord[self.negCentroidKey.getY()] = result.negCentroidY
 
         # Dia source flux: average of pos+neg
-        measRecord[self.fluxKey] = (abs(result.posFlux) + abs(result.negFlux))/2.
+        measRecord[self.fluxKey.getInstFlux()] = (abs(result.posFlux) + abs(result.negFlux))/2.
         measRecord[self.orientationKey] = result.orientation
         measRecord[self.separationKey] = np.sqrt((result.posCentroidX - result.negCentroidX)**2.
                                                  + (result.posCentroidY - result.negCentroidY)**2.)
-        measRecord[self.centroidKeyX] = result.centroidX
-        measRecord[self.centroidKeyY] = result.centroidY
+        measRecord[self.centroidKey.getX()] = result.centroidX
+        measRecord[self.centroidKey.getY()] = result.centroidY
 
         measRecord[self.signalToNoiseKey] = result.signalToNoise
         measRecord[self.chi2dofKey] = result.redChi2
@@ -1205,12 +1194,12 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
 
         # Second, are the pos/neg fluxes greater than 1.0 and no more than 0.65 (param maxFluxRatio)
         # of the total flux? By default this will never happen since posFlux = negFlux.
-        passesFluxPos = (abs(measRecord[self.posFluxKey])
-                         / (measRecord[self.fluxKey]*2.)) < self.config.maxFluxRatio
-        passesFluxPos &= (abs(measRecord[self.posFluxKey]) >= 1.0)
-        passesFluxNeg = (abs(measRecord[self.negFluxKey])
-                         / (measRecord[self.fluxKey]*2.)) < self.config.maxFluxRatio
-        passesFluxNeg &= (abs(measRecord[self.negFluxKey]) >= 1.0)
+        passesFluxPos = (abs(measRecord[self.posFluxKey.getInstFlux()])
+                         / (measRecord[self.fluxKey.getInstFlux()]*2.)) < self.config.maxFluxRatio
+        passesFluxPos &= (abs(measRecord[self.posFluxKey.getInstFlux()]) >= 1.0)
+        passesFluxNeg = (abs(measRecord[self.negFluxKey.getInstFlux()])
+                         / (measRecord[self.fluxKey.getInstFlux()]*2.)) < self.config.maxFluxRatio
+        passesFluxNeg &= (abs(measRecord[self.negFluxKey.getInstFlux()]) >= 1.0)
         allPass = (passesSn and passesFluxPos and passesFluxNeg)  # and passesChi2)
 
         # Third, is it a good fit (chi2dof < 1)?
