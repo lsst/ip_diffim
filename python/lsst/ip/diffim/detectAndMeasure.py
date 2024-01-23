@@ -156,12 +156,12 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         self.detection.excludeMaskPlanes = ["EDGE"]
 
         # Add filtered flux measurement, the correct measurement for pre-convolved images.
-        self.measurement.algorithms.names.add('base_PeakLikelihoodFlux')
-        self.measurement.plugins.names |= ['ext_trailedSources_Naive',
-                                           'base_LocalPhotoCalib',
-                                           'base_LocalWcs',
-                                           'ext_shapeHSM_HsmSourceMoments',
-                                           'ext_shapeHSM_HsmPsfMoments',
+        self.measurement.algorithms.names.add("base_PeakLikelihoodFlux")
+        self.measurement.plugins.names |= ["ext_trailedSources_Naive",
+                                           "base_LocalPhotoCalib",
+                                           "base_LocalWcs",
+                                           "ext_shapeHSM_HsmSourceMoments",
+                                           "ext_shapeHSM_HsmPsfMoments",
                                            ]
         self.measurement.slots.psfShape = "ext_shapeHSM_HsmPsfMoments"
         self.measurement.slots.shape = "ext_shapeHSM_HsmSourceMoments"
@@ -174,8 +174,10 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         self.forcedMeasurement.slots.shape = None
 
         # Keep track of which footprints contain streaks
-        self.measurement.plugins['base_PixelFlags'].masksFpAnywhere = ['STREAK']
-        self.measurement.plugins['base_PixelFlags'].masksFpCenter = ['STREAK']
+        self.measurement.plugins["base_PixelFlags"].masksFpAnywhere = [
+            "STREAK", "INJECTED", "INJECTED_TEMPLATE"]
+        self.measurement.plugins["base_PixelFlags"].masksFpCenter = [
+            "STREAK", "INJECTED", "INJECTED_TEMPLATE"]
 
 
 class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):

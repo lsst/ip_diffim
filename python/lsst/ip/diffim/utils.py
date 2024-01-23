@@ -1266,6 +1266,9 @@ def detectTestSources(exposure):
         doSmooth=True
     )
     exposure.mask.addMaskPlane("STREAK")  # add empty streak mask plane in lieu of maskStreaksTask
+    exposure.mask.addMaskPlane("INJECTED")  # add empty injected mask plane
+    exposure.mask.addMaskPlane("INJECTED_TEMPLATE")  # add empty injected template mask plane
+
     selectSources = detRet.sources
     selectMeasurement.run(measCat=selectSources, exposure=exposure)
 

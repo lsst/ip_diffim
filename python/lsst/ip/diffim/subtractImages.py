@@ -651,16 +651,15 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         mask = difference.mask
         mask &= ~(mask.getPlaneBitMask("DETECTED") | mask.getPlaneBitMask("DETECTED_NEGATIVE"))
 
+        self.log.info("Adding injected mask planes")
+        mask.addMaskPlane("INJECTED")
+        mask.addMaskPlane("INJECTED_TEMPLATE")
+
         if "FAKE" in science.mask.getMaskPlaneDict().keys():
             # propagate the mask plane related to Fake source injection
             # NOTE: the fake source injection sets FAKE plane, but it should be INJECTED
             # NOTE: This can be removed in DM-40796
-
-            self.log.info("Adding injected mask planes")
-            mask.addMaskPlane("INJECTED")
             diffInjectedBitMask = mask.getPlaneBitMask("INJECTED")
-
-            mask.addMaskPlane("INJECTED_TEMPLATE")
             diffInjTmpltBitMask = mask.getPlaneBitMask("INJECTED_TEMPLATE")
 
             scienceFakeBitMask = science.mask.getPlaneBitMask('FAKE')
