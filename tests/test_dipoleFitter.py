@@ -164,13 +164,13 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
             self.assertFloatsAlmostEqual((result['ip_diffim_DipoleFit_pos_instFlux']
                                           + abs(result['ip_diffim_DipoleFit_neg_instFlux']))/2.,
                                          dipoleTestImage.flux[i], rtol=rtol)
-            self.assertFloatsAlmostEqual(result['ip_diffim_DipoleFit_pos_centroid_x'],
+            self.assertFloatsAlmostEqual(result['ip_diffim_DipoleFit_pos_x'],
                                          dipoleTestImage.xc[i] + offsets[i], rtol=rtol)
-            self.assertFloatsAlmostEqual(result['ip_diffim_DipoleFit_pos_centroid_y'],
+            self.assertFloatsAlmostEqual(result['ip_diffim_DipoleFit_pos_y'],
                                          dipoleTestImage.yc[i] + offsets[i], rtol=rtol)
-            self.assertFloatsAlmostEqual(result['ip_diffim_DipoleFit_neg_centroid_x'],
+            self.assertFloatsAlmostEqual(result['ip_diffim_DipoleFit_neg_x'],
                                          dipoleTestImage.xc[i] - offsets[i], rtol=rtol)
-            self.assertFloatsAlmostEqual(result['ip_diffim_DipoleFit_neg_centroid_y'],
+            self.assertFloatsAlmostEqual(result['ip_diffim_DipoleFit_neg_y'],
                                          dipoleTestImage.yc[i] - offsets[i], rtol=rtol)
             # Note this is dependent on the noise (variance) being realistic in the image.
             # otherwise it throws off the chi2 estimate, which is used for classification:
@@ -183,16 +183,16 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
                                          (result2['ip_diffim_PsfDipoleFlux_pos_instFlux']
                                           + abs(result2['ip_diffim_PsfDipoleFlux_neg_instFlux']))/2.,
                                          rtol=rtol)
-            self.assertFloatsAlmostEqual(result['ip_diffim_DipoleFit_pos_centroid_x'],
+            self.assertFloatsAlmostEqual(result['ip_diffim_DipoleFit_pos_x'],
                                          result2['ip_diffim_PsfDipoleFlux_pos_centroid_x'],
                                          rtol=rtol)
-            self.assertFloatsAlmostEqual(result['ip_diffim_DipoleFit_pos_centroid_y'],
+            self.assertFloatsAlmostEqual(result['ip_diffim_DipoleFit_pos_y'],
                                          result2['ip_diffim_PsfDipoleFlux_pos_centroid_y'],
                                          rtol=rtol)
-            self.assertFloatsAlmostEqual(result['ip_diffim_DipoleFit_neg_centroid_x'],
+            self.assertFloatsAlmostEqual(result['ip_diffim_DipoleFit_neg_x'],
                                          result2['ip_diffim_PsfDipoleFlux_neg_centroid_x'],
                                          rtol=rtol)
-            self.assertFloatsAlmostEqual(result['ip_diffim_DipoleFit_neg_centroid_y'],
+            self.assertFloatsAlmostEqual(result['ip_diffim_DipoleFit_neg_y'],
                                          result2['ip_diffim_PsfDipoleFlux_neg_centroid_y'],
                                          rtol=rtol)
 

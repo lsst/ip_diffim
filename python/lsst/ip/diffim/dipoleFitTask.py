@@ -26,7 +26,6 @@ import warnings
 
 import lsst.afw.image as afwImage
 import lsst.meas.base as measBase
-import lsst.afw.table as afwTable
 import lsst.afw.detection as afwDet
 import lsst.geom as geom
 import lsst.pex.exceptions as pexExcept
@@ -104,13 +103,12 @@ class DipoleFitTaskConfig(measBase.SingleFrameMeasurementConfig):
     def setDefaults(self):
         measBase.SingleFrameMeasurementConfig.setDefaults(self)
 
-        # This task also runs DipoleFitPlugin directly in DipoleFitTask, which
-        # writes outputs to "ip_diffim_DipoleFit" entries.
-        self.plugins.names = ["base_CircularApertureFlux",
+        self.plugins.names = ["base_SdssCentroid",
+                              "ip_diffim_DipoleFit",
+                              "base_CircularApertureFlux",
                               "base_PixelFlags",
                               "base_SkyCoord",
                               "base_PsfFlux",
-                              "base_SdssCentroid",
                               "base_SdssShape",
                               "base_GaussianFlux",
                               ]
@@ -121,7 +119,8 @@ class DipoleFitTaskConfig(measBase.SingleFrameMeasurementConfig):
         self.slots.modelFlux = None
         self.slots.gaussianFlux = None
         self.slots.shape = "base_SdssShape"
-        self.slots.centroid = "ip_diffim_NaiveDipoleCentroid"
+        # This will be switched to "ip_diffim_DipoleFit" as this task runs.
+        self.slots.centroid = "base_SdssCentroid"
         self.doReplaceWithNoise = False
 
 
@@ -135,21 +134,28 @@ class DipoleFitTask(measBase.SingleFrameMeasurementTask):
     """
 
     ConfigClass = DipoleFitTaskConfig
-    _DefaultName = "ip_diffim_DipoleFit"
+    _DefaultName = "dipoleFit"
 
     def __init__(self, schema, algMetadata=None, **kwargs):
+        super().__init__(schema, algMetadata, **kwargs)
 
-        measBase.SingleFrameMeasurementTask.__init__(self, schema, algMetadata, **kwargs)
-
-        dpFitPluginConfig = self.config.plugins['ip_diffim_DipoleFit']
-
-        self.dipoleFitter = DipoleFitPlugin(dpFitPluginConfig, name=self._DefaultName,
-                                            schema=schema, metadata=algMetadata,
-                                            logName=self.log.name)
+        # Enforce a specific plugin order, so that DipoleFit can fall back on
+        # SdssCentroid for non-dipoles
+        self.plugins_pre = self.plugins.copy()
+        self.plugins_post = self.plugins.copy()
+        self.plugins_pre.clear()
+        self.plugins_pre["base_SdssCentroid"] = self.plugins["base_SdssCentroid"]
+        self.plugins_post.pop("base_SdssCentroid")
+        self.dipoleFit = self.plugins_post.pop("ip_diffim_DipoleFit")
+        del self.plugins
 
     @timeMethod
     def run(self, sources, exposure, posExp=None, negExp=None, **kwargs):
-        """Run dipole measurement and classification
+        """Run dipole measurement and classification.
+
+        Run SdssCentroid first, then switch the centroid slot, then DipoleFit
+        then the rest; DipoleFit will fall back on SdssCentroid for sources
+        not containing positive+negative peaks.
 
         Parameters
         ----------
@@ -168,14 +174,15 @@ class DipoleFitTask(measBase.SingleFrameMeasurementTask):
         **kwargs
             Additional keyword arguments for `lsst.meas.base.sfm.SingleFrameMeasurementTask`.
         """
+        self.plugins = self.plugins_pre
+        super().run(sources, exposure, **kwargs)
 
-        measBase.SingleFrameMeasurementTask.run(self, sources, exposure, **kwargs)
-
-        if not sources:
-            return
-
+        sources.schema.getAliasMap().set("slot_Centroid", "ip_diffim_DipoleFit")
         for source in sources:
-            self.dipoleFitter.measure(source, exposure, posExp, negExp)
+            self.dipoleFit.measureDipoles(source, exposure, posExp, negExp)
+
+        self.plugins = self.plugins_post
+        super().run(sources, exposure, **kwargs)
 
 
 class DipoleModel:
@@ -981,12 +988,10 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
 
     @classmethod
     def getExecutionOrder(cls):
-        """Set execution order to `FLUX_ORDER`.
-
-        This includes algorithms that require both `getShape()` and `getCentroid()`,
-        in addition to a Footprint and its Peaks.
+        """This algorithm simultaneously fits the centroid and flux, and does
+        not require any previous centroid fit.
         """
-        return cls.FLUX_ORDER
+        return cls.CENTROID_ORDER
 
     def __init__(self, config, name, schema, metadata, logName=None):
         if logName is None:
@@ -1010,15 +1015,15 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
         self.fluxKey = measBase.FluxResultKey.addFields(schema, name, doc)
 
         self.posCentroidKey = measBase.CentroidResultKey.addFields(schema,
-                                                                   schema.join(name, "pos", "centroid"),
+                                                                   schema.join(name, "pos"),
                                                                    "Dipole positive lobe centroid position.",
                                                                    measBase.UncertaintyEnum.NO_UNCERTAINTY)
         self.negCentroidKey = measBase.CentroidResultKey.addFields(schema,
-                                                                   schema.join(name, "neg", "centroid"),
+                                                                   schema.join(name, "neg"),
                                                                    "Dipole negative lobe centroid position.",
                                                                    measBase.UncertaintyEnum.NO_UNCERTAINTY)
         self.centroidKey = measBase.CentroidResultKey.addFields(schema,
-                                                                schema.join(name, "centroid"),
+                                                                name,
                                                                 "Dipole centroid position.",
                                                                 measBase.UncertaintyEnum.NO_UNCERTAINTY)
 
@@ -1058,7 +1063,12 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
             schema.join(name, "flag", "edge"), type="Flag",
             doc="Flag set when dipole is too close to edge of image")
 
-    def measure(self, measRecord, exposure, posExp=None, negExp=None):
+    def measure(self, *args):
+        """No op: the real work of this task is done in `measureDipoles`.
+        """
+        pass
+
+    def measureDipoles(self, measRecord, exposure, posExp=None, negExp=None):
         """Perform the non-linear least squares minimization on the putative dipole source.
 
         Parameters
@@ -1105,7 +1115,9 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
             measRecord.set(self.classificationAttemptedFlagKey, False)
             self.fail(measRecord, measBase.MeasurementError('not a dipole', self.FAILURE_NOT_DIPOLE))
             if not self.config.fitAllDiaSources:
-                return result
+                measRecord[self.centroidKey.getX()] = measRecord["base_SdssCentroid_x"]
+                measRecord[self.centroidKey.getY()] = measRecord["base_SdssCentroid_y"]
+                return
 
         try:
             alg = self.DipoleFitAlgorithmClass(exposure, posImage=posExp, negImage=negExp)
@@ -1125,7 +1137,7 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
         if result is None:
             measRecord.set(self.classificationFlagKey, False)
             measRecord.set(self.classificationAttemptedFlagKey, False)
-            return result
+            return
 
         self.log.debug("Dipole fit result: %d %s", measRecord.getId(), str(result))
 
