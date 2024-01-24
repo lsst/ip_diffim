@@ -100,14 +100,12 @@ class DipoleFitPluginConfig(measBase.SingleFramePluginConfig):
 
 
 class DipoleFitTaskConfig(measBase.SingleFrameMeasurementConfig):
-    """Measurement of detected diaSources as dipoles
-
-    Currently we keep the "old" DipoleMeasurement algorithms turned on.
-    """
 
     def setDefaults(self):
         measBase.SingleFrameMeasurementConfig.setDefaults(self)
 
+        # This task also runs DipoleFitPlugin directly in DipoleFitTask, which
+        # writes outputs to "ip_diffim_DipoleFit" entries.
         self.plugins.names = ["base_CircularApertureFlux",
                               "base_PixelFlags",
                               "base_SkyCoord",
@@ -133,7 +131,8 @@ class DipoleFitTaskConfig(measBase.SingleFrameMeasurementConfig):
 
 
 class DipoleFitTask(measBase.SingleFrameMeasurementTask):
-    """A task that fits a dipole to a difference image, with an optional separate detection image.
+    """A task that fits a dipole to a difference image, with an optional
+    separate detection image.
 
     Because it subclasses SingleFrameMeasurementTask, and calls
     SingleFrameMeasurementTask.run() from its run() method, it still
@@ -160,10 +159,10 @@ class DipoleFitTask(measBase.SingleFrameMeasurementTask):
         Parameters
         ----------
         sources : `lsst.afw.table.SourceCatalog`
-            ``diaSources`` that will be measured using dipole measurement
+            ``diaSources`` that will be measured using dipole measurement.
         exposure : `lsst.afw.image.Exposure`
-            The difference exposure on which the ``diaSources`` of the ``sources`` parameter
-            were detected. If neither ``posExp`` nor ``negExp`` are set, then the dipole is also
+            The difference exposure on which the ``sources`` were detected.
+            If neither ``posExp`` nor ``negExp`` are set, then the dipole is also
             fitted directly to this difference image.
         posExp : `lsst.afw.image.Exposure`, optional
             "Positive" exposure, typically a science exposure, or None if unavailable
@@ -1094,7 +1093,6 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
         result : TODO: DM-17458
             TODO: DM-17458
         """
-
         result = None
         pks = measRecord.getFootprint().getPeaks()
 
