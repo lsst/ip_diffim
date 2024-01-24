@@ -113,13 +113,6 @@ class DipoleFitTaskConfig(measBase.SingleFrameMeasurementConfig):
                               "base_SdssCentroid",
                               "base_SdssShape",
                               "base_GaussianFlux",
-                              "base_PeakLikelihoodFlux",
-                              "base_PeakCentroid",
-                              "base_NaiveCentroid",
-                              "ip_diffim_NaiveDipoleCentroid",
-                              "ip_diffim_NaiveDipoleFlux",
-                              "ip_diffim_PsfDipoleFlux",
-                              "ip_diffim_ClassificationDipole",
                               ]
 
         self.slots.calibFlux = None
