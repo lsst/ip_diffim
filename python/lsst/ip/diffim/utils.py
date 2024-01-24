@@ -706,7 +706,7 @@ def plotWhisker(results, newWcs):
     plt.show()
 
 
-class DipoleTestImage(object):
+class DipoleTestImage:
     """Utility class for dipole measurement testing.
 
     Generate an image with simulated dipoles and noise; store the original
