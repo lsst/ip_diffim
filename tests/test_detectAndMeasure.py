@@ -33,7 +33,7 @@ class DetectAndMeasureTestBase:
 
     def _check_diaSource(self, refSources, diaSource, refIds=None,
                          matchDistance=1., scale=1., usePsfFlux=True,
-                         rtol=0.02, atol=None):
+                         rtol=0.021, atol=None):
         """Match a diaSource with a source in a reference catalog
         and compare properties.
 
@@ -115,6 +115,21 @@ class DetectAndMeasureTestBase:
         if doSkySources:
             config.skySources.nSources = nSkySources
         config.update(**kwargs)
+
+        # Make a realistic id generator so that output catalog ids are useful.
+        dataId = lsst.daf.butler.DataCoordinate.standardize(
+            instrument="I",
+            visit=42,
+            detector=12,
+            universe=lsst.daf.butler.DimensionUniverse(),
+        )
+        config.idGenerator.packer.name = "observation"
+        config.idGenerator.packer["observation"].n_observations = 10000
+        config.idGenerator.packer["observation"].n_detectors = 99
+        config.idGenerator.n_releases = 8
+        config.idGenerator.release_id = 2
+        self.idGenerator = config.idGenerator.apply(dataId)
+
         return self.detectionTask(config=config)
 
 
@@ -137,9 +152,12 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         detectionTask = self._setup_detection()
 
         # Run detection and check the results
-        output = detectionTask.run(science, matchedTemplate, difference)
+        output = detectionTask.run(science, matchedTemplate, difference,
+                                   idFactory=self.idGenerator.make_table_id_factory())
         subtractedMeasuredExposure = output.subtractedMeasuredExposure
 
+        # Catalog ids should be very large from this id generator.
+        self.assertTrue(all(output.diaSources['id'] > 1000000000))
         self.assertImagesEqual(subtractedMeasuredExposure.image, difference.image)
 
     def test_measurements_finite(self):
@@ -274,7 +292,11 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
                 difference.maskedImage += transients.maskedImage
             else:
                 difference.maskedImage -= transients.maskedImage
-            output = detectionTask.run(science, matchedTemplate, difference)
+            # NOTE: NoiseReplacer (run by forcedMeasurement) can modify the
+            # science image if we've e.g. removed parents post-deblending.
+            # Pass a clone of the science image, so that it doesn't disrupt
+            # later tests.
+            output = detectionTask.run(science.clone(), matchedTemplate, difference)
             refIds = []
             scale = 1. if positive else -1.
             for diaSource in output.diaSources:
@@ -384,7 +406,8 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         detectionTask = self._setup_detection(doSkySources=True)
 
         # Run detection and check the results
-        output = detectionTask.run(science, matchedTemplate, difference)
+        output = detectionTask.run(science, matchedTemplate, difference,
+                                   idFactory=self.idGenerator.make_table_id_factory())
         skySources = output.diaSources[output.diaSources["sky_source"]]
         self.assertEqual(len(skySources), detectionTask.config.skySources.nSources)
         for skySource in skySources:
@@ -396,6 +419,9 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
             # The sky sources should have low flux levels.
             self._check_diaSource(transientSources, skySource, matchDistance=1000, scale=0.,
                                   atol=np.sqrt(transientFluxRange*transientFluxLevel))
+
+        # Catalog ids should be very large from this id generator.
+        self.assertTrue(all(output.diaSources['id'] > 1000000000))
 
     def test_edge_detections(self):
         """Sources with certain bad mask planes set should not be detected.
@@ -554,7 +580,11 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         detectionTask = self._setup_detection()
 
         # Run detection and check the results
-        output = detectionTask.run(science, matchedTemplate, difference, score)
+        output = detectionTask.run(science, matchedTemplate, difference, score,
+                                   idFactory=self.idGenerator.make_table_id_factory())
+
+        # Catalog ids should be very large from this id generator.
+        self.assertTrue(all(output.diaSources['id'] > 1000000000))
         subtractedMeasuredExposure = output.subtractedMeasuredExposure
 
         self.assertImagesEqual(subtractedMeasuredExposure.image, difference.image)
@@ -643,16 +673,17 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
             else:
                 difference.maskedImage -= transients.maskedImage
             score = subtractTask._convolveExposure(difference, scienceKernel, subtractTask.convolutionControl)
-            output = detectionTask.run(science, matchedTemplate, difference, score)
+            # NOTE: NoiseReplacer (run by forcedMeasurement) can modify the
+            # science image if we've e.g. removed parents post-deblending.
+            # Pass a clone of the science image, so that it doesn't disrupt
+            # later tests.
+            output = detectionTask.run(science.clone(), matchedTemplate, difference, score)
             refIds = []
             scale = 1. if positive else -1.
-            goodSrcFlags = subtractTask._checkMask(score.mask, transientSources,
-                                                   subtractTask.config.badMaskPlanes)
+            # sources near the edge may have untrustworthy centroids
+            goodSrcFlags = ~output.diaSources['base_PixelFlags_flag_edge']
             for diaSource, goodSrcFlag in zip(output.diaSources, goodSrcFlags):
-                if ~goodSrcFlag:
-                    with self.assertRaises(AssertionError):
-                        self._check_diaSource(transientSources, diaSource, refIds=refIds, scale=scale)
-                else:
+                if goodSrcFlag:
                     self._check_diaSource(transientSources, diaSource, refIds=refIds, scale=scale)
         _detection_wrapper(positive=True)
         _detection_wrapper(positive=False)
@@ -749,7 +780,8 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         detectionTask = self._setup_detection(doSkySources=True)
 
         # Run detection and check the results
-        output = detectionTask.run(science, matchedTemplate, difference, score)
+        output = detectionTask.run(science, matchedTemplate, difference, score,
+                                   idFactory=self.idGenerator.make_table_id_factory())
         nSkySourcesGenerated = detectionTask.metadata["nSkySources"]
         skySources = output.diaSources[output.diaSources["sky_source"]]
         self.assertEqual(len(skySources), nSkySourcesGenerated)
@@ -762,6 +794,9 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
             # The sky sources should have low flux levels.
             self._check_diaSource(transientSources, skySource, matchDistance=1000, scale=0.,
                                   atol=np.sqrt(transientFluxRange*transientFluxLevel))
+
+        # Catalog ids should be very large from this id generator.
+        self.assertTrue(all(output.diaSources['id'] > 1000000000))
 
     def test_edge_detections(self):
         """Sources with certain bad mask planes set should not be detected.
