@@ -29,7 +29,6 @@ import numpy as np
 
 import lsst.utils.tests
 import lsst.afw.table as afwTable
-import lsst.meas.base as measBase
 from lsst.ip.diffim.dipoleFitTask import (DipoleFitAlgorithm, DipoleFitTask)
 import lsst.ip.diffim.utils as ipUtils
 
@@ -125,33 +124,16 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
 
         Then run DipoleFitTask on the image and return the resulting catalog.
         """
-
         # Create the various tasks and schema -- avoid code reuse.
         testImage = dipoleTestImage.testImage
         detectTask, schema = testImage.detectDipoleSources(doMerge=False, minBinSize=32)
 
-        measureConfig = measBase.SingleFrameMeasurementConfig()
-
-        measureConfig.slots.calibFlux = None
-        measureConfig.slots.modelFlux = None
-        measureConfig.slots.gaussianFlux = None
-        measureConfig.slots.shape = None
-        measureConfig.slots.centroid = "ip_diffim_NaiveDipoleCentroid"
-        measureConfig.doReplaceWithNoise = False
-
-        measureConfig.plugins.names = ["base_CircularApertureFlux",
-                                       "base_PixelFlags",
-                                       "base_SkyCoord",
-                                       "base_PsfFlux",
-                                       "ip_diffim_NaiveDipoleCentroid",
-                                       "ip_diffim_NaiveDipoleFlux",
-                                       "ip_diffim_PsfDipoleFlux"]
-
-        # Here is where we make the dipole fitting task. It can run the other measurements as well.
-        measureTask = DipoleFitTask(config=measureConfig, schema=schema)
-
+        config = DipoleFitTask.ConfigClass()
+        # Also run the older C++ DipoleFlux algorithm for comparison purposes.
+        config.plugins.names |= ["ip_diffim_PsfDipoleFlux"]
         if maxFootprintArea:
-            measureTask.config.plugins["ip_diffim_DipoleFit"].maxFootprintArea = maxFootprintArea
+            config.plugins["ip_diffim_DipoleFit"].maxFootprintArea = maxFootprintArea
+        measureTask = DipoleFitTask(schema=schema, config=config)
 
         table = afwTable.SourceTable.make(schema)
         detectResult = detectTask.run(table, testImage.diffim)
