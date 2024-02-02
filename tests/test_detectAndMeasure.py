@@ -29,7 +29,7 @@ from lsst.pipe.base import InvalidQuantumError
 import lsst.utils.tests
 
 
-class DetectAndMeasureTestBase(lsst.utils.tests.TestCase):
+class DetectAndMeasureTestBase:
 
     def _check_diaSource(self, refSources, diaSource, refIds=None,
                          matchDistance=1., scale=1., usePsfFlux=True,
@@ -118,7 +118,7 @@ class DetectAndMeasureTestBase(lsst.utils.tests.TestCase):
         return self.detectionTask(config=config)
 
 
-class DetectAndMeasureTest(DetectAndMeasureTestBase):
+class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
     detectionTask = detectAndMeasure.DetectAndMeasureTask
 
     def test_detection_xy0(self):
@@ -531,7 +531,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase):
                 self.assertFalse(diaSrc['base_PixelFlags_flag_injectedCenter'])
 
 
-class DetectAndMeasureScoreTest(DetectAndMeasureTestBase):
+class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
     detectionTask = detectAndMeasure.DetectAndMeasureScoreTask
 
     def test_detection_xy0(self):
