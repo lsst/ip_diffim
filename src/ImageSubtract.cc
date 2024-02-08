@@ -211,7 +211,6 @@ Eigen::MatrixXd imageToEigenMatrix(lsst::afw::image::Image<float> const &);
 template
 Eigen::MatrixXd imageToEigenMatrix(lsst::afw::image::Image<double> const &);
 
-template class FindSetBits<lsst::afw::image::Mask<> >;
 template class ImageStatistics<float>;
 template class ImageStatistics<double>;
 

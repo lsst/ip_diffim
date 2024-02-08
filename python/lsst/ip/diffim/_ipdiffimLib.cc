@@ -33,11 +33,9 @@ namespace ip {
 namespace diffim {
 void wrapBasisLists(WrapperCollection &wrappers);
 void wrapDipoleAlgorithms(WrapperCollection &wrappers);
-void wrapFindSetBits(WrapperCollection &wrappers);
 void wrapImageStatistics(WrapperCollection &wrappers);
 void wrapImageSubtract(WrapperCollection &wrappers);
 void wrapKernelCandidate(WrapperCollection &wrappers);
-void wrapKernelCandidateDetection(WrapperCollection &wrappers);
 void wrapKernelSolution(WrapperCollection &wrappers);
 namespace detail {
     void wrapAssessSpatialKernelVisitor(WrapperCollection &wrappers);
@@ -58,11 +56,9 @@ PYBIND11_MODULE(_ipdiffimLib, mod) {
 
     wrapBasisLists(wrappers);
     wrapDipoleAlgorithms(wrappers);
-    wrapFindSetBits(wrappers);
     wrapImageStatistics(wrappers);
     wrapImageSubtract(wrappers);
     wrapKernelCandidate(wrappers);
-    wrapKernelCandidateDetection(wrappers);
     wrapKernelSolution(wrappers);
     detail::wrapAssessSpatialKernelVisitor(wrappers);
     detail::wrapBuildSingleKernelVisitor(wrappers);
