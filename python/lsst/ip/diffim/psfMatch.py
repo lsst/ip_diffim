@@ -925,119 +925,112 @@ class PsfMatchTask(pipeBase.Task, abc.ABC):
         # Main loop
         trace_loggers = [getTraceLogger(self.log.getChild("_solve"), i) for i in range(5)]
         t0 = time.time()
-        try:
-            totalIterations = 0
-            thisIteration = 0
-            while (thisIteration < maxSpatialIterations):
+        totalIterations = 0
+        thisIteration = 0
+        while (thisIteration < maxSpatialIterations):
 
-                # Make sure there are no uninitialized candidates as active occupants of Cell
-                nRejectedSkf = -1
-                while (nRejectedSkf != 0):
-                    trace_loggers[1].debug("Building single kernels...")
-                    kernelCellSet.visitCandidates(singlekv, nStarPerCell, ignoreExceptions=True)
-                    nRejectedSkf = singlekv.getNRejected()
-                    trace_loggers[1].debug(
-                        "Iteration %d, rejected %d candidates due to initial kernel fit",
-                        thisIteration, nRejectedSkf
-                    )
-
-                # Reject outliers in kernel sum
-                ksv.resetKernelSum()
-                ksv.setMode(diffimLib.KernelSumVisitorF.AGGREGATE)
-                kernelCellSet.visitCandidates(ksv, nStarPerCell, ignoreExceptions=True)
-                ksv.processKsumDistribution()
-                ksv.setMode(diffimLib.KernelSumVisitorF.REJECT)
-                kernelCellSet.visitCandidates(ksv, nStarPerCell, ignoreExceptions=True)
-
-                nRejectedKsum = ksv.getNRejected()
+            # Make sure there are no uninitialized candidates as active occupants of Cell
+            nRejectedSkf = -1
+            while (nRejectedSkf != 0):
+                trace_loggers[1].debug("Building single kernels...")
+                kernelCellSet.visitCandidates(singlekv, nStarPerCell, ignoreExceptions=True)
+                nRejectedSkf = singlekv.getNRejected()
                 trace_loggers[1].debug(
-                    "Iteration %d, rejected %d candidates due to kernel sum",
-                    thisIteration, nRejectedKsum
+                    "Iteration %d, rejected %d candidates due to initial kernel fit",
+                    thisIteration, nRejectedSkf
                 )
 
-                # Do we jump back to the top without incrementing thisIteration?
-                if nRejectedKsum > 0:
+            # Reject outliers in kernel sum
+            ksv.resetKernelSum()
+            ksv.setMode(diffimLib.KernelSumVisitorF.AGGREGATE)
+            kernelCellSet.visitCandidates(ksv, nStarPerCell, ignoreExceptions=True)
+            ksv.processKsumDistribution()
+            ksv.setMode(diffimLib.KernelSumVisitorF.REJECT)
+            kernelCellSet.visitCandidates(ksv, nStarPerCell, ignoreExceptions=True)
+
+            nRejectedKsum = ksv.getNRejected()
+            trace_loggers[1].debug(
+                "Iteration %d, rejected %d candidates due to kernel sum",
+                thisIteration, nRejectedKsum
+            )
+
+            # Do we jump back to the top without incrementing thisIteration?
+            if nRejectedKsum > 0:
+                totalIterations += 1
+                continue
+
+            # At this stage we can either apply the spatial fit to
+            # the kernels, or we run a PCA, use these as a *new*
+            # basis set with lower dimensionality, and then apply
+            # the spatial fit to these kernels
+
+            if (usePcaForSpatialKernel):
+                trace_loggers[0].debug("Building Pca basis")
+
+                nRejectedPca, spatialBasisList = self._createPcaBasis(kernelCellSet, nStarPerCell, ps)
+                trace_loggers[1].debug(
+                    "Iteration %d, rejected %d candidates due to Pca kernel fit",
+                    thisIteration, nRejectedPca
+                )
+
+                # We don't want to continue on (yet) with the
+                # spatial modeling, because we have bad objects
+                # contributing to the Pca basis.  We basically
+                # need to restart from the beginning of this loop,
+                # since the cell-mates of those objects that were
+                # rejected need their original Kernels built by
+                # singleKernelFitter.
+
+                # Don't count against thisIteration
+                if (nRejectedPca > 0):
                     totalIterations += 1
                     continue
+            else:
+                spatialBasisList = basisList
 
-                # At this stage we can either apply the spatial fit to
-                # the kernels, or we run a PCA, use these as a *new*
-                # basis set with lower dimensionality, and then apply
-                # the spatial fit to these kernels
+            # We have gotten on to the spatial modeling part
+            regionBBox = kernelCellSet.getBBox()
+            spatialkv = diffimLib.BuildSpatialKernelVisitorF(spatialBasisList, regionBBox, ps)
+            kernelCellSet.visitCandidates(spatialkv, nStarPerCell)
+            spatialkv.solveLinearEquation()
+            trace_loggers[2].debug("Spatial kernel built with %d candidates", spatialkv.getNCandidates())
+            spatialKernel, spatialBackground = spatialkv.getSolutionPair()
 
-                if (usePcaForSpatialKernel):
-                    trace_loggers[0].debug("Building Pca basis")
+            # Check the quality of the spatial fit (look at residuals)
+            assesskv = diffimLib.AssessSpatialKernelVisitorF(spatialKernel, spatialBackground, ps)
+            kernelCellSet.visitCandidates(assesskv, nStarPerCell)
+            nRejectedSpatial = assesskv.getNRejected()
+            nGoodSpatial = assesskv.getNGood()
+            trace_loggers[1].debug(
+                "Iteration %d, rejected %d candidates due to spatial kernel fit",
+                thisIteration, nRejectedSpatial
+            )
+            trace_loggers[1].debug("%d candidates used in fit", nGoodSpatial)
 
-                    nRejectedPca, spatialBasisList = self._createPcaBasis(kernelCellSet, nStarPerCell, ps)
-                    trace_loggers[1].debug(
-                        "Iteration %d, rejected %d candidates due to Pca kernel fit",
-                        thisIteration, nRejectedPca
-                    )
+            # If only nGoodSpatial == 0, might be other candidates in the cells
+            if nGoodSpatial == 0 and nRejectedSpatial == 0:
+                raise RuntimeError("No kernel candidates for spatial fit")
 
-                    # We don't want to continue on (yet) with the
-                    # spatial modeling, because we have bad objects
-                    # contributing to the Pca basis.  We basically
-                    # need to restart from the beginning of this loop,
-                    # since the cell-mates of those objects that were
-                    # rejected need their original Kernels built by
-                    # singleKernelFitter.
+            if nRejectedSpatial == 0:
+                # Nothing rejected, finished with spatial fit
+                break
 
-                    # Don't count against thisIteration
-                    if (nRejectedPca > 0):
-                        totalIterations += 1
-                        continue
-                else:
-                    spatialBasisList = basisList
+            # Otherwise, iterate on...
+            thisIteration += 1
 
-                # We have gotten on to the spatial modeling part
-                regionBBox = kernelCellSet.getBBox()
-                spatialkv = diffimLib.BuildSpatialKernelVisitorF(spatialBasisList, regionBBox, ps)
-                kernelCellSet.visitCandidates(spatialkv, nStarPerCell)
-                spatialkv.solveLinearEquation()
-                trace_loggers[2].debug("Spatial kernel built with %d candidates", spatialkv.getNCandidates())
-                spatialKernel, spatialBackground = spatialkv.getSolutionPair()
+        # Final fit if above did not converge
+        if (nRejectedSpatial > 0) and (thisIteration == maxSpatialIterations):
+            trace_loggers[1].debug("Final spatial fit")
+            if (usePcaForSpatialKernel):
+                nRejectedPca, spatialBasisList = self._createPcaBasis(kernelCellSet, nStarPerCell, ps)
+            regionBBox = kernelCellSet.getBBox()
+            spatialkv = diffimLib.BuildSpatialKernelVisitorF(spatialBasisList, regionBBox, ps)
+            kernelCellSet.visitCandidates(spatialkv, nStarPerCell)
+            spatialkv.solveLinearEquation()
+            trace_loggers[2].debug("Spatial kernel built with %d candidates", spatialkv.getNCandidates())
+            spatialKernel, spatialBackground = spatialkv.getSolutionPair()
 
-                # Check the quality of the spatial fit (look at residuals)
-                assesskv = diffimLib.AssessSpatialKernelVisitorF(spatialKernel, spatialBackground, ps)
-                kernelCellSet.visitCandidates(assesskv, nStarPerCell)
-                nRejectedSpatial = assesskv.getNRejected()
-                nGoodSpatial = assesskv.getNGood()
-                trace_loggers[1].debug(
-                    "Iteration %d, rejected %d candidates due to spatial kernel fit",
-                    thisIteration, nRejectedSpatial
-                )
-                trace_loggers[1].debug("%d candidates used in fit", nGoodSpatial)
-
-                # If only nGoodSpatial == 0, might be other candidates in the cells
-                if nGoodSpatial == 0 and nRejectedSpatial == 0:
-                    raise RuntimeError("No kernel candidates for spatial fit")
-
-                if nRejectedSpatial == 0:
-                    # Nothing rejected, finished with spatial fit
-                    break
-
-                # Otherwise, iterate on...
-                thisIteration += 1
-
-            # Final fit if above did not converge
-            if (nRejectedSpatial > 0) and (thisIteration == maxSpatialIterations):
-                trace_loggers[1].debug("Final spatial fit")
-                if (usePcaForSpatialKernel):
-                    nRejectedPca, spatialBasisList = self._createPcaBasis(kernelCellSet, nStarPerCell, ps)
-                regionBBox = kernelCellSet.getBBox()
-                spatialkv = diffimLib.BuildSpatialKernelVisitorF(spatialBasisList, regionBBox, ps)
-                kernelCellSet.visitCandidates(spatialkv, nStarPerCell)
-                spatialkv.solveLinearEquation()
-                trace_loggers[2].debug("Spatial kernel built with %d candidates", spatialkv.getNCandidates())
-                spatialKernel, spatialBackground = spatialkv.getSolutionPair()
-
-            spatialSolution = spatialkv.getKernelSolution()
-
-        except Exception as e:
-            self.log.error("ERROR: Unable to calculate psf matching kernel")
-
-            trace_loggers[1].debug("%s", e)
-            raise e
+        spatialSolution = spatialkv.getKernelSolution()
 
         t1 = time.time()
         trace_loggers[0].debug("Total time to compute the spatial kernel : %.2f s", (t1 - t0))
