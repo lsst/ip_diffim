@@ -19,7 +19,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-__all__ = ["backgroundSubtract", "writeKernelCellSet", "sourceToFootprintList", "NbasisEvaluator"]
+__all__ = ["backgroundSubtract", "writeKernelCellSet", "NbasisEvaluator"]
 
 # python
 import time
@@ -27,14 +27,9 @@ import os
 from collections import Counter
 import numpy as np
 
-# all the c++ level classes and routines
 from . import diffimLib
 
-# all the other LSST packages
-import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
-import lsst.afw.table as afwTable
-import lsst.afw.detection as afwDetect
 import lsst.afw.math as afwMath
 import lsst.geom as geom
 import lsst.pex.config as pexConfig
@@ -367,169 +362,6 @@ def writeKernelCellSet(kernelCellSet, psfMatchingKernel, backgroundModel, outdir
                 sbg = backgroundModel(xCand, yCand)
                 sdmi = cand.getDifferenceImage(sk, sbg)
                 sdmi.writeFits(os.path.join(outdir, 'sdiffim_c%d_x%d_y%d.fits' % (idCand, xCand, yCand)))
-
-#######
-# Converting types
-#######
-
-
-def sourceToFootprintList(candidateInList, templateExposure, scienceExposure, kernelSize, config, log):
-    """Convert a list of sources for the PSF-matching Kernel to Footprints.
-
-    Parameters
-    ----------
-    candidateInList : TODO: DM-17458
-        Input list of Sources
-    templateExposure : TODO: DM-17458
-        Template image, to be checked for Mask bits in Source Footprint
-    scienceExposure : TODO: DM-17458
-        Science image, to be checked for Mask bits in Source Footprint
-    kernelSize : TODO: DM-17458
-        TODO: DM-17458
-    config : TODO: DM-17458
-        Config that defines the Mask planes that indicate an invalid Source and Bbox grow radius
-    log : TODO: DM-17458
-        Log for output
-
-    Returns
-    -------
-    candidateOutList : `list`
-        a list of dicts having a "source" and "footprint" field, to be used for Psf-matching
-
-    Raises
-    ------
-    RuntimeError
-        TODO: DM-17458
-
-    Notes
-    -----
-    Takes an input list of Sources that were selected to constrain
-    the Psf-matching Kernel and turns them into a List of Footprints,
-    which are used to seed a set of KernelCandidates.  The function
-    checks both the template and science image for masked pixels,
-    rejecting the Source if certain Mask bits (defined in config) are
-    set within the Footprint.
-    """
-
-    candidateOutList = []
-    fsb = diffimLib.FindSetBitsU()
-    badBitMask = 0
-    for mp in config.badMaskPlanes:
-        badBitMask |= afwImage.Mask.getPlaneBitMask(mp)
-    bbox = scienceExposure.getBBox()
-
-    # Size to grow Sources
-    if config.scaleByFwhm:
-        fpGrowPix = int(config.fpGrowKernelScaling*kernelSize + 0.5)
-    else:
-        fpGrowPix = config.fpGrowPix
-    log.info("Growing %d kernel candidate stars by %d pixels", len(candidateInList), fpGrowPix)
-
-    for kernelCandidate in candidateInList:
-        if not type(kernelCandidate) == afwTable.SourceRecord:
-            raise RuntimeError("Candiate not of type afwTable.SourceRecord")
-        bm1 = 0
-        bm2 = 0
-        center = geom.Point2I(scienceExposure.getWcs().skyToPixel(kernelCandidate.getCoord()))
-        if center[0] < bbox.getMinX() or center[0] > bbox.getMaxX():
-            continue
-        if center[1] < bbox.getMinY() or center[1] > bbox.getMaxY():
-            continue
-
-        xmin = center[0] - fpGrowPix
-        xmax = center[0] + fpGrowPix
-        ymin = center[1] - fpGrowPix
-        ymax = center[1] + fpGrowPix
-
-        # Keep object centered
-        if (xmin - bbox.getMinX()) < 0:
-            xmax += (xmin - bbox.getMinX())
-            xmin -= (xmin - bbox.getMinX())
-        if (ymin - bbox.getMinY()) < 0:
-            ymax += (ymin - bbox.getMinY())
-            ymin -= (ymin - bbox.getMinY())
-        if (bbox.getMaxX() - xmax) < 0:
-            xmin -= (bbox.getMaxX() - xmax)
-            xmax += (bbox.getMaxX() - xmax)
-        if (bbox.getMaxY() - ymax) < 0:
-            ymin -= (bbox.getMaxY() - ymax)
-            ymax += (bbox.getMaxY() - ymax)
-        if xmin > xmax or ymin > ymax:
-            continue
-
-        kbbox = geom.Box2I(geom.Point2I(xmin, ymin), geom.Point2I(xmax, ymax))
-        try:
-            fsb.apply(afwImage.MaskedImageF(templateExposure.maskedImage, kbbox, deep=False).getMask())
-            bm1 = fsb.getBits()
-            fsb.apply(afwImage.MaskedImageF(scienceExposure.maskedImage, kbbox, deep=False).getMask())
-            bm2 = fsb.getBits()
-        except Exception:
-            pass
-        else:
-            if not ((bm1 & badBitMask) or (bm2 & badBitMask)):
-                candidateOutList.append({'source': kernelCandidate,
-                                         'footprint': afwDetect.Footprint(afwGeom.SpanSet(kbbox))})
-    log.info("Selected %d / %d sources for KernelCandidacy", len(candidateOutList), len(candidateInList))
-    return candidateOutList
-
-
-def sourceTableToCandidateList(sourceTable, templateExposure, scienceExposure, kConfig, dConfig, log,
-                               basisList, doBuild=False):
-    """Convert a list of Sources into KernelCandidates.
-
-    The KernelCandidates are used for fitting the Psf-matching kernel.
-
-    Parameters
-    ----------
-    sourceTable : TODO: DM-17458
-        TODO: DM-17458
-    templateExposure : TODO: DM-17458
-        TODO: DM-17458
-    scienceExposure : TODO: DM-17458
-        TODO: DM-17458
-    kConfig : TODO: DM-17458
-        TODO: DM-17458
-    dConfig : TODO: DM-17458
-        TODO: DM-17458
-    log : TODO: DM-17458
-        TODO: DM-17458
-    basisList : TODO: DM-17458
-        TODO: DM-17458
-    doBuild : `bool`, optional
-        TODO: DM-17458
-
-    Returns
-    -------
-    TODO: DM-17458
-        TODO: DM-17458
-    """
-    kernelSize = basisList[0].getWidth()
-    footprintList = sourceToFootprintList(list(sourceTable), templateExposure, scienceExposure,
-                                          kernelSize, dConfig, log)
-    candList = []
-
-    if doBuild and not basisList:
-        doBuild = False
-    else:
-        ps = pexConfig.makePropertySet(kConfig)
-        visitor = diffimLib.BuildSingleKernelVisitorF(basisList, ps)
-
-    ps = pexConfig.makePropertySet(kConfig)
-    for cand in footprintList:
-        bbox = cand['footprint'].getBBox()
-        tmi = afwImage.MaskedImageF(templateExposure.maskedImage, bbox)
-        smi = afwImage.MaskedImageF(scienceExposure.maskedImage, bbox)
-        kCand = diffimLib.makeKernelCandidate(cand['source'], tmi, smi, ps)
-        if doBuild:
-            visitor.processCandidate(kCand)
-            kCand.setStatus(afwMath.SpatialCellCandidate.UNKNOWN)
-        candList.append(kCand)
-    return candList
-
-
-#######
-#
-#######
 
 
 class NbasisEvaluator(object):
