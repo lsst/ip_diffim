@@ -53,13 +53,13 @@ KernelCandidate<PixelT>::KernelCandidate(float const xCenter, float const yCente
         imstats.apply(*_scienceMaskedImage, candidateCoreRadius);
     } catch (pexExcept::Exception& e) {
         LOGL_DEBUG("TRACE2.ip.diffim.KernelCandidate",
-                   "Unable to calculate core imstats for ranking Candidate %d", this->getId());
+                   "Unable to calculate core imstats for rating Candidate %d", this->getId());
         this->setStatus(afwMath::SpatialCellCandidate::BAD);
         return;
     }
 
     _coreFlux = imstats.getMean();
-    LOGL_DEBUG("TRACE4.ip.diffim.KernelCandidate", "Candidate %d at %.2f %.2f with ranking %.2f",
+    LOGL_DEBUG("TRACE4.ip.diffim.KernelCandidate", "Candidate %d at %.2f %.2f with rating %.2f",
                this->getId(), this->getXCenter(), this->getYCenter(), _coreFlux);
 }
 
@@ -79,7 +79,7 @@ KernelCandidate<PixelT>::KernelCandidate(SourcePtr const& source, MaskedImagePtr
           _fitForBackground(ps.getAsBool("fitForBackground")),
           _kernelSolutionOrig(),
           _kernelSolutionPca() {
-    LOGL_DEBUG("TRACE4.ip.diffim.KernelCandidate", "Candidate %d at %.2f %.2f with ranking %.2f",
+    LOGL_DEBUG("TRACE4.ip.diffim.KernelCandidate", "Candidate %d at %.2f %.2f with rating %.2f",
                this->getId(), this->getXCenter(), this->getYCenter(), _coreFlux);
 }
 
