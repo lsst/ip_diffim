@@ -143,6 +143,9 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         dtype=str,
         doc="Sources with any of these flags set are removed before writing the output catalog.",
         default=("base_PixelFlags_flag_offimage",
+                 "base_PixelFlags_flag_interpolatedCenterAll",
+                 "base_PixelFlags_flag_badCenterAll",
+                 "base_PixelFlags_flag_edgeCenterAll",
                  ),
     )
     idGenerator = DetectorVisitIdGeneratorConfig.make_field()
