@@ -8,7 +8,7 @@
  *
  * @ingroup ip_diffim
  */
-
+#include <stdexcept>
 #include "boost/timer.hpp"
 
 #include "lsst/afw/math.h"
@@ -144,7 +144,7 @@ void KernelCandidate<PixelT>::_buildKernelSolution(lsst::afw::math::KernelList c
     } else if (conditionNumberType == "EIGENVALUE") {
         ctype = KernelSolution::EIGENVALUE;
     } else {
-        throw LSST_EXCEPT(pexExcept::Exception, "conditionNumberType not recognized");
+        throw LSST_EXCEPT(pexExcept::TypeError, "conditionNumberType not recognized");
     }
 
     /* Do we have a regularization matrix?  If so use it */
@@ -222,21 +222,21 @@ std::shared_ptr<lsst::afw::math::Kernel> KernelCandidate<PixelT>::getKernel(Cand
         if (_kernelSolutionOrig)
             return _kernelSolutionOrig->getKernel();
         else
-            throw LSST_EXCEPT(pexExcept::Exception, "Original kernel does not exist");
+            throw LSST_EXCEPT(pexExcept::RuntimeError, "Original kernel does not exist");
     } else if (cand == KernelCandidate::PCA) {
         if (_kernelSolutionPca)
             return _kernelSolutionPca->getKernel();
         else
-            throw LSST_EXCEPT(pexExcept::Exception, "Pca kernel does not exist");
+            throw LSST_EXCEPT(pexExcept::RuntimeError, "Pca kernel does not exist");
     } else if (cand == KernelCandidate::RECENT) {
         if (_kernelSolutionPca)
             return _kernelSolutionPca->getKernel();
         else if (_kernelSolutionOrig)
             return _kernelSolutionOrig->getKernel();
         else
-            throw LSST_EXCEPT(pexExcept::Exception, "No kernels exist");
+            throw LSST_EXCEPT(pexExcept::RuntimeError, "No kernels exist");
     } else {
-        throw LSST_EXCEPT(pexExcept::Exception, "Invalid CandidateSwitch, cannot get kernel");
+        throw std::logic_error("Invalid CandidateSwitch, cannot get kernel");
     }
 }
 
@@ -246,21 +246,21 @@ double KernelCandidate<PixelT>::getBackground(CandidateSwitch cand) const {
         if (_kernelSolutionOrig)
             return _kernelSolutionOrig->getBackground();
         else
-            throw LSST_EXCEPT(pexExcept::Exception, "Original kernel does not exist");
+            throw LSST_EXCEPT(pexExcept::RuntimeError, "Original kernel does not exist");
     } else if (cand == KernelCandidate::PCA) {
         if (_kernelSolutionPca)
             return _kernelSolutionPca->getBackground();
         else
-            throw LSST_EXCEPT(pexExcept::Exception, "Pca kernel does not exist");
+            throw LSST_EXCEPT(pexExcept::RuntimeError, "Pca kernel does not exist");
     } else if (cand == KernelCandidate::RECENT) {
         if (_kernelSolutionPca)
             return _kernelSolutionPca->getBackground();
         else if (_kernelSolutionOrig)
             return _kernelSolutionOrig->getBackground();
         else
-            throw LSST_EXCEPT(pexExcept::Exception, "No kernels exist");
+            throw LSST_EXCEPT(pexExcept::RuntimeError, "No kernels exist");
     } else {
-        throw LSST_EXCEPT(pexExcept::Exception, "Invalid CandidateSwitch, cannot get background");
+        throw std::logic_error("Invalid CandidateSwitch, cannot get background");
     }
 }
 
@@ -270,21 +270,21 @@ double KernelCandidate<PixelT>::getKsum(CandidateSwitch cand) const {
         if (_kernelSolutionOrig)
             return _kernelSolutionOrig->getKsum();
         else
-            throw LSST_EXCEPT(pexExcept::Exception, "Original kernel does not exist");
+            throw LSST_EXCEPT(pexExcept::RuntimeError, "Original kernel does not exist");
     } else if (cand == KernelCandidate::PCA) {
         if (_kernelSolutionPca)
             return _kernelSolutionPca->getKsum();
         else
-            throw LSST_EXCEPT(pexExcept::Exception, "Pca kernel does not exist");
+            throw LSST_EXCEPT(pexExcept::RuntimeError, "Pca kernel does not exist");
     } else if (cand == KernelCandidate::RECENT) {
         if (_kernelSolutionPca)
             return _kernelSolutionPca->getKsum();
         else if (_kernelSolutionOrig)
             return _kernelSolutionOrig->getKsum();
         else
-            throw LSST_EXCEPT(pexExcept::Exception, "No kernels exist");
+            throw LSST_EXCEPT(pexExcept::RuntimeError, "No kernels exist");
     } else {
-        throw LSST_EXCEPT(pexExcept::Exception, "Invalid CandidateSwitch, cannot get kSum");
+        throw std::logic_error("Invalid CandidateSwitch, cannot get kSum");
     }
 }
 
@@ -295,21 +295,21 @@ std::shared_ptr<typename KernelCandidate<PixelT>::ImageT> KernelCandidate<PixelT
         if (_kernelSolutionOrig)
             return _kernelSolutionOrig->makeKernelImage();
         else
-            throw LSST_EXCEPT(pexExcept::Exception, "Original kernel does not exist");
+            throw LSST_EXCEPT(pexExcept::RuntimeError, "Original kernel does not exist");
     } else if (cand == KernelCandidate::PCA) {
         if (_kernelSolutionPca)
             return _kernelSolutionPca->makeKernelImage();
         else
-            throw LSST_EXCEPT(pexExcept::Exception, "Pca kernel does not exist");
+            throw LSST_EXCEPT(pexExcept::RuntimeError, "Pca kernel does not exist");
     } else if (cand == KernelCandidate::RECENT) {
         if (_kernelSolutionPca)
             return _kernelSolutionPca->makeKernelImage();
         else if (_kernelSolutionOrig)
             return _kernelSolutionOrig->makeKernelImage();
         else
-            throw LSST_EXCEPT(pexExcept::Exception, "No kernels exist");
+            throw LSST_EXCEPT(pexExcept::RuntimeError, "No kernels exist");
     } else {
-        throw LSST_EXCEPT(pexExcept::Exception, "Invalid CandidateSwitch, cannot get kernel image");
+        throw std::logic_error("Invalid CandidateSwitch, cannot get kernel image");
     }
 }
 
@@ -325,21 +325,21 @@ std::shared_ptr<StaticKernelSolution<PixelT> > KernelCandidate<PixelT>::getKerne
         if (_kernelSolutionOrig)
             return _kernelSolutionOrig;
         else
-            throw LSST_EXCEPT(pexExcept::Exception, "Original kernel does not exist");
+            throw LSST_EXCEPT(pexExcept::RuntimeError, "Original kernel does not exist");
     } else if (cand == KernelCandidate::PCA) {
         if (_kernelSolutionPca)
             return _kernelSolutionPca;
         else
-            throw LSST_EXCEPT(pexExcept::Exception, "Pca kernel does not exist");
+            throw LSST_EXCEPT(pexExcept::RuntimeError, "Pca kernel does not exist");
     } else if (cand == KernelCandidate::RECENT) {
         if (_kernelSolutionPca)
             return _kernelSolutionPca;
         else if (_kernelSolutionOrig)
             return _kernelSolutionOrig;
         else
-            throw LSST_EXCEPT(pexExcept::Exception, "No kernels exist");
+            throw LSST_EXCEPT(pexExcept::RuntimeError, "No kernels exist");
     } else {
-        throw LSST_EXCEPT(pexExcept::Exception, "Invalid CandidateSwitch, cannot get solution");
+        throw std::logic_error("Invalid CandidateSwitch, cannot get solution");
     }
 }
 
@@ -349,21 +349,21 @@ lsst::afw::image::MaskedImage<PixelT> KernelCandidate<PixelT>::getDifferenceImag
         if (_kernelSolutionOrig)
             return getDifferenceImage(_kernelSolutionOrig->getKernel(), _kernelSolutionOrig->getBackground());
         else
-            throw LSST_EXCEPT(pexExcept::Exception, "Original kernel does not exist");
+            throw LSST_EXCEPT(pexExcept::RuntimeError, "Original kernel does not exist");
     } else if (cand == KernelCandidate::PCA) {
         if (_kernelSolutionPca)
             return getDifferenceImage(_kernelSolutionPca->getKernel(), _kernelSolutionPca->getBackground());
         else
-            throw LSST_EXCEPT(pexExcept::Exception, "Pca kernel does not exist");
+            throw LSST_EXCEPT(pexExcept::RuntimeError, "Pca kernel does not exist");
     } else if (cand == KernelCandidate::RECENT) {
         if (_kernelSolutionPca)
             return getDifferenceImage(_kernelSolutionPca->getKernel(), _kernelSolutionPca->getBackground());
         else if (_kernelSolutionOrig)
             return getDifferenceImage(_kernelSolutionOrig->getKernel(), _kernelSolutionOrig->getBackground());
         else
-            throw LSST_EXCEPT(pexExcept::Exception, "No kernels exist");
+            throw LSST_EXCEPT(pexExcept::RuntimeError, "No kernels exist");
     } else {
-        throw LSST_EXCEPT(pexExcept::Exception, "Invalid CandidateSwitch, cannot get diffim");
+        throw std::logic_error("Invalid CandidateSwitch, cannot get diffim");
     }
 }
 
