@@ -419,7 +419,7 @@ class MakeKernelTask(PsfMatchTask):
                                                             scienceCutout,
                                                             candidateConfig)
 
-            self.log.debug("Candidate %d at %f, %f rating=%f",
+            self.log.debug("Candidate %d at %.2f, %.2f rating=%f",
                            kernelCandidate.getId(),
                            kernelCandidate.getXCenter(),
                            kernelCandidate.getYCenter(),
