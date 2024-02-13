@@ -30,13 +30,8 @@ from .psfMatch import *
 from .modelPsfMatch import *
 from .makeKernel import *
 from .makeKernelBasisList import *
-from .diaCatalogSourceSelector import *
 from .dipoleMeasurement import *
-from .diffimTools import *
-from .kernelCandidateQa import *
 from .getTemplate import *
-from .diaCatalogSourceSelector import *
-from lsst.meas.base import wrapSimpleAlgorithm
 from .dipoleFitTask import *
 from .detectAndMeasure import *
 from .imageDecorrelation import *
@@ -45,6 +40,7 @@ from .subtractImages import *
 from .version import *
 
 # automatically register ip_diffim Algorithms
+from lsst.meas.base import wrapSimpleAlgorithm
 wrapSimpleAlgorithm(NaiveDipoleCentroid, Control=DipoleCentroidControl, executionOrder=0.0)
 wrapSimpleAlgorithm(NaiveDipoleFlux, Control=DipoleFluxControl, executionOrder=2.0)
 wrapSimpleAlgorithm(PsfDipoleFlux, Control=PsfDipoleFluxControl, executionOrder=2.0)

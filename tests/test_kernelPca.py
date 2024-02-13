@@ -1,16 +1,48 @@
 import unittest
 
+import numpy as np
 
 import lsst.utils.tests
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.geom as geom
 import lsst.ip.diffim as ipDiffim
-import lsst.ip.diffim.diffimTools as diffimTools
 import lsst.utils.logging as logUtils
 import lsst.pex.config as pexConfig
 
 logUtils.trace_set_at("lsst.ip.diffim", 4)
+
+
+def makePoissonNoiseImage(image):
+    """Return a Poisson noise image based on image
+
+    Parameters
+    ----------
+    image : `lsst.afw.image.Image`
+        image; the output image has the same dtype, dimensions, and shape
+        and its expectation value is the value of ``image`` at each pixel
+
+    Returns
+    -------
+    noiseIm : `lsst.afw.image.Image`
+        Newly constructed image instance, same type as ``image``.
+
+    Notes
+    -----
+    - Warning: This uses an undocumented numpy API (the documented API
+        uses a single float expectation value instead of an array).
+
+    - Uses numpy.random; you may wish to call numpy.random.seed first.
+    """
+    import numpy.random as rand
+    imArr = image.array
+    noiseIm = image.Factory(image.getBBox())
+    noiseArr = noiseIm.array
+
+    intNoiseArr = rand.poisson(np.where(np.isfinite(imArr), imArr, 0.0))
+
+    noiseArr[:, :] = intNoiseArr.astype(noiseArr.dtype)
+    return noiseIm
 
 
 class DiffimTestCases(lsst.utils.tests.TestCase):
@@ -21,11 +53,6 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
         self.kList = ipDiffim.makeKernelBasisList(self.config)
         self.ps = pexConfig.makePropertySet(self.config)
         self.ps["useRegularization"] = False
-
-    def tearDown(self):
-        del self.config
-        del self.ps
-        del self.kList
 
     def makeCandidate(self, kSum, x, y, size=51):
         mi1 = afwImage.MaskedImageF(geom.Extent2I(size, size))
@@ -57,7 +84,7 @@ class DiffimTestCases(lsst.utils.tests.TestCase):
             if kRefIm is None:
                 kRefIm = kImage1
 
-            kImage1 = diffimTools.makePoissonNoiseImage(kImage1)
+            kImage1 = makePoissonNoiseImage(kImage1)
             kImage2 = afwImage.ImageD(kImage1, True)
 
             imagePca1.addImage(kImage1, 1.0)
