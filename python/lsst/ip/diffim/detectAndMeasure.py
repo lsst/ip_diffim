@@ -181,6 +181,7 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
             "STREAK", "INJECTED", "INJECTED_TEMPLATE"]
         self.measurement.plugins["base_PixelFlags"].masksFpCenter = [
             "STREAK", "INJECTED", "INJECTED_TEMPLATE"]
+        self.skySources.avoidMask = ["DETECTED", "DETECTED_NEGATIVE", "BAD", "NO_DATA", "EDGE"]
 
 
 class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
