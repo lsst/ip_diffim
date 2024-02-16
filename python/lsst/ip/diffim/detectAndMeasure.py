@@ -397,6 +397,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             Seed value to initialize the random number generator.
         """
         skySourceFootprints = self.skySources.run(mask=mask, seed=seed)
+        self.metadata.add("nSkySources", len(skySourceFootprints))
         if skySourceFootprints:
             for foot in skySourceFootprints:
                 s = diaSources.addNew()
