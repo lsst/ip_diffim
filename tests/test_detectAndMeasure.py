@@ -728,8 +728,9 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase):
 
         # Run detection and check the results
         output = detectionTask.run(science, matchedTemplate, difference, score)
+        nSkySourcesGenerated = detectionTask.metadata["nSkySources"]
         skySources = output.diaSources[output.diaSources["sky_source"]]
-        self.assertEqual(len(skySources), detectionTask.config.skySources.nSources)
+        self.assertEqual(len(skySources), nSkySourcesGenerated)
         for skySource in skySources:
             # The sky sources should not be close to any other source
             with self.assertRaises(AssertionError):

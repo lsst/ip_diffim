@@ -143,6 +143,9 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         dtype=str,
         doc="Sources with any of these flags set are removed before writing the output catalog.",
         default=("base_PixelFlags_flag_offimage",
+                 "base_PixelFlags_flag_interpolatedCenterAll",
+                 "base_PixelFlags_flag_badCenterAll",
+                 "base_PixelFlags_flag_edgeCenterAll",
                  ),
     )
     idGenerator = DetectorVisitIdGeneratorConfig.make_field()
@@ -178,6 +181,7 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
             "STREAK", "INJECTED", "INJECTED_TEMPLATE"]
         self.measurement.plugins["base_PixelFlags"].masksFpCenter = [
             "STREAK", "INJECTED", "INJECTED_TEMPLATE"]
+        self.skySources.avoidMask = ["DETECTED", "DETECTED_NEGATIVE", "BAD", "NO_DATA", "EDGE"]
 
 
 class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
@@ -394,6 +398,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             Seed value to initialize the random number generator.
         """
         skySourceFootprints = self.skySources.run(mask=mask, seed=seed)
+        self.metadata.add("nSkySources", len(skySourceFootprints))
         if skySourceFootprints:
             for foot in skySourceFootprints:
                 s = diaSources.addNew()
