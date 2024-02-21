@@ -28,6 +28,7 @@ import lsst.afw.image
 import lsst.afw.math
 import lsst.afw.table
 import lsst.daf.base
+import lsst.geom
 from lsst.meas.algorithms import SourceDetectionTask, SubtractBackgroundTask
 from lsst.meas.base import SingleFrameMeasurementTask
 from lsst.pex.exceptions import InvalidParameterError
@@ -38,7 +39,6 @@ from .makeKernelBasisList import makeKernelBasisList
 from .psfMatch import PsfMatchConfig, PsfMatchTask, PsfMatchConfigAL, PsfMatchConfigDF
 
 from . import diffimLib
-from . import diffimTools
 from .utils import evaluateMeanPsfFwhm, getPsfFwhm
 
 
@@ -115,10 +115,9 @@ class MakeKernelTask(PsfMatchTask):
             Exposure that will be convolved.
         science : `lsst.afw.image.Exposure`
             The exposure that will be matched.
-        kernelSources : `list` of `dict`
-            A list of dicts having a "source" and "footprint"
-            field for the Sources deemed to be appropriate for Psf
-            matching. Can be the output from ``selectKernelSources``.
+        kernelSources : `lsst.afw.table.SourceCatalog`
+            Kernel candidate sources with appropriately sized footprints.
+            Typically the output of `MakeKernelTask.selectKernelSources`.
         preconvolved : `bool`, optional
             Was the science image convolved with its own PSF?
 
@@ -173,19 +172,15 @@ class MakeKernelTask(PsfMatchTask):
             Exposure that will be convolved.
         science : `lsst.afw.image.Exposure`
             The exposure that will be matched.
-        candidateList : `list`, optional
-            List of Sources to examine. Elements must be of type afw.table.Source
-            or a type that wraps a Source and has a getSource() method, such as
-            meas.algorithms.PsfCandidateF.
+        candidateList : `lsst.afw.table.SourceCatalog`
+            Sources to check as possible kernel candidates.
         preconvolved : `bool`, optional
             Was the science image convolved with its own PSF?
 
         Returns
         -------
-        kernelSources : `list` of `dict`
-            A list of dicts having a "source" and "footprint"
-            field for the Sources deemed to be appropriate for Psf
-            matching.
+        kernelSources : `lsst.afw.table.SourceCatalog`
+            Kernel candidates with appropriate sized footprints.
         """
         # Calling getPsfFwhm on template.psf fails on some rare occasions when
         # the template has no input exposures at the average position of the
@@ -273,71 +268,77 @@ class MakeKernelTask(PsfMatchTask):
             # Put back on the background in case it is needed down stream
             mi += bkgd
             del bkgd
+
+        self.log.info("Selected %d sources via detection measurement.", len(selectSources))
         return selectSources
 
-    def makeCandidateList(self, templateExposure, scienceExposure, kernelSize,
-                          candidateList=None, preconvolved=False):
+    def makeCandidateList(self, convolved, reference, kernelSize,
+                          candidateList, preconvolved=False):
         """Make a list of acceptable KernelCandidates.
 
-        Accept or generate a list of candidate sources for
-        Psf-matching, and examine the Mask planes in both of the
-        images for indications of bad pixels
+        Generate a list of candidate sources for Psf-matching, remove sources
+        with bad pixel masks set or that extend off the image.
 
         Parameters
         ----------
-        templateExposure : `lsst.afw.image.Exposure`
-            Exposure that will be convolved
-        scienceExposure : `lsst.afw.image.Exposure`
-            Exposure that will be matched-to
+        convolved : `lsst.afw.image.Exposure`
+            Exposure that will be convolved. This is typically the template
+            image, and may have a large bbox than the reference exposure.
+        reference : `lsst.afw.image.Exposure`
+            Exposure that will be matched-to. This is typically the science
+            image.
         kernelSize : `float`
-            Dimensions of the Psf-matching Kernel, used to grow detection footprints
-        candidateList : `list`, optional
-            List of Sources to examine. Elements must be of type afw.table.Source
-            or a type that wraps a Source and has a getSource() method, such as
-            meas.algorithms.PsfCandidateF.
+            Dimensions of the Psf-matching Kernel, used to set detection
+            footprints.
+        candidateList : `lsst.afw.table.SourceCatalog`
+            List of Sources to examine for kernel candidacy.
         preconvolved : `bool`, optional
             Was the science exposure already convolved with its PSF?
 
         Returns
         -------
-        candidateList : `list` of `dict`
-            A list of dicts having a "source" and "footprint"
-            field for the Sources deemed to be appropriate for Psf
-            matching.
+        candidates : `lsst.afw.table.SourceCatalog`
+            Candidates with footprints extended to a ``kernelSize`` box.
 
         Raises
         ------
         RuntimeError
-            If ``candidateList`` is empty or contains incompatible types.
+            If ``candidateList`` is empty after sub-selection.
         """
         if candidateList is None:
-            candidateList = self.getSelectSources(scienceExposure, doSmooth=not preconvolved)
+            candidateList = self.getSelectSources(reference, doSmooth=not preconvolved)
+            if len(candidateList) < 1:
+                raise RuntimeError("No kernel candidates after detection and measurement.")
 
-        if len(candidateList) < 1:
-            raise RuntimeError("No candidates in candidateList")
+        bitmask = reference.mask.getPlaneBitMask(self.config.badMaskPlanes)
+        good = np.ones(len(candidateList), dtype=bool)
+        # Make all candidates have the same size footprint, based on kernelSize.
+        for i, candidate in enumerate(candidateList):
+            # Only use the brightest peak; the input should be pre-deblended!
+            peak = candidate.getFootprint().getPeaks()[0]
+            size = 2*kernelSize + 1  # ensure the resulting box is odd
+            bbox = lsst.geom.Box2I.makeCenteredBox(candidate.getCentroid(),
+                                                   lsst.geom.Extent2I(size, size))
+            boxFootprint = lsst.afw.detection.Footprint(lsst.afw.geom.SpanSet(bbox))
+            boxFootprint.addPeak(peak.getFx(), peak.getFy(), peak.getPeakValue())
+            candidate.setFootprint(boxFootprint)
 
-        listTypes = set(type(x) for x in candidateList)
-        if len(listTypes) > 1:
-            raise RuntimeError("Candidate list contains mixed types: %s" % [t for t in listTypes])
+            # Reject footprints not contained in either image.
+            if not reference.getBBox().contains(bbox) or not convolved.getBBox().contains(bbox):
+                good[i] = False
+                continue
+            # Reject footprints with any bad mask bits set.
+            if (reference.subset(bbox).mask.array & bitmask).any():
+                good[i] = False
+                continue
+        candidates = candidateList[good].copy(deep=True)
 
-        if not isinstance(candidateList[0], lsst.afw.table.SourceRecord):
-            try:
-                candidateList[0].getSource()
-            except Exception as e:
-                raise RuntimeError(f"Candidate List is of type: {type(candidateList[0])} "
-                                   "Can only make candidate list from list of afwTable.SourceRecords, "
-                                   f"measAlg.PsfCandidateF or other type with a getSource() method: {e}")
-            candidateList = [c.getSource() for c in candidateList]
+        self.log.info("Selected %d / %d sources as kernel candidates.", good.sum(), len(candidateList))
 
-        candidateList = diffimTools.sourceToFootprintList(candidateList,
-                                                          templateExposure, scienceExposure,
-                                                          kernelSize,
-                                                          self.kConfig.detectionConfig,
-                                                          self.log)
-        if len(candidateList) == 0:
-            raise RuntimeError("Cannot find any objects suitable for KernelCandidacy")
+        if len(candidates) < 1:
+            raise RuntimeError("No good kernel candidates available.")
 
-        return candidateList
+        return candidates
 
     def makeKernelBasisList(self, targetFwhmPix=None, referenceFwhmPix=None,
                             basisDegGauss=None, basisSigmaGauss=None, metadata=None):
@@ -382,59 +383,48 @@ class MakeKernelTask(PsfMatchTask):
 
         return basisList
 
-    def _buildCellSet(self, templateMaskedImage, scienceMaskedImage, candidateList):
+    def _buildCellSet(self, convolved, reference, candidateList):
         """Build a SpatialCellSet for use with the solve method.
 
         Parameters
         ----------
-        templateMaskedImage : `lsst.afw.image.MaskedImage`
-            MaskedImage to PSF-matched to scienceMaskedImage
-        scienceMaskedImage : `lsst.afw.image.MaskedImage`
-            Reference MaskedImage
-        candidateList : `list`
-            A list of footprints/maskedImages for kernel candidates;
-
-            - Currently supported: list of Footprints or measAlg.PsfCandidateF
+        convolved : `lsst.afw.image.MaskedImage`
+            MaskedImage to PSF-matched to reference.
+        reference : `lsst.afw.image.MaskedImage`
+            Reference MaskedImage.
+        candidateList : `lsst.afw.table.SourceCatalog`
+            Kernel candidate sources with footprints.
 
         Returns
         -------
         kernelCellSet : `lsst.afw.math.SpatialCellSet`
-            a SpatialCellSet for use with self._solve
-
-        Raises
-        ------
-        RuntimeError
-            If no `candidateList` is supplied.
+            A SpatialCellSet for use with self._solve.
         """
-        if not candidateList:
-            raise RuntimeError("Candidate list must be populated by makeCandidateList")
-
         sizeCellX, sizeCellY = self._adaptCellSize(candidateList)
 
-        imageBBox = templateMaskedImage.getBBox()
-        imageBBox.clip(scienceMaskedImage.getBBox())
+        imageBBox = convolved.getBBox()
+        imageBBox.clip(reference.getBBox())
         # Object to store the KernelCandidates for spatial modeling
         kernelCellSet = lsst.afw.math.SpatialCellSet(imageBBox, sizeCellX, sizeCellY)
 
-        ps = lsst.pex.config.makePropertySet(self.kConfig)
+        candidateConfig = lsst.pex.config.makePropertySet(self.kConfig)
         # Place candidates within the spatial grid
-        for cand in candidateList:
-            if isinstance(cand, lsst.afw.detection.Footprint):
-                bbox = cand.getBBox()
-            else:
-                bbox = cand['footprint'].getBBox()
-            tmi = lsst.afw.image.MaskedImageF(templateMaskedImage, bbox)
-            smi = lsst.afw.image.MaskedImageF(scienceMaskedImage, bbox)
+        for candidate in candidateList:
+            bbox = candidate.getFootprint().getBBox()
+            templateCutout = lsst.afw.image.MaskedImageF(convolved, bbox)
+            scienceCutout = lsst.afw.image.MaskedImageF(reference, bbox)
 
-            if not isinstance(cand, lsst.afw.detection.Footprint):
-                if 'source' in cand:
-                    cand = cand['source']
-            xPos = cand.getCentroid()[0]
-            yPos = cand.getCentroid()[1]
-            cand = diffimLib.makeKernelCandidate(xPos, yPos, tmi, smi, ps)
+            kernelCandidate = diffimLib.makeKernelCandidate(candidate,
+                                                            templateCutout,
+                                                            scienceCutout,
+                                                            candidateConfig)
 
-            self.log.debug("Candidate %d at %f, %f", cand.getId(), cand.getXCenter(), cand.getYCenter())
-            kernelCellSet.insertCandidate(cand)
+            self.log.debug("Candidate %d at %.2f, %.2f rating=%f",
+                           kernelCandidate.getId(),
+                           kernelCandidate.getXCenter(),
+                           kernelCandidate.getYCenter(),
+                           kernelCandidate.getCandidateRating())
+            kernelCellSet.insertCandidate(kernelCandidate)
 
         return kernelCellSet
 

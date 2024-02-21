@@ -126,7 +126,7 @@ namespace detail {
     template<typename PixelT>
     void KernelSumVisitor<PixelT>::processKsumDistribution() {
         if (_kSums.size() == 0) {
-            throw LSST_EXCEPT(pexExcept::Exception,
+            throw LSST_EXCEPT(pexExcept::RuntimeError,
                               "Unable to determine kernel sum; 0 candidates");
         }
         else if (_kSums.size() == 1) {
@@ -151,12 +151,12 @@ namespace detail {
                 throw e;
             }
             if (std::isnan(_kSumMean)) {
-                throw LSST_EXCEPT(pexExcept::Exception,
+                throw LSST_EXCEPT(pexExcept::RuntimeError,
                                   str(boost::format("Mean kernel sum returns NaN (%d points)")
                                       % _kSumNpts));
             }
             if (std::isnan(_kSumStd)) {
-                throw LSST_EXCEPT(pexExcept::Exception,
+                throw LSST_EXCEPT(pexExcept::RuntimeError,
                                   str(boost::format("Kernel sum stdev returns NaN (%d points)")
                                       % _kSumNpts));
             }
