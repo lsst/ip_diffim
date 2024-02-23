@@ -10,7 +10,6 @@
  */
 
 #include <memory>
-#include "boost/timer.hpp"
 
 #include "Eigen/Core"
 #include "Eigen/Cholesky"

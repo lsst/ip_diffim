@@ -11,8 +11,6 @@
 #include <cmath>
 #include <limits>
 
-#include "boost/timer.hpp"
-
 #include "lsst/pex/exceptions/Exception.h"
 #include "lsst/daf/base/PropertySet.h"
 #include "lsst/afw/image.h"
