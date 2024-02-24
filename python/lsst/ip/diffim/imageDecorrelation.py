@@ -507,7 +507,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
           as a weighted sum of the input variances.
 
         Notes
-        ------
+        -----
         See DMTN-179 Section 5 about the variance plane calculations.
         """
         w1 = np.sum(np.real(np.conj(c1ft)*c1ft)) / c1ft.size
@@ -541,7 +541,7 @@ class DecorrelateALKernelTask(pipeBase.Task):
           The variance plane of the difference/score images.
 
         Notes
-        ------
+        -----
         See DMTN-179 Section 5 about the variance plane calculations.
 
         Infs and NaNs are allowed and kept in the returned array.
