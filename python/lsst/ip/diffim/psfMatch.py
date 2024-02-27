@@ -24,8 +24,6 @@ __all__ = ["DetectionConfig", "PsfMatchConfig", "PsfMatchConfigAL", "PsfMatchCon
 import abc
 import time
 
-from deprecated.sphinx import deprecated
-
 import numpy as np
 
 import lsst.afw.image as afwImage
@@ -40,8 +38,8 @@ from . import utils as diutils
 from . import diffimLib
 
 
-@deprecated(reason="This config class is no longer used. Will be removed after v27.",
-            version="v27.0", category=FutureWarning)
+# Remove this class on DM-42980.
+# Not deprecated-decorated to prevent excessive warnings when using PsfMatchTask.
 class DetectionConfig(pexConfig.Config):
     """Configuration for detecting sources on images for building a
     PSF-matching kernel
@@ -140,6 +138,7 @@ class PsfMatchConfig(pexConfig.Config):
 
     warpingConfig = pexConfig.ConfigField("Config for warping exposures to a common alignment",
                                           afwMath.WarperConfig)
+    # Remove this field on DM-42980.
     detectionConfig = pexConfig.ConfigField(
         "Controlling the detection of sources for kernel building",
         DetectionConfig,
