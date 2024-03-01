@@ -14,7 +14,7 @@
 #include <limits>
 
 #include <memory>
-#include "boost/timer.hpp"
+#include "boost/timer/timer.hpp"
 
 #include "Eigen/Core"
 #include "Eigen/Cholesky"
@@ -140,8 +140,7 @@ namespace diffim {
 
         Eigen::VectorXd aVec = Eigen::VectorXd::Zero(bVec.size());
 
-        boost::timer t;
-        t.restart();
+        boost::timer::cpu_timer t;
 
         LOGL_DEBUG("TRACE2.ip.diffim.KernelSolution.solve",
                    "Solving for kernel");
@@ -177,7 +176,8 @@ namespace diffim {
 			}
 		}
 
-        double time = t.elapsed();
+        t.stop();
+        double time = 1e-9 * t.elapsed().wall;
         LOGL_DEBUG("TRACE3.ip.diffim.KernelSolution.solve",
                    "Compute time for matrix math : %.2f s", time);
 
@@ -322,8 +322,7 @@ namespace diffim {
         unsigned int endCol = goodBBox.getMaxX() + 1;
         unsigned int endRow = goodBBox.getMaxY() + 1;
 
-        boost::timer t;
-        t.restart();
+        boost::timer::cpu_timer t;
 
         /* Eigen representation of input images; only the pixels that are unconvolved in cimage below */
         Eigen::MatrixXd eigenTemplate = imageToEigenMatrix(templateImage).block(startRow,
@@ -366,10 +365,10 @@ namespace diffim {
 
         }
 
-        double time = t.elapsed();
+        t.stop();
+        double time = 1e-9 * t.elapsed().wall;
         LOGL_DEBUG("TRACE3.ip.diffim.StaticKernelSolution.build",
                    "Total compute time to do basis convolutions : %.2f s", time);
-        t.restart();
 
         /*
            Load matrix with all values from convolvedEigenList : all images
@@ -600,8 +599,7 @@ namespace diffim {
         }
 
 
-        boost::timer t;
-        t.restart();
+        boost::timer::cpu_timer t;
 
         unsigned int const nKernelParameters     = basisList.size();
         unsigned int const nBackgroundParameters = this->_fitForBackground ? 1 : 0;
@@ -638,10 +636,10 @@ namespace diffim {
 
             *eiter = eigenC;
         }
-        double time = t.elapsed();
+        t.stop();
+        double time = 1e-9 * t.elapsed().wall;
         LOGL_DEBUG("TRACE3.ip.diffim.StaticKernelSolution.buildWithMask",
                    "Total compute time to do basis convolutions : %.2f s", time);
-        t.restart();
 
         /* Load matrix with all convolved images */
         Eigen::MatrixXd cMat(eigenTemplate.size(), nParameters);
@@ -720,8 +718,7 @@ namespace diffim {
         endCol += 1;
         endRow += 1;
 
-        boost::timer t;
-        t.restart();
+        boost::timer::cpu_timer t;
 
         /* Eigen representation of input images; only the pixels that are unconvolved in cimage below */
         Eigen::MatrixXi eMask = maskToEigenMatrix(sMask).block(startRow,
@@ -799,10 +796,10 @@ namespace diffim {
             *eiter = cMat;
         }
 
-        double time = t.elapsed();
+        t.stop();
+        double time = 1e-9 * t.elapsed().wall;
         LOGL_DEBUG("TRACE3.ip.diffim.StaticKernelSolution.build",
                    "Total compute time to do basis convolutions : %.2f s", time);
-        t.restart();
 
         /*
            Load matrix with all values from convolvedEigenList : all images
@@ -973,8 +970,7 @@ namespace diffim {
         eigenScience.setZero();
         eigeniVariance.setZero();
 
-        boost::timer t;
-        t.restart();
+        boost::timer::cpu_timer t;
 
         int nTerms = 0;
         typename std::vector<geom::Box2I>::iterator biter = boxArray.begin();
@@ -1029,10 +1025,10 @@ namespace diffim {
 
         }
 
-        double time = t.elapsed();
+        t.stop();
+        double time = 1e-9 * t.elapsed().wall;
         LOGL_DEBUG("TRACE3.ip.diffim.MaskedKernelSolution.build",
                    "Total compute time to do basis convolutions : %.2f s", time);
-        t.restart();
 
         /*
            Load matrix with all values from convolvedEigenList : all images

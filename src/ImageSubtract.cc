@@ -35,7 +35,7 @@
 #include <numeric>
 #include <limits>
 
-#include "boost/timer.hpp"
+#include "boost/timer/timer.hpp"
 
 #include "Eigen/Core"
 
@@ -120,8 +120,7 @@ afwImage::MaskedImage<PixelT> convolveAndSubtract(
     bool invert                                              ///< Invert the output difference image
     ) {
 
-    boost::timer t;
-    t.restart();
+    boost::timer::cpu_timer t;
 
     afwImage::MaskedImage<PixelT> convolvedMaskedImage(templateImage.getDimensions());
     afwMath::ConvolutionControl convolutionControl = afwMath::ConvolutionControl();
@@ -140,7 +139,8 @@ afwImage::MaskedImage<PixelT> convolveAndSubtract(
         convolvedMaskedImage *= -1.0;
     }
 
-    double time = t.elapsed();
+    t.stop();
+    double time = 1e-9 * t.elapsed().wall;
     LOGL_DEBUG("TRACE4.ip.diffim.convolveAndSubtract",
                "Total compute time to convolve and subtract : %.2f s", time);
 
@@ -171,8 +171,7 @@ afwImage::MaskedImage<PixelT> convolveAndSubtract(
     bool invert                                              ///< Invert the output difference image
     ) {
 
-    boost::timer t;
-    t.restart();
+    boost::timer::cpu_timer t;
 
     afwImage::MaskedImage<PixelT> convolvedMaskedImage(templateImage.getDimensions());
     afwMath::ConvolutionControl convolutionControl = afwMath::ConvolutionControl();
@@ -193,7 +192,8 @@ afwImage::MaskedImage<PixelT> convolveAndSubtract(
     convolvedMaskedImage.getMask()->assign(*scienceMaskedImage.getMask());
     convolvedMaskedImage.getVariance()->assign(*scienceMaskedImage.getVariance());
 
-    double time = t.elapsed();
+    t.stop();
+    double time = 1e-9 * t.elapsed().wall;
     LOGL_DEBUG("TRACE4.ip.diffim.convolveAndSubtract",
                "Total compute time to convolve and subtract : %.2f s", time);
 

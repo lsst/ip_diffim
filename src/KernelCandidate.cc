@@ -9,7 +9,6 @@
  * @ingroup ip_diffim
  */
 #include <stdexcept>
-#include "boost/timer.hpp"
 
 #include "lsst/afw/math.h"
 #include "lsst/afw/image.h"

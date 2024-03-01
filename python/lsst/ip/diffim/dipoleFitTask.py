@@ -1239,7 +1239,7 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
         measRecord.set(self.flagKey, True)
         if error is not None:
             if error.getFlagBit() == self.FAILURE_EDGE:
-                self.log.warning('DipoleFitPlugin not run on record %d: %s', measRecord.getId(), str(error))
+                self.log.debug('DipoleFitPlugin not run on record %d: %s', measRecord.getId(), str(error))
                 measRecord.set(self.edgeFlagKey, True)
             if error.getFlagBit() == self.FAILURE_FIT:
                 self.log.warning('DipoleFitPlugin failed on record %d: %s', measRecord.getId(), str(error))
