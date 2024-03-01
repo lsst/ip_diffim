@@ -474,13 +474,14 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         template.mask.addMaskPlane("FAKE")
         template_fake_bitmask = template.mask.getPlaneBitMask("FAKE")
 
-        for a_science_source in science_fake_sources:
-            bbox = a_science_source.getFootprint().getBBox()
-            science[bbox].mask.array |= science_fake_bitmask
-
-        for a_template_source in tmplt_fake_sources:
-            bbox = a_template_source.getFootprint().getBBox()
-            template[bbox].mask.array |= template_fake_bitmask
+        # makeTestImage sets the DETECTED plane on the sources; we can use
+        # that to set the FAKE plane on the science and template images.
+        detected = science_fake_img.mask.getPlaneBitMask("DETECTED")
+        fake_pixels = (science_fake_img.mask.array & detected).nonzero()
+        science.mask.array[fake_pixels] |= science_fake_bitmask
+        detected = tmplt_fake_img.mask.getPlaneBitMask("DETECTED")
+        fake_pixels = (tmplt_fake_img.mask.array & detected).nonzero()
+        template.mask.array[fake_pixels] |= science_fake_bitmask
 
         science_fake_masked = (science.mask.array & science_fake_bitmask) > 0
         template_fake_masked = (template.mask.array & template_fake_bitmask) > 0
