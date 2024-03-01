@@ -768,12 +768,11 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             If there are too few sources to compute the PSF matching kernel
             remaining after source selection.
         """
+        # TODO: this doesn't select isolated sources!
+        # should really replace this with an ordinary source selector.
         flags = np.ones(len(sources), dtype=bool)
         for flag in self.config.badSourceFlags:
-            try:
-                flags *= ~sources[flag]
-            except Exception as e:
-                self.log.warning("Could not apply source flag: %s", e)
+            flags *= ~sources[flag]
         signalToNoise = sources.getPsfInstFlux()/sources.getPsfInstFluxErr()
         sToNFlag = signalToNoise > self.config.detectionThreshold
         flags *= sToNFlag
