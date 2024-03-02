@@ -173,6 +173,32 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
                                                 makeStats(), statistic=afwMath.STDEV)
         self.assertFloatsAlmostEqual(differenceStd, np.sqrt(2)*noiseLevel, rtol=0.1)
 
+    def test_equal_images_missing_mask_planes(self):
+        """Test that running with enough sources produces reasonable output,
+        with the same size psf in the template and science and with missing
+        mask planes.
+        """
+        noiseLevel = 1.
+        science, sources = makeTestImage(psfSize=2.4, noiseLevel=noiseLevel, noiseSeed=6, addMaskPlanes=[])
+        template, _ = makeTestImage(psfSize=2.4, noiseLevel=noiseLevel, noiseSeed=7,
+                                    templateBorderSize=20, doApplyCalibration=True, addMaskPlanes=[])
+        config = subtractImages.AlardLuptonSubtractTask.ConfigClass()
+        config.doSubtractBackground = False
+        task = subtractImages.AlardLuptonSubtractTask(config=config)
+        output = task.run(template, science, sources)
+        # There shoud be no NaN values in the difference image
+        self.assertTrue(np.all(np.isfinite(output.difference.image.array)))
+        # Mean of difference image should be close to zero.
+        meanError = noiseLevel/np.sqrt(output.difference.image.array.size)
+        # Make sure to include pixels with the DETECTED mask bit set.
+        statsCtrl = makeStats(badMaskPlanes=("EDGE", "BAD", "NO_DATA", "DETECTED", "DETECTED_NEGATIVE"))
+        differenceMean = computeRobustStatistics(output.difference.image, output.difference.mask, statsCtrl)
+        self.assertFloatsAlmostEqual(differenceMean, 0, atol=5*meanError)
+        # stddev of difference image should be close to expected value.
+        differenceStd = computeRobustStatistics(output.difference.image, output.difference.mask,
+                                                makeStats(), statistic=afwMath.STDEV)
+        self.assertFloatsAlmostEqual(differenceStd, np.sqrt(2)*noiseLevel, rtol=0.1)
+
     def test_psf_size(self):
         """Test that the image subtract task runs without failing, if
         fwhmExposureBuffer and fwhmExposureGrid parameters are set.

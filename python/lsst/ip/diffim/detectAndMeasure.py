@@ -420,6 +420,9 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             Warped and PSF-matched template that was used produce the
             difference image.
         """
+        # Ensure that the required mask planes are present
+        for mp in self.config.measurement.plugins["base_PixelFlags"].masksFpAnywhere:
+            difference.mask.addMaskPlane(mp)
         # Note that this may not be correct if we convolved the science image.
         # In the future we may wish to persist the matchedScience image.
         self.measurement.run(diaSources, difference, science, matchedTemplate)

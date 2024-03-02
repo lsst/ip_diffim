@@ -1018,7 +1018,7 @@ def computeAveragePsf(exposure: afwImage.Exposure,
     return psfImage
 
 
-def detectTestSources(exposure):
+def detectTestSources(exposure, addMaskPlanes=None):
     """Minimal source detection wrapper suitable for unit tests.
 
     Parameters
@@ -1032,6 +1032,10 @@ def detectTestSources(exposure):
     selectSources :
         Source catalog containing candidates
     """
+    if addMaskPlanes is None:
+        # add empty streak mask plane in lieu of maskStreaksTask
+        # And add empty INJECTED and INJECTED_TEMPLATE mask planes
+        addMaskPlanes = ["STREAK", "INJECTED", "INJECTED_TEMPLATE"]
 
     schema = afwTable.SourceTable.makeMinimalSchema()
     selectDetection = measAlg.SourceDetectionTask(schema=schema)
@@ -1044,9 +1048,8 @@ def detectTestSources(exposure):
         sigma=None,  # The appropriate sigma is calculated from the PSF
         doSmooth=True
     )
-    exposure.mask.addMaskPlane("STREAK")  # add empty streak mask plane in lieu of maskStreaksTask
-    exposure.mask.addMaskPlane("INJECTED")  # add empty injected mask plane
-    exposure.mask.addMaskPlane("INJECTED_TEMPLATE")  # add empty injected template mask plane
+    for mp in addMaskPlanes:
+        exposure.mask.addMaskPlane(mp)
 
     selectSources = detRet.sources
     selectMeasurement.run(measCat=selectSources, exposure=exposure)
@@ -1078,6 +1081,7 @@ def makeTestImage(seed=5, nSrc=20, psfSize=2., noiseLevel=5.,
                   yLoc=None,
                   flux=None,
                   clearEdgeMask=False,
+                  addMaskPlanes=None,
                   ):
     """Make a reproduceable PSF-convolved exposure for testing.
 
@@ -1119,6 +1123,8 @@ def makeTestImage(seed=5, nSrc=20, psfSize=2., noiseLevel=5.,
         If specified, must have length equal to ``nSrc``
     clearEdgeMask : `bool`, optional
         Clear the "EDGE" mask plane after source detection.
+    addMaskPlanes : `list` of `str`, optional
+        Mask plane names to add to the image.
 
     Returns
     -------
@@ -1172,7 +1178,7 @@ def makeTestImage(seed=5, nSrc=20, psfSize=2., noiseLevel=5.,
     modelExposure.image.array += noise
 
     # Run source detection to set up the mask plane
-    sourceCat = detectTestSources(modelExposure)
+    sourceCat = detectTestSources(modelExposure, addMaskPlanes=addMaskPlanes)
     if clearEdgeMask:
         modelExposure.mask &= ~modelExposure.mask.getPlaneBitMask("EDGE")
     modelExposure.setPhotoCalib(afwImage.PhotoCalib(calibration, 0., bbox))
