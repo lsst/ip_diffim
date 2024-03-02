@@ -481,6 +481,9 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase):
         injTmplt_masked = (diff_mask.array & diff_mask.getPlaneBitMask("INJECTED_TEMPLATE")) > 0
 
         self.assertFloatsEqual(inj_masked.astype(int), science_fake_masked.astype(int))
+        # The template is convolved, so the INJECTED_TEMPLATE mask plane may
+        # include more pixels than the FAKE mask plane
+        injTmplt_masked &= template_fake_masked
         self.assertFloatsEqual(injTmplt_masked.astype(int), template_fake_masked.astype(int))
 
         # Now check that detection of fakes have the correct flag for injections
