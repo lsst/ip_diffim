@@ -40,9 +40,11 @@ Basis functions
 Solving for the matching kernel starts with the generation of the
 basis functions. The number of basis functions and the properties of
 the Gaussian bases (e.g. widths in pixels) are determined in
-`lsst.ip.diffim.makeKernelBasisList.generateAlardLuptonBasisList`. The
-decision logic depends on configuration and psf fwhm values of the
-images, some details is given in the function API documentation.
+`lsst.ip.diffim.makeKernelBasisList.generateAlardLuptonBasisList`. 
+The full config for this is being set in the module 
+`lsst.ip.diffim.psfMatch` config classes. The decision logic depends 
+on this configuration and psf fwhm values of the images, some details 
+are given in the function API documentation.
 
 .. TODO More details about the basis function generation
 
