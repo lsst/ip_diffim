@@ -1026,10 +1026,12 @@ def detectTestSources(exposure, addMaskPlanes=None):
     exposure : `lsst.afw.image.Exposure`
         Exposure on which to run detection/measurement
         The exposure is modified in place to set the 'DETECTED' mask plane.
+    addMaskPlanes : `list` of `str`, optional
+        Additional mask planes to add to the maskedImage of the exposure.
 
     Returns
     -------
-    selectSources :
+    selectSources
         Source catalog containing candidates
     """
     if addMaskPlanes is None:
