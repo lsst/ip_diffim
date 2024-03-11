@@ -304,14 +304,6 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
         Parameters
         ----------
-        sources : `lsst.afw.table.SourceCatalog`
-            Detected sources on the difference exposure.
-        positiveFootprints : `lsst.afw.detection.FootprintSet`, optional
-            Positive polarity footprints.
-        negativeFootprints : `lsst.afw.detection.FootprintSet`, optional
-            Negative polarity footprints.
-        table : `lsst.afw.table.SourceTable`
-            Table object that will be used to create the SourceCatalog.
         science : `lsst.afw.image.ExposureF`
             Science exposure that the template was subtracted from.
         matchedTemplate : `lsst.afw.image.ExposureF`
@@ -319,6 +311,14 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             difference image.
         difference : `lsst.afw.image.ExposureF`
             Result of subtracting template from the science image.
+        sources : `lsst.afw.table.SourceCatalog`
+            Detected sources on the difference exposure.
+        table : `lsst.afw.table.SourceTable`
+            Table object that will be used to create the SourceCatalog.
+        positiveFootprints : `lsst.afw.detection.FootprintSet`, optional
+            Positive polarity footprints.
+        negativeFootprints : `lsst.afw.detection.FootprintSet`, optional
+            Negative polarity footprints.
 
         Returns
         -------
@@ -420,6 +420,9 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             Warped and PSF-matched template that was used produce the
             difference image.
         """
+        # Ensure that the required mask planes are present
+        for mp in self.config.measurement.plugins["base_PixelFlags"].masksFpAnywhere:
+            difference.mask.addMaskPlane(mp)
         # Note that this may not be correct if we convolved the science image.
         # In the future we may wish to persist the matchedScience image.
         self.measurement.run(diaSources, difference, science, matchedTemplate)

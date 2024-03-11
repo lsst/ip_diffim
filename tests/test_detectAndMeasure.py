@@ -282,6 +282,24 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase):
         _detection_wrapper(positive=True)
         _detection_wrapper(positive=False)
 
+    def test_missing_mask_planes(self):
+        """Check that detection runs with missing mask planes.
+        """
+        # Set up the simulated images
+        noiseLevel = 1.
+        fluxLevel = 500
+        kwargs = {"psfSize": 2.4, "fluxLevel": fluxLevel, "addMaskPlanes": []}
+        # Use different seeds for the science and template so every source is a diaSource
+        science, sources = makeTestImage(seed=5, noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
+        matchedTemplate, _ = makeTestImage(seed=6, noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
+
+        difference = science.clone()
+        difference.maskedImage -= matchedTemplate.maskedImage
+        detectionTask = self._setup_detection()
+
+        # Verify that detection runs without errors
+        detectionTask.run(science, matchedTemplate, difference)
+
     def test_detect_dipoles(self):
         """Run detection on a difference image containing dipoles.
         """
@@ -481,6 +499,9 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase):
         injTmplt_masked = (diff_mask.array & diff_mask.getPlaneBitMask("INJECTED_TEMPLATE")) > 0
 
         self.assertFloatsEqual(inj_masked.astype(int), science_fake_masked.astype(int))
+        # The template is convolved, so the INJECTED_TEMPLATE mask plane may
+        # include more pixels than the FAKE mask plane
+        injTmplt_masked &= template_fake_masked
         self.assertFloatsEqual(injTmplt_masked.astype(int), template_fake_masked.astype(int))
 
         # Now check that detection of fakes have the correct flag for injections

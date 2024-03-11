@@ -233,8 +233,14 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
     )
     preserveTemplateMask = lsst.pex.config.ListField(
         dtype=str,
-        default=("NO_DATA", "BAD", "SAT", "FAKE", "INJECTED", "INJECTED_CORE"),
+        default=("NO_DATA", "BAD",),
         doc="Mask planes from the template to propagate to the image difference."
+    )
+    renameTemplateMask = lsst.pex.config.ListField(
+        dtype=str,
+        default=("SAT", "INJECTED", "INJECTED_CORE",),
+        doc="Mask planes from the template to propagate to the image difference"
+        "with '_TEMPLATE' appended to the name."
     )
     allowKernelSourceDetection = lsst.pex.config.Field(
         dtype=bool,
@@ -624,11 +630,6 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         correctedExposure : `lsst.afw.image.ExposureF`
             The decorrelated image difference.
         """
-        # Erase existing detection mask planes.
-        #  We don't want the detection mask from the science image
-
-        self.updateMasks(template, science, difference)
-
         if self.config.doDecorrelation:
             self.log.info("Decorrelating image difference.")
             # We have cleared the template mask plane, so copy the mask plane of
@@ -643,35 +644,6 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             self.log.info("NOT decorrelating image difference.")
             correctedExposure = difference
         return correctedExposure
-
-    def updateMasks(self, template, science, difference):
-        """Update the mask planes on images for finalizing."""
-
-        bbox = science.getBBox()
-        mask = difference.mask
-        mask &= ~(mask.getPlaneBitMask("DETECTED") | mask.getPlaneBitMask("DETECTED_NEGATIVE"))
-
-        self.log.info("Adding injected mask planes")
-        mask.addMaskPlane("INJECTED")
-        mask.addMaskPlane("INJECTED_TEMPLATE")
-
-        if "FAKE" in science.mask.getMaskPlaneDict().keys():
-            # propagate the mask plane related to Fake source injection
-            # NOTE: the fake source injection sets FAKE plane, but it should be INJECTED
-            # NOTE: This can be removed in DM-40796
-            diffInjectedBitMask = mask.getPlaneBitMask("INJECTED")
-            diffInjTmpltBitMask = mask.getPlaneBitMask("INJECTED_TEMPLATE")
-
-            scienceFakeBitMask = science.mask.getPlaneBitMask('FAKE')
-            tmpltFakeBitMask = template[bbox].mask.getPlaneBitMask('FAKE')
-
-            injScienceMaskArray = ((science.mask.array & scienceFakeBitMask) > 0) * diffInjectedBitMask
-            injTemplateMaskArray = ((template[bbox].mask.array & tmpltFakeBitMask) > 0) * diffInjTmpltBitMask
-
-            mask.array |= injScienceMaskArray
-            mask.array |= injTemplateMaskArray
-
-        template[bbox].mask.array[...] = difference.mask.array[...]
 
     @staticmethod
     def _validateExposures(template, science):
@@ -868,20 +840,87 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             self.metadata.add("scaleTemplateVarianceFactor", templateVarFactor)
             self.log.info("Science variance scaling factor: %.2f", sciVarFactor)
             self.metadata.add("scaleScienceVarianceFactor", sciVarFactor)
-        self._clearMask(template)
 
-    def _clearMask(self, template):
+        # Erase existing detection mask planes.
+        #  We don't want the detection mask from the science image
+        self.updateMasks(template, science)
+
+    def updateMasks(self, template, science):
+        """Update the science and template mask planes before differencing.
+
+        Parameters
+        ----------
+        template : `lsst.afw.image.Exposure`
+            Template exposure, warped to match the science exposure.
+            The template mask planes will be erased, except for a few specified
+            in the task config.
+        science : `lsst.afw.image.Exposure`
+            Science exposure to subtract from the template.
+            The DETECTED and DETECTED_NEGATIVE mask planes of the science image
+            will be erased.
+        """
+        self._clearMask(science.mask, clearMaskPlanes=["DETECTED", "DETECTED_NEGATIVE"])
+
+        # We will clear ALL template mask planes, except for those specified
+        # via the `preserveTemplateMask` config. Mask planes specified via
+        # the `renameTemplateMask` config will be copied to new planes with
+        # "_TEMPLATE" appended to their names, and the original mask plane will
+        # be cleared.
+        clearMaskPlanes = [mp for mp in template.mask.getMaskPlaneDict().keys()
+                           if mp not in self.config.preserveTemplateMask]
+        renameMaskPlanes = [mp for mp in self.config.renameTemplateMask
+                            if mp in template.mask.getMaskPlaneDict().keys()]
+
+        # propagate the mask plane related to Fake source injection
+        # NOTE: the fake source injection sets FAKE plane, but it should be INJECTED
+        # NOTE: This can be removed in DM-40796
+        if "FAKE" in science.mask.getMaskPlaneDict().keys():
+            self.log.info("Adding injected mask plane to science image")
+            self._renameMaskPlanes(science.mask, "FAKE", "INJECTED")
+        if "FAKE" in template.mask.getMaskPlaneDict().keys():
+            self.log.info("Adding injected mask plane to template image")
+            self._renameMaskPlanes(template.mask, "FAKE", "INJECTED_TEMPLATE")
+            if "INJECTED" in renameMaskPlanes:
+                renameMaskPlanes.remove("INJECTED")
+            if "INJECTED_TEMPLATE" in clearMaskPlanes:
+                clearMaskPlanes.remove("INJECTED_TEMPLATE")
+
+        for maskPlane in renameMaskPlanes:
+            self._renameMaskPlanes(template.mask, maskPlane, maskPlane + "_TEMPLATE")
+        self._clearMask(template.mask, clearMaskPlanes=clearMaskPlanes)
+
+    @staticmethod
+    def _renameMaskPlanes(mask, maskPlane, newMaskPlane):
+        """Rename a mask plane by adding the new name and copying the data.
+
+        Parameters
+        ----------
+        mask : `lsst.afw.image.Mask`
+            The mask image to update in place.
+        maskPlane : `str`
+            The name of the existing mask plane to copy.
+        newMaskPlane : `str`
+            The new name of the mask plane that will be added.
+            If the mask plane already exists, it will be updated in place.
+        """
+        mask.addMaskPlane(newMaskPlane)
+        originBitMask = mask.getPlaneBitMask(maskPlane)
+        destinationBitMask = mask.getPlaneBitMask(newMaskPlane)
+        mask.array |= ((mask.array & originBitMask) > 0)*destinationBitMask
+
+    def _clearMask(self, mask, clearMaskPlanes=None):
         """Clear the mask plane of the template.
 
         Parameters
         ----------
-        template : `lsst.afw.image.ExposureF`
-            Template exposure, warped to match the science exposure.
-            The mask plane will be modified in place.
+        mask : `lsst.afw.image.Mask`
+            The mask plane to erase, which will be modified in place.
+        clearMaskPlanes : `list` of `str`, optional
+            Erase the specified mask planes.
+            If not supplied, the entire mask will be erased.
         """
-        mask = template.mask
-        clearMaskPlanes = [maskplane for maskplane in mask.getMaskPlaneDict().keys()
-                           if maskplane not in self.config.preserveTemplateMask]
+        if clearMaskPlanes is None:
+            clearMaskPlanes = list(mask.getMaskPlaneDict().keys())
 
         bitMaskToClear = mask.getPlaneBitMask(clearMaskPlanes)
         mask &= ~bitMaskToClear
