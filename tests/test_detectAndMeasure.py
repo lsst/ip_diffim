@@ -532,6 +532,37 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
                 self.assertFalse(diaSrc['base_PixelFlags_flag_injected'])
                 self.assertFalse(diaSrc['base_PixelFlags_flag_injectedCenter'])
 
+    def test_mask_streaks(self):
+        """Run detection on a difference image containing a streak.
+        """
+        # Set up the simulated images
+        noiseLevel = 1.
+        staticSeed = 1
+        fluxLevel = 500
+        kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel}
+        science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
+        matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
+
+        # Configure the detection Task
+        detectionTask = self._setup_detection(doMerge=False, doMaskStreaks=True)
+
+        # Test that no streaks are detected
+        difference = science.clone()
+        difference.maskedImage -= matchedTemplate.maskedImage
+        output = detectionTask.run(science, matchedTemplate, difference)
+        outMask = output.subtractedMeasuredExposure.mask.array
+        streakMask = output.subtractedMeasuredExposure.mask.getPlaneBitMask("STREAK")
+        streakMaskSet = (outMask & streakMask) > 0
+        self.assertTrue(np.all(streakMaskSet == 0))
+
+        # Add streak-like shape and check that streak is detected
+        difference.image.array[20:23, 40:200] += 50
+        output = detectionTask.run(science, matchedTemplate, difference)
+        outMask = output.subtractedMeasuredExposure.mask.array
+        streakMask = output.subtractedMeasuredExposure.mask.getPlaneBitMask("STREAK")
+        streakMaskSet = (outMask & streakMask) > 0
+        self.assertTrue(np.all(streakMaskSet[20:23, 40:200]))
+
 
 class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
     detectionTask = detectAndMeasure.DetectAndMeasureScoreTask

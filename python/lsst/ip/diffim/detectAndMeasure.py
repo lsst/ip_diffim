@@ -26,7 +26,7 @@ import lsst.afw.table as afwTable
 import lsst.daf.base as dafBase
 import lsst.geom
 from lsst.ip.diffim.utils import getPsfFwhm, angleMean
-from lsst.meas.algorithms import SkyObjectsTask, SourceDetectionTask, SetPrimaryFlagsTask
+from lsst.meas.algorithms import SkyObjectsTask, SourceDetectionTask, SetPrimaryFlagsTask, MaskStreaksTask
 from lsst.meas.base import ForcedMeasurementTask, ApplyApCorrTask, DetectorVisitIdGeneratorConfig
 import lsst.meas.deblender
 import lsst.meas.extensions.trailedSources  # noqa: F401
@@ -89,11 +89,20 @@ class DetectAndMeasureConnections(pipeBase.PipelineTaskConnections,
         storageClass="ArrowAstropy",
         name="{fakesType}{coaddName}Diff_spatiallySampledMetrics",
     )
+    maskedStreaks = pipeBase.connectionTypes.Output(
+        doc='Streak profile information.',
+        storageClass="ArrowNumpyDict",
+        dimensions=("instrument", "visit", "detector"),
+        name="{fakesType}{coaddName}Diff_streaks",
+    )
 
-    def __init__(self, *, config=None):
+    def __init__(self, *, config):
         super().__init__(config=config)
         if not config.doWriteMetrics:
             self.outputs.remove("spatiallySampledMetrics")
+
+        if not (self.config.writeStreakInfo and self.config.doMaskStreaks):
+            self.outputs.remove("maskedStreaks")
 
 
 class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
@@ -158,6 +167,22 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
     skySources = pexConfig.ConfigurableField(
         target=SkyObjectsTask,
         doc="Generate sky sources",
+    )
+    doMaskStreaks = pexConfig.Field(
+        dtype=bool,
+        default=False,
+        doc="Turn on streak masking",
+    )
+    maskStreaks = pexConfig.ConfigurableField(
+        target=MaskStreaksTask,
+        doc="Subtask for masking streaks. Only used if doMaskStreaks is True. "
+            "Adds a mask plane to an exposure, with the mask plane name set by streakMaskName.",
+    )
+    writeStreakInfo = pexConfig.Field(
+        dtype=bool,
+        default=False,
+        doc="Record the parameters of any detected streaks. For LSST, this should be turned off except for "
+            "development work."
     )
     setPrimaryFlags = pexConfig.ConfigurableField(
         target=SetPrimaryFlagsTask,
@@ -275,6 +300,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         self.schema.addField("srcMatchId", "L", "unique id of source match")
         if self.config.doSkySources:
             self.makeSubtask("skySources", schema=self.schema)
+        if self.config.doMaskStreaks:
+            self.makeSubtask("maskStreaks")
 
         # Check that the schema and config are consistent
         for flag in self.config.badSourceFlags:
@@ -463,6 +490,9 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
         self.metadata.add("nMergedDiaSources", len(initialDiaSources))
 
+        if self.config.doMaskStreaks:
+            streakInfo = self._runStreakMasking(difference.maskedImage)
+
         if self.config.doSkySources:
             self.addSkySources(initialDiaSources, difference.mask, difference.info.id)
 
@@ -483,6 +513,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             diaSources=diaSources,
             spatiallySampledMetrics=spatiallySampledMetrics,
         )
+        if self.config.doMaskStreaks and self.config.writeStreakInfo:
+            measurementResults.mergeItems(streakInfo, 'maskedStreaks')
 
         return measurementResults
 
@@ -754,6 +786,35 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             src.set("%s_mask_fraction"%maskPlane.lower(),
                     evaluateMaskFraction(difference.mask[bbox], maskPlane)
                     )
+
+    def _runStreakMasking(self, maskedImage):
+        """Do streak masking at put results into catalog.
+
+        Parameters
+        ----------
+        maskedImage: `lsst.afw.image.maskedImage`
+            The image in which to search for streaks. Must have a detection
+            mask.
+
+        Returns
+        -------
+        streakInfo: `lsst.pipe.base.Struct`
+            ``rho`` : `np.ndarray`
+                Angle of detected streak.
+            ``theta`` : `np.ndarray`
+                Distance from center of detected streak.
+            ``sigma`` : `np.ndarray`
+                Width of streak profile.
+        """
+        streaks = self.maskStreaks.run(maskedImage)
+        if self.config.writeStreakInfo:
+            rhos = np.array([line.rho for line in streaks.lines])
+            thetas = np.array([line.theta for line in streaks.lines])
+            sigmas = np.array([line.sigma for line in streaks.lines])
+            streakInfo = {'rho': rhos, 'theta': thetas, 'sigma': sigmas}
+        else:
+            streakInfo = {'rho': np.array([]), 'theta': np.array([]), 'sigma': np.array([])}
+        return pipeBase.Struct(maskedStreaks=streakInfo)
 
 
 class DetectAndMeasureScoreConnections(DetectAndMeasureConnections):
