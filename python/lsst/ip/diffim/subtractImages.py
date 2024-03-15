@@ -825,10 +825,13 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         self._validateExposures(template, science)
         if visitSummary is not None:
             self._applyExternalCalibrations(science, visitSummary=visitSummary)
-        checkTemplateIsSufficient(template[science.getBBox()], self.log,
-                                  requiredTemplateFraction=self.config.requiredTemplateFraction,
-                                  exceptionMessage="Not attempting subtraction. To force subtraction,"
-                                  " set config requiredTemplateFraction=0")
+        templateCoverageFraction = checkTemplateIsSufficient(
+            template[science.getBBox()], self.log,
+            requiredTemplateFraction=self.config.requiredTemplateFraction,
+            exceptionMessage="Not attempting subtraction. To force subtraction,"
+            " set config requiredTemplateFraction=0"
+        )
+        self.metadata.add("templateCoveragePercent", 100*templateCoverageFraction)
 
         if self.config.doScaleVariance:
             # Scale the variance of the template and science images before
@@ -1112,6 +1115,11 @@ def checkTemplateIsSufficient(templateExposure, logger, requiredTemplateFraction
         Message to include in the exception raised if the template coverage
         is insufficient.
 
+    Returns
+    -------
+    templateCoverageFraction: `float`
+        Fraction of pixels in the template with data.
+
     Raises
     ------
     lsst.pipe.base.NoWorkFound
@@ -1123,14 +1131,15 @@ def checkTemplateIsSufficient(templateExposure, logger, requiredTemplateFraction
     pixNoData = np.count_nonzero(templateExposure.mask.array
                                  & templateExposure.mask.getPlaneBitMask('NO_DATA'))
     pixGood = templateExposure.getBBox().getArea() - pixNoData
-    logger.info("template has %d good pixels (%.1f%%)", pixGood,
-                100*pixGood/templateExposure.getBBox().getArea())
+    templateCoverageFraction = pixGood/templateExposure.getBBox().getArea()
+    logger.info("template has %d good pixels (%.1f%%)", pixGood, 100*templateCoverageFraction)
 
-    if pixGood/templateExposure.getBBox().getArea() < requiredTemplateFraction:
+    if templateCoverageFraction < requiredTemplateFraction:
         message = ("Insufficient Template Coverage. (%.1f%% < %.1f%%)" % (
-                   100*pixGood/templateExposure.getBBox().getArea(),
+                   100*templateCoverageFraction,
                    100*requiredTemplateFraction))
         raise lsst.pipe.base.NoWorkFound(message + " " + exceptionMessage)
+    return templateCoverageFraction
 
 
 def _subtractImages(science, template, backgroundModel=None):
