@@ -284,7 +284,9 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         difference : `lsst.afw.image.ExposureF`
             Result of subtracting template from the science image.
         idFactory : `lsst.afw.table.IdFactory`, optional
-            Generator object to assign ids to detected sources in the difference image.
+            Generator object used to assign ids to detected sources in the
+            difference image. Ids from this generator are not set until after
+            deblending and merging positive/negative peaks.
 
         Returns
         -------
@@ -302,8 +304,10 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         mask = difference.mask
         mask &= ~(mask.getPlaneBitMask("DETECTED") | mask.getPlaneBitMask("DETECTED_NEGATIVE"))
 
+        # Don't use the idFactory until after deblend+merge, so that we aren't
+        # generating ids that just get thrown away (footprint merge doesn't
+        # know about past ids).
         table = afwTable.SourceTable.make(self.schema)
-        table.setMetadata(self.algMetadata)
         results = self.detection.run(
             table=table,
             exposure=difference,
@@ -312,14 +316,13 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
         sources, positives, negatives = self._deblend(difference,
                                                       results.positive,
-                                                      results.negative,
-                                                      table)
+                                                      results.negative)
 
-        return self.processResults(science, matchedTemplate, difference, sources, table, idFactory,
+        return self.processResults(science, matchedTemplate, difference, sources, idFactory,
                                    positiveFootprints=positives,
                                    negativeFootprints=negatives)
 
-    def processResults(self, science, matchedTemplate, difference, sources, table, idFactory,
+    def processResults(self, science, matchedTemplate, difference, sources, idFactory,
                        positiveFootprints=None, negativeFootprints=None,):
         """Measure and process the results of source detection.
 
@@ -334,8 +337,9 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             Result of subtracting template from the science image.
         sources : `lsst.afw.table.SourceCatalog`
             Detected sources on the difference exposure.
-        table : `lsst.afw.table.SourceTable`
-            Table object that will be used to create the SourceCatalog.
+        idFactory : `lsst.afw.table.IdFactory`
+            Generator object used to assign ids to detected sources in the
+            difference image.
         positiveFootprints : `lsst.afw.detection.FootprintSet`, optional
             Positive polarity footprints.
         negativeFootprints : `lsst.afw.detection.FootprintSet`, optional
@@ -355,7 +359,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             fpSet = positiveFootprints
             fpSet.merge(negativeFootprints, self.config.growFootprint,
                         self.config.growFootprint, False)
-            initialDiaSources = afwTable.SourceCatalog(table)
+            initialDiaSources = afwTable.SourceCatalog(self.schema)
             fpSet.makeSources(initialDiaSources)
             self.log.info("Merging detections into %d sources", len(initialDiaSources))
         else:
@@ -367,6 +371,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             source.setId(idFactory())
         # Ensure sources added after this get correct ids.
         initialDiaSources.getTable().setIdFactory(idFactory)
+        initialDiaSources.setMetadata(self.algMetadata)
 
         self.metadata.add("nMergedDiaSources", len(initialDiaSources))
 
@@ -387,7 +392,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
         return measurementResults
 
-    def _deblend(self, difference, positiveFootprints, negativeFootprints, table):
+    def _deblend(self, difference, positiveFootprints, negativeFootprints):
         """Deblend the positive and negative footprints and return a catalog
         containing just the children, and the deblended footprints.
 
@@ -398,8 +403,6 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         positiveFootprints, negativeFootprints : `lsst.afw.detection.FootprintSet`
             Positive and negative polarity footprints measured on
             ``difference`` to be deblended separately.
-        table : `lsst.afw.table.SourceTable`
-            Table to define the SourceCatalog schema, ids, etc.
 
         Returns
         -------
@@ -418,7 +421,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             """Deblend a positive or negative footprint set,
             and return the deblended children.
             """
-            sources = afwTable.SourceCatalog(table)
+            sources = afwTable.SourceCatalog(self.schema)
             footprints.makeSources(sources)
             self.deblend.run(exposure=difference, sources=sources)
             self.setPrimaryFlags.run(sources)
@@ -431,12 +434,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         positives = deblend(positiveFootprints)
         negatives = deblend(negativeFootprints)
 
-        # TODO: id generation here might be a problem; we are reusing the same
-        # id generator, which might just keep adding to the next id, instead
-        # of starting from scratch for the final catalog.
-        # TODO solution?: just use idFactory post-deblending, not in initial detection?
-        # TODO: also do that in CalibrateImage?
-        sources = afwTable.SourceCatalog(table)
+        sources = afwTable.SourceCatalog(self.schema)
         sources.reserve(len(positives) + len(negatives))
         sources.extend(positives, deep=True)
         sources.extend(negatives, deep=True)
@@ -620,7 +618,9 @@ class DetectAndMeasureScoreTask(DetectAndMeasureTask):
         scoreExposure : `lsst.afw.image.ExposureF`
             Score or maximum likelihood difference image
         idFactory : `lsst.afw.table.IdFactory`, optional
-            Generator object to assign ids to detected sources in the difference image.
+            Generator object used to assign ids to detected sources in the
+            difference image. Ids from this generator are not set until after
+            deblending and merging positive/negative peaks.
 
         Returns
         -------
@@ -638,8 +638,10 @@ class DetectAndMeasureScoreTask(DetectAndMeasureTask):
         mask = scoreExposure.mask
         mask &= ~(mask.getPlaneBitMask("DETECTED") | mask.getPlaneBitMask("DETECTED_NEGATIVE"))
 
+        # Don't use the idFactory until after deblend+merge, so that we aren't
+        # generating ids that just get thrown away (footprint merge doesn't
+        # know about past ids).
         table = afwTable.SourceTable.make(self.schema)
-        table.setMetadata(self.algMetadata)
         results = self.detection.run(
             table=table,
             exposure=scoreExposure,
@@ -650,8 +652,7 @@ class DetectAndMeasureScoreTask(DetectAndMeasureTask):
 
         sources, positives, negatives = self._deblend(difference,
                                                       results.positive,
-                                                      results.negative,
-                                                      table)
+                                                      results.negative)
 
-        return self.processResults(science, matchedTemplate, difference, sources, table, idFactory,
+        return self.processResults(science, matchedTemplate, difference, sources, idFactory,
                                    positiveFootprints=positives, negativeFootprints=negatives)
