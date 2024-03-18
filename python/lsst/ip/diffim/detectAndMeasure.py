@@ -357,6 +357,10 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                         self.config.growFootprint, False)
             initialDiaSources = afwTable.SourceCatalog(table)
             fpSet.makeSources(initialDiaSources)
+            print("before ids re-assigned")
+            print("ID:", initialDiaSources['id'])
+            print("parent:", initialDiaSources['parent'])
+            # initialDiaSources["parent"] = 0
             self.log.info("Merging detections into %d sources", len(initialDiaSources))
         else:
             initialDiaSources = sources
@@ -384,6 +388,10 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             diaSources=diaSources,
         )
         self.calculateMetrics(difference)
+
+        print("final ids")
+        print("ID:", diaSources['id'])
+        print("parent:", diaSources['parent'])
 
         return measurementResults
 
