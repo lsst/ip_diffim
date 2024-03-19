@@ -241,8 +241,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         self.schema.addField("refMatchId", "L", "unique id of reference catalog match")
         self.schema.addField("srcMatchId", "L", "unique id of source match")
         if self.config.doSkySources:
-            self.makeSubtask("skySources")
-            self.skySourceKey = self.schema.addField("sky_source", type="Flag", doc="Sky objects.")
+            self.makeSubtask("skySources", schema=self.schema)
 
         # Check that the schema and config are consistent
         for flag in self.config.badSourceFlags:
@@ -479,13 +478,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         seed : `int`
             Seed value to initialize the random number generator.
         """
-        skySourceFootprints = self.skySources.run(mask=mask, seed=seed)
+        skySourceFootprints = self.skySources.run(mask=mask, seed=seed, catalog=diaSources)
         self.metadata.add("nSkySources", len(skySourceFootprints))
-        if skySourceFootprints:
-            for foot in skySourceFootprints:
-                s = diaSources.addNew()
-                s.setFootprint(foot)
-                s.set(self.skySourceKey, True)
 
     def measureDiaSources(self, diaSources, science, difference, matchedTemplate):
         """Use (matched) template and science image to constrain dipole fitting.
