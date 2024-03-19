@@ -29,6 +29,7 @@ import numpy as np
 import lsst.geom as geom
 import lsst.afw.detection as afwDet
 import lsst.afw.display as afwDisplay
+import lsst.afw.detection as afwDetection
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
@@ -1131,9 +1132,10 @@ def makeTestImage(seed=5, nSrc=20, psfSize=2., noiseLevel=5.,
     Returns
     -------
     modelExposure : `lsst.afw.image.Exposure`
-        The model image, with the mask and variance planes.
+        The model image, with the mask and variance planes. The DETECTED
+        plane is filled in for the injected source footprints.
     sourceCat : `lsst.afw.table.SourceCatalog`
-        Catalog of sources detected on the model image.
+        Catalog of sources inserted in the model image.
 
     Raises
     ------
@@ -1169,10 +1171,10 @@ def makeTestImage(seed=5, nSrc=20, psfSize=2., noiseLevel=5.,
         if len(flux) != nSrc:
             raise ValueError("flux must have length equal to nSrc. %f supplied vs %f", len(flux), nSrc)
     sigmas = [psfSize for src in range(nSrc)]
-    coordList = list(zip(xLoc, yLoc, flux, sigmas))
+    injectList = list(zip(xLoc, yLoc, flux, sigmas))
     skyLevel = 0
     # Don't use the built in poisson noise: it modifies the global state of numpy random
-    modelExposure = plantSources(bbox, kernelSize, skyLevel, coordList, addPoissonNoise=False)
+    modelExposure = plantSources(bbox, kernelSize, skyLevel, injectList, addPoissonNoise=False)
     modelExposure.setWcs(makeFakeWcs())
     noise = rngNoise.randn(ySize, xSize)*noiseLevel
     noise -= np.mean(noise)
@@ -1180,7 +1182,7 @@ def makeTestImage(seed=5, nSrc=20, psfSize=2., noiseLevel=5.,
     modelExposure.image.array += noise
 
     # Run source detection to set up the mask plane
-    sourceCat = detectTestSources(modelExposure, addMaskPlanes=addMaskPlanes)
+    detectTestSources(modelExposure, addMaskPlanes=addMaskPlanes)
     if clearEdgeMask:
         modelExposure.mask &= ~modelExposure.mask.getPlaneBitMask("EDGE")
     modelExposure.setPhotoCalib(afwImage.PhotoCalib(calibration, 0., bbox))
@@ -1191,7 +1193,73 @@ def makeTestImage(seed=5, nSrc=20, psfSize=2., noiseLevel=5.,
     if doApplyCalibration:
         modelExposure.maskedImage = modelExposure.photoCalib.calibrateImage(modelExposure.maskedImage)
 
-    return modelExposure, sourceCat
+    truth = _fillTruthCatalog(injectList)
+
+    return modelExposure, truth
+
+
+def _makeTruthSchema():
+    """Make a schema for the truth catalog produced by `makeTestImage`.
+
+    Returns
+    -------
+    keys : `dict` [`str`]
+        Fields added to the catalog, to make it easier to set them.
+    schema : `lsst.afw.table.Schema`
+        Schema to use to make a "truth" SourceCatalog.
+        Calib, Ap, and Psf flux slots all are set to ``truth_instFlux``.
+    """
+    schema = afwTable.SourceTable.makeMinimalSchema()
+    keys = {}
+    # Don't use a FluxResultKey so we can manage the flux and err separately.
+    keys["instFlux"] = schema.addField("truth_instFlux", type=np.float64,
+                                       doc="true instFlux", units="count")
+    keys["instFluxErr"] = schema.addField("truth_instFluxErr", type=np.float64,
+                                          doc="true instFluxErr", units="count")
+    keys["centroid"] = afwTable.Point2DKey.addFields(schema, "truth", "true simulated centroid", "pixel")
+    schema.addField("truth_flag", "Flag", "truth flux failure flag.")
+    # Add the flag fields a source selector would need.
+    schema.addField("sky_source", "Flag", "testing flag.")
+    schema.addField("base_PixelFlags_flag_interpolated", "Flag", "testing flag.")
+    schema.addField("base_PixelFlags_flag_saturated", "Flag", "testing flag.")
+    schema.addField("base_PixelFlags_flag_bad", "Flag", "testing flag.")
+    schema.getAliasMap().set("slot_Centroid", "truth")
+    schema.getAliasMap().set("slot_CalibFlux", "truth")
+    schema.getAliasMap().set("slot_ApFlux", "truth")
+    schema.getAliasMap().set("slot_PsfFlux", "truth")
+    return keys, schema
+
+
+def _fillTruthCatalog(injectList):
+    """Add injected sources to the truth catalog.
+
+    Parameters
+    ----------
+    injectList : `list` [`float`]
+        Sources that were injected; tuples of (x, y, flux, size).
+
+    Returns
+    -------
+    catalog : `lsst.afw.table.SourceCatalog`
+        Catalog with centroids and instFlux/instFluxErr values filled in and
+        appropriate slots set.
+    """
+    keys, schema = _makeTruthSchema()
+    catalog = afwTable.SourceCatalog(schema)
+    catalog.reserve(len(injectList))
+    for x, y, flux, size in injectList:
+        record = catalog.addNew()
+        keys["centroid"].set(record, geom.PointD(x, y))
+        keys["instFlux"].set(record, flux)
+        # Approximate injected errors
+        keys["instFluxErr"].set(record, 20)
+        # 5-sigma effective source width
+        circle = afwGeom.Ellipse(afwGeom.ellipses.Axes(5*size, 5*size, 0), geom.Point2D(x, y))
+        footprint = afwDetection.Footprint(afwGeom.SpanSet.fromShape(circle))
+        footprint.addPeak(x, y, flux)
+        record.setFootprint(footprint)
+
+    return catalog
 
 
 def makeStats(badMaskPlanes=None):
