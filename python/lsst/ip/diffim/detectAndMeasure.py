@@ -177,7 +177,7 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
     )
     doWriteMetrics = lsst.pex.config.Field(
         dtype=bool,
-        default=False,
+        default=True,
         doc="Compute and write summary metrics."
     )
     idGenerator = DetectorVisitIdGeneratorConfig.make_field()
