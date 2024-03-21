@@ -46,7 +46,7 @@ class DipoleFitPluginConfig(measBase.SingleFramePluginConfig):
     """
 
     fitAllDiaSources = pexConfig.Field(
-        dtype=float, default=False,
+        dtype=bool, default=False,
         doc="""Attempte dipole fit of all diaSources (otherwise just the ones consisting of overlapping
         positive and negative footprints)""")
 
