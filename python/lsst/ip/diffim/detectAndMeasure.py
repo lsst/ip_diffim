@@ -507,7 +507,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         return sources, makeFootprints(positives), makeFootprints(negatives)
 
     def _removeBadSources(self, diaSources):
-        """Remove bad diaSources from the catalog.
+        """Remove unphysical diaSources from the catalog.
 
         Parameters
         ----------
@@ -520,16 +520,16 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             The updated catalog of detected sources, with any source that has a
             flag in ``config.badSourceFlags`` set removed.
         """
-        nBadTotal = 0
         selector = np.ones(len(diaSources), dtype=bool)
         for flag in self.config.badSourceFlags:
             flags = diaSources[flag]
             nBad = np.count_nonzero(flags)
             if nBad > 0:
-                self.log.info("Found and removed %d unphysical sources with flag %s.", nBad, flag)
+                self.log.debug("Found %d unphysical sources with flag %s.", nBad, flag)
                 selector &= ~flags
-                nBadTotal += nBad
+        nBadTotal = np.count_nonzero(~selector)
         self.metadata.add("nRemovedBadFlaggedSources", nBadTotal)
+        self.log.info("Removed %d unphysical sources.", nBadTotal)
         return diaSources[selector].copy(deep=True)
 
     def addSkySources(self, diaSources, mask, seed,
