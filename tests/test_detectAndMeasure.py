@@ -782,7 +782,7 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         # Run detection and check the results
         output = detectionTask.run(science, matchedTemplate, difference, score,
                                    idFactory=self.idGenerator.make_table_id_factory())
-        nSkySourcesGenerated = detectionTask.metadata["nSkySources"]
+        nSkySourcesGenerated = detectionTask.metadata["n_skySources"]
         skySources = output.diaSources[output.diaSources["sky_source"]]
         self.assertEqual(len(skySources), nSkySourcesGenerated)
         for skySource in skySources:
