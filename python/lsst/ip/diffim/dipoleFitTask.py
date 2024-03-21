@@ -1113,6 +1113,7 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
         ):
             measRecord.set(self.classificationFlagKey, False)
             measRecord.set(self.classificationAttemptedFlagKey, False)
+            # TODO: Do we want to fail here, or just leave it marked as not fit?
             self.fail(measRecord, measBase.MeasurementError('not a dipole', self.FAILURE_NOT_DIPOLE))
             if not self.config.fitAllDiaSources:
                 measRecord[self.centroidKey.getX()] = measRecord["base_SdssCentroid_x"]
