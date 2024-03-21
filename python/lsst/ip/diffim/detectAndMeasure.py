@@ -468,7 +468,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         self.metadata.add("nRemovedBadFlaggedSources", nBadTotal)
         return diaSources[selector].copy(deep=True)
 
-    def addSkySources(self, diaSources, mask, seed):
+    def addSkySources(self, diaSources, mask, seed,
+                      subtask=None):
         """Add sources in empty regions of the difference image
         for measuring the background.
 
@@ -481,8 +482,10 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         seed : `int`
             Seed value to initialize the random number generator.
         """
-        skySourceFootprints = self.skySources.run(mask=mask, seed=seed, catalog=diaSources)
-        self.metadata.add("nSkySources", len(skySourceFootprints))
+        if subtask is None:
+            subtask = self.skySources
+        skySourceFootprints = subtask.run(mask=mask, seed=seed, catalog=diaSources)
+        self.metadata.add(f"n_{subtask.getName()}", len(skySourceFootprints))
 
     def measureDiaSources(self, diaSources, science, difference, matchedTemplate):
         """Use (matched) template and science image to constrain dipole fitting.
