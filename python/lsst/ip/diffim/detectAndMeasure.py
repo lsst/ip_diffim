@@ -24,6 +24,8 @@ import numpy as np
 import lsst.afw.detection as afwDetection
 import lsst.afw.table as afwTable
 import lsst.daf.base as dafBase
+import lsst.geom
+from lsst.ip.diffim.utils import getPsfFwhm
 from lsst.meas.algorithms import SkyObjectsTask, SourceDetectionTask, SetPrimaryFlagsTask
 from lsst.meas.base import ForcedMeasurementTask, ApplyApCorrTask, DetectorVisitIdGeneratorConfig
 import lsst.meas.deblender
@@ -80,6 +82,17 @@ class DetectAndMeasureConnections(pipeBase.PipelineTaskConnections,
         storageClass="ExposureF",
         name="{fakesType}{coaddName}Diff_differenceExp",
     )
+    summaryMetrics = pipeBase.connectionTypes.Output(
+        doc="Summary metrics computed at randomized locations.",
+        dimensions=("instrument", "visit", "detector"),
+        storageClass="DataFrame",
+        name="{fakesType}{coaddName}Diff_summaryMetrics",
+    )
+
+    def __init__(self, *, config=None):
+        super().__init__(config=config)
+        if not config.doWriteMetrics:
+            self.outputs.remove("summaryMetrics")
 
 
 class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
@@ -158,6 +171,15 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
                  "base_PixelFlags_flag_edgeCenterAll",
                  ),
     )
+    metricSources = pexConfig.ConfigurableField(
+        target=SkyObjectsTask,
+        doc="Generate QA metric sources",
+    )
+    doWriteMetrics = lsst.pex.config.Field(
+        dtype=bool,
+        default=True,
+        doc="Compute and write summary metrics."
+    )
     idGenerator = DetectorVisitIdGeneratorConfig.make_field()
 
     def setDefaults(self):
@@ -192,6 +214,7 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         self.measurement.plugins["base_PixelFlags"].masksFpCenter = [
             "STREAK", "INJECTED", "INJECTED_TEMPLATE"]
         self.skySources.avoidMask = ["DETECTED", "DETECTED_NEGATIVE", "BAD", "NO_DATA", "EDGE"]
+        self.metricSources.avoidMask = ["NO_DATA", "EDGE"]
 
 
 class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
@@ -247,6 +270,45 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         for flag in self.config.badSourceFlags:
             if flag not in self.schema:
                 raise pipeBase.InvalidQuantumError("Field %s not in schema" % flag)
+
+        if self.config.doWriteMetrics:
+            self.makeSubtask("metricSources")
+            self.metricSchema = afwTable.SourceTable.makeMinimalSchema()
+            self.metricSources.skySourceKey = self.metricSchema.addField("sky_source", type="Flag",
+                                                                         doc="Metric evaluation objects.")
+            self.metricSchema.addField(
+                "metric_source_density", "F",
+                "Density of diaSources at location.",
+                units="count/degree^2")
+            self.metricSchema.addField(
+                "metric_dipole_density", "F",
+                "Density of dipoles at location.",
+                units="count/degree^2")
+            self.metricSchema.addField(
+                "metric_dipole_direction", "F",
+                "Mean dipole orientation.",
+                units="radian")
+            self.metricSchema.addField(
+                "metric_template_value", "F",
+                "Median of template at location.",
+                units="nJy")
+            self.metricSchema.addField(
+                "metric_science_value", "F",
+                "Median of science at location.",
+                units="nJy")
+            self.metricSchema.addField(
+                "metric_diffim_value", "F",
+                "Median of diffim at location.",
+                units="nJy")
+            self.metricSchema.addField(
+                "metric_science_psfSize", "F",
+                "Width of the science image PSF at location.",
+                units="pixel")
+            self.metricSchema.addField(
+                "metric_template_psfSize", "F",
+                "Width of the template image PSF at location.",
+                units="pixel")
+            
         # initialize InitOutputs
         self.outputSchema = afwTable.SourceCatalog(self.schema)
         self.outputSchema.getTable().setMetadata(self.algMetadata)
@@ -386,11 +448,13 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         if self.config.doForcedMeasurement:
             self.measureForcedSources(diaSources, science, difference.getWcs())
 
+        summaryMetrics = self.calculateMetrics(difference, diaSources, science, matchedTemplate, idFactory)
+
         measurementResults = pipeBase.Struct(
             subtractedMeasuredExposure=difference,
             diaSources=diaSources,
+            summaryMetrics=summaryMetrics,
         )
-        self.calculateMetrics(difference)
 
         return measurementResults
 
@@ -443,7 +507,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         return sources, makeFootprints(positives), makeFootprints(negatives)
 
     def _removeBadSources(self, diaSources):
-        """Remove bad diaSources from the catalog.
+        """Remove unphysical diaSources from the catalog.
 
         Parameters
         ----------
@@ -456,16 +520,16 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             The updated catalog of detected sources, with any source that has a
             flag in ``config.badSourceFlags`` set removed.
         """
-        nBadTotal = 0
         selector = np.ones(len(diaSources), dtype=bool)
         for flag in self.config.badSourceFlags:
             flags = diaSources[flag]
             nBad = np.count_nonzero(flags)
             if nBad > 0:
-                self.log.info("Found and removed %d unphysical sources with flag %s.", nBad, flag)
+                self.log.debug("Found %d unphysical sources with flag %s.", nBad, flag)
                 selector &= ~flags
-                nBadTotal += nBad
+        nBadTotal = np.count_nonzero(~selector)
         self.metadata.add("nRemovedBadFlaggedSources", nBadTotal)
+        self.log.info("Removed %d unphysical sources.", nBadTotal)
         return diaSources[selector].copy(deep=True)
 
     def addSkySources(self, diaSources, mask, seed,
@@ -550,13 +614,27 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         for diaSource, forcedSource in zip(diaSources, forcedSources):
             diaSource.assign(forcedSource, mapper)
 
-    def calculateMetrics(self, difference):
+    def calculateMetrics(self, difference, diaSources, science, matchedTemplate, idFactory):
         """Add image QA metrics to the Task metadata.
 
         Parameters
         ----------
         difference : `lsst.afw.image.Exposure`
             The target image to calculate metrics for.
+        diaSources : TYPE
+            Description
+        science : TYPE
+            Description
+        matchedTemplate : TYPE
+            Description
+        idFactory : TYPE
+            Description
+
+        Returns
+        -------
+        summaryMetrics : `lsst.afw.table.SourceCatalog`, or `None`
+            A catalog of randomized locations containing locally evaluated
+            metric results
         """
         mask = difference.mask
         badPix = (mask.array & mask.getPlaneBitMask(self.config.detection.excludeMaskPlanes)) > 0
@@ -570,6 +648,47 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         detNegPix &= badPix
         self.metadata.add("nBadPixelsDetectedPositive", np.sum(detPosPix))
         self.metadata.add("nBadPixelsDetectedNegative", np.sum(detNegPix))
+
+        if self.config.doWriteMetrics:
+            summaryMetrics = afwTable.SourceCatalog(self.metricSchema)
+            summaryMetrics.getTable().setIdFactory(idFactory)         
+            self.addSkySources(summaryMetrics, science.mask, difference.info.id,
+                               subtask=self.metricSources)
+            for src in summaryMetrics:
+                self._evaluateLocalMetric(src, diaSources, science, matchedTemplate, difference)
+
+            return summaryMetrics.asAstropy().to_pandas()
+
+    def _evaluateLocalMetric(self, src, diaSources, science, matchedTemplate, difference, size=100):
+        bbox = src.getFootprint().getBBox()
+        pix = bbox.getCenter()
+        src.set('metric_science_psfSize', getPsfFwhm(science.psf, position=pix))
+        src.set('metric_template_psfSize', getPsfFwhm(matchedTemplate.psf, position=pix))
+        
+        bbox.grow(size)
+        bbox = bbox.clippedTo(science.getBBox())
+        nPix = bbox.getArea()
+        pixScale = science.wcs.getPixelScale()
+        area = nPix*pixScale.asDegrees()**2
+        peak = src.getFootprint().getPeaks()[0]
+        src.setCoord(science.wcs.pixelToSky(peak['i_x'], peak['i_y']))
+        selectSources = diaSources[bbox.contains(diaSources.getX(), diaSources.getY())]
+        if self.config.doSkySources:
+            selectSources = selectSources[~selectSources["sky_source"]]
+        sourceDensity = len(selectSources)/area
+        dipoleSources = selectSources[selectSources["ip_diffim_DipoleFit_flag_classification"]]
+        dipoleDensity = len(dipoleSources)/area
+        if dipoleSources:
+            meanDipoleOrientation = _angleMean(dipoleSources["ip_diffim_DipoleFit_orientation"])
+            src.set('metric_dipole_direction', meanDipoleOrientation)
+        templateVal = np.median(matchedTemplate[bbox].image.array)
+        scienceVal = np.median(science[bbox].image.array)
+        diffimVal = np.median(difference[bbox].image.array)
+        src.set('metric_source_density', sourceDensity)
+        src.set('metric_dipole_density', dipoleDensity)
+        src.set('metric_template_value', templateVal)
+        src.set('metric_science_value', scienceVal)
+        src.set('metric_diffim_value', diffimVal)
 
 
 class DetectAndMeasureScoreConnections(DetectAndMeasureConnections):
@@ -656,3 +775,8 @@ class DetectAndMeasureScoreTask(DetectAndMeasureTask):
 
         return self.processResults(science, matchedTemplate, difference, sources, idFactory,
                                    positiveFootprints=positives, negativeFootprints=negatives)
+
+
+def _angleMean(angles):
+    complexArray = [complex(np.cos(np.deg2rad(angle)), np.sin(np.deg2rad(angle))) for angle in angles]
+    return(lsst.geom.Angle(np.angle(np.mean(complexArray))))

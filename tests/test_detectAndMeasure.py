@@ -93,7 +93,7 @@ class DetectAndMeasureTestBase:
         if maxValue is not None:
             self.assertTrue(np.all(values <= maxValue))
 
-    def _setup_detection(self, doSkySources=False, nSkySources=5, **kwargs):
+    def _setup_detection(self, doSkySources=False, nSkySources=5, doWriteMetrics=False, **kwargs):
         """Setup and configure the detection and measurement PipelineTask.
 
         Parameters
@@ -114,6 +114,7 @@ class DetectAndMeasureTestBase:
         config.doSkySources = doSkySources
         if doSkySources:
             config.skySources.nSources = nSkySources
+        config.doWriteMetrics = doWriteMetrics
         config.update(**kwargs)
 
         # Make a realistic id generator so that output catalog ids are useful.
