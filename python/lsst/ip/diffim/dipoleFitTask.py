@@ -985,6 +985,7 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
     FAILURE_EDGE = 1   # too close to the edge
     FAILURE_FIT = 2    # failure in the fitting
     FAILURE_NOT_DIPOLE = 4  # input source is not a putative dipole to begin with
+    FAILURE_TOO_LARGE = 8  # input source is too large to be fit
 
     @classmethod
     def getExecutionOrder(cls):
@@ -1104,21 +1105,25 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
         # Check if the footprint consists of a putative dipole - else don't fit it.
         if (
                 # One peak in the footprint (not a dipole)
-                (len(pks) <= 1)
+                ((nPeaks := len(pks)) <= 1)
                 # Peaks are the same sign (not a dipole)
-                or (len(pks) > 1 and (np.sign(pks[0].getPeakValue())
+                or (nPeaks > 1 and (np.sign(pks[0].getPeakValue())
                     == np.sign(pks[-1].getPeakValue())))
-                # Footprint is too large (not a dipole)
-                or (measRecord.getFootprint().getArea() > self.config.maxFootprintArea)
         ):
             measRecord.set(self.classificationFlagKey, False)
             measRecord.set(self.classificationAttemptedFlagKey, False)
             # TODO: Do we want to fail here, or just leave it marked as not fit?
-            self.fail(measRecord, measBase.MeasurementError('not a dipole', self.FAILURE_NOT_DIPOLE))
+            # self.fail(measRecord, measBase.MeasurementError('not a dipole', self.FAILURE_NOT_DIPOLE))
             if not self.config.fitAllDiaSources:
                 measRecord[self.centroidKey.getX()] = measRecord["base_SdssCentroid_x"]
                 measRecord[self.centroidKey.getY()] = measRecord["base_SdssCentroid_y"]
+                measRecord[self.flagKey] = measRecord["base_SdssCentroid_flag"]
                 return
+
+        # Footprint is too large (not a dipole).
+        if ((area := measRecord.getFootprint().getArea()) > self.config.maxFootprintArea):
+            self.fail(measRecord, measBase.MeasurementError(f"{area} > {self.config.maxFootprintArea}",
+                                                            self.FAILURE_TOO_LARGE))
 
         try:
             alg = self.DipoleFitAlgorithmClass(exposure, posImage=posExp, negImage=negExp)
@@ -1229,8 +1234,11 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
 
     def fail(self, measRecord, error=None):
         """Catch failures and set the correct flags.
-        """
 
+        Fallback on the SdssCentroid positions.
+        """
+        measRecord[self.centroidKey.getX()] = measRecord["base_SdssCentroid_x"]
+        measRecord[self.centroidKey.getY()] = measRecord["base_SdssCentroid_y"]
         measRecord.set(self.flagKey, True)
         if error is not None:
             if error.getFlagBit() == self.FAILURE_EDGE:
@@ -1239,8 +1247,8 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
             if error.getFlagBit() == self.FAILURE_FIT:
                 self.log.warning('DipoleFitPlugin failed on record %d: %s', measRecord.getId(), str(error))
                 measRecord.set(self.flagKey, True)
-            if error.getFlagBit() == self.FAILURE_NOT_DIPOLE:
-                self.log.debug('DipoleFitPlugin not run on record %d: %s',
+            if error.getFlagBit() == self.FAILURE_TOO_LARGE:
+                self.log.debug('DipoleFitPlugin not run on record with too large footprint %d: %s',
                                measRecord.getId(), str(error))
                 measRecord.set(self.classificationAttemptedFlagKey, False)
                 measRecord.set(self.flagKey, True)
