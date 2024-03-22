@@ -1026,7 +1026,7 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
         self.centroidKey = measBase.CentroidResultKey.addFields(schema,
                                                                 name,
                                                                 "Dipole centroid position.",
-                                                                measBase.UncertaintyEnum.NO_UNCERTAINTY)
+                                                                measBase.UncertaintyEnum.SIGMA_ONLY)
 
         self.orientationKey = schema.addField(
             schema.join(name, "orientation"), type=float, units="deg",
@@ -1115,6 +1115,10 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
             if not self.config.fitAllDiaSources:
                 measRecord[self.centroidKey.getX()] = measRecord["base_SdssCentroid_x"]
                 measRecord[self.centroidKey.getY()] = measRecord["base_SdssCentroid_y"]
+                self.centroidKey.getCentroidErr().setElement(measRecord, 0, 0,
+                                                             measRecord["base_SdssCentroid_xErr"])
+                self.centroidKey.getCentroidErr().setElement(measRecord, 1, 1,
+                                                             measRecord["base_SdssCentroid_yErr"])
                 measRecord[self.flagKey] = measRecord["base_SdssCentroid_flag"]
                 return
 
@@ -1235,6 +1239,10 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
         """
         measRecord[self.centroidKey.getX()] = measRecord["base_SdssCentroid_x"]
         measRecord[self.centroidKey.getY()] = measRecord["base_SdssCentroid_y"]
+        self.centroidKey.getCentroidErr().setElement(measRecord, 0, 0,
+                                                     measRecord["base_SdssCentroid_xErr"])
+        self.centroidKey.getCentroidErr().setElement(measRecord, 1, 1,
+                                                     measRecord["base_SdssCentroid_yErr"])
         measRecord.set(self.flagKey, True)
         if error is not None:
             if error.getFlagBit() == self.FAILURE_EDGE:
