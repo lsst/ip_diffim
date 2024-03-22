@@ -377,6 +377,9 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         if self.config.doSkySources:
             self.addSkySources(initialDiaSources, difference.mask, difference.info.id)
 
+        if not initialDiaSources.isContiguous():
+            initialDiaSources = initialDiaSources.copy(deep=True)
+
         self.measureDiaSources(initialDiaSources, science, difference, matchedTemplate)
         diaSources = self._removeBadSources(initialDiaSources)
 
