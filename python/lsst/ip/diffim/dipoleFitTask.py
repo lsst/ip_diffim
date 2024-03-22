@@ -1110,8 +1110,6 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
                 or (nPeaks > 1 and (np.sign(pks[0].getPeakValue())
                     == np.sign(pks[-1].getPeakValue())))
         ):
-            measRecord.set(self.classificationFlagKey, False)
-            measRecord.set(self.classificationAttemptedFlagKey, False)
             # TODO: Do we want to fail here, or just leave it marked as not fit?
             # self.fail(measRecord, measBase.MeasurementError('not a dipole', self.FAILURE_NOT_DIPOLE))
             if not self.config.fitAllDiaSources:
@@ -1141,8 +1139,6 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
             self.fail(measRecord, measBase.MeasurementError(errorMessage, self.FAILURE_FIT))
 
         if result is None:
-            measRecord.set(self.classificationFlagKey, False)
-            measRecord.set(self.classificationAttemptedFlagKey, False)
             return
 
         self.log.debug("Dipole fit result: %d %s", measRecord.getId(), str(result))
@@ -1246,11 +1242,8 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
                 measRecord.set(self.edgeFlagKey, True)
             if error.getFlagBit() == self.FAILURE_FIT:
                 self.log.warning('DipoleFitPlugin failed on record %d: %s', measRecord.getId(), str(error))
-                measRecord.set(self.flagKey, True)
             if error.getFlagBit() == self.FAILURE_TOO_LARGE:
                 self.log.debug('DipoleFitPlugin not run on record with too large footprint %d: %s',
                                measRecord.getId(), str(error))
-                measRecord.set(self.classificationAttemptedFlagKey, False)
-                measRecord.set(self.flagKey, True)
         else:
             self.log.warning('DipoleFitPlugin failed on record %d', measRecord.getId())
