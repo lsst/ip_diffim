@@ -32,6 +32,7 @@ import lsst.meas.deblender
 import lsst.meas.extensions.trailedSources  # noqa: F401
 import lsst.meas.extensions.shapeHSM
 import lsst.pex.config as pexConfig
+from lsst.pex.exceptions import InvalidParameterError
 import lsst.pipe.base as pipeBase
 import lsst.utils
 from lsst.utils.timer import timeMethod
@@ -175,10 +176,10 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
     metricsMaskPlanes = lsst.pex.config.ListField(
         dtype=str,
         doc="List of mask planes to include in metrics",
-        default=('BAD', 'CLIPPED', 'CR', 'CROSSTALK', 'DETECTED', 'DETECTED_NEGATIVE', 'EDGE',
+        default=('BAD', 'CLIPPED', 'CR', 'DETECTED', 'DETECTED_NEGATIVE', 'EDGE',
                  'INEXACT_PSF', 'INJECTED', 'INJECTED_TEMPLATE', 'INTRP', 'NOT_DEBLENDED',
                  'NO_DATA', 'REJECTED', 'SAT', 'SAT_TEMPLATE', 'SENSOR_EDGE', 'STREAK', 'SUSPECT',
-                 'UNMASKEDNAN'
+                 'UNMASKEDNAN',
                  ),
     )
     metricSources = pexConfig.ConfigurableField(
@@ -667,6 +668,14 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         detNegPix &= badPix
         self.metadata.add("nBadPixelsDetectedPositive", np.sum(detPosPix))
         self.metadata.add("nBadPixelsDetectedNegative", np.sum(detNegPix))
+        metricsMaskPlanes = []
+        for maskPlane in self.config.metricsMaskPlanes:
+            try:
+                self.metadata.add("%s_mask_fraction"%maskPlane.lower(), evaluateMaskFraction(mask, maskPlane))
+                metricsMaskPlanes.append(maskPlane)
+            except InvalidParameterError:
+                self.metadata.add("%s_mask_fraction"%maskPlane.lower(), -1)
+                self.log.info("Unable to calculate metrics for mask plane %s: not in image"%maskPlane)
 
         if self.config.doWriteMetrics:
             summaryMetrics = afwTable.SourceCatalog(self.metricSchema)
@@ -674,11 +683,13 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             self.addSkySources(summaryMetrics, science.mask, difference.info.id,
                                subtask=self.metricSources)
             for src in summaryMetrics:
-                self._evaluateLocalMetric(src, diaSources, science, matchedTemplate, difference)
+                self._evaluateLocalMetric(src, diaSources, science, matchedTemplate, difference,
+                                          metricsMaskPlanes=metricsMaskPlanes)
 
             return summaryMetrics.asAstropy().to_pandas()
 
-    def _evaluateLocalMetric(self, src, diaSources, science, matchedTemplate, difference, size=100):
+    def _evaluateLocalMetric(self, src, diaSources, science, matchedTemplate, difference,
+                             metricsMaskPlanes, size=100):
         bbox = src.getFootprint().getBBox()
         pix = bbox.getCenter()
         src.set('science_psfSize', getPsfFwhm(science.psf, position=pix))
@@ -710,7 +721,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         src.set('template_value', templateVal)
         src.set('science_value', scienceVal)
         src.set('diffim_value', diffimVal)
-        for maskPlane in self.config.metricsMaskPlanes:
+        for maskPlane in metricsMaskPlanes:
             src.set("%s_mask_fraction"%maskPlane.lower(),
                     evaluateMaskFraction(difference.mask[bbox], maskPlane)
                     )
