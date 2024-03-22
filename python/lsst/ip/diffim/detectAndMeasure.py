@@ -711,7 +711,9 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         src.set('science_value', scienceVal)
         src.set('diffim_value', diffimVal)
         for maskPlane in self.config.metricsMaskPlanes:
-            src.set("%s_mask_fraction"%maskPlane.lower(), evaluateMaskFraction(difference.mask, maskPlane))
+            src.set("%s_mask_fraction"%maskPlane.lower(),
+                    evaluateMaskFraction(difference.mask[bbox], maskPlane)
+                    )
 
 
 class DetectAndMeasureScoreConnections(DetectAndMeasureConnections):
