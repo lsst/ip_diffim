@@ -172,6 +172,15 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
                  "base_PixelFlags_flag_saturatedCenterAll",
                  ),
     )
+    metricsMaskPlanes = lsst.pex.config.ListField(
+        dtype=str,
+        doc="List of mask planes to include in metrics",
+        default=('BAD', 'CLIPPED', 'CR', 'CROSSTALK', 'DETECTED', 'DETECTED_NEGATIVE', 'EDGE',
+                 'INEXACT_PSF', 'INJECTED', 'INJECTED_TEMPLATE', 'INTRP', 'NOT_DEBLENDED',
+                 'NO_DATA', 'REJECTED', 'SAT', 'SAT_TEMPLATE', 'SENSOR_EDGE', 'STREAK', 'SUSPECT',
+                 'UNMASKEDNAN'
+                 ),
+    )
     metricSources = pexConfig.ConfigurableField(
         target=SkyObjectsTask,
         doc="Generate QA metric sources",
@@ -278,38 +287,47 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             self.metricSources.skySourceKey = self.metricSchema.addField("sky_source", type="Flag",
                                                                          doc="Metric evaluation objects.")
             self.metricSchema.addField(
-                "metric_source_density", "F",
+                "source_density", "F",
                 "Density of diaSources at location.",
                 units="count/degree^2")
             self.metricSchema.addField(
-                "metric_dipole_density", "F",
+                "dipole_density", "F",
                 "Density of dipoles at location.",
                 units="count/degree^2")
             self.metricSchema.addField(
-                "metric_dipole_direction", "F",
+                "dipole_direction", "F",
                 "Mean dipole orientation relative to parallactic angle.",
                 units="radian")
             self.metricSchema.addField(
-                "metric_template_value", "F",
+                "dipole_separation", "F",
+                "Mean dipole separation.",
+                units="pixel")
+            self.metricSchema.addField(
+                "template_value", "F",
                 "Median of template at location.",
                 units="nJy")
             self.metricSchema.addField(
-                "metric_science_value", "F",
+                "science_value", "F",
                 "Median of science at location.",
                 units="nJy")
             self.metricSchema.addField(
-                "metric_diffim_value", "F",
+                "diffim_value", "F",
                 "Median of diffim at location.",
                 units="nJy")
             self.metricSchema.addField(
-                "metric_science_psfSize", "F",
+                "science_psfSize", "F",
                 "Width of the science image PSF at location.",
                 units="pixel")
             self.metricSchema.addField(
-                "metric_template_psfSize", "F",
+                "template_psfSize", "F",
                 "Width of the template image PSF at location.",
                 units="pixel")
-            
+            for maskPlane in self.config.metricsMaskPlanes:
+                self.metricSchema.addField(
+                    "%s_mask_fraction"%maskPlane.lower(), "F",
+                    "Fraction of pixels with %s mask"%maskPlane
+                )
+
         # initialize InitOutputs
         self.outputSchema = afwTable.SourceCatalog(self.schema)
         self.outputSchema.getTable().setMetadata(self.algMetadata)
@@ -652,7 +670,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
         if self.config.doWriteMetrics:
             summaryMetrics = afwTable.SourceCatalog(self.metricSchema)
-            summaryMetrics.getTable().setIdFactory(idFactory)         
+            summaryMetrics.getTable().setIdFactory(idFactory)
             self.addSkySources(summaryMetrics, science.mask, difference.info.id,
                                subtask=self.metricSources)
             for src in summaryMetrics:
@@ -663,9 +681,9 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
     def _evaluateLocalMetric(self, src, diaSources, science, matchedTemplate, difference, size=100):
         bbox = src.getFootprint().getBBox()
         pix = bbox.getCenter()
-        src.set('metric_science_psfSize', getPsfFwhm(science.psf, position=pix))
-        src.set('metric_template_psfSize', getPsfFwhm(matchedTemplate.psf, position=pix))
-        
+        src.set('science_psfSize', getPsfFwhm(science.psf, position=pix))
+        src.set('template_psfSize', getPsfFwhm(matchedTemplate.psf, position=pix))
+
         bbox.grow(size)
         bbox = bbox.clippedTo(science.getBBox())
         nPix = bbox.getArea()
@@ -681,15 +699,19 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         dipoleDensity = len(dipoleSources)/area
         if dipoleSources:
             meanDipoleOrientation = _angleMean(dipoleSources["ip_diffim_DipoleFit_orientation"])
-            src.set('metric_dipole_direction', meanDipoleOrientation)
+            src.set('dipole_direction', meanDipoleOrientation)
+            meanDipoleSeparation = np.mean(dipoleSources["ip_diffim_DipoleFit_separation"])
+            src.set('dipole_separation', meanDipoleSeparation)
         templateVal = np.median(matchedTemplate[bbox].image.array)
         scienceVal = np.median(science[bbox].image.array)
         diffimVal = np.median(difference[bbox].image.array)
-        src.set('metric_source_density', sourceDensity)
-        src.set('metric_dipole_density', dipoleDensity)
-        src.set('metric_template_value', templateVal)
-        src.set('metric_science_value', scienceVal)
-        src.set('metric_diffim_value', diffimVal)
+        src.set('source_density', sourceDensity)
+        src.set('dipole_density', dipoleDensity)
+        src.set('template_value', templateVal)
+        src.set('science_value', scienceVal)
+        src.set('diffim_value', diffimVal)
+        for maskPlane in self.config.metricsMaskPlanes:
+            src.set("%s_mask_fraction"%maskPlane.lower(), evaluateMaskFraction(difference.mask, maskPlane))
 
 
 class DetectAndMeasureScoreConnections(DetectAndMeasureConnections):
@@ -780,4 +802,9 @@ class DetectAndMeasureScoreTask(DetectAndMeasureTask):
 
 def _angleMean(angles):
     complexArray = [complex(np.cos(np.deg2rad(angle)), np.sin(np.deg2rad(angle))) for angle in angles]
-    return(lsst.geom.Angle(np.angle(np.mean(complexArray))))
+    return (lsst.geom.Angle(np.angle(np.mean(complexArray))))
+
+
+def evaluateMaskFraction(mask, maskPlane):
+    nMaskSet = np.count_nonzero((mask.array & mask.getPlaneBitMask(maskPlane)))
+    return nMaskSet/mask.array.size
