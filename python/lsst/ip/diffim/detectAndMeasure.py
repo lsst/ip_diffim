@@ -285,6 +285,14 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         if self.config.doWriteMetrics:
             self.makeSubtask("metricSources")
             self.metricSchema = afwTable.SourceTable.makeMinimalSchema()
+            self.metricSchema.addField(
+                "x", "F",
+                "X location of the metric evaluation.",
+                units="pixel")
+            self.metricSchema.addField(
+                "y", "F",
+                "Y location of the metric evaluation.",
+                units="pixel")
             self.metricSources.skySourceKey = self.metricSchema.addField("sky_source", type="Flag",
                                                                          doc="Metric evaluation objects.")
             self.metricSchema.addField(
@@ -701,6 +709,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         pixScale = science.wcs.getPixelScale()
         area = nPix*pixScale.asDegrees()**2
         peak = src.getFootprint().getPeaks()[0]
+        src.set('x', peak['i_x'])
+        src.set('y', peak['i_y'])
         src.setCoord(science.wcs.pixelToSky(peak['i_x'], peak['i_y']))
         selectSources = diaSources[bbox.contains(diaSources.getX(), diaSources.getY())]
         if self.config.doSkySources:
