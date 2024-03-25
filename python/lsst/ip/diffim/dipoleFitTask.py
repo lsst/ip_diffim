@@ -447,13 +447,12 @@ class DipoleModel:
         if fluxNeg is None:
             fluxNeg = flux
 
-        if self.debug:
-            self.log.debug('%.2f %.2f %.2f %.2f %.2f %.2f',
-                           flux, fluxNeg, xcenPos, ycenPos, xcenNeg, ycenNeg)
-            if x1 is not None:
-                self.log.debug('     %.2f %.2f %.2f', b, x1, y1)
-            if xy is not None:
-                self.log.debug('     %.2f %.2f %.2f', xy, x2, y2)
+        self.log.debug('flux: %.2f fluxNeg: %.2f x+: %.2f x-: %.2f y+: %.2f y-: %.2f ',
+                       flux, fluxNeg, xcenPos, xcenNeg, ycenPos, ycenNeg)
+        if x1 is not None:
+            self.log.debug('     b: %.2f x1: %.2f y1: %.2f', b, x1, y1)
+        if xy is not None:
+            self.log.debug('     xy: %.2f x2: %.2f y2: %.2f', xy, x2, y2)
 
         posIm = self.makeStarModel(bbox, psf, xcenPos, ycenPos, flux)
         negIm = self.makeStarModel(bbox, psf, xcenNeg, ycenNeg, fluxNeg)
@@ -913,14 +912,10 @@ class DipoleFitAlgorithm:
 
         Parameters
         ----------
-        footprint : TODO: DM-17458
+        footprint : `lsst.afw.detection.Footprint`
             Footprint containing the dipole that was fit
         result : `lmfit.MinimizerResult`
             `lmfit.MinimizerResult` object returned by `lmfit` optimizer
-
-        Returns
-        -------
-        fig : `matplotlib.pyplot.plot`
         """
         try:
             import matplotlib.pyplot as plt
@@ -941,7 +936,7 @@ class DipoleFitAlgorithm:
         bbox = footprint.getBBox()
         extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
         if z.shape[0] == 3:
-            fig = plt.figure(figsize=(8, 8))
+            plt.figure(figsize=(8, 8))
             for i in range(3):
                 plt.subplot(3, 3, i*3+1)
                 display2dArray(z[i, :], 'Data', extent=extent)
@@ -949,16 +944,14 @@ class DipoleFitAlgorithm:
                 display2dArray(fit[i, :], 'Model', extent=extent)
                 plt.subplot(3, 3, i*3+3)
                 display2dArray(z[i, :] - fit[i, :], 'Residual', extent=extent)
-            return fig
         else:
-            fig = plt.figure(figsize=(8, 2.5))
+            plt.figure(figsize=(8, 2.5))
             plt.subplot(1, 3, 1)
             display2dArray(z, 'Data', extent=extent)
             plt.subplot(1, 3, 2)
             display2dArray(fit, 'Model', extent=extent)
             plt.subplot(1, 3, 3)
             display2dArray(z - fit, 'Residual', extent=extent)
-            return fig
 
         plt.show()
 
