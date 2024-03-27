@@ -86,7 +86,7 @@ class DetectAndMeasureConnections(pipeBase.PipelineTaskConnections,
     summaryMetrics = pipeBase.connectionTypes.Output(
         doc="Summary metrics computed at randomized locations.",
         dimensions=("instrument", "visit", "detector"),
-        storageClass="DataFrame",
+        storageClass="ArrowAstropy",
         name="{fakesType}{coaddName}Diff_summaryMetrics",
     )
 
@@ -694,7 +694,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                 self._evaluateLocalMetric(src, diaSources, science, matchedTemplate, difference,
                                           metricsMaskPlanes=metricsMaskPlanes)
 
-            return summaryMetrics.asAstropy().to_pandas()
+            return summaryMetrics.asAstropy()
 
     def _evaluateLocalMetric(self, src, diaSources, science, matchedTemplate, difference,
                              metricsMaskPlanes, size=100):
