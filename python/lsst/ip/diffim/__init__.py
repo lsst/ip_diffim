@@ -39,7 +39,8 @@ from .imageMapReduce import *
 from .subtractImages import *
 from .version import *
 
-# automatically register ip_diffim Algorithms
+# automatically register ip_diffim Algorithms;
+# CENTROID_ORDER=0.0, FLUX_ORDER==2.0
 from lsst.meas.base import wrapSimpleAlgorithm
 wrapSimpleAlgorithm(NaiveDipoleCentroid, Control=DipoleCentroidControl, executionOrder=0.0)
 wrapSimpleAlgorithm(NaiveDipoleFlux, Control=DipoleFluxControl, executionOrder=2.0)

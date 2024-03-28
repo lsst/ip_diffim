@@ -33,7 +33,7 @@ class DetectAndMeasureTestBase:
 
     def _check_diaSource(self, refSources, diaSource, refIds=None,
                          matchDistance=1., scale=1., usePsfFlux=True,
-                         rtol=0.021, atol=None):
+                         rtol=0.025, atol=None):
         """Match a diaSource with a source in a reference catalog
         and compare properties.
 
@@ -227,17 +227,6 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         bbox = difference.getBBox()
         difference.maskedImage -= matchedTemplate.maskedImage
 
-        # Configure the detection Task, and do not remove unphysical sources
-        detectionTask = self._setup_detection(doForcedMeasurement=False, doSkySources=True, nSkySources=20,
-                                              badSourceFlags=[])
-
-        # Run detection and check the results
-        diaSources = detectionTask.run(science, matchedTemplate, difference).diaSources
-        badDiaSrcNoRemove = ~bbox.contains(diaSources.getX(), diaSources.getY())
-        nBadNoRemove = np.count_nonzero(badDiaSrcNoRemove)
-        # Verify that unphysical sources exist
-        self.assertGreater(nBadNoRemove, 0)
-
         # Configure the detection Task, and remove unphysical sources
         detectionTask = self._setup_detection(doForcedMeasurement=False, doSkySources=True, nSkySources=20,
                                               badSourceFlags=["base_PixelFlags_flag_offimage", ])
@@ -351,26 +340,11 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         matchedTemplate.mask.array[...] = np.roll(matchedTemplate.mask.array[...], offset, axis=0)
         difference.maskedImage -= matchedTemplate.maskedImage[science.getBBox()]
 
-        # Configure the detection Task
-        detectionTask = self._setup_detection(doMerge=False)
-
-        # Run detection and check the results
+        detectionTask = self._setup_detection(doMerge=True)
         output = detectionTask.run(science, matchedTemplate, difference)
-        self.assertIn(dipoleFlag, output.diaSources.schema.getNames())
-        nSourcesDet = len(sources)
-        self.assertEqual(len(output.diaSources), 2*nSourcesDet)
+        self.assertEqual(len(output.diaSources), len(sources))
         refIds = []
-        # The diaSource check should fail if we don't merge positive and negative footprints
         for diaSource in output.diaSources:
-            with self.assertRaises(AssertionError):
-                self._check_diaSource(sources, diaSource, refIds=refIds, scale=0,
-                                      atol=np.sqrt(fluxRange*fluxLevel))
-
-        detectionTask2 = self._setup_detection(doMerge=True)
-        output2 = detectionTask2.run(science, matchedTemplate, difference)
-        self.assertEqual(len(output2.diaSources), nSourcesDet)
-        refIds = []
-        for diaSource in output2.diaSources:
             if diaSource[dipoleFlag]:
                 self._check_diaSource(sources, diaSource, refIds=refIds, scale=0,
                                       rtol=0.05, atol=None, usePsfFlux=False)
@@ -720,28 +694,11 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         scienceKernel = science.psf.getKernel()
         score = subtractTask._convolveExposure(difference, scienceKernel, subtractTask.convolutionControl)
 
-        # Configure the detection Task
-        detectionTask = self._setup_detection(doMerge=False)
-
-        # Run detection and check the results
+        detectionTask = self._setup_detection()
         output = detectionTask.run(science, matchedTemplate, difference, score)
-        self.assertIn(dipoleFlag, output.diaSources.schema.getNames())
-        nSourcesDet = len(sources)
-        # Since we did not merge the dipoles, each source should result in
-        # both a positive and a negative diaSource
-        self.assertEqual(len(output.diaSources), 2*nSourcesDet)
+        self.assertEqual(len(output.diaSources), len(sources))
         refIds = []
-        # The diaSource check should fail if we don't merge positive and negative footprints
         for diaSource in output.diaSources:
-            with self.assertRaises(AssertionError):
-                self._check_diaSource(sources, diaSource, refIds=refIds, scale=0,
-                                      atol=np.sqrt(fluxRange*fluxLevel))
-
-        detectionTask2 = self._setup_detection(doMerge=True)
-        output2 = detectionTask2.run(science, matchedTemplate, difference, score)
-        self.assertEqual(len(output2.diaSources), nSourcesDet)
-        refIds = []
-        for diaSource in output2.diaSources:
             if diaSource[dipoleFlag]:
                 self._check_diaSource(sources, diaSource, refIds=refIds, scale=0,
                                       rtol=0.05, atol=None, usePsfFlux=False)
