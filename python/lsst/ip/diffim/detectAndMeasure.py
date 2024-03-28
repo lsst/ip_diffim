@@ -25,7 +25,7 @@ import lsst.afw.detection as afwDetection
 import lsst.afw.table as afwTable
 import lsst.daf.base as dafBase
 import lsst.geom
-from lsst.ip.diffim.utils import getPsfFwhm
+from lsst.ip.diffim.utils import getPsfFwhm, angleMean
 from lsst.meas.algorithms import SkyObjectsTask, SourceDetectionTask, SetPrimaryFlagsTask
 from lsst.meas.base import ForcedMeasurementTask, ApplyApCorrTask, DetectorVisitIdGeneratorConfig
 import lsst.meas.deblender
@@ -649,14 +649,15 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         ----------
         difference : `lsst.afw.image.Exposure`
             The target image to calculate metrics for.
-        diaSources : TYPE
-            Description
-        science : TYPE
-            Description
-        matchedTemplate : TYPE
-            Description
-        idFactory : TYPE
-            Description
+        diaSources : `lsst.afw.table.SourceCatalog`
+            The catalog of detected sources.
+        science : `lsst.afw.image.Exposure`
+            The science image.
+        matchedTemplate : `lsst.afw.image.Exposure`
+            The reference image, warped and psf-matched to the science image.
+        idFactory : `lsst.afw.table.IdFactory`, optional
+            Generator object used to assign ids to detected sources in the
+            difference image.
 
         Returns
         -------
@@ -697,13 +698,31 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             return summaryMetrics.asAstropy()
 
     def _evaluateLocalMetric(self, src, diaSources, science, matchedTemplate, difference,
-                             metricsMaskPlanes, size=100):
+                             metricsMaskPlanes):
+        """Summary
+
+        Parameters
+        ----------
+        src : TYPE
+            Description
+        diaSources : `lsst.afw.table.SourceCatalog`
+            The catalog of detected sources.
+        science : `lsst.afw.image.Exposure`
+            The science image.
+        matchedTemplate : `lsst.afw.image.Exposure`
+            The reference image, warped and psf-matched to the science image.
+        difference : `lsst.afw.image.Exposure`
+            Result of subtracting template from the science image.
+        metricsMaskPlanes : `list` of `str`
+            Mask planes to calculate metrics from.
+        """
         bbox = src.getFootprint().getBBox()
         pix = bbox.getCenter()
         src.set('science_psfSize', getPsfFwhm(science.psf, position=pix))
         src.set('template_psfSize', getPsfFwhm(matchedTemplate.psf, position=pix))
 
-        bbox.grow(size)
+        metricRegionSize = 100
+        bbox.grow(metricRegionSize)
         bbox = bbox.clippedTo(science.getBBox())
         nPix = bbox.getArea()
         pixScale = science.wcs.getPixelScale()
@@ -719,7 +738,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         dipoleSources = selectSources[selectSources["ip_diffim_DipoleFit_flag_classification"]]
         dipoleDensity = len(dipoleSources)/area
         if dipoleSources:
-            meanDipoleOrientation = _angleMean(dipoleSources["ip_diffim_DipoleFit_orientation"])
+            meanDipoleOrientation = angleMean(dipoleSources["ip_diffim_DipoleFit_orientation"])
             src.set('dipole_direction', meanDipoleOrientation)
             meanDipoleSeparation = np.mean(dipoleSources["ip_diffim_DipoleFit_separation"])
             src.set('dipole_separation', meanDipoleSeparation)
@@ -821,11 +840,6 @@ class DetectAndMeasureScoreTask(DetectAndMeasureTask):
 
         return self.processResults(science, matchedTemplate, difference, sources, idFactory,
                                    positiveFootprints=positives, negativeFootprints=negatives)
-
-
-def _angleMean(angles):
-    complexArray = [complex(np.cos(np.deg2rad(angle)), np.sin(np.deg2rad(angle))) for angle in angles]
-    return (lsst.geom.Angle(np.angle(np.mean(complexArray))))
 
 
 def evaluateMaskFraction(mask, maskPlane):

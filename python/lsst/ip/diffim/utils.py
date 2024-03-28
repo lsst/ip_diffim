@@ -1323,3 +1323,20 @@ def computePSFNoiseEquivalentArea(psf):
     psfImg = psf.computeImage(psf.getAveragePosition())
     nea = 1./np.sum(psfImg.array**2)
     return nea
+
+
+def angleMean(angles):
+    """Calculate the mean of an array of angles.
+
+    Parameters
+    ----------
+    angles : `ndarray`
+        An array of angles, in degrees
+
+    Returns
+    -------
+    `lsst.geom.Angle`
+        The mean angle
+    """
+    complexArray = [complex(np.cos(np.deg2rad(angle)), np.sin(np.deg2rad(angle))) for angle in angles]
+    return (geom.Angle(np.angle(np.mean(complexArray))))
