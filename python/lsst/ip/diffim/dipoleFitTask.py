@@ -860,13 +860,7 @@ class DipoleFitAlgorithm:
 
         fitParams = fitResult.best_values
         if fitParams['flux'] <= 1.:   # usually around 0.1 -- the minimum flux allowed -- i.e. bad fit.
-            out = Struct(posCentroidX=np.nan, posCentroidY=np.nan,
-                         negCentroidX=np.nan, negCentroidY=np.nan,
-                         posFlux=np.nan, negFlux=np.nan, posFluxErr=np.nan, negFluxErr=np.nan,
-                         centroidX=np.nan, centroidY=np.nan, orientation=np.nan,
-                         signalToNoise=np.nan, chi2=np.nan, redChi2=np.nan,
-                         nData=np.nan)
-            return out, fitResult
+            return None, fitResult
 
         centroid = ((fitParams['xcenPos'] + fitParams['xcenNeg']) / 2.,
                     (fitParams['ycenPos'] + fitParams['ycenNeg']) / 2.)
@@ -1127,13 +1121,11 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
             errorMessage = f"Exception in dipole fit. {e.__class__.__name__}: {e}"
             self.fail(measRecord, measBase.MeasurementError(errorMessage, self.FAILURE_FIT))
 
-        if result is None:
-            return
-
         self.log.debug("Dipole fit result: %d %s", measRecord.getId(), str(result))
 
-        if result.posFlux <= 1.:   # usually around 0.1 -- the minimum flux allowed -- i.e. bad fit.
-            self.fail(measRecord, measBase.MeasurementError('dipole fit failure', self.FAILURE_FIT))
+        if result is None:
+            self.fail(measRecord, measBase.MeasurementError("bad dipole fit", self.FAILURE_FIT))
+            return
 
         # add chi2, coord/flux uncertainties (TBD), dipole classification
         # Add the relevant values to the measRecord
