@@ -83,17 +83,17 @@ class DetectAndMeasureConnections(pipeBase.PipelineTaskConnections,
         storageClass="ExposureF",
         name="{fakesType}{coaddName}Diff_differenceExp",
     )
-    summaryMetrics = pipeBase.connectionTypes.Output(
+    spatiallySampledMetrics = pipeBase.connectionTypes.Output(
         doc="Summary metrics computed at randomized locations.",
         dimensions=("instrument", "visit", "detector"),
         storageClass="ArrowAstropy",
-        name="{fakesType}{coaddName}Diff_summaryMetrics",
+        name="{fakesType}{coaddName}Diff_spatiallySampledMetrics",
     )
 
     def __init__(self, *, config=None):
         super().__init__(config=config)
         if not config.doWriteMetrics:
-            self.outputs.remove("summaryMetrics")
+            self.outputs.remove("spatiallySampledMetrics")
 
 
 class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
@@ -476,12 +476,13 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         if self.config.doForcedMeasurement:
             self.measureForcedSources(diaSources, science, difference.getWcs())
 
-        summaryMetrics = self.calculateMetrics(difference, diaSources, science, matchedTemplate, idFactory)
+        spatiallySampledMetrics = self.calculateMetrics(difference, diaSources, science, matchedTemplate,
+                                                        idFactory)
 
         measurementResults = pipeBase.Struct(
             subtractedMeasuredExposure=difference,
             diaSources=diaSources,
-            summaryMetrics=summaryMetrics,
+            spatiallySampledMetrics=spatiallySampledMetrics,
         )
 
         return measurementResults
@@ -661,7 +662,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
         Returns
         -------
-        summaryMetrics : `lsst.afw.table.SourceCatalog`, or `None`
+        spatiallySampledMetrics : `lsst.afw.table.SourceCatalog`, or `None`
             A catalog of randomized locations containing locally evaluated
             metric results
         """
@@ -687,24 +688,24 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                 self.log.info("Unable to calculate metrics for mask plane %s: not in image"%maskPlane)
 
         if self.config.doWriteMetrics:
-            summaryMetrics = afwTable.SourceCatalog(self.metricSchema)
-            summaryMetrics.getTable().setIdFactory(idFactory)
-            self.addSkySources(summaryMetrics, science.mask, difference.info.id,
+            spatiallySampledMetrics = afwTable.SourceCatalog(self.metricSchema)
+            spatiallySampledMetrics.getTable().setIdFactory(idFactory)
+            self.addSkySources(spatiallySampledMetrics, science.mask, difference.info.id,
                                subtask=self.metricSources)
-            for src in summaryMetrics:
+            for src in spatiallySampledMetrics:
                 self._evaluateLocalMetric(src, diaSources, science, matchedTemplate, difference,
                                           metricsMaskPlanes=metricsMaskPlanes)
 
-            return summaryMetrics.asAstropy()
+            return spatiallySampledMetrics.asAstropy()
 
     def _evaluateLocalMetric(self, src, diaSources, science, matchedTemplate, difference,
                              metricsMaskPlanes):
-        """Summary
+        """Calculate image quality metrics at spatially sampled locations.
 
         Parameters
         ----------
-        src : TYPE
-            Description
+        src : `lsst.afw.table.SourceRecord`
+            The source record to be updated with metric calculations.
         diaSources : `lsst.afw.table.SourceCatalog`
             The catalog of detected sources.
         science : `lsst.afw.image.Exposure`
