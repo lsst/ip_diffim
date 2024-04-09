@@ -95,6 +95,12 @@ class SubtractImageOutputConnections(lsst.pipe.base.PipelineTaskConnections,
         storageClass="ExposureF",
         name="{fakesType}{coaddName}Diff_matchedExp",
     )
+    psfMatchingKernel = connectionTypes.Output(
+        doc="Kernel used to PSF match the science and template images.",
+        dimensions=("instrument", "visit", "detector"),
+        storageClass="MatchingKernel",
+        name="{fakesType}{coaddName}Diff_psfMatchKernel",
+    )
 
 
 class SubtractScoreOutputConnections(lsst.pipe.base.PipelineTaskConnections,
@@ -105,6 +111,12 @@ class SubtractScoreOutputConnections(lsst.pipe.base.PipelineTaskConnections,
         dimensions=("instrument", "visit", "detector"),
         storageClass="ExposureF",
         name="{fakesType}{coaddName}Diff_scoreExp",
+    )
+    psfMatchingKernel = connectionTypes.Output(
+        doc="Kernel used to PSF match the science and template images.",
+        dimensions=("instrument", "visit", "detector"),
+        storageClass="MatchingKernel",
+        name="{fakesType}{coaddName}Diff_psfScoreMatchKernel",
     )
 
 
