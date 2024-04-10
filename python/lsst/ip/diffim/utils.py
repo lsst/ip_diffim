@@ -853,13 +853,6 @@ class DipoleTestImage:
             return detectTask, schema
 
 
-def _sliceWidth(image, threshold, peaks, axis):
-    vec = image.take(peaks[1 - axis], axis=axis)
-    low = np.interp(threshold, vec[:peaks[axis] + 1], np.arange(peaks[axis] + 1))
-    high = np.interp(threshold, vec[:peaks[axis] - 1:-1], np.arange(len(vec) - 1, peaks[axis] - 1, -1))
-    return high - low
-
-
 def getPsfFwhm(psf, average=True, position=None):
     """Directly calculate the horizontal and vertical widths
     of a PSF at half its maximum value.
@@ -887,11 +880,13 @@ def getPsfFwhm(psf, average=True, position=None):
     """
     if position is None:
         position = psf.getAveragePosition()
-    image = psf.computeKernelImage(position).array
-    peak = psf.computePeak(position)
-    peakLocs = np.unravel_index(np.argmax(image), image.shape)
-    width = _sliceWidth(image, peak/2., peakLocs, axis=0), _sliceWidth(image, peak/2., peakLocs, axis=1)
-    return np.nanmean(width) if average else width
+    shape = psf.computeShape(position)
+    sigmaToFwhm = 2*np.log(2*np.sqrt(2))
+
+    if average:
+        return sigmaToFwhm*shape.getTraceRadius()
+    else:
+        return [sigmaToFwhm*np.sqrt(shape.getIxx()), sigmaToFwhm*np.sqrt(shape.getIyy())]
 
 
 def evaluateMeanPsfFwhm(exposure: afwImage.Exposure,
