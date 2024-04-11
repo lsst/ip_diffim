@@ -65,18 +65,6 @@ class SubtractInputConnections(lsst.pipe.base.PipelineTaskConnections,
         storageClass="SourceCatalog",
         name="{fakesType}src"
     )
-    finalizedPsfApCorrCatalog = connectionTypes.Input(
-        doc=("Per-visit finalized psf models and aperture correction maps. "
-             "These catalogs use the detector id for the catalog id, "
-             "sorted on id for fast lookup."),
-        dimensions=("instrument", "visit"),
-        storageClass="ExposureCatalog",
-        name="finalVisitSummary",
-        # TODO: remove on DM-39854.
-        deprecated=(
-            "Deprecated in favor of visitSummary.  Will be removed after v26."
-        )
-    )
     visitSummary = connectionTypes.Input(
         doc=("Per-visit catalog with final calibration objects. "
              "These catalogs use the detector id for the catalog id, "
@@ -88,9 +76,7 @@ class SubtractInputConnections(lsst.pipe.base.PipelineTaskConnections,
 
     def __init__(self, *, config=None):
         super().__init__(config=config)
-        if not config.doApplyFinalizedPsf:
-            self.inputs.remove("finalizedPsfApCorrCatalog")
-        if not config.doApplyExternalCalibrations or config.doApplyFinalizedPsf:
+        if not config.doApplyExternalCalibrations:
             del self.visitSummary
 
 
@@ -167,17 +153,6 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
         doc="Subtract the background fit when solving the kernel?",
         dtype=bool,
         default=True,
-    )
-    doApplyFinalizedPsf = lsst.pex.config.Field(
-        doc="Replace science Exposure's psf and aperture correction map"
-        " with those in finalizedPsfApCorrCatalog.",
-        dtype=bool,
-        default=False,
-        # TODO: remove on DM-39854.
-        deprecated=(
-            "Deprecated in favor of doApplyExternalCalibrations.  "
-            "Will be removed after v26."
-        )
     )
     doApplyExternalCalibrations = lsst.pex.config.Field(
         doc=(
@@ -947,7 +922,7 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
     ConfigClass = AlardLuptonPreconvolveSubtractConfig
     _DefaultName = "alardLuptonPreconvolveSubtract"
 
-    def run(self, template, science, sources, finalizedPsfApCorrCatalog=None, visitSummary=None):
+    def run(self, template, science, sources, visitSummary=None):
         """Preconvolve the science image with its own PSF,
         convolve the template image with a PSF-matching kernel and subtract
         from the preconvolved science image.
@@ -964,16 +939,9 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
             Identified sources on the science exposure. This catalog is used to
             select sources in order to perform the AL PSF matching on stamp
             images around them.
-        finalizedPsfApCorrCatalog : `lsst.afw.table.ExposureCatalog`, optional
-            Exposure catalog with finalized psf models and aperture correction
-            maps to be applied.  Catalog uses the detector id for the catalog
-            id, sorted on id for fast lookup. Deprecated in favor of
-            ``visitSummary``, and will be removed after v26.
         visitSummary : `lsst.afw.table.ExposureCatalog`, optional
             Exposure catalog with complete external calibrations. Catalog uses
             the detector id for the catalog id, sorted on id for fast lookup.
-            Ignored (for temporary backwards compatibility) if
-            ``finalizedPsfApCorrCatalog`` is provided.
 
         Returns
         -------
@@ -994,15 +962,6 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
                 Final kernel used to PSF-match the template to the science
                 image.
         """
-        if finalizedPsfApCorrCatalog is not None:
-            warnings.warn(
-                "The finalizedPsfApCorrCatalog argument is deprecated in favor of the visitSummary "
-                "argument, and will be removed after v26.",
-                FutureWarning,
-                stacklevel=find_outside_stacklevel("lsst.ip.diffim"),
-            )
-            visitSummary = finalizedPsfApCorrCatalog
-
         self._prepareInputs(template, science, visitSummary=visitSummary)
 
         # TODO: DM-37212 we need to mirror the kernel in order to get correct cross correlation
