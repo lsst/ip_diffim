@@ -25,7 +25,7 @@ import lsst.afw.detection as afwDetection
 import lsst.afw.table as afwTable
 import lsst.daf.base as dafBase
 import lsst.geom
-from lsst.ip.diffim.utils import getPsfFwhm, angleMean
+from lsst.ip.diffim.utils import evaluateMaskFraction
 from lsst.meas.algorithms import SkyObjectsTask, SourceDetectionTask, SetPrimaryFlagsTask, MaskStreaksTask
 from lsst.meas.base import ForcedMeasurementTask, ApplyApCorrTask, DetectorVisitIdGeneratorConfig
 import lsst.meas.deblender
@@ -83,12 +83,6 @@ class DetectAndMeasureConnections(pipeBase.PipelineTaskConnections,
         storageClass="ExposureF",
         name="{fakesType}{coaddName}Diff_differenceExp",
     )
-    spatiallySampledMetrics = pipeBase.connectionTypes.Output(
-        doc="Summary metrics computed at randomized locations.",
-        dimensions=("instrument", "visit", "detector"),
-        storageClass="ArrowAstropy",
-        name="{fakesType}{coaddName}Diff_spatiallySampledMetrics",
-    )
     maskedStreaks = pipeBase.connectionTypes.Output(
         doc='Streak profile information.',
         storageClass="ArrowNumpyDict",
@@ -98,9 +92,6 @@ class DetectAndMeasureConnections(pipeBase.PipelineTaskConnections,
 
     def __init__(self, *, config):
         super().__init__(config=config)
-        if not config.doWriteMetrics:
-            self.outputs.remove("spatiallySampledMetrics")
-
         if not (self.config.writeStreakInfo and self.config.doMaskStreaks):
             self.outputs.remove("maskedStreaks")
 
@@ -198,24 +189,6 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
                  "base_PixelFlags_flag_saturatedCenterAll",
                  ),
     )
-    metricsMaskPlanes = lsst.pex.config.ListField(
-        dtype=str,
-        doc="List of mask planes to include in metrics",
-        default=('BAD', 'CLIPPED', 'CR', 'DETECTED', 'DETECTED_NEGATIVE', 'EDGE',
-                 'INEXACT_PSF', 'INJECTED', 'INJECTED_TEMPLATE', 'INTRP', 'NOT_DEBLENDED',
-                 'NO_DATA', 'REJECTED', 'SAT', 'SAT_TEMPLATE', 'SENSOR_EDGE', 'STREAK', 'SUSPECT',
-                 'UNMASKEDNAN',
-                 ),
-    )
-    metricSources = pexConfig.ConfigurableField(
-        target=SkyObjectsTask,
-        doc="Generate QA metric sources",
-    )
-    doWriteMetrics = lsst.pex.config.Field(
-        dtype=bool,
-        default=True,
-        doc="Compute and write summary metrics."
-    )
     idGenerator = DetectorVisitIdGeneratorConfig.make_field()
 
     def setDefaults(self):
@@ -249,7 +222,6 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         self.measurement.plugins["base_PixelFlags"].masksFpCenter = [
             "STREAK", "INJECTED", "INJECTED_TEMPLATE"]
         self.skySources.avoidMask = ["DETECTED", "DETECTED_NEGATIVE", "BAD", "NO_DATA", "EDGE"]
-        self.metricSources.avoidMask = ["NO_DATA", "EDGE"]
 
 
 class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
@@ -307,61 +279,6 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         for flag in self.config.badSourceFlags:
             if flag not in self.schema:
                 raise pipeBase.InvalidQuantumError("Field %s not in schema" % flag)
-
-        if self.config.doWriteMetrics:
-            self.makeSubtask("metricSources")
-            self.metricSchema = afwTable.SourceTable.makeMinimalSchema()
-            self.metricSchema.addField(
-                "x", "F",
-                "X location of the metric evaluation.",
-                units="pixel")
-            self.metricSchema.addField(
-                "y", "F",
-                "Y location of the metric evaluation.",
-                units="pixel")
-            self.metricSources.skySourceKey = self.metricSchema.addField("sky_source", type="Flag",
-                                                                         doc="Metric evaluation objects.")
-            self.metricSchema.addField(
-                "source_density", "F",
-                "Density of diaSources at location.",
-                units="count/degree^2")
-            self.metricSchema.addField(
-                "dipole_density", "F",
-                "Density of dipoles at location.",
-                units="count/degree^2")
-            self.metricSchema.addField(
-                "dipole_direction", "F",
-                "Mean dipole orientation.",
-                units="radian")
-            self.metricSchema.addField(
-                "dipole_separation", "F",
-                "Mean dipole separation.",
-                units="pixel")
-            self.metricSchema.addField(
-                "template_value", "F",
-                "Median of template at location.",
-                units="nJy")
-            self.metricSchema.addField(
-                "science_value", "F",
-                "Median of science at location.",
-                units="nJy")
-            self.metricSchema.addField(
-                "diffim_value", "F",
-                "Median of diffim at location.",
-                units="nJy")
-            self.metricSchema.addField(
-                "science_psfSize", "F",
-                "Width of the science image PSF at location.",
-                units="pixel")
-            self.metricSchema.addField(
-                "template_psfSize", "F",
-                "Width of the template image PSF at location.",
-                units="pixel")
-            for maskPlane in self.config.metricsMaskPlanes:
-                self.metricSchema.addField(
-                    "%s_mask_fraction"%maskPlane.lower(), "F",
-                    "Fraction of pixels with %s mask"%maskPlane
-                )
 
         # initialize InitOutputs
         self.outputSchema = afwTable.SourceCatalog(self.schema)
@@ -505,13 +422,11 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         if self.config.doForcedMeasurement:
             self.measureForcedSources(diaSources, science, difference.getWcs())
 
-        spatiallySampledMetrics = self.calculateMetrics(difference, diaSources, science, matchedTemplate,
-                                                        idFactory)
+        self.calculateMetrics(difference)
 
         measurementResults = pipeBase.Struct(
             subtractedMeasuredExposure=difference,
             diaSources=diaSources,
-            spatiallySampledMetrics=spatiallySampledMetrics,
         )
         if self.config.doMaskStreaks and self.config.writeStreakInfo:
             measurementResults.mergeItems(streakInfo, 'maskedStreaks')
@@ -674,28 +589,14 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         for diaSource, forcedSource in zip(diaSources, forcedSources):
             diaSource.assign(forcedSource, mapper)
 
-    def calculateMetrics(self, difference, diaSources, science, matchedTemplate, idFactory):
+    def calculateMetrics(self, difference):
         """Add image QA metrics to the Task metadata.
 
         Parameters
         ----------
         difference : `lsst.afw.image.Exposure`
             The target image to calculate metrics for.
-        diaSources : `lsst.afw.table.SourceCatalog`
-            The catalog of detected sources.
-        science : `lsst.afw.image.Exposure`
-            The science image.
-        matchedTemplate : `lsst.afw.image.Exposure`
-            The reference image, warped and psf-matched to the science image.
-        idFactory : `lsst.afw.table.IdFactory`, optional
-            Generator object used to assign ids to detected sources in the
-            difference image.
 
-        Returns
-        -------
-        spatiallySampledMetrics : `lsst.afw.table.SourceCatalog`, or `None`
-            A catalog of randomized locations containing locally evaluated
-            metric results
         """
         mask = difference.mask
         badPix = (mask.array & mask.getPlaneBitMask(self.config.detection.excludeMaskPlanes)) > 0
@@ -709,83 +610,14 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         detNegPix &= badPix
         self.metadata.add("nBadPixelsDetectedPositive", np.sum(detPosPix))
         self.metadata.add("nBadPixelsDetectedNegative", np.sum(detNegPix))
-        metricsMaskPlanes = []
-        for maskPlane in self.config.metricsMaskPlanes:
+
+        metricsMaskPlanes = list(mask.getMaskPlaneDict().keys())
+        for maskPlane in metricsMaskPlanes:
             try:
                 self.metadata.add("%s_mask_fraction"%maskPlane.lower(), evaluateMaskFraction(mask, maskPlane))
-                metricsMaskPlanes.append(maskPlane)
             except InvalidParameterError:
                 self.metadata.add("%s_mask_fraction"%maskPlane.lower(), -1)
                 self.log.info("Unable to calculate metrics for mask plane %s: not in image"%maskPlane)
-
-        if self.config.doWriteMetrics:
-            spatiallySampledMetrics = afwTable.SourceCatalog(self.metricSchema)
-            spatiallySampledMetrics.getTable().setIdFactory(idFactory)
-            self.addSkySources(spatiallySampledMetrics, science.mask, difference.info.id,
-                               subtask=self.metricSources)
-            for src in spatiallySampledMetrics:
-                self._evaluateLocalMetric(src, diaSources, science, matchedTemplate, difference,
-                                          metricsMaskPlanes=metricsMaskPlanes)
-
-            return spatiallySampledMetrics.asAstropy()
-
-    def _evaluateLocalMetric(self, src, diaSources, science, matchedTemplate, difference,
-                             metricsMaskPlanes):
-        """Calculate image quality metrics at spatially sampled locations.
-
-        Parameters
-        ----------
-        src : `lsst.afw.table.SourceRecord`
-            The source record to be updated with metric calculations.
-        diaSources : `lsst.afw.table.SourceCatalog`
-            The catalog of detected sources.
-        science : `lsst.afw.image.Exposure`
-            The science image.
-        matchedTemplate : `lsst.afw.image.Exposure`
-            The reference image, warped and psf-matched to the science image.
-        difference : `lsst.afw.image.Exposure`
-            Result of subtracting template from the science image.
-        metricsMaskPlanes : `list` of `str`
-            Mask planes to calculate metrics from.
-        """
-        bbox = src.getFootprint().getBBox()
-        pix = bbox.getCenter()
-        src.set('science_psfSize', getPsfFwhm(science.psf, position=pix))
-        src.set('template_psfSize', getPsfFwhm(matchedTemplate.psf, position=pix))
-
-        metricRegionSize = 100
-        bbox.grow(metricRegionSize)
-        bbox = bbox.clippedTo(science.getBBox())
-        nPix = bbox.getArea()
-        pixScale = science.wcs.getPixelScale()
-        area = nPix*pixScale.asDegrees()**2
-        peak = src.getFootprint().getPeaks()[0]
-        src.set('x', peak['i_x'])
-        src.set('y', peak['i_y'])
-        src.setCoord(science.wcs.pixelToSky(peak['i_x'], peak['i_y']))
-        selectSources = diaSources[bbox.contains(diaSources.getX(), diaSources.getY())]
-        if self.config.doSkySources:
-            selectSources = selectSources[~selectSources["sky_source"]]
-        sourceDensity = len(selectSources)/area
-        dipoleSources = selectSources[selectSources["ip_diffim_DipoleFit_flag_classification"]]
-        dipoleDensity = len(dipoleSources)/area
-        if dipoleSources:
-            meanDipoleOrientation = angleMean(dipoleSources["ip_diffim_DipoleFit_orientation"])
-            src.set('dipole_direction', meanDipoleOrientation)
-            meanDipoleSeparation = np.mean(dipoleSources["ip_diffim_DipoleFit_separation"])
-            src.set('dipole_separation', meanDipoleSeparation)
-        templateVal = np.median(matchedTemplate[bbox].image.array)
-        scienceVal = np.median(science[bbox].image.array)
-        diffimVal = np.median(difference[bbox].image.array)
-        src.set('source_density', sourceDensity)
-        src.set('dipole_density', dipoleDensity)
-        src.set('template_value', templateVal)
-        src.set('science_value', scienceVal)
-        src.set('diffim_value', diffimVal)
-        for maskPlane in metricsMaskPlanes:
-            src.set("%s_mask_fraction"%maskPlane.lower(),
-                    evaluateMaskFraction(difference.mask[bbox], maskPlane)
-                    )
 
     def _runStreakMasking(self, maskedImage):
         """Do streak masking at put results into catalog.
@@ -901,8 +733,3 @@ class DetectAndMeasureScoreTask(DetectAndMeasureTask):
 
         return self.processResults(science, matchedTemplate, difference, sources, idFactory,
                                    positiveFootprints=positives, negativeFootprints=negatives)
-
-
-def evaluateMaskFraction(mask, maskPlane):
-    nMaskSet = np.count_nonzero((mask.array & mask.getPlaneBitMask(maskPlane)))
-    return nMaskSet/mask.array.size

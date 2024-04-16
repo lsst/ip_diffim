@@ -1335,3 +1335,22 @@ def angleMean(angles):
     """
     complexArray = [complex(np.cos(np.deg2rad(angle)), np.sin(np.deg2rad(angle))) for angle in angles]
     return (geom.Angle(np.angle(np.mean(complexArray))))
+
+
+def evaluateMaskFraction(mask, maskPlane):
+    """Evaluate the fraction of masked pixels in a mask plane.
+
+    Parameters
+    ----------
+    mask : `lsst.afw.image.Mask`
+        The mask to evaluate the fraction on
+    maskPlane : `str`
+        The particular mask plane to evaluate the fraction
+
+    Returns
+    -------
+    value : `float`
+        The calculated fraction of masked pixels
+    """
+    nMaskSet = np.count_nonzero((mask.array & mask.getPlaneBitMask(maskPlane)))
+    return nMaskSet/mask.array.size
