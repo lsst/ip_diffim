@@ -25,6 +25,7 @@
 from .diffimLib import *
 
 # Python code
+from .computeSpatiallySampledMetrics import *
 from .dcrModel import *
 from .psfMatch import *
 from .modelPsfMatch import *
