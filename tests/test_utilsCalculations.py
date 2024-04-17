@@ -22,7 +22,8 @@
 import numpy as np
 
 import lsst.geom
-from lsst.ip.diffim.utils import angleMean
+from lsst.ip.diffim.utils import angleMean, getPsfFwhm
+import lsst.meas.algorithms as measAlg
 import lsst.utils.tests
 
 
@@ -32,9 +33,39 @@ class UtilsCalculationsTest(lsst.utils.tests.TestCase):
     """
 
     def test_angleMean(self):
+        """Function for averages of angles.
+        """
         seed = 5
         nSrc = 100
         angleOffset = 30
         rng = np.random.RandomState(seed)
         angles = (rng.rand(nSrc) - 0.5)*20 + angleOffset
         self.assertFloatsAlmostEqual(angleOffset, angleMean(angles).asDegrees(), rtol=0.01)
+
+    def test_getPsfFwhm(self):
+        """Calculation of FWHM from a realization of the PSF
+        """
+        sigmaToFwhm = 2*np.log(2*np.sqrt(2))
+
+        def make_and_check_psf(xKsize, yKsize, sigma):
+            psf = measAlg.SingleGaussianPsf(xKsize, yKsize, sigma)
+            psfSize = getPsfFwhm(psf)
+            psfSize2d = getPsfFwhm(psf, average=False)
+            self.assertFloatsAlmostEqual(sigma*sigmaToFwhm, psfSize, rtol=0.01)
+            self.assertFloatsAlmostEqual(psfSize, psfSize2d[0], rtol=0.01)
+            self.assertFloatsAlmostEqual(psfSize, psfSize2d[1], rtol=0.01)
+
+        # Test equal and unequal axes with a narrow PSF
+        make_and_check_psf(23, 23, 1)
+        make_and_check_psf(23, 25, 1)
+        make_and_check_psf(23, 21, 1)
+
+        # Test equal and unequal axes with a narrow PSF
+        make_and_check_psf(23, 23, 1.23456)
+        make_and_check_psf(23, 25, 1.23456)
+        make_and_check_psf(23, 21, 1.23456)
+
+        # Test equal and unequal axes with a wide PSF
+        make_and_check_psf(23, 23, 2.1)
+        make_and_check_psf(23, 25, 2.1)
+        make_and_check_psf(23, 21, 2.1)
