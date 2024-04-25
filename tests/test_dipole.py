@@ -131,6 +131,7 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
         self.w, self.h = 100, 100  # size of image
         self.xc, self.yc = 50, 50  # location of center of dipole
 
+    # Remove this test on DM-44030
     def testNaiveDipoleCentroid(self):
         control = ipDiffim.DipoleCentroidControl()
         psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc)
@@ -147,6 +148,7 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
             except Exception:
                 self.fail()
 
+    # Remove this test on DM-44030
     def testNaiveDipoleFluxControl(self):
         psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc)
         control = ipDiffim.DipoleFluxControl()
@@ -321,8 +323,8 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
         self.assertFalse(source.get("ip_diffim_PsfDipoleFlux_neg_flag"))
         self.assertFalse(source.get("ip_diffim_PsfDipoleFlux_pos_flag"))
 
-        self.assertAlmostEqual(source.get("ip_diffim_PsfDipoleFlux_centroid_x"), 50.0, 1)
-        self.assertAlmostEqual(source.get("ip_diffim_PsfDipoleFlux_centroid_y"), 50.0, 1)
+        self.assertAlmostEqual(source.get("ip_diffim_PsfDipoleFlux_x"), 50.0, 1)
+        self.assertAlmostEqual(source.get("ip_diffim_PsfDipoleFlux_y"), 50.0, 1)
         self.assertAlmostEqual(source.get("ip_diffim_PsfDipoleFlux_neg_centroid_x"), negCenter[0], 1)
         self.assertAlmostEqual(source.get("ip_diffim_PsfDipoleFlux_neg_centroid_y"), negCenter[1], 1)
         self.assertAlmostEqual(source.get("ip_diffim_PsfDipoleFlux_pos_centroid_x"), posCenter[0], 1)

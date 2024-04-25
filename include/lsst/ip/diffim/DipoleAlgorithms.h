@@ -208,7 +208,9 @@ inline DipoleFluxAlgorithm::DipoleFluxAlgorithm(
 class that knows how to calculate centroids as a simple unweighted first
  * moment of the 3x3 region around the peaks
  */
-class NaiveDipoleFlux : public DipoleFluxAlgorithm {
+class [[deprecated(
+        "This algorithm is deprecated and will be removed after v28.")]]
+    NaiveDipoleFlux : public DipoleFluxAlgorithm {
 public:
 
     typedef DipoleFluxControl Control;
@@ -240,7 +242,9 @@ private:
 /**
  *  @brief Intermediate base class for algorithms that compute a centroid.
  */
-class NaiveDipoleCentroid : public DipoleCentroidAlgorithm {
+class [[deprecated(
+        "This algorithm is deprecated and will be removed after v28.")]]
+    NaiveDipoleCentroid : public DipoleCentroidAlgorithm {
 public:
 
     NaiveDipoleCentroid(Control const & ctrl, std::string const & name, afw::table::Schema & schema);
@@ -299,10 +303,10 @@ public:
     {
         meas::base::CentroidResultKey::addFields(schema, name+"_pos_centroid", "psf fitted center of positive lobe", meas::base::SIGMA_ONLY);
         meas::base::CentroidResultKey::addFields(schema, name+"_neg_centroid", "psf fitted center of negative lobe", meas::base::SIGMA_ONLY);
-        meas::base::CentroidResultKey::addFields(schema, name+"_centroid", "average of negative and positive lobe positions", meas::base::SIGMA_ONLY);
+        meas::base::CentroidResultKey::addFields(schema, name, "average of negative and positive lobe positions", meas::base::SIGMA_ONLY);
         _posCentroid = meas::base::CentroidResultKey(schema[name+"_pos_centroid"]);
         _negCentroid = meas::base::CentroidResultKey(schema[name+"_neg_centroid"]);
-        _avgCentroid = meas::base::CentroidResultKey(schema[name+"_centroid"]);
+        _avgCentroid = meas::base::CentroidResultKey(schema[name]);
     }
     std::pair<double,int> chi2(afw::table::SourceRecord & source,
                 afw::image::Exposure<float> const & exposure,

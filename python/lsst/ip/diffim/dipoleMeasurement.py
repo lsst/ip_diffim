@@ -106,8 +106,6 @@ class DipoleMeasurementConfig(SingleFrameMeasurementConfig):
                         "base_PixelFlags",
                         "base_SkyCoord",
                         "base_PsfFlux",
-                        "ip_diffim_NaiveDipoleCentroid",
-                        "ip_diffim_NaiveDipoleFlux",
                         "ip_diffim_PsfDipoleFlux",
                         "ip_diffim_ClassificationDipole",
                         ]
@@ -116,7 +114,7 @@ class DipoleMeasurementConfig(SingleFrameMeasurementConfig):
         self.slots.modelFlux = None
         self.slots.gaussianFlux = None
         self.slots.shape = None
-        self.slots.centroid = "ip_diffim_NaiveDipoleCentroid"
+        self.slots.centroid = "ip_diffim_PsfDipoleFlux"
         self.doReplaceWithNoise = False
 
 
@@ -260,7 +258,8 @@ class DipoleAnalysis(object):
         if display and displayDiaSources:
             with disp.Buffering():
                 for source in sources:
-                    cenX, cenY = source.get("ipdiffim_DipolePsfFlux_centroid")
+                    cenX = source.get("ipdiffim_DipolePsfFlux_x")
+                    cenY = source.get("ipdiffim_DipolePsfFlux_y")
                     if np.isinf(cenX) or np.isinf(cenY):
                         cenX, cenY = source.getCentroid()
 
