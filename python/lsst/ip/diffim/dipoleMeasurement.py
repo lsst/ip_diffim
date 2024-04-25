@@ -260,7 +260,8 @@ class DipoleAnalysis(object):
         if display and displayDiaSources:
             with disp.Buffering():
                 for source in sources:
-                    cenX, cenY = source.get("ipdiffim_DipolePsfFlux_centroid")
+                    cenX = source.get("ipdiffim_DipolePsfFlux_x")
+                    cenY = source.get("ipdiffim_DipolePsfFlux_y")
                     if np.isinf(cenX) or np.isinf(cenY):
                         cenX, cenY = source.getCentroid()
 

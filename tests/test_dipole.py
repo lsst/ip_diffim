@@ -321,8 +321,8 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
         self.assertFalse(source.get("ip_diffim_PsfDipoleFlux_neg_flag"))
         self.assertFalse(source.get("ip_diffim_PsfDipoleFlux_pos_flag"))
 
-        self.assertAlmostEqual(source.get("ip_diffim_PsfDipoleFlux_centroid_x"), 50.0, 1)
-        self.assertAlmostEqual(source.get("ip_diffim_PsfDipoleFlux_centroid_y"), 50.0, 1)
+        self.assertAlmostEqual(source.get("ip_diffim_PsfDipoleFlux_x"), 50.0, 1)
+        self.assertAlmostEqual(source.get("ip_diffim_PsfDipoleFlux_y"), 50.0, 1)
         self.assertAlmostEqual(source.get("ip_diffim_PsfDipoleFlux_neg_centroid_x"), negCenter[0], 1)
         self.assertAlmostEqual(source.get("ip_diffim_PsfDipoleFlux_neg_centroid_y"), negCenter[1], 1)
         self.assertAlmostEqual(source.get("ip_diffim_PsfDipoleFlux_pos_centroid_x"), posCenter[0], 1)

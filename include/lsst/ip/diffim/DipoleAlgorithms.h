@@ -299,10 +299,10 @@ public:
     {
         meas::base::CentroidResultKey::addFields(schema, name+"_pos_centroid", "psf fitted center of positive lobe", meas::base::SIGMA_ONLY);
         meas::base::CentroidResultKey::addFields(schema, name+"_neg_centroid", "psf fitted center of negative lobe", meas::base::SIGMA_ONLY);
-        meas::base::CentroidResultKey::addFields(schema, name+"_centroid", "average of negative and positive lobe positions", meas::base::SIGMA_ONLY);
+        meas::base::CentroidResultKey::addFields(schema, name, "average of negative and positive lobe positions", meas::base::SIGMA_ONLY);
         _posCentroid = meas::base::CentroidResultKey(schema[name+"_pos_centroid"]);
         _negCentroid = meas::base::CentroidResultKey(schema[name+"_neg_centroid"]);
-        _avgCentroid = meas::base::CentroidResultKey(schema[name+"_centroid"]);
+        _avgCentroid = meas::base::CentroidResultKey(schema[name]);
     }
     std::pair<double,int> chi2(afw::table::SourceRecord & source,
                 afw::image::Exposure<float> const & exposure,
