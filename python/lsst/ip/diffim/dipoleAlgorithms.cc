@@ -102,6 +102,10 @@ void declareDipoleFluxAlgorithm(lsst::cpputils::python::WrapperCollection &wrapp
     });
 }
 
+// Hide deprecation warnings when building pybind11.
+// Remove these pragmas on DM-44030
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated"
 void declareNaiveDipoleFlux(lsst::cpputils::python::WrapperCollection &wrappers) {
     using PyNaiveDipoleFlux = py::class_<NaiveDipoleFlux, std::shared_ptr<NaiveDipoleFlux>, DipoleFluxAlgorithm>;
 
@@ -157,6 +161,10 @@ void wrapDipoleAlgorithms(lsst::cpputils::python::WrapperCollection &wrappers) {
     declareNaiveDipoleCentroid(wrappers);
     declarePsfDipoleFlux(wrappers);
 }
+
+// Stop hiding deprecation warnings when building pybind11.
+// Remove these pragmas on DM-44030
+#pragma GCC diagnostic pop
 
 }  // diffim
 }  // ip

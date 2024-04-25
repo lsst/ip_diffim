@@ -106,8 +106,6 @@ class DipoleMeasurementConfig(SingleFrameMeasurementConfig):
                         "base_PixelFlags",
                         "base_SkyCoord",
                         "base_PsfFlux",
-                        "ip_diffim_NaiveDipoleCentroid",
-                        "ip_diffim_NaiveDipoleFlux",
                         "ip_diffim_PsfDipoleFlux",
                         "ip_diffim_ClassificationDipole",
                         ]
@@ -116,7 +114,7 @@ class DipoleMeasurementConfig(SingleFrameMeasurementConfig):
         self.slots.modelFlux = None
         self.slots.gaussianFlux = None
         self.slots.shape = None
-        self.slots.centroid = "ip_diffim_NaiveDipoleCentroid"
+        self.slots.centroid = "ip_diffim_PsfDipoleFlux"
         self.doReplaceWithNoise = False
 
 

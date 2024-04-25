@@ -208,7 +208,9 @@ inline DipoleFluxAlgorithm::DipoleFluxAlgorithm(
 class that knows how to calculate centroids as a simple unweighted first
  * moment of the 3x3 region around the peaks
  */
-class NaiveDipoleFlux : public DipoleFluxAlgorithm {
+class [[deprecated(
+        "This algorithm is deprecated and will be removed after v28.")]]
+    NaiveDipoleFlux : public DipoleFluxAlgorithm {
 public:
 
     typedef DipoleFluxControl Control;
@@ -240,7 +242,9 @@ private:
 /**
  *  @brief Intermediate base class for algorithms that compute a centroid.
  */
-class NaiveDipoleCentroid : public DipoleCentroidAlgorithm {
+class [[deprecated(
+        "This algorithm is deprecated and will be removed after v28.")]]
+    NaiveDipoleCentroid : public DipoleCentroidAlgorithm {
 public:
 
     NaiveDipoleCentroid(Control const & ctrl, std::string const & name, afw::table::Schema & schema);

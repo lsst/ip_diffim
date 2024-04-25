@@ -131,6 +131,7 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
         self.w, self.h = 100, 100  # size of image
         self.xc, self.yc = 50, 50  # location of center of dipole
 
+    # Remove this test on DM-44030
     def testNaiveDipoleCentroid(self):
         control = ipDiffim.DipoleCentroidControl()
         psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc)
@@ -147,6 +148,7 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
             except Exception:
                 self.fail()
 
+    # Remove this test on DM-44030
     def testNaiveDipoleFluxControl(self):
         psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc)
         control = ipDiffim.DipoleFluxControl()
