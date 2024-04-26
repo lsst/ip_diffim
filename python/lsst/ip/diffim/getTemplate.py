@@ -227,77 +227,30 @@ class GetTemplateTask(pipeBase.PipelineTask):
             If the PSF of the template can't be calculated.
         """
         # Table for CoaddPSF
-        tractsSchema = afwTable.ExposureTable.makeMinimalSchema()
-        tractKey = tractsSchema.addField('tract', type=np.int32, doc='Which tract')
-        patchKey = tractsSchema.addField('patch', type=np.int32, doc='Which patch')
-        weightKey = tractsSchema.addField('weight', type=float, doc='Weight for each tract, should be 1')
-        tractsCatalog = afwTable.ExposureCatalog(tractsSchema)
+        schema = afwTable.ExposureTable.makeMinimalSchema()
+        schema.addField('tract', type=np.int32, doc='Which tract this exposure came from.')
+        schema.addField('patch', type=np.int32, doc='Which patch in the tract this exposure came from.')
+        schema.addField('weight', type=float, doc='Weight for each exposure; should be 1.')
+        catalog = afwTable.ExposureCatalog(schema)
 
-        finalWcs = wcs
         bbox.grow(self.config.templateBorderSize)
-        finalBBox = bbox
 
         nPatchesFound = 0
         maskedImageList = []
         weightList = []
 
         for coaddExposure, dataId in zip(coaddExposures, dataIds):
-
-            # warp to detector WCS
-            warped = self.warper.warpExposure(finalWcs, coaddExposure, maxBBox=finalBBox)
-
-            # Check if warped image is viable
-            if not np.any(np.isfinite(warped.image.array)):
-                self.log.info("No overlap for warped %s. Skipping" % dataId)
-                continue
-
-            exp = afwImage.ExposureF(finalBBox, finalWcs)
-            exp.maskedImage.set(np.nan, afwImage.Mask.getPlaneBitMask("NO_DATA"), np.nan)
-            exp.maskedImage.assign(warped.maskedImage, warped.getBBox())
-
-            maskedImageList.append(exp.maskedImage)
-            weightList.append(1)
-            record = tractsCatalog.addNew()
-            record.setPsf(coaddExposure.getPsf())
-            record.setWcs(coaddExposure.getWcs())
-            record.setPhotoCalib(coaddExposure.getPhotoCalib())
-            record.setBBox(coaddExposure.getBBox())
-            record.setValidPolygon(afwGeom.Polygon(geom.Box2D(coaddExposure.getBBox()).getCorners()))
-            record.set(tractKey, dataId['tract'])
-            record.set(patchKey, dataId['patch'])
-            record.set(weightKey, 1.)
-            nPatchesFound += 1
+            if (exposure := self._warp(coaddExposure, wcs, bbox, dataId, catalog)):
+                maskedImageList.append(exposure)
+                nPatchesFound += 1
+                weightList.append(1)
 
         if nPatchesFound == 0:
             raise pipeBase.NoWorkFound("No patches found to overlap detector")
 
         # Combine images from individual patches together
-        statsFlags = afwMath.stringToStatisticsProperty('MEAN')
-        statsCtrl = afwMath.StatisticsControl()
-        statsCtrl.setNanSafe(True)
-        statsCtrl.setWeighted(True)
-        statsCtrl.setCalcErrorMosaicMode(True)
+        templateExposure = self._merge(maskedImageList, weightList, wcs, bbox, catalog)
 
-        templateExposure = afwImage.ExposureF(finalBBox, finalWcs)
-        templateExposure.maskedImage.set(np.nan, afwImage.Mask.getPlaneBitMask("NO_DATA"), np.nan)
-        xy0 = templateExposure.getXY0()
-        # Do not mask any values
-        templateExposure.maskedImage = afwMath.statisticsStack(maskedImageList, statsFlags, statsCtrl,
-                                                               weightList, clipped=0, maskMap=[])
-        templateExposure.maskedImage.setXY0(xy0)
-
-        # CoaddPsf centroid not only must overlap image, but must overlap the
-        # part of image with data. Use centroid of region with data.
-        boolmask = templateExposure.mask.array & templateExposure.mask.getPlaneBitMask('NO_DATA') == 0
-        maskx = afwImage.makeMaskFromArray(boolmask.astype(afwImage.MaskPixel))
-        centerCoord = afwGeom.SpanSet.fromMask(maskx, 1).computeCentroid()
-
-        ctrl = self.config.coaddPsf.makeControl()
-        coaddPsf = CoaddPsf(tractsCatalog, finalWcs, centerCoord, ctrl.warpingKernelName, ctrl.cacheSize)
-        if coaddPsf is None:
-            raise RuntimeError("CoaddPsf could not be constructed")
-
-        templateExposure.setPsf(coaddPsf)
         # Coadds do not have a physical filter, so fetch it from the butler to prevent downstream warnings.
         if physical_filter is None:
             filterLabel = coaddExposure.getFilter()
@@ -306,6 +259,61 @@ class GetTemplateTask(pipeBase.PipelineTask):
         templateExposure.setFilter(filterLabel)
         templateExposure.setPhotoCalib(coaddExposure.getPhotoCalib())
         return pipeBase.Struct(template=templateExposure)
+
+    def _merge(self, maskedImages, weights, wcs, bbox, catalog):
+        statsFlags = afwMath.stringToStatisticsProperty('MEAN')
+        statsCtrl = afwMath.StatisticsControl()
+        statsCtrl.setNanSafe(True)
+        statsCtrl.setWeighted(True)
+        statsCtrl.setCalcErrorMosaicMode(True)
+
+        template = afwImage.ExposureF(bbox, wcs)
+        template.maskedImage.set(np.nan, afwImage.Mask.getPlaneBitMask("NO_DATA"), np.nan)
+        xy0 = template.getXY0()
+        # Do not mask any values
+        template.maskedImage = afwMath.statisticsStack(maskedImages, statsFlags, statsCtrl,
+                                                       weights, clipped=0, maskMap=[])
+        template.maskedImage.setXY0(xy0)
+
+        # CoaddPsf centroid not only must overlap image, but must overlap the
+        # part of image with data. Use centroid of region with data.
+        boolmask = template.mask.array & template.mask.getPlaneBitMask('NO_DATA') == 0
+        maskx = afwImage.makeMaskFromArray(boolmask.astype(afwImage.MaskPixel))
+        centerCoord = afwGeom.SpanSet.fromMask(maskx, 1).computeCentroid()
+
+        ctrl = self.config.coaddPsf.makeControl()
+        coaddPsf = CoaddPsf(catalog, wcs, centerCoord, ctrl.warpingKernelName, ctrl.cacheSize)
+        if coaddPsf is None:
+            raise RuntimeError("CoaddPsf could not be constructed")
+
+        template.setPsf(coaddPsf)
+
+        return template
+
+    def _warp(self, coadd, wcs, bbox, dataId, catalog):
+        # warp to detector WCS
+        warped = self.warper.warpExposure(wcs, coadd, maxBBox=bbox)
+
+        # Check if warped image is viable
+        if not np.any(np.isfinite(warped.image.array)):
+            self.log.info("No overlap for warped %s. Skipping" % dataId)
+            return
+
+        exp = afwImage.ExposureF(bbox, wcs)
+        exp.maskedImage.set(np.nan, afwImage.Mask.getPlaneBitMask("NO_DATA"), np.nan)
+        exp.maskedImage.assign(warped.maskedImage, warped.getBBox())
+
+        record = catalog.addNew()
+        record.setPsf(coadd.getPsf())
+        record.setWcs(coadd.getWcs())
+        record.setPhotoCalib(coadd.getPhotoCalib())
+        record.setBBox(coadd.getBBox())
+        record.setValidPolygon(afwGeom.Polygon(geom.Box2D(coadd.getBBox()).getCorners()))
+        record.set("tract", dataId["tract"])
+        record.set("patch", dataId["patch"])
+        record.set("weight", 1.)
+
+        return exp.maskedImage
 
 
 class GetDcrTemplateConnections(GetTemplateConnections,
