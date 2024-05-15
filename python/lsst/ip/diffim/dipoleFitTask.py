@@ -1105,6 +1105,7 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
         if ((area := measRecord.getFootprint().getArea()) > self.config.maxFootprintArea):
             self.fail(measRecord, measBase.MeasurementError(f"{area} > {self.config.maxFootprintArea}",
                                                             self.FAILURE_TOO_LARGE))
+            return
 
         try:
             alg = self.DipoleFitAlgorithmClass(exposure, posImage=posExp, negImage=negExp)
