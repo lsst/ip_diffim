@@ -332,9 +332,13 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         if idFactory is None:
             idFactory = lsst.meas.base.IdGenerator().make_table_id_factory()
 
-        # Ensure that we start with an empty detection mask.
+        # Ensure that we start with an empty detection and deblended mask.
         mask = difference.mask
-        mask &= ~(mask.getPlaneBitMask("DETECTED") | mask.getPlaneBitMask("DETECTED_NEGATIVE"))
+        clearMaskPlanes = ["DETECTED", "DETECTED_NEGATIVE", "NOT_DEBLENDED"]
+        for mp in clearMaskPlanes:
+            if mp not in mask.getMaskPlaneDict():
+                mask.addMaskPlane(mp)
+        mask &= ~mask.getPlaneBitMask(clearMaskPlanes)
 
         # Don't use the idFactory until after deblend+merge, so that we aren't
         # generating ids that just get thrown away (footprint merge doesn't
