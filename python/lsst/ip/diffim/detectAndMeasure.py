@@ -198,8 +198,6 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         self.detection.thresholdType = "pixel_stdev"
         self.detection.excludeMaskPlanes = ["EDGE", "SAT", "BAD", "INTRP"]
 
-        # Add filtered flux measurement, the correct measurement for pre-convolved images.
-        self.measurement.algorithms.names.add("base_PeakLikelihoodFlux")
         self.measurement.plugins.names |= ["ext_trailedSources_Naive",
                                            "base_LocalPhotoCalib",
                                            "base_LocalWcs",
