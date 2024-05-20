@@ -110,7 +110,6 @@ class DipoleFitTaskConfig(measBase.SingleFrameMeasurementConfig):
                               "base_SkyCoord",
                               "base_PsfFlux",
                               "base_SdssShape",
-                              "base_GaussianFlux",
                               ]
         # Only measure the apertures we need to report in the alert stream.
         self.plugins["base_CircularApertureFlux"].radii = [12.0]
