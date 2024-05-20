@@ -26,6 +26,7 @@ import warnings
 
 import lsst.afw.image as afwImage
 import lsst.meas.base as measBase
+import lsst.meas.extensions.shapeHSM  # noqa: F401
 import lsst.afw.detection as afwDet
 import lsst.geom as geom
 import lsst.pex.exceptions as pexExcept
@@ -109,15 +110,17 @@ class DipoleFitTaskConfig(measBase.SingleFrameMeasurementConfig):
                               "base_PixelFlags",
                               "base_SkyCoord",
                               "base_PsfFlux",
-                              "base_SdssShape",
+                              "ext_shapeHSM_HsmSourceMoments",
+                              "ext_shapeHSM_HsmPsfMoments",
                               ]
+        self.slots.psfShape = "ext_shapeHSM_HsmPsfMoments"
+        self.slots.shape = "ext_shapeHSM_HsmSourceMoments"
         # Only measure the apertures we need to report in the alert stream.
         self.plugins["base_CircularApertureFlux"].radii = [12.0]
 
         self.slots.calibFlux = None
         self.slots.modelFlux = None
         self.slots.gaussianFlux = None
-        self.slots.shape = "base_SdssShape"
         # This will be switched to "ip_diffim_DipoleFit" as this task runs.
         self.slots.centroid = "base_SdssCentroid"
         self.doReplaceWithNoise = False

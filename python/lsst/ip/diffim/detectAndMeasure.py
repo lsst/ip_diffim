@@ -30,7 +30,6 @@ from lsst.meas.algorithms import SkyObjectsTask, SourceDetectionTask, SetPrimary
 from lsst.meas.base import ForcedMeasurementTask, ApplyApCorrTask, DetectorVisitIdGeneratorConfig
 import lsst.meas.deblender
 import lsst.meas.extensions.trailedSources  # noqa: F401
-import lsst.meas.extensions.shapeHSM
 import lsst.pex.config as pexConfig
 from lsst.pex.exceptions import InvalidParameterError
 import lsst.pipe.base as pipeBase
@@ -204,11 +203,7 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         self.measurement.plugins.names |= ["ext_trailedSources_Naive",
                                            "base_LocalPhotoCalib",
                                            "base_LocalWcs",
-                                           "ext_shapeHSM_HsmSourceMoments",
-                                           "ext_shapeHSM_HsmPsfMoments",
                                            ]
-        self.measurement.slots.psfShape = "ext_shapeHSM_HsmPsfMoments"
-        self.measurement.slots.shape = "ext_shapeHSM_HsmSourceMoments"
         self.measurement.plugins["base_SdssCentroid"].maxDistToPeak = 5.0
         self.forcedMeasurement.plugins = ["base_TransformedCentroid", "base_PsfFlux"]
         self.forcedMeasurement.copyColumns = {
