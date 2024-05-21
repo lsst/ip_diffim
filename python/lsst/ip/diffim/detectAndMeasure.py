@@ -296,7 +296,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
     @timeMethod
     def run(self, science, matchedTemplate, difference,
-            idFactory=None):
+            idFactory=None, make_deep=True):
         """Detect and measure sources on a difference image.
 
         The difference image will be convolved with a gaussian approximation of
@@ -340,16 +340,28 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         # Don't use the idFactory until after deblend+merge, so that we aren't
         # generating ids that just get thrown away (footprint merge doesn't
         # know about past ids).
-        table = afwTable.SourceTable.make(self.schema)
-        results = self.detection.run(
-            table=table,
+        results = self.detection.detectFootprints(
             exposure=difference,
             doSmooth=True,
         )
 
         sources = self._buildCatalogAndDeblend(difference, results.positive, results.negative, idFactory)
 
-        return self._measureSources(science, matchedTemplate, difference, sources)
+        if make_deep:
+            #sources2 = sources.copy(deep=True)
+            #merged_footprints = results.positive
+            #merged_footprints.merge(results.negative, 0, 0, False)
+
+            # Create a source catalog from the footprints.
+            table = afwTable.SourceTable.make(self.schema, idFactory)
+            #table = sources.table.clone()
+            import ipdb; ipdb.set_trace()
+            #table.setIdFactory(idFactory.clone())
+            sources2 = afwTable.SourceCatalog(table)
+            sources2.extend(sources, deep=True)
+        #import ipdb; ipdb.set_trace()
+
+        return self._measureSources(science, matchedTemplate, difference, sources2)
 
     def _measureSources(self, science, matchedTemplate, difference, initialDiaSources):
         """Measure and process the results of source detection.
@@ -440,11 +452,11 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         # Sky sources must be added before deblending, otherwise the
         # sources with parent == 0 will be out of order and
         # downstream measurement tasks cannot run.
-        if self.config.doSkySources:
-            self.addSkySources(sources, difference.mask, difference.info.id)
+        #if self.config.doSkySources:
+        #    self.addSkySources(sources, difference.mask, difference.info.id)
 
         # Find the footprints with only positive peaks and no negative peaks.
-        footprints = [src.getFootprint() for src in sources]
+        """footprints = [src.getFootprint() for src in sources]
         nPeaks = np.array([len(fp.peaks) for fp in footprints])
         blend_ids = []
         skipped_ids = []
@@ -473,10 +485,10 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         # instead of setting the flags manually.
         for sid in skipped_ids:
             src = sources.find(sid)
-            self.deblend.skipParent(src, difference.mask)
+            self.deblend.skipParent(src, difference.mask)"""
 
         # Set detection and primary flags
-        self.setPrimaryFlags.run(sources)
+        #self.setPrimaryFlags.run(sources)
 
         return sources
 
