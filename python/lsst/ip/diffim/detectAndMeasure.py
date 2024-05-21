@@ -379,7 +379,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             ``diaSources``  : `lsst.afw.table.SourceCatalog`
                 The catalog of detected sources.
         """
-        self.metadata.add("nDiaSources", len(initialDiaSources))
+        self.metadata.add("nMergedDiaSources", len(initialDiaSources))
         initialDiaSources.setMetadata(self.algMetadata)
 
         if self.config.doMaskStreaks:
@@ -430,6 +430,10 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             Deblended positive and negative polarity footprints measured on
             ``difference``.
         """
+        self.metadata.add(
+            "nUnmergedDiaSources",
+            len(positiveFootprints.getFootprints()) + len(negativeFootprints.getFootprints())
+        )
         # Merge the positive and negative footprints.
         # The original detection FootprintSets already grew each detection,
         # so there is no need to grow them again.
