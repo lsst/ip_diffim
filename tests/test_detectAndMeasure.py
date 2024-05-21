@@ -288,9 +288,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
             output = detectionTask.run(science.clone(), matchedTemplate, difference)
             refIds = []
             scale = 1. if positive else -1.
-            # Deblending provides multiple copies of the main parent source,
-            # so we only check the parents. Deblending is checked in another test.
-            for diaSource in output.diaSources[output.diaSources["parent"] == 0]:
+            for diaSource in output.diaSources:
                 self._check_diaSource(transientSources, diaSource, refIds=refIds, scale=scale)
         _detection_wrapper(positive=True)
         _detection_wrapper(positive=False)
@@ -519,7 +517,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
 
         sci_refIds = []
         tmpl_refIds = []
-        for diaSrc in output.diaSources[output.diaSources["parent"] == 0]:
+        for diaSrc in output.diaSources:
             if diaSrc['base_PsfFlux_instFlux'] > 0:
                 self._check_diaSource(science_fake_sources, diaSrc, scale=1, refIds=sci_refIds)
                 self.assertTrue(diaSrc['base_PixelFlags_flag_injected'])
@@ -689,10 +687,7 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
             scale = 1. if positive else -1.
             # sources near the edge may have untrustworthy centroids
             goodSrcFlags = ~output.diaSources['base_PixelFlags_flag_edge']
-            # Deblending provides multiple copies of the main parent source,
-            # so we only check the parents. Deblending is checked in another test.
-            for diaSource, goodSrcFlag in zip(output.diaSources[output.diaSources["parent"] == 0],
-                                              goodSrcFlags):
+            for diaSource, goodSrcFlag in zip(output.diaSources, goodSrcFlags):
                 if goodSrcFlag:
                     self._check_diaSource(transientSources, diaSource, refIds=refIds, scale=scale)
         _detection_wrapper(positive=True)
