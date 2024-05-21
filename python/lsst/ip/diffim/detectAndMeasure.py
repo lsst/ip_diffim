@@ -482,7 +482,11 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         # Set detection and primary flags
         self.setPrimaryFlags.run(sources)
 
-        return sources
+        table = afwTable.SourceTable.make(self.schema, idFactory)
+        _sources = afwTable.SourceCatalog(table)
+        _sources.extend(sources, deep=True)
+
+        return _sources
 
     def _removeBadSources(self, diaSources):
         """Remove unphysical diaSources from the catalog.
