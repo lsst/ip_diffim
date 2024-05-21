@@ -899,7 +899,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         mask.array |= ((mask.array & originBitMask) > 0)*destinationBitMask
 
     def _clearMask(self, mask, clearMaskPlanes=None):
-        """Clear the mask plane of the template.
+        """Clear the mask plane of an exposure.
 
         Parameters
         ----------
