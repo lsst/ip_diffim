@@ -20,6 +20,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
+from astropy import units as u
 
 import lsst.afw.detection as afwDetection
 import lsst.afw.table as afwTable
@@ -424,7 +425,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         if self.config.doForcedMeasurement:
             self.measureForcedSources(diaSources, science, difference.getWcs())
 
-        self.calculateMetrics(difference)
+        self.calculateMetrics(difference, matchedTemplate, science)
 
         measurementResults = pipeBase.Struct(
             subtractedMeasuredExposure=difference,
@@ -591,13 +592,19 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         for diaSource, forcedSource in zip(diaSources, forcedSources):
             diaSource.assign(forcedSource, mapper)
 
-    def calculateMetrics(self, difference):
-        """Add image QA metrics to the Task metadata.
+    def calculateMetrics(self, difference, matchedTemplate, science):
+        """Add difference image QA metrics to the Task metadata.
+        This may be used to produce corresponding metrics (see
+        lsst.analysis.tools.tasks.diffimTaskDetectorVisitMetricAnalysis).
 
         Parameters
         ----------
         difference : `lsst.afw.image.Exposure`
-            The target image to calculate metrics for.
+            The target difference image to calculate metrics for.
+        matchedTemplate : `lsst.afw.image.Exposure`
+            The warped and PSF-matched template used to create difference.
+        science : `lsst.afw.image.Exposure`
+            Science exposure that the template was subtracted from.
 
         """
         mask = difference.mask
@@ -620,6 +627,39 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             except InvalidParameterError:
                 self.metadata.add("%s_mask_fraction"%maskPlane.lower(), -1)
                 self.log.info("Unable to calculate metrics for mask plane %s: not in image"%maskPlane)
+
+        maglim_science = self._calculateMagLim(science)
+        fluxlim_science = (maglim_science*u.ABmag).to_value(u.nJy)
+        maglim_template = self._calculateMagLim(matchedTemplate)
+        fluxlim_template = (maglim_template*u.ABmag).to_value(u.nJy)
+        maglim_diffim = (np.sqrt(fluxlim_science**2 + fluxlim_template**2)*u.nJy).to(u.ABmag).value
+        self.metadata.add("diffimLimitingMagnitude", maglim_diffim)
+
+    def _calculateMagLim(self, exposure, nsigma=5.0):
+        """Calculate an exposure's limiting magnitude.
+
+        This method uses the photometric zeropoint together with the
+        PSF size from the center of the exposure.
+
+        Parameters
+        ----------
+        exposure : `lsst.afw.image.Exposure`
+            The target exposure to calculate the limiting magnitude for.
+        nsigma : `float`, optional
+            The detection threshold in sigma.
+
+        Returns
+        -------
+        maglim : `astropy.units.Quantity`
+            The limiting magnitude of the exposure.
+        """
+        zeropoint = exposure.getPhotoCalib().instFluxToMagnitude(1)
+        psf = exposure.getPsf()
+        psf_shape = psf.computeShape(exposure.getBBox().getCenter())
+        psf_size = psf_shape.getDeterminantRadius()
+        psf_area = np.pi*psf_size**2
+        maglim = zeropoint - 2.5*np.log10(nsigma*np.sqrt(psf_area))
+        return maglim
 
     def _runStreakMasking(self, maskedImage):
         """Do streak masking at put results into catalog.
