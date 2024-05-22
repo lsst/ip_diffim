@@ -247,8 +247,9 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         badDiaSrc = ~bbox.contains(diaSources.getX(), diaSources.getY())
         nBad = np.count_nonzero(badDiaSrc)
         self.assertEqual(nBad, nSetBad)
-        diaSourcesNoBad = detectionTask._removeBadSources(diaSources)
+        diaSourcesNoBad, removedSources = detectionTask._removeBadSources(diaSources)
         badDiaSrcNoBad = ~bbox.contains(diaSourcesNoBad.getX(), diaSourcesNoBad.getY())
+        self.assertEqual(len(removedSources), nSetBad)
 
         # Verify that no sources outside the image bounding box remain
         self.assertEqual(np.count_nonzero(badDiaSrcNoBad), 0)

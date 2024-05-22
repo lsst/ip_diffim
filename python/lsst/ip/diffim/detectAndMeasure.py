@@ -76,6 +76,12 @@ class DetectAndMeasureConnections(pipeBase.PipelineTaskConnections,
         storageClass="SourceCatalog",
         name="{fakesType}{coaddName}Diff_diaSrc",
     )
+    removedSources = pipeBase.connectionTypes.Output(
+        doc="Sources and blends removed from the diaSources catalog.",
+        dimensions=("instrument", "visit", "detector"),
+        storageClass="SourceCatalog",
+        name="{fakesType}{coaddName}Diff_diaSrc_removed",
+    )
     subtractedMeasuredExposure = pipeBase.connectionTypes.Output(
         doc="Difference image with detection mask plane filled in.",
         dimensions=("instrument", "visit", "detector"),
@@ -386,7 +392,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             streakInfo = self._runStreakMasking(difference.maskedImage)
 
         self.measureDiaSources(initialDiaSources, science, difference, matchedTemplate)
-        diaSources = self._removeBadSources(initialDiaSources)
+        diaSources, removedSources = self._removeBadSources(initialDiaSources)
 
         if self.config.doForcedMeasurement:
             self.measureForcedSources(diaSources, science, difference.getWcs())
@@ -396,6 +402,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         measurementResults = pipeBase.Struct(
             subtractedMeasuredExposure=difference,
             diaSources=diaSources,
+            removedSources=removedSources,
         )
         if self.config.doMaskStreaks and self.config.writeStreakInfo:
             measurementResults.mergeItems(streakInfo, 'maskedStreaks')
@@ -506,17 +513,33 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             The updated catalog of detected sources, with any source that has a
             flag in ``config.badSourceFlags`` set removed.
         """
-        selector = np.ones(len(diaSources), dtype=bool)
+        bad_sources = np.zeros(len(diaSources), dtype=bool)
         for flag in self.config.badSourceFlags:
             flags = diaSources[flag]
             nBad = np.count_nonzero(flags)
             if nBad > 0:
                 self.log.debug("Found %d unphysical sources with flag %s.", nBad, flag)
-                selector &= ~flags
-        nBadTotal = np.count_nonzero(~selector)
+                bad_sources |= flags
+        # Remove parents of bad children, and children of bad parents.
+        # This is due to the measurement plugins, where it is assumed that
+        # parent blends have all of their children in the catalog, and vice versa.
+        parents = (
+            (diaSources["parent"] == 0)
+            & (diaSources["deblend_nChild"] > 1)
+            & (~diaSources["deblend_skipped"])
+        )
+        children = (diaSources["parent"] != 0)
+        parents_to_remove = np.unique(diaSources["parent"][children & bad_sources])
+        bad_parents = parents & bad_sources
+        bad_parents |= np.in1d(diaSources["id"], parents_to_remove)
+        children_to_remove = np.in1d(diaSources["parent"], diaSources["id"][bad_parents])
+        bad_children = (bad_sources & children) | children_to_remove
+        bad_sources |= bad_parents | bad_children
+
+        nBadTotal = np.count_nonzero(bad_sources)
         self.metadata.add("nRemovedBadFlaggedSources", nBadTotal)
-        self.log.info("Removed %d unphysical sources.", nBadTotal)
-        return diaSources[selector].copy(deep=True)
+        self.log.info("Removed %d unphysical sources and blends.", nBadTotal)
+        return diaSources[~bad_sources].copy(deep=True), diaSources[bad_sources]
 
     def addSkySources(self, diaSources, mask, seed,
                       subtask=None):
