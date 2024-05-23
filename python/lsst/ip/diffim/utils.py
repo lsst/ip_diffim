@@ -1326,14 +1326,14 @@ def angleMean(angles):
     Parameters
     ----------
     angles : `ndarray`
-        An array of angles, in degrees
+        An array of angles, in radians
 
     Returns
     -------
     `lsst.geom.Angle`
         The mean angle
     """
-    complexArray = [complex(np.cos(np.deg2rad(angle)), np.sin(np.deg2rad(angle))) for angle in angles]
+    complexArray = [complex(np.cos(angle), np.sin(angle)) for angle in angles]
     return (geom.Angle(np.angle(np.mean(complexArray))))
 
 
