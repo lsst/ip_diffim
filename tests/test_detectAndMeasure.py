@@ -560,6 +560,42 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         streakMaskSet = (outMask & streakMask) > 0
         self.assertTrue(np.all(streakMaskSet[20:23, 40:200]))
 
+    def test_metadata_metrics(self):
+        """Verify fields are added to metadata when detection is run, and
+        that the difference image limiting magnitude is calculated correctly,
+        both with a "good" and "bad" seeing template.
+        """
+        science, sources = makeTestImage(psfSize=1.8, doApplyCalibration=True)
+        matchedTemplate_good, _ = makeTestImage(psfSize=2.4, doApplyCalibration=True)
+        matchedTemplate_bad, _ = makeTestImage(psfSize=9.5, doApplyCalibration=True)
+
+        # We aren't testing subtraction, so just make a very simple diffim
+        difference_good = science.clone()
+        difference_good.maskedImage -= matchedTemplate_good.maskedImage
+        difference_bad = science.clone()
+        difference_bad.maskedImage -= matchedTemplate_bad.maskedImage
+
+        # The metadata fields are attached to the detectionTask, so we do
+        # need to run that; run it for both "good" and "bad" seeing templates
+        detectionTask_good = self._setup_detection()
+        detectionTask_bad = self._setup_detection()
+        _ = detectionTask_good.run(science, matchedTemplate_good, difference_good)
+        _ = detectionTask_bad.run(science, matchedTemplate_bad, difference_bad)
+
+        # Test that the diffim limiting magnitudes are computed correctly
+        self.assertFloatsAlmostEqual(detectionTask_good.metadata['diffimLimitingMagnitude'],
+                                     27.8383475, atol=1e-6)
+        self.assertFloatsAlmostEqual(detectionTask_bad.metadata['diffimLimitingMagnitude'],
+                                     26.6690207, atol=1e-6)
+
+        # Test that several other expected metadata metrics exist
+        self.assertIn('nGoodPixels', detectionTask_good.metadata)
+        self.assertIn('nBadPixels', detectionTask_good.metadata)
+        self.assertIn('nPixelsDetectedPositive', detectionTask_good.metadata)
+        self.assertIn('nPixelsDetectedNegative', detectionTask_good.metadata)
+        self.assertIn('nBadPixelsDetectedPositive', detectionTask_good.metadata)
+        self.assertIn('nBadPixelsDetectedNegative', detectionTask_good.metadata)
+
 
 class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
     detectionTask = detectAndMeasure.DetectAndMeasureScoreTask
