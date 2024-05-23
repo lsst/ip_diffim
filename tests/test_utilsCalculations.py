@@ -39,7 +39,7 @@ class UtilsCalculationsTest(lsst.utils.tests.TestCase):
         nSrc = 100
         angleOffset = 30
         rng = np.random.RandomState(seed)
-        angles = (rng.rand(nSrc) - 0.5)*20 + angleOffset
+        angles = np.radians((rng.rand(nSrc) - 0.5)*20 + angleOffset)
         self.assertFloatsAlmostEqual(angleOffset, angleMean(angles).asDegrees(), rtol=0.01)
 
     def test_getPsfFwhm(self):

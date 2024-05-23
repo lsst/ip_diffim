@@ -865,7 +865,7 @@ class DipoleFitAlgorithm:
         centroid = ((fitParams['xcenPos'] + fitParams['xcenNeg']) / 2.,
                     (fitParams['ycenPos'] + fitParams['ycenNeg']) / 2.)
         dx, dy = fitParams['xcenPos'] - fitParams['xcenNeg'], fitParams['ycenPos'] - fitParams['ycenNeg']
-        angle = np.arctan2(dy, dx) / np.pi * 180.   # convert to degrees (should keep as rad?)
+        angle = np.arctan2(dy, dx)
 
         # Exctract flux value, compute signalToNoise from flux/variance_within_footprint
         # Also extract the stderr of flux estimate.
@@ -1020,7 +1020,7 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
                                                                 measBase.UncertaintyEnum.SIGMA_ONLY)
 
         self.orientationKey = schema.addField(
-            schema.join(name, "orientation"), type=float, units="deg",
+            schema.join(name, "orientation"), type=float, units="rad",
             doc="Dipole orientation")
 
         self.separationKey = schema.addField(

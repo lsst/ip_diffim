@@ -348,7 +348,8 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
             if diaSource[dipoleFlag]:
                 self._check_diaSource(sources, diaSource, refIds=refIds, scale=0,
                                       rtol=0.05, atol=None, usePsfFlux=False)
-                self.assertFloatsAlmostEqual(diaSource["ip_diffim_DipoleFit_orientation"], -90., atol=2.)
+                self.assertFloatsAlmostEqual(diaSource["ip_diffim_DipoleFit_orientation"],
+                                             -np.pi / 2, atol=2.)
                 self.assertFloatsAlmostEqual(diaSource["ip_diffim_DipoleFit_separation"], offset, rtol=0.1)
             else:
                 raise ValueError("DiaSource with ID %s is not a dipole!", diaSource.getId())
@@ -733,7 +734,8 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
             if diaSource[dipoleFlag]:
                 self._check_diaSource(sources, diaSource, refIds=refIds, scale=0,
                                       rtol=0.05, atol=None, usePsfFlux=False)
-                self.assertFloatsAlmostEqual(diaSource["ip_diffim_DipoleFit_orientation"], -90., atol=2.)
+                self.assertFloatsAlmostEqual(diaSource["ip_diffim_DipoleFit_orientation"],
+                                             -np.pi / 2, atol=2.)
                 self.assertFloatsAlmostEqual(diaSource["ip_diffim_DipoleFit_separation"], offset, rtol=0.1)
             else:
                 raise ValueError("DiaSource with ID %s is not a dipole!", diaSource.getId())
