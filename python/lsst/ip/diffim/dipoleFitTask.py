@@ -1019,7 +1019,7 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
 
         self.orientationKey = schema.addField(
             schema.join(name, "orientation"), type=float, units="rad",
-            doc="Dipole orientation")
+            doc="Dipole orientation.  Convention is CCW from +x on image.")
 
         self.separationKey = schema.addField(
             schema.join(name, "separation"), type=float, units="pixel",
