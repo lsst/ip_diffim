@@ -37,7 +37,7 @@ import lsst.afw.table as afwTable
 import lsst.meas.algorithms as measAlg
 import lsst.meas.base as measBase
 from lsst.meas.algorithms.testUtils import plantSources
-from lsst.pex.exceptions import InvalidParameterError
+from lsst.pex.exceptions import InvalidParameterError, RangeError
 from lsst.utils.logging import getLogger
 from .dipoleFitTask import DipoleFitAlgorithm
 from . import diffimLib
@@ -937,7 +937,7 @@ def evaluateMeanPsfFwhm(exposure: afwImage.Exposure,
         pos = geom.Point2D(x, y)
         try:
             fwhm = getPsfFwhm(psf, average=True, position=pos)
-        except InvalidParameterError:
+        except (InvalidParameterError, RangeError):
             _LOG.debug("Unable to compute PSF FWHM at position (%f, %f).", x, y)
             continue
 

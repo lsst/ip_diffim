@@ -392,7 +392,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         try:
             templatePsfSize = getPsfFwhm(template.psf)
             sciencePsfSize = getPsfFwhm(science.psf)
-        except lsst.pex.exceptions.InvalidParameterError:
+        except (lsst.pex.exceptions.InvalidParameterError, lsst.pex.exceptions.RangeError):
             self.log.info("Unable to evaluate PSF at the average position. "
                           "Evaluting PSF on a grid of points."
                           )
@@ -1218,7 +1218,7 @@ def _shapeTest(exp1, exp2, fwhmExposureBuffer, fwhmExposureGrid):
     try:
         shape1 = getPsfFwhm(exp1.psf, average=False)
         shape2 = getPsfFwhm(exp2.psf, average=False)
-    except lsst.pex.exceptions.InvalidParameterError:
+    except (lsst.pex.exceptions.InvalidParameterError, lsst.pex.exceptions.RangeError):
         shape1 = evaluateMeanPsfFwhm(exp1,
                                      fwhmExposureBuffer=fwhmExposureBuffer,
                                      fwhmExposureGrid=fwhmExposureGrid

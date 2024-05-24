@@ -29,7 +29,7 @@ import lsst.pex.config as pexConfig
 
 from lsst.ip.diffim.utils import getPsfFwhm, angleMean, evaluateMaskFraction
 from lsst.meas.algorithms import SkyObjectsTask
-from lsst.pex.exceptions import InvalidParameterError
+from lsst.pex.exceptions import InvalidParameterError, RangeError
 from lsst.utils.timer import timeMethod
 
 import lsst.utils
@@ -235,7 +235,7 @@ class SpatiallySampledMetricsTask(lsst.pipe.base.PipelineTask):
         src.set('science_psfSize', getPsfFwhm(science.psf, position=pix))
         try:
             src.set('template_psfSize', getPsfFwhm(template.psf, position=pix))
-        except InvalidParameterError:
+        except (InvalidParameterError, RangeError):
             src.set('template_psfSize', np.nan)
 
         metricRegionSize = 100
