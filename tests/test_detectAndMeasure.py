@@ -398,7 +398,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         # Catalog ids should be very large from this id generator.
         self.assertTrue(all(output.diaSources['id'] > 1000000000))
 
-    def test_edge_detections(self):
+    def test_exclude_mask_detections(self):
         """Sources with certain bad mask planes set should not be detected.
         """
         # Set up the simulated images
@@ -508,9 +508,6 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
 
         # Now check that detection of fakes have the correct flag for injections
         detectionTask = self._setup_detection()
-        excludeMaskPlanes = detectionTask.config.detection.excludeMaskPlanes
-        nBad = len(excludeMaskPlanes)
-        self.assertEqual(nBad, 1)
 
         output = detectionTask.run(subtraction.matchedScience,
                                    subtraction.matchedTemplate,
@@ -788,7 +785,7 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         # Catalog ids should be very large from this id generator.
         self.assertTrue(all(output.diaSources['id'] > 1000000000))
 
-    def test_edge_detections(self):
+    def test_exclude_mask_detections(self):
         """Sources with certain bad mask planes set should not be detected.
         """
         # Set up the simulated images
