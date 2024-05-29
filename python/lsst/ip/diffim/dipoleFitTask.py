@@ -109,8 +109,6 @@ class DipoleFitTaskConfig(measBase.SingleFrameMeasurementConfig):
                               "base_PixelFlags",
                               "base_SkyCoord",
                               "base_PsfFlux",
-                              "base_SdssShape",
-                              "base_GaussianFlux",
                               ]
         # Only measure the apertures we need to report in the alert stream.
         self.plugins["base_CircularApertureFlux"].radii = [12.0]
@@ -118,7 +116,7 @@ class DipoleFitTaskConfig(measBase.SingleFrameMeasurementConfig):
         self.slots.calibFlux = None
         self.slots.modelFlux = None
         self.slots.gaussianFlux = None
-        self.slots.shape = "base_SdssShape"
+        self.slots.shape = None
         # This will be switched to "ip_diffim_DipoleFit" as this task runs.
         self.slots.centroid = "base_SdssCentroid"
         self.doReplaceWithNoise = False
