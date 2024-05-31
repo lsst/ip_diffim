@@ -19,6 +19,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import collections
 import itertools
 import unittest
 
@@ -34,45 +35,53 @@ import lsst.meas.base.tests
 import lsst.skymap
 import lsst.utils.tests
 
-import lsst.afw.display
-display = lsst.afw.display.Display()
+# Change this to True, `setup display_ds9`, and open ds9 (or use another afw
+# display backend) to show the tract/patch layouts on the image.
+debug = False
+if debug:
+    import lsst.afw.display
+    display = lsst.afw.display.Display()
+    display.frame = 1
+
+
+def _showTemplate(box, template):
+    """Show the corners of the template we made in this test."""
+    for point in box.getCorners():
+        display.dot("+", point.x, point.y, ctype="orange", size=40)
+    display.frame = 2
+    display.image(template, "warped template")
+    display.frame = 3
+    display.image(template.variance, "warped variance")
 
 
 class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
-    """Checks that GetTemplateTask works on both one tract and multiple tract
+    """Test that GetTemplateTask works on both one tract and multiple tract
     input coadd exposures.
 
     Makes a synthetic exposure large enough to fit four small tracts with 2x2
-    (300x300 pixel) patches each, extracts pixels for thos patches by warping,
-    and tests GetTemplateTask against a box that fits in one tract and a box
-    that overlaps multiple.
+    (300x300 pixel) patches each, extracts pixels for those patches by warping,
+    and tests GetTemplateTask's output against boxes that overlap various
+    combinations of one or multiple tracts.
     """
     def setUp(self):
-        self.scale = 0.2
+        self.scale = 0.2  # arcsec/pixel
         self.skymap = self._makeSkymap()
-        self.patches = {}
-        self.dataIds = {}
+        self.patches = collections.defaultdict(list)
+        self.dataIds = collections.defaultdict(list)
         self.exposure = self._makeExposure()
-        self.copy = self.exposure.clone()
-        # display.image(self.exposure)
-        # print("!!!!!!!")
-        # for tract_id in range(4):
-        tract = self.skymap.generateTract(0)
-        self._makePatches(tract)
-        # import os; print(os.getpid()); import ipdb; ipdb.set_trace();
 
-        # display.frame = 0
-        # for patch in self.patches:
-        #     print(patch)
-        #     display.image(self.patches[patch], title=patch)
-        #     display.frame += 1
-        # display.image(self.exposure)
-        # import os; print(os.getpid()); import ipdb; ipdb.set_trace();
+        if debug:
+            display.image(self.exposure, "base exposure")
+
+        for tract_id in range(4):
+            tract = self.skymap.generateTract(tract_id)
+            self._makePatches(tract)
 
     def _makeSkymap(self):
         """Make a Skymap with 4 tracts with 4 patches each.
         """
-        tractScale = 0.01
+        tractScale = 0.02  # degrees
+        # On-sky coordinates of the tract centers.
         coords = [(0, 0),
                   (0, tractScale),
                   (tractScale, 0),
@@ -81,57 +90,64 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         config = lsst.skymap.DiscreteSkyMap.ConfigClass()
         config.raList = [c[0] for c in coords]
         config.decList = [c[1] for c in coords]
-        config.radiusList = [tractScale for c in coords]
+        # Half the tract center step size, to keep the tract overlap small.
+        config.radiusList = [tractScale/2 for c in coords]
         config.projection = "TAN"
         config.pixelScale = self.scale
-        config.tractOverlap = 0.001
+        config.tractOverlap = 0.0005
         config.tractBuilder = "legacy"
         config.tractBuilder["legacy"].patchInnerDimensions = (300, 300)
         config.tractBuilder["legacy"].patchBorder = 10
-        # config.tractBuilder = "cells"
-        # config.tractBuilder["cells"].numCellsPerPatchInner = 11
-        # import os; print(os.getpid()); import ipdb; ipdb.set_trace();
         return lsst.skymap.DiscreteSkyMap(config=config)
 
     def _makeExposure(self):
         """Create a large image to break up into tracts and patches.
 
-        The image will have a source every 100 pixels in x and y, and a
+        The image will have a source every 100 pixels in x and y, and a WCS
+        that results in the tracts all fitting in the image, with tract=0
+        in the lower left, tract=1 to the right, tract=2 above, and tract=3
+        to the upper right.
         """
-        box = lsst.geom.Box2I(lsst.geom.Point2I(-100, -100), lsst.geom.Point2I(700, 700))
-        # Use a WCS close to that of tract 0, so that all the tracts fit.
-        cd_matrix = lsst.afw.geom.makeCdMatrix(self.scale*1.05*lsst.geom.arcseconds, 50*lsst.geom.arcseconds)
-        wcs = lsst.afw.geom.makeSkyWcs(lsst.geom.Point2D(200, 200),
+        box = lsst.geom.Box2I(lsst.geom.Point2I(-200, -200), lsst.geom.Point2I(800, 800))
+        # This WCS was constructed so that tract 0 mostly fills the lower left
+        # quadrant of the image, and the other tracts fill the rest; slight
+        # extra rotation as a check on the final warp layout, scaled by 5%
+        # from the patch pixel scale.
+        cd_matrix = lsst.afw.geom.makeCdMatrix(1.05*self.scale*lsst.geom.arcseconds, 93*lsst.geom.degrees)
+        wcs = lsst.afw.geom.makeSkyWcs(lsst.geom.Point2D(120, 150),
                                        lsst.geom.SpherePoint(0, 0, lsst.geom.radians),
                                        cd_matrix)
         dataset = lsst.meas.base.tests.TestDataset(box, wcs=wcs)
         for x, y in itertools.product(np.arange(0, 500, 100), np.arange(0, 500, 100)):
             dataset.addSource(1e5, lsst.geom.Point2D(x, y))
-        exposure, _ = dataset.realize(1, dataset.makeMinimalSchema())
+        exposure, _ = dataset.realize(2, dataset.makeMinimalSchema())
         exposure.setFilter(lsst.afw.image.FilterLabel("a", "a_test"))
         return exposure
 
     def _makePatches(self, tract):
-        """Fill the dicts of (tract_id, patch_id)->exposure, with the
-        exposures being deep copied subsets of the main exposure.
+        """Populate the patches and dataId dicts, keyed on tract id, with the
+        warps of the main exposure and minimal dataIds, respectively.
         """
-        # print(tract.tract_id, tract.bbox)
-        # print(tract.wcs)
-        config = lsst.afw.math.Warper.ConfigClass()
+        if debug:
+            color = ['red', 'green', 'cyan', 'yellow'][tract.tract_id]
+            point = self.exposure.wcs.skyToPixel(tract.ctr_coord)
+            # Show the tract center, colored by tract id.
+            display.dot("x", point.x, point.y, ctype=color, size=30)
+
         # Use 5th order to minimize artifacts on the templates.
+        config = lsst.afw.math.Warper.ConfigClass()
         config.warpingKernelName = "lanczos5"
         warper = lsst.afw.math.Warper.fromConfig(config)
-        # import os; print(os.getpid()); import ipdb; ipdb.set_trace();
-        # color = ['red', 'green', 'cyan', 'yellow'][tract.tract_id]
-        for patch_id in range(tract.num_patches.x*tract.num_patches.y):
-            patch = tract.getPatchInfo(patch_id)
+        for patchId in range(tract.num_patches.x*tract.num_patches.y):
+            patch = tract.getPatchInfo(patchId)
             box = patch.getOuterBBox()
-            # print(box)
-            # points = self.exposure.wcs.skyToPixel(patch.wcs.pixelToSky([lsst.geom.Point2D(x) for x in box.getCorners()]))
-            # for p in points:
-            #     display.dot(patch_id, p.x, p.y, ctype=color)
-            #     print(p)
-            # subset = self.exposure[box].clone()
+
+            if debug:
+                # Show the patch corners as patch ids, colored by tract id.
+                points = self.exposure.wcs.skyToPixel(patch.wcs.pixelToSky([lsst.geom.Point2D(x)
+                                                                           for x in box.getCorners()]))
+                for p in points:
+                    display.dot(patchId, p.x, p.y, ctype=color)
 
             # This is mostly stolen from pipe_tasks warpAndPsfMatch, but
             # ip_diffim cannot depend on pipe_tasks.
@@ -139,81 +155,100 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
             warpedPsf = lsst.meas.algorithms.WarpedPsf(self.exposure.psf, xyTransform)
             warped = warper.warpExposure(patch.wcs, self.exposure, destBBox=box)
             warped.setPsf(warpedPsf)
-            # psfMatch = lsst.ip.diffim.ModelPsfMatchTask()
-            # warpedAndMatched = psfMatch.run(warped, self.exposure.psf).psfMatchedExposure
-            self.patches[(tract.tract_id, patch_id)] = warped
-            self.dataIds[(tract.tract_id, patch_id)] = {"tract": tract.tract_id,
-                                                        "patch": patch_id}
+            self.patches[tract.tract_id].append(warped)
+            self.dataIds[tract.tract_id].append({"tract": tract.tract_id,
+                                                 "patch": patchId,
+                                                 "band": "a"})
 
-    def _checkMetadata(self, template, config, box, wcs):
+    def _checkMetadata(self, template, config, box, wcs, nInputs):
         """Check that the various metadata components were set correctly.
         """
         expectedBox = lsst.geom.Box2I(box)
         expectedBox.grow(config.templateBorderSize)
         self.assertEqual(template.getBBox(), expectedBox)
-        # WCS should be the distorted one above, not the input exposure.
-        # self.assertEqual(template.wcs, wcs)
-        # self.assertNotEqual(template.wcs, self.exposure.wcs)
+        # WCS should match our exposure, not any of the coadd tracts.
+        for tract in self.patches:
+            self.assertNotEqual(template.wcs, self.patches[tract][0].wcs)
+        self.assertEqual(template.wcs, self.exposure.wcs)
         self.assertEqual(template.photoCalib, self.exposure.photoCalib)
         self.assertEqual(template.getXY0(), expectedBox.getMin())
         self.assertEqual(template.filter.bandLabel, "a")
         self.assertEqual(template.filter.physicalLabel, "a_test")
-        # TODO: can I check something better on the psf?
-        self.assertIsInstance(template.psf, lsst.meas.algorithms.CoaddPsf)
-        # TOOD: need other things to test here!
+        self.assertEqual(template.psf.getComponentCount(), nInputs)
 
     def _checkPixels(self, template, config, box):
+        """Check that the pixel values in the template are close to the
+        original image.
+        """
         # All pixels should have real values!
         expectedBox = lsst.geom.Box2I(box)
         expectedBox.grow(config.templateBorderSize)
-        display.frame = 0
-        display.image(self.exposure, title="exposure")
-        display.frame += 1
-        display.image(template, title="template")
-        image = template.clone()
-        image.maskedImage -= self.exposure.maskedImage[expectedBox]
-        display.frame += 1
-        display.image(image, title="difference")
-        import os; print(os.getpid()); import ipdb; ipdb.set_trace();
+
+        if debug:
+            _showTemplate(expectedBox, template)
+
         # Check that we fully filled the template from the patches.
         self.assertTrue(np.all(np.isfinite(template.image.array)))
-        # Because of the scale changes, there will be small ringing in the
-        # difference between the template and the original image.
-        self.assertImagesAlmostEqual(template.image, self.exposure[expectedBox].image, atol=5)
-        # Variance plane ==1 in the original image, but the warped images will
+        # Because of the scale changes, there will be some ringing in the
+        # difference between the template and the original image; pick
+        # tolerances large enough to account for that.
+        self.assertImagesAlmostEqual(template.image, self.exposure[expectedBox].image,
+                                     rtol=.1, atol=4)
+        # Variance plane ==2 in the original image, but the warped images will
         # have some structure due to the warping.
-        self.assertImagesAlmostEqual(template.variance, self.exposure[expectedBox].variance, atol=0.5)
+        self.assertImagesAlmostEqual(template.variance, self.exposure[expectedBox].variance,
+                                     rtol=0.5, msg="variance planes differ")
         # Not checking the mask, as warping changes the sizes of the masks.
 
-    def testRunSameTract(self):
-        """Test a bounding box that fully fits inside one tract.
+    def testRunOneTractInput(self):
+        """Test a bounding box that fully fits inside one tract, with only
+        that tract passed as input. This checks that the code handles a single
+        tract input correctly.
         """
-        # A WCS with a slightly larger pixel scale to distort the coadds to.
-        # distortion = lsst.afw.geom.makeRadialTransform([0, 1.1])
-        # wcs = lsst.afw.geom.makeModifiedWcs(distortion, self.skymap.generateTract(0).wcs, False)
-        box = lsst.geom.Box2I(lsst.geom.Point2I(50, 50), lsst.geom.Point2I(200, 200))
+        box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
+        task = lsst.ip.diffim.GetTemplateTask()
+        # Restrict to tract 0, since the box fits in just that tract.
+        # Task modifies the input bbox, so pass a copy.
+        result = task.run({0: self.patches[0]}, lsst.geom.Box2I(box),
+                          self.exposure.wcs, {0: self.dataIds[0]}, "a_test")
+
+        # All 4 patches from tract 0 are included in this template.
+        self._checkMetadata(result.template, task.config, box, self.exposure.wcs, 4)
+        self._checkPixels(result.template, task.config, box)
+
+    def testRunOneTractMultipleInputs(self):
+        """Test a bounding box that fully fits inside one tract but where
+        multiple tracts were passed in. This checks that patches that are
+        mostly NaN after warping are merged correctly in the output.
+        """
+        box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
         task = lsst.ip.diffim.GetTemplateTask()
         # Task modifies the input bbox, so pass a copy.
-        result = task.run(list(self.patches.values()), lsst.geom.Box2I(box), self.exposure.wcs,
-                          list(self.dataIds.values()))
+        result = task.run(self.patches, lsst.geom.Box2I(box), self.exposure.wcs, self.dataIds, "a_test")
 
-        self._checkMetadata(result.template, task.config, box, self.exposure.wcs)
+        # All 4 patches from two tracts are included in this template.
+        self._checkMetadata(result.template, task.config, box, self.exposure.wcs, 8)
         self._checkPixels(result.template, task.config, box)
 
     def testRunTwoTracts(self):
-        """Test a bounding box that crosses one tract boundary.
+        """Test a bounding box that crosses tract boundaries.
         """
-        # A WCS with a slightly larger pixel scale to distort the coadds to.
-        # distortion = lsst.afw.geom.makeRadialTransform([0, 1.1])
-        # wcs = lsst.afw.geom.makeModifiedWcs(distortion, self.skymap.generateTract(0).wcs, False)
-        box = lsst.geom.Box2I(lsst.geom.Point2I(100, 200), lsst.geom.Point2I(400, 450))
+        box = lsst.geom.Box2I(lsst.geom.Point2I(200, 200), lsst.geom.Point2I(600, 600))
         task = lsst.ip.diffim.GetTemplateTask()
-        # TODO: something should fail here!
-        result = task.run(list(self.patches.values()), lsst.geom.Box2I(box), self.exposure.wcs,
-                          list(self.dataIds.values()))
+        # Task modifies the input bbox, so pass a copy.
+        result = task.run(self.patches, lsst.geom.Box2I(box), self.exposure.wcs, self.dataIds, "a_test")
 
-        self._checkMetadata(result.template, task.config, box, self.exposure.wcs)
+        # All 4 patches from all 4 tracts are included in this template
+        self._checkMetadata(result.template, task.config, box, self.exposure.wcs, 16)
         self._checkPixels(result.template, task.config, box)
+
+    def testRunNoTemplate(self):
+        """A bounding box that doesn't overlap the patches will raise.
+        """
+        box = lsst.geom.Box2I(lsst.geom.Point2I(1200, 1200), lsst.geom.Point2I(1600, 1600))
+        task = lsst.ip.diffim.GetTemplateTask()
+        with self.assertRaisesRegex(lsst.pipe.base.NoWorkFound, "No patches found"):
+            task.run(self.patches, lsst.geom.Box2I(box), self.exposure.wcs, self.dataIds, "a_test")
 
 
 def setup_module(module):

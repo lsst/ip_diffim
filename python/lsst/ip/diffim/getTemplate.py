@@ -18,6 +18,8 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
+import collections
+
 import numpy as np
 
 import lsst.afw.image as afwImage
@@ -105,11 +107,16 @@ class GetTemplateTask(pipeBase.PipelineTask):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.warper = afwMath.Warper.fromConfig(self.config.warp)
+        self.schema = afwTable.ExposureTable.makeMinimalSchema()
+        self.schema.addField('tract', type=np.int32, doc='Which tract this exposure came from.')
+        self.schema.addField('patch', type=np.int32, doc='Which patch in the tract this exposure came from.')
+        self.schema.addField('weight', type=float,
+                             doc='Weight for each exposure, used to make the CoaddPsf; should always be 1.')
 
     def runQuantum(self, butlerQC, inputRefs, outputRefs):
-        # Read in all inputs.
         inputs = butlerQC.get(inputRefs)
         results = self.getOverlappingExposures(inputs)
+        del inputs["skyMap"]  # Only needed for the above.
         inputs["coaddExposures"] = results.coaddExposures
         inputs["dataIds"] = results.dataIds
         inputs["physical_filter"] = butlerQC.quantum.dataId["physical_filter"]
@@ -146,11 +153,12 @@ class GetTemplateTask(pipeBase.PipelineTask):
            A struct with attributes:
 
            ``coaddExposures``
-               List of Coadd exposures that overlap the detector (`list`
-               [`lsst.afw.image.Exposure`]).
+               Dict of Coadd exposures that overlap the detector, indexed on
+               tract id (`dict` [`int`, `list` [`lsst.afw.image.Exposure`] ]).
            ``dataIds``
-               List of data IDs of the coadd exposures that overlap the
-               detector (`list` [`lsst.daf.butler.DataCoordinate`]).
+               Dict of data IDs of the coadd exposures that overlap the
+               detector, indexed on tract id
+               (`dict` [`int`, `list [`lsst.daf.butler.DataCoordinate`] ]).
 
         Raises
         ------
@@ -161,8 +169,8 @@ class GetTemplateTask(pipeBase.PipelineTask):
         # Exposure's validPolygon would be more accurate
         detectorPolygon = geom.Box2D(inputs['bbox'])
         overlappingArea = 0
-        coaddExposureList = []
-        dataIds = []
+        coaddExposures = collections.defaultdict(list)
+        dataIds = collections.defaultdict(list)
         for coaddRef in inputs['coaddExposures']:
             dataId = coaddRef.dataId
             patchWcs = inputs['skyMap'][dataId['tract']].getWcs()
@@ -175,40 +183,45 @@ class GetTemplateTask(pipeBase.PipelineTask):
                     overlappingArea += patchPolygon.intersectionSingle(detectorPolygon).calculateArea()
                     self.log.info("Using template input tract=%s, patch=%s" %
                                   (dataId['tract'], dataId['patch']))
-                    coaddExposureList.append(coaddRef.get())
-                    dataIds.append(dataId)
+                    coaddExposures[dataId['tract']].append(coaddRef.get())
+                    dataIds[dataId['tract']].append(dataId)
             else:
-                self.log.info("Exposure has no WCS, so cannot create associated template.")
+                self.log.warning("Exposure %s has no WCS, so cannot include it in the template.",
+                                 coaddRef)
 
         if not overlappingArea:
             raise pipeBase.NoWorkFound('No patches overlap detector')
 
-        return pipeBase.Struct(coaddExposures=coaddExposureList,
+        return pipeBase.Struct(coaddExposures=coaddExposures,
                                dataIds=dataIds)
 
     @timeMethod
-    def run(self, coaddExposures, bbox, wcs, dataIds, physical_filter=None, **kwargs):
-        """Warp coadds from multiple tracts to form a template for image diff.
+    def run(self, coaddExposures, bbox, wcs, dataIds, physical_filter):
+        """Warp coadds from multiple tracts and patches to form a template to
+        subtract from a science image.
 
-        Where the tracts overlap, the resulting template image is averaged.
+        Tract and patch overlap regions are combined by a variance-weighted
+        average, and the variance planes are combined with the same weights,
+        not added in quadrature; the overlap regions are not statistically
+        independent, because they're derived from the same original data.
         The PSF on the template is created by combining the CoaddPsf on each
         template image into a meta-CoaddPsf.
 
         Parameters
         ----------
-        coaddExposures : `list` [`lsst.afw.image.Exposure`]
-            Coadds to be mosaicked.
+        coaddExposures : `dict` [`int`, `list` [`lsst.afw.image.Exposure`]]
+            Coadds to be mosaicked, indexed on tract id.
         bbox : `lsst.geom.Box2I`
             Template Bounding box of the detector geometry onto which to
-            resample the ``coaddExposures``.
+            resample the ``coaddExposures``. Modified in-place to include the
+            template border.
         wcs : `lsst.afw.geom.SkyWcs`
             Template WCS onto which to resample the ``coaddExposures``.
-        dataIds : `list` [`lsst.daf.butler.DataCoordinate`]
-            Record of the tract and patch of each coaddExposure.
-        physical_filter : `str`, optional
-            The physical filter of the science image.
-        **kwargs
-            Any additional keyword parameters.
+        dataIds : `dict` [`int`, `list` [`lsst.daf.butler.DataCoordinate`]]
+            Record of the tract and patch of each coaddExposure, indexed on
+            tract id.
+        physical_filter : `str`
+            Physical filter of the science image.
 
         Returns
         -------
@@ -223,58 +236,187 @@ class GetTemplateTask(pipeBase.PipelineTask):
         ------
         NoWorkFound
             If no coadds are found with sufficient un-masked pixels.
-        RuntimeError
-            If the PSF of the template can't be calculated.
         """
-        # Table for CoaddPSF
-        schema = afwTable.ExposureTable.makeMinimalSchema()
-        schema.addField('tract', type=np.int32, doc='Which tract this exposure came from.')
-        schema.addField('patch', type=np.int32, doc='Which patch in the tract this exposure came from.')
-        schema.addField('weight', type=float, doc='Weight for each exposure; should be 1.')
-        catalog = afwTable.ExposureCatalog(schema)
+        band, photoCalib = self._checkInputs(dataIds, coaddExposures)
 
         bbox.grow(self.config.templateBorderSize)
 
-        nPatchesFound = 0
-        maskedImageList = []
-        weightList = []
+        warped = {}
+        catalogs = []
+        for tract in coaddExposures:
+            maskedImages, catalog, totalBox = self._makeExposureCatalog(coaddExposures[tract],
+                                                                        dataIds[tract])
+            # Combine images from individual patches together.
+            unwarped = self._merge(maskedImages, totalBox, catalog[0].wcs)
+            potentialInput = self.warper.warpExposure(wcs, unwarped, destBBox=bbox)
+            if not np.any(np.isfinite(potentialInput.image.array)):
+                self.log.info("No overlap from coadds in tract %s; not including in output.", tract)
+                continue
+            catalogs.append(catalog)
+            warped[tract] = potentialInput
+            warped[tract].setWcs(wcs)
 
-        for coaddExposure, dataId in zip(coaddExposures, dataIds):
-            if (exposure := self._warp(coaddExposure, wcs, bbox, dataId, catalog)):
-                maskedImageList.append(exposure)
-                nPatchesFound += 1
-                weightList.append(1)
+        if len(warped) == 0:
+            raise pipeBase.NoWorkFound("No patches found to overlap science exposure.")
+        template = self._merge([x.maskedImage for x in warped.values()], bbox, wcs)
 
-        if nPatchesFound == 0:
-            raise pipeBase.NoWorkFound("No patches found to overlap detector")
+        # Make a single catalog containing all the inputs that were accepted.
+        catalog = afwTable.ExposureCatalog(self.schema)
+        catalog.reserve(sum([len(c) for c in catalogs]))
+        for c in catalogs:
+            catalog.extend(c)
 
-        # Combine images from individual patches together
-        templateExposure = self._merge(maskedImageList, weightList, wcs, bbox, catalog)
+        template.setPsf(self._makePsf(template, catalog, wcs))
+        template.setFilter(afwImage.FilterLabel(band, physical_filter))
+        template.setPhotoCalib(photoCalib)
+        return pipeBase.Struct(template=template)
 
-        # Coadds do not have a physical filter, so fetch it from the butler to prevent downstream warnings.
-        if physical_filter is None:
-            filterLabel = coaddExposure.getFilter()
-        else:
-            filterLabel = afwImage.FilterLabel(dataId['band'], physical_filter)
-        templateExposure.setFilter(filterLabel)
-        templateExposure.setPhotoCalib(coaddExposure.getPhotoCalib())
-        return pipeBase.Struct(template=templateExposure)
+    @staticmethod
+    def _checkInputs(dataIds, coaddExposures):
+        """Check that the all the dataIds are from the same band and that
+        the exposures all have the same photometric calibration.
 
-    def _merge(self, maskedImages, weights, wcs, bbox, catalog):
-        statsFlags = afwMath.stringToStatisticsProperty('MEAN')
-        statsCtrl = afwMath.StatisticsControl()
-        statsCtrl.setNanSafe(True)
-        statsCtrl.setWeighted(True)
-        statsCtrl.setCalcErrorMosaicMode(True)
+        Parameters
+        ----------
+        dataIds : `dict` [`int`, `list` [`lsst.daf.butler.DataCoordinate`]]
+            Record of the tract and patch of each coaddExposure.
+        coaddExposures : `dict` [`int`, `list` [`lsst.afw.image.Exposure`]]
+            Coadds to be mosaicked.
 
-        template = afwImage.ExposureF(bbox, wcs)
-        template.maskedImage.set(np.nan, afwImage.Mask.getPlaneBitMask("NO_DATA"), np.nan)
-        xy0 = template.getXY0()
-        # Do not mask any values
-        template.maskedImage = afwMath.statisticsStack(maskedImages, statsFlags, statsCtrl,
-                                                       weights, clipped=0, maskMap=[])
-        template.maskedImage.setXY0(xy0)
+        Returns
+        -------
+        band : `str`
+            Filter band of all the input exposures.
+        photoCalib : `lsst.afw.image.PhotoCalib`
+            Photometric calibration of all of the input exposures.
 
+        Raises
+        ------
+        RuntimeError
+            Raised if the bands or calibrations of the input exposures are not
+            all the same.
+        """
+        bands = set(dataId["band"] for tract in dataIds for dataId in dataIds[tract])
+        if len(bands) > 1:
+            raise RuntimeError(f"GetTemplateTask called with multiple bands: {bands}")
+        band = bands.pop()
+        photoCalibs = [exposure.photoCalib for exposures in coaddExposures.values() for exposure in exposures]
+        if not all([photoCalibs[0] == x for x in photoCalibs]):
+            msg = f"GetTemplateTask called with exposures with different photoCalibs: {photoCalibs}"
+            raise RuntimeError(msg)
+        photoCalib = photoCalibs[0]
+        return band, photoCalib
+
+    def _makeExposureCatalog(self, exposures, dataIds):
+        """Make an exposure catalog for one tract.
+
+        Parameters
+        ----------
+        exposures : `list` [`lsst.afw.image.Exposuref`]
+            Exposures to include in the catalog.
+        dataIds : `list` [`lsst.daf.butler.DataCoordinate`]
+            Data ids of each of the included exposures; must have "tract" and
+            "patch" entries.
+
+        Returns
+        -------
+        images : `list` [`lsst.afw.image.MaskedImage`]
+            MaskedImages of each of the input exposures, for warping.
+        catalog : `lsst.afw.table.ExposureCatalog`
+            Catalog of metadata for each exposure
+        totalBox : `lsst.geom.Box2I`
+            The union of the bounding boxes of all the input exposures.
+        """
+        catalog = afwTable.ExposureCatalog(self.schema)
+        catalog.reserve(len(exposures))
+        images = [exposure.maskedImage for exposure in exposures]
+        totalBox = geom.Box2I()
+        for coadd, dataId in zip(exposures, dataIds):
+            totalBox = totalBox.expandedTo(coadd.getBBox())
+            record = catalog.addNew()
+            record.setPsf(coadd.psf)
+            record.setWcs(coadd.wcs)
+            record.setPhotoCalib(coadd.photoCalib)
+            record.setBBox(coadd.getBBox())
+            record.setValidPolygon(afwGeom.Polygon(geom.Box2D(coadd.getBBox()).getCorners()))
+            record.set("tract", dataId["tract"])
+            record.set("patch", dataId["patch"])
+            # Weight is used by CoaddPsf, but the PSFs from overlapping patches
+            # should be very similar, so this value mostly shouldn't matter.
+            record.set("weight", 1)
+
+        return images, catalog, totalBox
+
+    def _merge(self, maskedImages, bbox, wcs):
+        """Merge the images that came from one tract into one larger image,
+        ignoring NaN pixels and non-finite variance pixels from individual
+        exposures.
+
+        Parameters
+        ----------
+        maskedImages : `list` [`lsst.afw.image.MaskedImage`]
+            Images to be merged into one larger bounding box.
+        bbox : `lsst.geom.Box2I`
+            Bounding box defining the image to merge into.
+        wcs : `lsst.afw.geom.SkyWcs`
+            WCS of all of the input images to set on the output image.
+
+        Returns
+        -------
+        merged : `lsst.afw.image.MaskedImage`
+            Merged image with all of the inputs at their respective bbox
+            positions.
+        """
+        merged = afwImage.ExposureF(bbox, wcs)
+        weights = afwImage.ImageF(bbox)
+        for maskedImage in maskedImages:
+            weight = afwImage.ImageF(maskedImage.variance.array**(-0.5))
+            bad = np.isnan(maskedImage.image.array) | ~np.isfinite(maskedImage.variance.array)
+            # Note that modifying the patch MaskedImage in place is fine;
+            # we're throwing it away at the end anyway.
+            maskedImage.image.array[bad] = 0.0
+            maskedImage.variance.array[bad] = 0.0
+            # Reset mask, too, since these pixels don't contribute to sum.
+            maskedImage.mask.array[bad] = 0
+            # Cannot use `merged.maskedImage *= weight` because that operator
+            # multiplies the variance by the weight twice; in this case
+            # `weight` are the exact values we want to scale by.
+            maskedImage.image *= weight
+            maskedImage.variance *= weight
+            merged.maskedImage[maskedImage.getBBox()] += maskedImage
+            weights[maskedImage.getBBox()] += weight
+        # Cannot use `merged.maskedImage /= weights` because that operator
+        # divides the variance by the weight twice; in this case `weights` are
+        # the exact values we want to scale by.
+        merged.image /= weights
+        merged.variance /= weights
+        merged.mask.array |= merged.mask.getPlaneBitMask("NO_DATA") * (weights.array == 0)
+
+        return merged
+
+    def _makePsf(self, template, catalog, wcs):
+        """Return a PSF containing the PSF at each of the input regions.
+
+        Note that although this includes all the exposures from the catalog,
+        the PSF knows which part of the template the inputs came from, so when
+        evaluated at a given position it will not include inputs that never
+        went in to those pixels.
+
+        Parameters
+        ----------
+        template : `lsst.afw.image.Exposure`
+            Generated template the PSF is for.
+        catalog : `lsst.afw.table.ExposureCatalog`
+            Catalog of exposures that went into the template that contains all
+            of the input PSFs.
+        wcs : `lsst.afw.geom.SkyWcs`
+            WCS of the template, to warp the PSFs to.
+
+        Returns
+        -------
+        coaddPsf : `lsst.meas.algorithms.CoaddPsf`
+            The meta-psf constructed from all of the input catalogs.
+        """
         # CoaddPsf centroid not only must overlap image, but must overlap the
         # part of image with data. Use centroid of region with data.
         boolmask = template.mask.array & template.mask.getPlaneBitMask('NO_DATA') == 0
@@ -283,37 +425,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
 
         ctrl = self.config.coaddPsf.makeControl()
         coaddPsf = CoaddPsf(catalog, wcs, centerCoord, ctrl.warpingKernelName, ctrl.cacheSize)
-        if coaddPsf is None:
-            raise RuntimeError("CoaddPsf could not be constructed")
-
-        template.setPsf(coaddPsf)
-
-        return template
-
-    def _warp(self, coadd, wcs, bbox, dataId, catalog):
-        # warp to detector WCS
-        warped = self.warper.warpExposure(wcs, coadd, maxBBox=bbox)
-
-        # Check if warped image is viable
-        if not np.any(np.isfinite(warped.image.array)):
-            self.log.info("No overlap for warped %s. Skipping" % dataId)
-            return
-
-        exp = afwImage.ExposureF(bbox, wcs)
-        exp.maskedImage.set(np.nan, afwImage.Mask.getPlaneBitMask("NO_DATA"), np.nan)
-        exp.maskedImage.assign(warped.maskedImage, warped.getBBox())
-
-        record = catalog.addNew()
-        record.setPsf(coadd.getPsf())
-        record.setWcs(coadd.getWcs())
-        record.setPhotoCalib(coadd.getPhotoCalib())
-        record.setBBox(coadd.getBBox())
-        record.setValidPolygon(afwGeom.Polygon(geom.Box2D(coadd.getBBox()).getCorners()))
-        record.set("tract", dataId["tract"])
-        record.set("patch", dataId["patch"])
-        record.set("weight", 1.)
-
-        return exp.maskedImage
+        return coaddPsf
 
 
 class GetDcrTemplateConnections(GetTemplateConnections,
@@ -482,10 +594,10 @@ class GetDcrTemplateTask(GetTemplateTask):
 
         Returns
         -------
-        coaddExposureList : `list` [`lsst.afw.image.Exposure`]
+        coaddExposures : `list` [`lsst.afw.image.Exposure`]
             Coadd exposures that overlap the detector.
         """
-        coaddExposureList = []
+        coaddExposures = []
         for tract in patchList:
             for patch in set(patchList[tract]):
                 coaddRefList = [coaddRef for coaddRef in coaddRefs
@@ -495,8 +607,8 @@ class GetDcrTemplateTask(GetTemplateTask):
                                                 self.config.effectiveWavelength,
                                                 self.config.bandwidth,
                                                 self.config.numSubfilters)
-                coaddExposureList.append(dcrModel.buildMatchedExposure(visitInfo=visitInfo))
-        return coaddExposureList
+                coaddExposures.append(dcrModel.buildMatchedExposure(visitInfo=visitInfo))
+        return coaddExposures
 
 
 def _selectDataRef(coaddRef, tract, patch):
