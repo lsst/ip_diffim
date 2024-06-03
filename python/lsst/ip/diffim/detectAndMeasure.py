@@ -594,6 +594,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
     def calculateMetrics(self, difference, matchedTemplate, science):
         """Add difference image QA metrics to the Task metadata.
+
         This may be used to produce corresponding metrics (see
         lsst.analysis.tools.tasks.diffimTaskDetectorVisitMetricAnalysis).
 
@@ -602,7 +603,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         difference : `lsst.afw.image.Exposure`
             The target difference image to calculate metrics for.
         matchedTemplate : `lsst.afw.image.Exposure`
-            The warped and PSF-matched template used to create difference.
+            The warped and PSF-matched template used to create the difference
+            image.
         science : `lsst.afw.image.Exposure`
             Science exposure that the template was subtracted from.
 
@@ -633,6 +635,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         maglim_template = self._calculateMagLim(matchedTemplate)
         fluxlim_template = (maglim_template*u.ABmag).to_value(u.nJy)
         maglim_diffim = (np.sqrt(fluxlim_science**2 + fluxlim_template**2)*u.nJy).to(u.ABmag).value
+        self.metadata.add("scienceLimitingMagnitude", maglim_science)
+        self.metadata.add("templateLimitingMagnitude", maglim_template)
         self.metadata.add("diffimLimitingMagnitude", maglim_diffim)
 
     def _calculateMagLim(self, exposure, nsigma=5.0):

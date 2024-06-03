@@ -21,6 +21,7 @@
 
 import numpy as np
 import unittest
+from astropy import units as u
 
 import lsst.geom
 from lsst.ip.diffim import detectAndMeasure, subtractImages
@@ -565,7 +566,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         that the difference image limiting magnitude is calculated correctly,
         both with a "good" and "bad" seeing template.
         """
-        science, sources = makeTestImage(psfSize=1.8, doApplyCalibration=True)
+        science, _ = makeTestImage(psfSize=1.8, doApplyCalibration=True)
         matchedTemplate_good, _ = makeTestImage(psfSize=2.4, doApplyCalibration=True)
         matchedTemplate_bad, _ = makeTestImage(psfSize=9.5, doApplyCalibration=True)
 
@@ -583,10 +584,20 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         _ = detectionTask_bad.run(science, matchedTemplate_bad, difference_bad)
 
         # Test that the diffim limiting magnitudes are computed correctly
+        maglim_science = detectionTask_good._calculateMagLim(science)
+        fluxlim_science = (maglim_science*u.ABmag).to_value(u.nJy)
+        maglim_template_good = detectionTask_good._calculateMagLim(matchedTemplate_good)
+        fluxlim_template_good = (maglim_template_good*u.ABmag).to_value(u.nJy)
+        maglim_template_bad = detectionTask_bad._calculateMagLim(matchedTemplate_bad)
+        fluxlim_template_bad = (maglim_template_bad*u.ABmag).to_value(u.nJy)
+
+        maglim_good = (np.sqrt(fluxlim_science**2 + fluxlim_template_good**2)*u.nJy).to(u.ABmag).value
+        maglim_bad = (np.sqrt(fluxlim_science**2 + fluxlim_template_bad**2)*u.nJy).to(u.ABmag).value
+
         self.assertFloatsAlmostEqual(detectionTask_good.metadata['diffimLimitingMagnitude'],
-                                     27.8383475, atol=1e-6)
+                                     maglim_good, atol=1e-6)
         self.assertFloatsAlmostEqual(detectionTask_bad.metadata['diffimLimitingMagnitude'],
-                                     26.6690207, atol=1e-6)
+                                     maglim_bad, atol=1e-6)
 
         # Test that several other expected metadata metrics exist
         self.assertIn('nGoodPixels', detectionTask_good.metadata)
@@ -595,6 +606,8 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         self.assertIn('nPixelsDetectedNegative', detectionTask_good.metadata)
         self.assertIn('nBadPixelsDetectedPositive', detectionTask_good.metadata)
         self.assertIn('nBadPixelsDetectedNegative', detectionTask_good.metadata)
+        self.assertIn('scienceLimitingMagnitude', detectionTask_good.metadata)
+        self.assertIn('templateLimitingMagnitude', detectionTask_good.metadata)
 
 
 class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
