@@ -92,32 +92,18 @@ class ModelPsfMatchConfig(pexConfig.Config):
 
 
 class ModelPsfMatchTask(PsfMatchTask):
-    """Matching of two model Psfs, and application of the Psf-matching kernel to an input Exposure
-
+    """Match two model Psfs, and application of the Psf-matching kernel
+    to an input Exposure.
     """
     ConfigClass = ModelPsfMatchConfig
 
     def __init__(self, *args, **kwargs):
-        """Create a ModelPsfMatchTask
-
-        Parameters
-        ----------
-        *args
-            arguments to be passed to lsst.ip.diffim.PsfMatchTask.__init__
-        **kwargs
-            keyword arguments to be passed to lsst.ip.diffim.PsfMatchTask.__init__
-
-        Notes
-        -----
-        Upon initialization, the kernel configuration is defined by self.config.kernel.active.  This Task
-        does have a run() method, which is the default way to call the Task.
-        """
         PsfMatchTask.__init__(self, *args, **kwargs)
         self.kConfig = self.config.kernel.active
 
     @timeMethod
     def run(self, exposure, referencePsfModel, kernelSum=1.0):
-        """Psf-match an exposure to a model Psf
+        """Psf-match an exposure to a model Psf.
 
         Parameters
         ----------
