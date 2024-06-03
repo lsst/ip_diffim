@@ -633,8 +633,12 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         maglim_science = self._calculateMagLim(science)
         fluxlim_science = (maglim_science*u.ABmag).to_value(u.nJy)
         maglim_template = self._calculateMagLim(matchedTemplate)
-        fluxlim_template = (maglim_template*u.ABmag).to_value(u.nJy)
-        maglim_diffim = (np.sqrt(fluxlim_science**2 + fluxlim_template**2)*u.nJy).to(u.ABmag).value
+        if np.isnan(maglim_template):
+            self.log.info("Cannot evaluate template limiting mag; adopting science limiting mag for diffim")
+            maglim_diffim = maglim_science
+        else:
+            fluxlim_template = (maglim_template*u.ABmag).to_value(u.nJy)
+            maglim_diffim = (np.sqrt(fluxlim_science**2 + fluxlim_template**2)*u.nJy).to(u.ABmag).value
         self.metadata.add("scienceLimitingMagnitude", maglim_science)
         self.metadata.add("templateLimitingMagnitude", maglim_template)
         self.metadata.add("diffimLimitingMagnitude", maglim_diffim)
@@ -655,15 +659,21 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         Returns
         -------
         maglim : `astropy.units.Quantity`
-            The limiting magnitude of the exposure.
+            The limiting magnitude of the exposure, or np.nan.
         """
-        zeropoint = exposure.getPhotoCalib().instFluxToMagnitude(1)
-        psf = exposure.getPsf()
-        psf_shape = psf.computeShape(exposure.getBBox().getCenter())
-        psf_size = psf_shape.getDeterminantRadius()
-        psf_area = np.pi*psf_size**2
-        maglim = zeropoint - 2.5*np.log10(nsigma*np.sqrt(psf_area))
-        return maglim
+        try:
+            psf = exposure.getPsf()
+            psf_shape = psf.computeShape(psf.getAveragePosition())
+        except (InvalidParameterError, afwDetection.InvalidPsfError):
+            self.log.info("Unable to evaluate PSF, setting maglim to nan")
+            maglim = np.nan
+        else:
+            # Get a more accurate area than `psf_shape.getArea()` via moments
+            psf_area = np.pi*np.sqrt(psf_shape.getIxx()*psf_shape.getIyy())
+            zeropoint = exposure.getPhotoCalib().instFluxToMagnitude(1)
+            maglim = zeropoint - 2.5*np.log10(nsigma*np.sqrt(psf_area))
+        finally:
+            return maglim
 
     def _runStreakMasking(self, maskedImage):
         """Do streak masking at put results into catalog.

@@ -31,15 +31,9 @@ from lsst.pipe.base import NoWorkFound
 import lsst.utils.tests
 import numpy as np
 from lsst.ip.diffim.utils import (computeRobustStatistics, computePSFNoiseEquivalentArea,
-                                  evaluateMeanPsfFwhm, getPsfFwhm, makeStats, makeTestImage)
+                                  evaluateMeanPsfFwhm, getPsfFwhm, makeStats, makeTestImage,
+                                  CustomCoaddPsf)
 from lsst.pex.exceptions import InvalidParameterError
-
-
-class CustomCoaddPsf(measAlg.CoaddPsf):
-    """A custom CoaddPSF that overrides the getAveragePosition method.
-    """
-    def getAveragePosition(self):
-        return lsst.geom.Point2D(-10000, -10000)
 
 
 class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):

@@ -1354,3 +1354,12 @@ def evaluateMaskFraction(mask, maskPlane):
     """
     nMaskSet = np.count_nonzero((mask.array & mask.getPlaneBitMask(maskPlane)))
     return nMaskSet/mask.array.size
+
+
+class CustomCoaddPsf(measAlg.CoaddPsf):
+    """A custom CoaddPSF that overrides the getAveragePosition method.
+
+    It intentionally moves the position off-image to cause a test failure.
+    """
+    def getAveragePosition(self):
+        return geom.Point2D(-10000, -10000)
