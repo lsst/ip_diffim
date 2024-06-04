@@ -84,7 +84,7 @@ class DetectAndMeasureConnections(pipeBase.PipelineTaskConnections,
         name="{fakesType}{coaddName}Diff_differenceExp",
     )
     maskedStreaks = pipeBase.connectionTypes.Output(
-        doc='Streak profile information.',
+        doc='Catalog of streak fit parameters for the difference image.',
         storageClass="ArrowNumpyDict",
         dimensions=("instrument", "visit", "detector"),
         name="{fakesType}{coaddName}Diff_streaks",
@@ -161,7 +161,7 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
     )
     doMaskStreaks = pexConfig.Field(
         dtype=bool,
-        default=False,
+        default=True,
         doc="Turn on streak masking",
     )
     maskStreaks = pexConfig.ConfigurableField(
@@ -332,7 +332,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
         # Ensure that we start with an empty detection and deblended mask.
         mask = difference.mask
-        clearMaskPlanes = ["DETECTED", "DETECTED_NEGATIVE", "NOT_DEBLENDED"]
+        clearMaskPlanes = ["DETECTED", "DETECTED_NEGATIVE", "NOT_DEBLENDED", "STREAK"]
         for mp in clearMaskPlanes:
             if mp not in mask.getMaskPlaneDict():
                 mask.addMaskPlane(mp)
@@ -624,7 +624,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                 self.log.info("Unable to calculate metrics for mask plane %s: not in image"%maskPlane)
 
     def _runStreakMasking(self, maskedImage):
-        """Do streak masking at put results into catalog.
+        """Do streak masking and optionally save the resulting streak
+        fit parameters in a catalog.
 
         Parameters
         ----------
