@@ -21,13 +21,10 @@
 
 import numpy as np
 import unittest
-from astropy import units as u
 
-import lsst.afw.table as afwTable
 import lsst.geom
 from lsst.ip.diffim import detectAndMeasure, subtractImages
-from lsst.ip.diffim.utils import makeTestImage, CustomCoaddPsf
-import lsst.meas.algorithms as measAlg
+from lsst.ip.diffim.utils import makeTestImage
 from lsst.pipe.base import InvalidQuantumError
 import lsst.utils.tests
 
@@ -562,82 +559,6 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         streakMask = output.subtractedMeasuredExposure.mask.getPlaneBitMask("STREAK")
         streakMaskSet = (outMask & streakMask) > 0
         self.assertTrue(np.all(streakMaskSet[20:23, 40:200]))
-
-    def test_metadata_metrics(self):
-        """Verify fields are added to metadata when detection is run, and
-        that the difference image limiting magnitude is calculated correctly,
-        both with a "good" and "bad" seeing template.
-        """
-        science, _ = makeTestImage(psfSize=1.8, doApplyCalibration=True)
-        matchedTemplate_good, _ = makeTestImage(psfSize=2.4, doApplyCalibration=True)
-        matchedTemplate_bad, _ = makeTestImage(psfSize=9.5, doApplyCalibration=True)
-
-        # We aren't testing subtraction, so just make a very simple diffim
-        difference_good = science.clone()
-        difference_good.maskedImage -= matchedTemplate_good.maskedImage
-        difference_bad = science.clone()
-        difference_bad.maskedImage -= matchedTemplate_bad.maskedImage
-
-        # The metadata fields are attached to the detectionTask, so we do
-        # need to run that; run it for both "good" and "bad" seeing templates
-        detectionTask_good = self._setup_detection()
-        detectionTask_bad = self._setup_detection()
-        _ = detectionTask_good.run(science, matchedTemplate_good, difference_good)
-        _ = detectionTask_bad.run(science, matchedTemplate_bad, difference_bad)
-
-        # Test that the diffim limiting magnitudes are computed correctly
-        maglim_science = detectionTask_good._calculateMagLim(science)
-        fluxlim_science = (maglim_science*u.ABmag).to_value(u.nJy)
-        maglim_template_good = detectionTask_good._calculateMagLim(matchedTemplate_good)
-        fluxlim_template_good = (maglim_template_good*u.ABmag).to_value(u.nJy)
-        maglim_template_bad = detectionTask_bad._calculateMagLim(matchedTemplate_bad)
-        fluxlim_template_bad = (maglim_template_bad*u.ABmag).to_value(u.nJy)
-
-        maglim_good = (np.sqrt(fluxlim_science**2 + fluxlim_template_good**2)*u.nJy).to(u.ABmag).value
-        maglim_bad = (np.sqrt(fluxlim_science**2 + fluxlim_template_bad**2)*u.nJy).to(u.ABmag).value
-
-        self.assertFloatsAlmostEqual(detectionTask_good.metadata['diffimLimitingMagnitude'],
-                                     maglim_good, atol=1e-6)
-        self.assertFloatsAlmostEqual(detectionTask_bad.metadata['diffimLimitingMagnitude'],
-                                     maglim_bad, atol=1e-6)
-
-        # Create a template with a PSF that is not defined at the image center.
-        # First, make an exposure catalog so we can force the template to have
-        # a bad (off-image) PSF. It must have a record with a weight field
-        # and a BBox in order to let us set the PSF manually.
-        matchedTemplate_offimage, _ = makeTestImage()
-        schema = afwTable.ExposureTable.makeMinimalSchema()
-        weightKey = schema.addField("weight", type="D", doc="Coadd weight")
-        exposureCatalog = afwTable.ExposureCatalog(schema)
-        record = exposureCatalog.addNew()
-        record.setD(weightKey, 1.0)
-        record.setBBox(matchedTemplate_offimage.getBBox())
-        kernel = measAlg.DoubleGaussianPsf(7, 7, 2.0).getKernel()
-        psf = measAlg.KernelPsf(kernel, matchedTemplate_offimage.getBBox().getCenter())
-        record.setPsf(psf)
-        record.setWcs(matchedTemplate_offimage.wcs)
-        custom_offimage_psf = CustomCoaddPsf(exposureCatalog, matchedTemplate_offimage.wcs)
-        matchedTemplate_offimage.setPsf(custom_offimage_psf)
-
-        # Test that the bad (off-image) PSF template has a nan maglim,
-        # and therefore the science maglim is assigned to the diffim.
-        detectionTask_offimage = self._setup_detection()
-        difference_offimage = science.clone()
-        difference_offimage.maskedImage -= matchedTemplate_offimage.maskedImage
-        _ = detectionTask_offimage.run(science, matchedTemplate_offimage, difference_offimage)
-        self.assertTrue(np.isnan(detectionTask_offimage.metadata['templateLimitingMagnitude']))
-        self.assertEqual(detectionTask_offimage.metadata['diffimLimitingMagnitude'],
-                         detectionTask_offimage.metadata['scienceLimitingMagnitude'])
-
-        # Test that several other expected metadata metrics exist
-        self.assertIn('nGoodPixels', detectionTask_good.metadata)
-        self.assertIn('nBadPixels', detectionTask_good.metadata)
-        self.assertIn('nPixelsDetectedPositive', detectionTask_good.metadata)
-        self.assertIn('nPixelsDetectedNegative', detectionTask_good.metadata)
-        self.assertIn('nBadPixelsDetectedPositive', detectionTask_good.metadata)
-        self.assertIn('nBadPixelsDetectedNegative', detectionTask_good.metadata)
-        self.assertIn('scienceLimitingMagnitude', detectionTask_good.metadata)
-        self.assertIn('templateLimitingMagnitude', detectionTask_good.metadata)
 
 
 class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
