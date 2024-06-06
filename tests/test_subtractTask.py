@@ -21,6 +21,8 @@
 
 import unittest
 
+from astropy import units as u
+
 import lsst.afw.math as afwMath
 import lsst.afw.table as afwTable
 import lsst.geom
@@ -31,15 +33,9 @@ from lsst.pipe.base import NoWorkFound
 import lsst.utils.tests
 import numpy as np
 from lsst.ip.diffim.utils import (computeRobustStatistics, computePSFNoiseEquivalentArea,
-                                  evaluateMeanPsfFwhm, getPsfFwhm, makeStats, makeTestImage)
+                                  evaluateMeanPsfFwhm, getPsfFwhm, makeStats, makeTestImage,
+                                  CustomCoaddPsf)
 from lsst.pex.exceptions import InvalidParameterError
-
-
-class CustomCoaddPsf(measAlg.CoaddPsf):
-    """A custom CoaddPSF that overrides the getAveragePosition method.
-    """
-    def getAveragePosition(self):
-        return lsst.geom.Point2D(-10000, -10000)
 
 
 class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
@@ -883,6 +879,75 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
 
         self.assertEqual(np.sum(inj_masked.astype(int)-science_fake_masked.astype(int)), 0)
         self.assertEqual(np.sum(injTmplt_masked.astype(int)-template_fake_masked.astype(int)), 0)
+
+    def test_metadata_metrics(self):
+        """Verify fields are added to metadata when subtraction is run, and
+        that the difference image limiting magnitude is calculated correctly,
+        both with a "good" and "bad" seeing template.
+        """
+        science, sources = makeTestImage(psfSize=1.8, doApplyCalibration=True)
+        template_good, _ = makeTestImage(psfSize=2.4, doApplyCalibration=True)
+        template_bad, _ = makeTestImage(psfSize=9.5, doApplyCalibration=True)
+
+        # The metadata fields are attached to the subtractTask, so we do
+        # need to run that; run it for both "good" and "bad" seeing templates
+        config = subtractImages.AlardLuptonSubtractTask.ConfigClass()
+        subtractTask_good = subtractImages.AlardLuptonSubtractTask(config=config)
+        _ = subtractTask_good.run(template_good.clone(), science.clone(), sources)
+        subtractTask_bad = subtractImages.AlardLuptonSubtractTask(config=config)
+        _ = subtractTask_bad.run(template_bad.clone(), science.clone(), sources)
+
+        # Test that the diffim limiting magnitudes are computed correctly
+        maglim_science = subtractTask_good._calculateMagLim(science)
+        fluxlim_science = (maglim_science*u.ABmag).to_value(u.nJy)
+        maglim_template_good = subtractTask_good._calculateMagLim(template_good)
+        fluxlim_template_good = (maglim_template_good*u.ABmag).to_value(u.nJy)
+        maglim_template_bad = subtractTask_bad._calculateMagLim(template_bad)
+        fluxlim_template_bad = (maglim_template_bad*u.ABmag).to_value(u.nJy)
+
+        maglim_good = (np.sqrt(fluxlim_science**2 + fluxlim_template_good**2)*u.nJy).to(u.ABmag).value
+        maglim_bad = (np.sqrt(fluxlim_science**2 + fluxlim_template_bad**2)*u.nJy).to(u.ABmag).value
+
+        self.assertFloatsAlmostEqual(subtractTask_good.metadata['diffimLimitingMagnitude'],
+                                     maglim_good, atol=1e-6)
+        self.assertFloatsAlmostEqual(subtractTask_bad.metadata['diffimLimitingMagnitude'],
+                                     maglim_bad, atol=1e-6)
+
+        # Create a template with a PSF that is not defined at the image center.
+        # First, make an exposure catalog so we can force the template to have
+        # a bad (off-image) PSF. It must have a record with a weight field
+        # and a BBox in order to let us set the PSF manually.
+        template_offimage, _ = makeTestImage()
+        schema = afwTable.ExposureTable.makeMinimalSchema()
+        weightKey = schema.addField("weight", type="D", doc="Coadd weight")
+        exposureCatalog = afwTable.ExposureCatalog(schema)
+        record = exposureCatalog.addNew()
+        record.setD(weightKey, 1.0)
+        record.setBBox(template_offimage.getBBox())
+        kernel = measAlg.DoubleGaussianPsf(7, 7, 2.0).getKernel()
+        psf = measAlg.KernelPsf(kernel, template_offimage.getBBox().getCenter())
+        record.setPsf(psf)
+        record.setWcs(template_offimage.wcs)
+        custom_offimage_psf = CustomCoaddPsf(exposureCatalog, template_offimage.wcs)
+        template_offimage.setPsf(custom_offimage_psf)
+
+        # Test that template PSF size edge cases are handled correctly.
+        subtractTask_offimage = subtractImages.AlardLuptonSubtractTask(config=config)
+        _ = subtractTask_offimage.run(template_offimage.clone(), science.clone(), sources)
+        # Test that providing no fallbackPsfSize results in a nan template
+        # limiting magnitude.
+        maglim_template_offimage = subtractTask_offimage._calculateMagLim(template_offimage)
+        self.assertTrue(np.isnan(maglim_template_offimage))
+        # Test that given the provided fallbackPsfSize, the diffim limiting
+        # magnitude is calculated correctly.
+        maglim_template_offimage = 28.3173123103493
+        fluxlim_template_offimage = (maglim_template_offimage*u.ABmag).to_value(u.nJy)
+        maglim_offimage = (np.sqrt(fluxlim_science**2 + fluxlim_template_offimage**2)*u.nJy).to(u.ABmag).value
+        self.assertEqual(subtractTask_offimage.metadata['diffimLimitingMagnitude'], maglim_offimage)
+
+        # Test that several other expected metadata metrics exist
+        self.assertIn('scienceLimitingMagnitude', subtractTask_good.metadata)
+        self.assertIn('templateLimitingMagnitude', subtractTask_good.metadata)
 
 
 class AlardLuptonPreconvolveSubtractTest(lsst.utils.tests.TestCase):

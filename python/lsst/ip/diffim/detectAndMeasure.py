@@ -592,13 +592,15 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             diaSource.assign(forcedSource, mapper)
 
     def calculateMetrics(self, difference):
-        """Add image QA metrics to the Task metadata.
+        """Add difference image QA metrics to the Task metadata.
+
+        This may be used to produce corresponding metrics (see
+        lsst.analysis.tools.tasks.diffimTaskDetectorVisitMetricAnalysis).
 
         Parameters
         ----------
         difference : `lsst.afw.image.Exposure`
-            The target image to calculate metrics for.
-
+            The target difference image to calculate metrics for.
         """
         mask = difference.mask
         badPix = (mask.array & mask.getPlaneBitMask(self.config.detection.excludeMaskPlanes)) > 0
