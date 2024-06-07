@@ -31,7 +31,7 @@ import lsst.daf.base
 import lsst.geom
 from lsst.meas.algorithms import SourceDetectionTask, SubtractBackgroundTask
 from lsst.meas.base import SingleFrameMeasurementTask
-from lsst.pex.exceptions import InvalidParameterError
+from lsst.pex.exceptions import InvalidParameterError, RangeError
 import lsst.pex.config
 import lsst.pipe.base
 
@@ -140,7 +140,7 @@ class MakeKernelTask(PsfMatchTask):
         try:
             templateFwhmPix = getPsfFwhm(template.psf)
             scienceFwhmPix = getPsfFwhm(science.psf)
-        except InvalidParameterError:
+        except (InvalidParameterError, RangeError):
             self.log.debug("Unable to evaluate PSF at the average position. "
                            "Evaluting PSF on a grid of points."
                            )
@@ -191,7 +191,7 @@ class MakeKernelTask(PsfMatchTask):
         try:
             templateFwhmPix = getPsfFwhm(template.psf)
             scienceFwhmPix = getPsfFwhm(science.psf)
-        except InvalidParameterError:
+        except (InvalidParameterError, RangeError):
             self.log.debug("Unable to evaluate PSF at the average position. "
                            "Evaluting PSF on a grid of points."
                            )
