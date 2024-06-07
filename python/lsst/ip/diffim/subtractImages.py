@@ -389,6 +389,11 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         # evaluate the PSF on a grid specified by fwhmExposure* fields.
         # To keep consistent definitions for PSF size on the template and
         # science images, we use the same method for both.
+        # In the try block below, we catch two exceptions:
+        # 1. InvalidParameterError, in case the point where we are evaluating
+        #    the PSF lands in a gap in the template.
+        # 2. RangeError, in case the template coverage is so poor that we end
+        #    up near a region with no data.
         try:
             templatePsfSize = getPsfFwhm(template.psf)
             sciencePsfSize = getPsfFwhm(science.psf)
