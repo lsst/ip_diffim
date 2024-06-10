@@ -247,8 +247,9 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         badDiaSrc = ~bbox.contains(diaSources.getX(), diaSources.getY())
         nBad = np.count_nonzero(badDiaSrc)
         self.assertEqual(nBad, nSetBad)
-        diaSourcesNoBad = detectionTask._removeBadSources(diaSources)
+        diaSourcesNoBad, removedSources = detectionTask._removeBadSources(diaSources)
         badDiaSrcNoBad = ~bbox.contains(diaSourcesNoBad.getX(), diaSourcesNoBad.getY())
+        self.assertEqual(len(removedSources), nSetBad)
 
         # Verify that no sources outside the image bounding box remain
         self.assertEqual(np.count_nonzero(badDiaSrcNoBad), 0)
@@ -288,7 +289,9 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
             output = detectionTask.run(science.clone(), matchedTemplate, difference)
             refIds = []
             scale = 1. if positive else -1.
-            for diaSource in output.diaSources:
+            # Deblending provides multiple copies of the main parent source,
+            # so we only check the parents. Deblending is checked in another test.
+            for diaSource in output.diaSources[output.diaSources["parent"] == 0]:
                 self._check_diaSource(transientSources, diaSource, refIds=refIds, scale=scale)
         _detection_wrapper(positive=True)
         _detection_wrapper(positive=False)
@@ -515,7 +518,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
 
         sci_refIds = []
         tmpl_refIds = []
-        for diaSrc in output.diaSources:
+        for diaSrc in output.diaSources[output.diaSources["parent"] == 0]:
             if diaSrc['base_PsfFlux_instFlux'] > 0:
                 self._check_diaSource(science_fake_sources, diaSrc, scale=1, refIds=sci_refIds)
                 self.assertTrue(diaSrc['base_PixelFlags_flag_injected'])
@@ -685,7 +688,10 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
             scale = 1. if positive else -1.
             # sources near the edge may have untrustworthy centroids
             goodSrcFlags = ~output.diaSources['base_PixelFlags_flag_edge']
-            for diaSource, goodSrcFlag in zip(output.diaSources, goodSrcFlags):
+            # Deblending provides multiple copies of the main parent source,
+            # so we only check the parents. Deblending is checked in another test.
+            for diaSource, goodSrcFlag in zip(output.diaSources[output.diaSources["parent"] == 0],
+                                              goodSrcFlags):
                 if goodSrcFlag:
                     self._check_diaSource(transientSources, diaSource, refIds=refIds, scale=scale)
         _detection_wrapper(positive=True)
