@@ -853,6 +853,64 @@ class DipoleTestImage:
             return detectTask, schema
 
 
+def getKernelCenterDisplacement(kernel, x, y, im=None):
+    """Calculate the PSF matching kernel peak offset from the nominal
+    position.
+    This is following Robert's code at
+    https://lsstc.slack.com/archives/C2JPMCF5X/p1715784207956889
+    https://lsstc.slack.com/archives/C2JPMCF5X/p1715865918632319
+
+    Parameters
+    ----------
+    kernel : `~lsst.afw.math.LinearCombinationKernel`
+        The PSF matching kernel to evaluate.
+    x : `float`
+        The x position on the detector to evaluate the kernel
+    y : `float`
+        The y position on the detector to evaluate the kernel
+    im : `~lsst.afw.image._image.ImageD`
+        The image to use as base for computing kernel pixel values
+
+    Returns
+    -------
+    krnl_sum : `float`
+        The sum of the kernel on the desired location
+    dx : `float`
+        The displacement of the kernel averaged peak, with respect to the
+        center of the extraction of the kernel
+    dy : `float`
+        The displacement of the kernel averaged peak, with respect to the
+        center of the extraction of the kernel
+    """
+
+    if im is None:
+        im = afwImage.ImageD(kernel.getDimensions())
+
+    # obtain the kernel image
+    hsize = kernel.getWidth()//2
+    krnl_sum = kernel.computeImage(im, doNormalize=False, x=x, y=y)
+
+    data = im.array
+    h, w = data.shape
+    xx = np.arange(w)
+    yy = np.arange(h)
+
+    # create sum vectors and estimate weighted average
+    vx = data.sum(axis=0)
+    vx /= vx.sum()
+    dx = np.dot(vx, xx) - hsize
+
+    vy = data.sum(axis=1)
+    vy /= vy.sum()
+    dy = np.dot(vy, yy) - hsize
+
+    # obtain position angle and norm of displacement
+    pos_angle = np.arctan2(dy, dx)
+    length = np.sqrt(dx**2 + dy**2)
+
+    return krnl_sum, dx, dy, pos_angle, length
+
+
 def getPsfFwhm(psf, average=True, position=None):
     """Directly calculate the horizontal and vertical widths
     of a PSF at half its maximum value.
