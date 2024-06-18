@@ -22,7 +22,7 @@
 """Support utilities for Measuring sources"""
 
 # Export DipoleTestImage to expose fake image generating funcs
-__all__ = ["DipoleTestImage", "evaluateMeanPsfFwhm", "getPsfFwhm"]
+__all__ = ["DipoleTestImage", "evaluateMeanPsfFwhm", "getPsfFwhm", "getKernelCenterDisplacement"]
 
 import itertools
 import numpy as np
@@ -853,12 +853,9 @@ class DipoleTestImage:
             return detectTask, schema
 
 
-def getKernelCenterDisplacement(kernel, x, y, im=None):
+def getKernelCenterDisplacement(kernel, x, y, image=None):
     """Calculate the PSF matching kernel peak offset from the nominal
     position.
-    This is following Robert's code at
-    https://lsstc.slack.com/archives/C2JPMCF5X/p1715784207956889
-    https://lsstc.slack.com/archives/C2JPMCF5X/p1715865918632319
 
     Parameters
     ----------
@@ -868,12 +865,12 @@ def getKernelCenterDisplacement(kernel, x, y, im=None):
         The x position on the detector to evaluate the kernel
     y : `float`
         The y position on the detector to evaluate the kernel
-    im : `~lsst.afw.image._image.ImageD`
+    image : `~lsst.afw.image.ImageD`
         The image to use as base for computing kernel pixel values
 
     Returns
     -------
-    krnl_sum : `float`
+    kernel_sum : `float`
         The sum of the kernel on the desired location
     dx : `float`
         The displacement of the kernel averaged peak, with respect to the
@@ -881,16 +878,20 @@ def getKernelCenterDisplacement(kernel, x, y, im=None):
     dy : `float`
         The displacement of the kernel averaged peak, with respect to the
         center of the extraction of the kernel
+    pos_angle: `float`
+        The position angle in detector coordinates of the displacement
+    length : `float`
+        The displacement module of the kernel centroid in pixel units
     """
 
-    if im is None:
-        im = afwImage.ImageD(kernel.getDimensions())
+    if image is None:
+        image = afwImage.ImageD(kernel.getDimensions())
 
     # obtain the kernel image
     hsize = kernel.getWidth()//2
-    krnl_sum = kernel.computeImage(im, doNormalize=False, x=x, y=y)
+    kernel_sum = kernel.computeImage(image, doNormalize=False, x=x, y=y)
 
-    data = im.array
+    data = image.array
     h, w = data.shape
     xx = np.arange(w)
     yy = np.arange(h)
@@ -908,7 +909,7 @@ def getKernelCenterDisplacement(kernel, x, y, im=None):
     pos_angle = np.arctan2(dy, dx)
     length = np.sqrt(dx**2 + dy**2)
 
-    return krnl_sum, dx, dy, pos_angle, length
+    return kernel_sum, dx, dy, pos_angle, length
 
 
 def getPsfFwhm(psf, average=True, position=None):

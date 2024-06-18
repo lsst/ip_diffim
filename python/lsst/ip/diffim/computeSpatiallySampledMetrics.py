@@ -27,7 +27,7 @@ import lsst.afw.table as afwTable
 import lsst.pipe.base as pipeBase
 import lsst.pex.config as pexConfig
 
-from lsst.ip.diffim.utils import getPsfFwhm, angleMean, evaluateMaskFraction
+from lsst.ip.diffim.utils import getPsfFwhm, angleMean, evaluateMaskFraction, getKernelCenterDisplacement
 from lsst.meas.algorithms import SkyObjectsTask
 from lsst.pex.exceptions import InvalidParameterError, RangeError
 from lsst.utils.timer import timeMethod
@@ -71,6 +71,12 @@ class SpatiallySampledMetricsConnections(pipeBase.PipelineTaskConnections,
         dimensions=("instrument", "visit", "detector"),
         storageClass="SourceCatalog",
         name="{fakesType}{coaddName}Diff_candidateDiaSrc",
+    )
+    psfMatchingKernel = pipeBase.connectionTypes.Input(
+        doc="Kernel used to PSF match the science and template images.",
+        dimensions=("instrument", "visit", "detector"),
+        storageClass="MatchingKernel",
+        name="{fakesType}{coaddName}Diff_psfMatchKernel",
     )
     spatiallySampledMetrics = pipeBase.connectionTypes.Output(
         doc="Summary metrics computed at randomized locations.",
@@ -164,9 +170,32 @@ class SpatiallySampledMetricsTask(lsst.pipe.base.PipelineTask):
                 "%s_mask_fraction"%maskPlane.lower(), "F",
                 "Fraction of pixels with %s mask"%maskPlane
             )
+        self.schema.addField(
+            "psfMatchingKernel_sum", "F",
+            "PSF matching kernel sum at location.")
+        self.schema.addField(
+            "psfMatchingKernel_dx", "F",
+            "PSF matching kernel centroid offset in x at location.",
+            units="pixel")
+        self.schema.addField(
+            "psfMatchingKernel_dy", "F",
+            "PSF matching kernel centroid offset in y at location.",
+            units="pixel")
+        self.schema.addField(
+            "psfMatchingKernel_length", "F",
+            "PSF matching kernel centroid offset module.",
+            units="arcsecond")
+        self.schema.addField(
+            "psfMatchingKernel_position_angle", "F",
+            "PSF matching kernel centroid offset position angle.",
+            units="radian")
+        self.schema.addField(
+            "psfMatchingKernel_direction", "F",
+            "PSF matching kernel centroid offset direction in detector plane.",
+            units="radian")
 
     @timeMethod
-    def run(self, science, matchedTemplate, template, difference, diaSources):
+    def run(self, science, matchedTemplate, template, difference, diaSources, psfMatchingKernel):
         """Calculate difference image metrics on specific locations across the images
 
         Parameters
@@ -183,6 +212,8 @@ class SpatiallySampledMetricsTask(lsst.pipe.base.PipelineTask):
             Result of subtracting template from the science image.
         diaSources : `lsst.afw.table.SourceCatalog`
                 The catalog of detected sources.
+        psfMatchingKernel : `~lsst.afw.math.LinearCombinationKernel`
+            The PSF matching kernel of the subtraction to evaluate.
 
         Returns
         -------
@@ -207,12 +238,13 @@ class SpatiallySampledMetricsTask(lsst.pipe.base.PipelineTask):
 
         for src in spatiallySampledMetrics:
             self._evaluateLocalMetric(src, science, matchedTemplate, template, difference, diaSources,
-                                      metricsMaskPlanes=metricsMaskPlanes)
+                                      metricsMaskPlanes=metricsMaskPlanes,
+                                      psfMatchingKernel=psfMatchingKernel)
 
         return pipeBase.Struct(spatiallySampledMetrics=spatiallySampledMetrics.asAstropy())
 
     def _evaluateLocalMetric(self, src, science, matchedTemplate, template, difference, diaSources,
-                             metricsMaskPlanes):
+                             metricsMaskPlanes, psfMatchingKernel):
         """Calculate image quality metrics at spatially sampled locations.
 
         Parameters
@@ -229,6 +261,8 @@ class SpatiallySampledMetricsTask(lsst.pipe.base.PipelineTask):
             Result of subtracting template from the science image.
         metricsMaskPlanes : `list` of `str`
             Mask planes to calculate metrics from.
+        psfMatchingKernel : `~lsst.afw.math.LinearCombinationKernel`
+            The PSF matching kernel of the subtraction to evaluate.
         """
         bbox = src.getFootprint().getBBox()
         pix = bbox.getCenter()
@@ -271,3 +305,24 @@ class SpatiallySampledMetricsTask(lsst.pipe.base.PipelineTask):
             src.set("%s_mask_fraction"%maskPlane.lower(),
                     evaluateMaskFraction(difference.mask[bbox], maskPlane)
                     )
+
+        krnlSum, dx, dy, direction, length = getKernelCenterDisplacement(
+            psfMatchingKernel, src.get('x'), src.get('y'))
+
+        point1 = lsst.geom.SpherePoint(
+            src.get('coord_ra'), src.get('coord_dec'),
+            lsst.geom.radians)
+        point2 = science.wcs.pixelToSky(src.get('x') + dx, src.get('y') + dy)
+        bearing = point1.bearingTo(point2)
+        pa_ref_angle = lsst.geom.Angle(np.pi/2, lsst.geom.radians)
+        pa = pa_ref_angle - bearing
+        # Wrap around to get Delta_RA from -pi to +pi
+        pa = pa.wrapCtr()
+        position_angle = pa.asRadians()
+
+        src.set('psfMatchingKernel_sum', krnlSum)
+        src.set('psfMatchingKernel_dx', dx)
+        src.set('psfMatchingKernel_dy', dy)
+        src.set('psfMatchingKernel_length', length*pixScale.asArcseconds())
+        src.set('psfMatchingKernel_position_angle', position_angle)  # in E of N position angle
+        src.set('psfMatchingKernel_direction', direction)  # direction offset in detector
