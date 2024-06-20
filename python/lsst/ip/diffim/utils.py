@@ -22,7 +22,7 @@
 """Support utilities for Measuring sources"""
 
 # Export DipoleTestImage to expose fake image generating funcs
-__all__ = ["DipoleTestImage", "evaluateMeanPsfFwhm", "getPsfFwhm"]
+__all__ = ["DipoleTestImage", "evaluateMeanPsfFwhm", "getPsfFwhm", "getKernelCenterDisplacement"]
 
 import itertools
 import numpy as np
@@ -851,6 +851,65 @@ class DipoleTestImage:
 
         else:
             return detectTask, schema
+
+
+def getKernelCenterDisplacement(kernel, x, y, image=None):
+    """Calculate the PSF matching kernel peak offset from the nominal
+    position.
+
+    Parameters
+    ----------
+    kernel : `~lsst.afw.math.LinearCombinationKernel`
+        The PSF matching kernel to evaluate.
+    x : `float`
+        The x position on the detector to evaluate the kernel
+    y : `float`
+        The y position on the detector to evaluate the kernel
+    image : `~lsst.afw.image.ImageD`
+        The image to use as base for computing kernel pixel values
+
+    Returns
+    -------
+    kernel_sum : `float`
+        The sum of the kernel on the desired location
+    dx : `float`
+        The displacement of the kernel averaged peak, with respect to the
+        center of the extraction of the kernel
+    dy : `float`
+        The displacement of the kernel averaged peak, with respect to the
+        center of the extraction of the kernel
+    pos_angle: `float`
+        The position angle in detector coordinates of the displacement
+    length : `float`
+        The displacement module of the kernel centroid in pixel units
+    """
+
+    if image is None:
+        image = afwImage.ImageD(kernel.getDimensions())
+
+    # obtain the kernel image
+    hsize = kernel.getWidth()//2
+    kernel_sum = kernel.computeImage(image, doNormalize=False, x=x, y=y)
+
+    data = image.array
+    h, w = data.shape
+    xx = np.arange(w)
+    yy = np.arange(h)
+
+    # create sum vectors and estimate weighted average
+    vx = data.sum(axis=0)
+    vx /= vx.sum()
+    dx = np.dot(vx, xx) - hsize
+
+    vy = data.sum(axis=1)
+    vy /= vy.sum()
+    dy = np.dot(vy, yy) - hsize
+
+    # obtain position angle and norm of displacement
+    pos_angle = np.arctan2(dy, dx)
+    length = np.sqrt(dx**2 + dy**2)
+
+    return kernel_sum, dx, dy, pos_angle, length
 
 
 def getPsfFwhm(psf, average=True, position=None):
