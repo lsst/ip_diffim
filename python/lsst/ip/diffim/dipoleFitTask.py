@@ -629,7 +629,10 @@ class DipoleFitAlgorithm:
         modelFunctor = dipoleModelFunctor  # dipoleModel.makeModel does not work for now.
         # Create the lmfit model (lmfit uses scipy 'leastsq' option by default - Levenberg-Marquardt)
         # We have to (later) filter out the nans by hand in our input to gmod.fit().
-        gmod = lmfit.Model(modelFunctor, verbose=verbose)
+        # The only independent variable in the model is "x"; lmfit tries to
+        # introspect variables and parameters from the function signature, but
+        # gets it wrong for the model signature above.
+        gmod = lmfit.Model(modelFunctor, independent_vars=["x"], verbose=verbose)
 
         # Add the constraints for centroids, fluxes.
         # starting constraint - near centroid of footprint
