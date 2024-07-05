@@ -1138,7 +1138,7 @@ def checkTemplateIsSufficient(templateExposure, logger, requiredTemplateFraction
     ----------
     templateExposure : `lsst.afw.image.ExposureF`
         The template exposure to check
-    logger : `lsst.log.Log`
+    logger : `logging.Logger`
         Logger for printing output.
     requiredTemplateFraction : `float`, optional
         Fraction of pixels of the science image required to have coverage
