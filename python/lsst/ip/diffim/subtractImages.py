@@ -712,12 +712,12 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             or if the science image is not fully contained in the template
             bounding box.
         """
-        assert template.wcs == science.wcs,\
+        assert template.wcs == science.wcs, \
             "Template and science exposure WCS are not identical."
         templateBBox = template.getBBox()
         scienceBBox = science.getBBox()
 
-        assert templateBBox.contains(scienceBBox),\
+        assert templateBBox.contains(scienceBBox), \
             "Template bbox does not contain all of the science image."
 
     def _convolveExposure(self, exposure, kernel, convolutionControl,
