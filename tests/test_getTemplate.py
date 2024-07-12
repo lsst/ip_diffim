@@ -250,6 +250,23 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         with self.assertRaisesRegex(lsst.pipe.base.NoWorkFound, "No patches found"):
             task.run(self.patches, lsst.geom.Box2I(box), self.exposure.wcs, self.dataIds, "a_test")
 
+    def testMissingPatches(self):
+        """Test that a missing patch results in an appropriate mask.
+
+        This fixes the bug reported on DM-44997 (image and variance were NaN
+        but the mask was not set to NO_DATA for those pixels).
+        """
+        # tract=0, patch=1 is the lower-left corner, as displayed in DS9.
+        self.patches[0].pop(1)
+        box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
+        task = lsst.ip.diffim.GetTemplateTask()
+        # Task modifies the input bbox, so pass a copy.
+        result = task.run(self.patches, lsst.geom.Box2I(box), self.exposure.wcs, self.dataIds, "a_test")
+        no_data = (result.template.mask.array & result.template.mask.getPlaneBitMask("NO_DATA")) != 0
+        self.assertTrue(all(np.isnan(result.template.image.array[no_data])))
+        self.assertTrue(all(np.isnan(result.template.variance.array[no_data])))
+        self.assertEqual(no_data.sum(), 22118)
+
 
 def setup_module(module):
     lsst.utils.tests.init()
