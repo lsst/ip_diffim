@@ -384,6 +384,9 @@ class GetTemplateTask(pipeBase.PipelineTask):
             maskedImage.image *= weight
             maskedImage.variance *= weight
             merged.maskedImage[maskedImage.getBBox()] += maskedImage
+            # Clear the NaNs to ensure that areas missing from this input are
+            # masked with NO_DATA after the loop.
+            weight.array[np.isnan(weight.array)] = 0
             weights[maskedImage.getBBox()] += weight
         # Cannot use `merged.maskedImage /= weights` because that operator
         # divides the variance by the weight twice; in this case `weights` are
