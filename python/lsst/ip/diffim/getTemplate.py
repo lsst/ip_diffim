@@ -134,9 +134,9 @@ class GetTemplateTask(pipeBase.PipelineTask):
         Parameters
         ----------
         inputs : `dict` of task Inputs, containing:
-            - coaddExposureRefs : `list` \
-                                [`lsst.daf.butler.DeferredDatasetHandle` of \
-                                `lsst.afw.image.Exposure`]
+            - coaddExposures : `list` \
+                              [`lsst.daf.butler.DeferredDatasetHandle` of \
+                               `lsst.afw.image.Exposure`]
                 Data references to exposures that might overlap the detector.
             - bbox : `lsst.geom.Box2I`
                 Template Bounding box of the detector geometry onto which to
