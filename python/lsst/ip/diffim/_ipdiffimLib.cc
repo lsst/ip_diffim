@@ -45,7 +45,7 @@ namespace detail {
     void wrapKernelSumVisitor(WrapperCollection &wrappers);
 }
 PYBIND11_MODULE(_ipdiffimLib, mod) {
-    lsst::utils::python::WrapperCollection wrappers(mod, "lsst.ip.diffim");
+    lsst::cpputils::python::WrapperCollection wrappers(mod, "lsst.ip.diffim");
     wrappers.addInheritanceDependency("lsst.meas.base");
     wrappers.addInheritanceDependency("lsst.afw.math");
     wrappers.addSignatureDependency("lsst.afw.table");
