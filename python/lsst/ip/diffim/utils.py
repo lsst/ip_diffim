@@ -1139,6 +1139,8 @@ def makeTestImage(seed=5, nSrc=20, psfSize=2., noiseLevel=5.,
                   flux=None,
                   clearEdgeMask=False,
                   addMaskPlanes=None,
+                  band="g",
+                  physicalFilter="g NotACamera"
                   ):
     """Make a reproduceable PSF-convolved exposure for testing.
 
@@ -1243,6 +1245,7 @@ def makeTestImage(seed=5, nSrc=20, psfSize=2., noiseLevel=5.,
     if background is not None:
         modelExposure.image += background
     modelExposure.maskedImage /= calibration
+    modelExposure.setFilter(afwImage.FilterLabel(band, physicalFilter))
     modelExposure.info.setId(seed)
     if doApplyCalibration:
         modelExposure.maskedImage = modelExposure.photoCalib.calibrateImage(modelExposure.maskedImage)

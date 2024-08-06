@@ -695,8 +695,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
 
     @staticmethod
     def _validateExposures(template, science):
-        """Check that the WCS of the two Exposures match, and the template bbox
-        contains the science bbox.
+        """Check that the WCS of the two Exposures match, the template bbox
+        contains the science bbox, and that the bands match.
 
         Parameters
         ----------
@@ -709,13 +709,16 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         ------
         AssertionError
             Raised if the WCS of the template is not equal to the science WCS,
-            or if the science image is not fully contained in the template
-            bounding box.
+            if the science image is not fully contained in the template
+            bounding box, or if the bands do not match.
         """
         assert template.wcs == science.wcs, \
             "Template and science exposure WCS are not identical."
         templateBBox = template.getBBox()
         scienceBBox = science.getBBox()
+        assert science.filter.bandLabel == template.filter.bandLabel, \
+            "Science and template exposures have different bands: %s, %s" % \
+            (science.filter, template.filter)
 
         assert templateBBox.contains(scienceBBox), \
             "Template bbox does not contain all of the science image."

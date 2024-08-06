@@ -64,6 +64,21 @@ class AlardLuptonSubtractTest(lsst.utils.tests.TestCase):
         with self.assertRaises(AssertionError):
             task.run(template, science, sources)
 
+    def test_mismatched_filter(self):
+        """Test that an error is raised if the science and template have
+        different bands.
+        """
+        xSize = 200
+        ySize = 200
+        science, sources = makeTestImage(psfSize=2.4, xSize=xSize + 20, ySize=ySize + 20,
+                                         band="g", physicalFilter="g noCamera")
+        template, _ = makeTestImage(psfSize=2.4, xSize=xSize, ySize=ySize, doApplyCalibration=True,
+                                    band="not-g", physicalFilter="not-g noCamera")
+        config = subtractImages.AlardLuptonSubtractTask.ConfigClass()
+        task = subtractImages.AlardLuptonSubtractTask(config=config)
+        with self.assertRaises(AssertionError):
+            task.run(template, science, sources)
+
     def test_incomplete_template_coverage(self):
         noiseLevel = 1.
         border = 20
