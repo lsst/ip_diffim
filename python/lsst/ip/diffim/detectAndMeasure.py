@@ -197,7 +197,12 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         self.detection.thresholdValue = 5.0
         self.detection.reEstimateBackground = False
         self.detection.thresholdType = "pixel_stdev"
-        self.detection.excludeMaskPlanes = ["EDGE", "SAT", "BAD", "INTRP"]
+        self.detection.excludeMaskPlanes = ["EDGE",
+                                            "SAT",
+                                            "BAD",
+                                            "INTRP",
+                                            "NO_DATA",
+                                            ]
 
         self.measurement.plugins.names |= ["ext_trailedSources_Naive",
                                            "base_LocalPhotoCalib",
