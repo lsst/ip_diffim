@@ -403,7 +403,7 @@ class DcrModel:
         if bbox is None:
             bbox = self.bbox
         dcrShift = calculateDcr(visitInfo, self.wcs, self.effectiveWavelength, self.bandwidth, len(self),
-                                splitSubfilters=splitSubfilters)
+                                splitSubfilters=splitSubfilters, bbox=bbox)
         templateImage = afwImage.ImageF(bbox)
         refModel = None
         for subfilter, dcr in enumerate(dcrShift):
@@ -729,7 +729,8 @@ def applyDcr(image, dcr, useInverse=False, splitSubfilters=False, splitThreshold
     return shiftedImage
 
 
-def calculateDcr(visitInfo, wcs, effectiveWavelength, bandwidth, dcrNumSubfilters, splitSubfilters=False):
+def calculateDcr(visitInfo, wcs, effectiveWavelength, bandwidth, dcrNumSubfilters, splitSubfilters=False,
+                 bbox=None):
     """Calculate the shift in pixels of an exposure due to DCR.
 
     Parameters
@@ -747,6 +748,10 @@ def calculateDcr(visitInfo, wcs, effectiveWavelength, bandwidth, dcrNumSubfilter
     splitSubfilters : `bool`, optional
         Calculate DCR for two evenly-spaced wavelengths in each subfilter,
         instead of at the midpoint. Default: False
+    bbox : `lsst.afw.geom.Box2I`, optional
+        Bounding box for the region of interest for evaluating the local
+        pixelScale (defaults to the Sky Origin of the ``wcs`` provided if
+        ``bbox`` is None).
 
     Returns
     -------
@@ -768,9 +773,14 @@ def calculateDcr(visitInfo, wcs, effectiveWavelength, bandwidth, dcrNumSubfilter
                                                  elevation=visitInfo.getBoresightAzAlt().getLatitude(),
                                                  observatory=visitInfo.getObservatory(),
                                                  weather=visitInfo.getWeather())
+        if bbox is not None:
+            pixelScale = wcs.getPixelScale(bbox.getCenter()).asArcseconds()
+        else:
+            pixelScale = wcs.getPixelScale().asArcseconds()
+
         if splitSubfilters:
-            diffRefractPix0 = diffRefractAmp0.asArcseconds()/wcs.getPixelScale().asArcseconds()
-            diffRefractPix1 = diffRefractAmp1.asArcseconds()/wcs.getPixelScale().asArcseconds()
+            diffRefractPix0 = diffRefractAmp0.asArcseconds()/pixelScale
+            diffRefractPix1 = diffRefractAmp1.asArcseconds()/pixelScale
             diffRefractArr = [diffRefractPix0*weight[0] + diffRefractPix1*weight[1],
                               diffRefractPix0*weight[1] + diffRefractPix1*weight[0]]
             shiftX = [diffRefractPix*np.sin(rotation.asRadians()) for diffRefractPix in diffRefractArr]
@@ -778,7 +788,7 @@ def calculateDcr(visitInfo, wcs, effectiveWavelength, bandwidth, dcrNumSubfilter
             dcrShift.append(((shiftY[0], shiftX[0]), (shiftY[1], shiftX[1])))
         else:
             diffRefractAmp = (diffRefractAmp0 + diffRefractAmp1)/2.
-            diffRefractPix = diffRefractAmp.asArcseconds()/wcs.getPixelScale().asArcseconds()
+            diffRefractPix = diffRefractAmp.asArcseconds()/pixelScale
             shiftX = diffRefractPix*np.sin(rotation.asRadians())
             shiftY = diffRefractPix*np.cos(rotation.asRadians())
             dcrShift.append((shiftY, shiftX))
