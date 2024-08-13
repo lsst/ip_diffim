@@ -288,7 +288,7 @@ class DcrModel:
 
         Returns
         -------
-        bbox : `lsst.afw.geom.SkyWcs`
+        wcs : `lsst.afw.geom.SkyWcs`
             Coordinate system definition (wcs) for the exposure.
         """
         return self._wcs
