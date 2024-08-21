@@ -276,7 +276,7 @@ class SpatiallySampledMetricsTask(lsst.pipe.base.PipelineTask):
         bbox.grow(metricRegionSize)
         bbox = bbox.clippedTo(science.getBBox())
         nPix = bbox.getArea()
-        pixScale = science.wcs.getPixelScale()
+        pixScale = science.wcs.getPixelScale(bbox.getCenter())
         area = nPix*pixScale.asDegrees()**2
         peak = src.getFootprint().getPeaks()[0]
         src.set('x', peak['i_x'])
