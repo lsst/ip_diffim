@@ -100,7 +100,10 @@ class MakeKernelTask(PsfMatchTask):
         # so cannot easily be constructed with makeSubtask
         self.background = SubtractBackgroundTask(config=self.kConfig.afwBackgroundConfig, name="background",
                                                  parentTask=self)
+
         self.selectSchema = lsst.afw.table.SourceTable.makeMinimalSchema()
+        # Add coordinate error fields:
+        lsst.afw.table.CoordKey.addErrorFields(self.selectSchema)
         self.selectAlgMetadata = lsst.daf.base.PropertyList()
         self.makeSubtask("selectDetection", schema=self.selectSchema)
         self.makeSubtask("selectMeasurement", schema=self.selectSchema, algMetadata=self.selectAlgMetadata)
