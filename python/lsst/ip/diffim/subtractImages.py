@@ -19,8 +19,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import warnings
-
 from astropy import units as u
 import numpy as np
 
@@ -28,7 +26,6 @@ import lsst.afw.detection as afwDetection
 import lsst.afw.image
 import lsst.afw.math
 import lsst.geom
-from lsst.utils.introspection import find_outside_stacklevel
 from lsst.ip.diffim.utils import evaluateMeanPsfFwhm, getPsfFwhm
 from lsst.meas.algorithms import ScaleVarianceTask
 import lsst.pex.config
@@ -319,8 +316,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         return exposure
 
     @timeMethod
-    def run(self, template, science, sources, finalizedPsfApCorrCatalog=None,
-            visitSummary=None):
+    def run(self, template, science, sources, visitSummary=None):
         """PSF match, subtract, and decorrelate two images.
 
         Parameters
@@ -333,16 +329,10 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             Identified sources on the science exposure. This catalog is used to
             select sources in order to perform the AL PSF matching on stamp
             images around them.
-        finalizedPsfApCorrCatalog : `lsst.afw.table.ExposureCatalog`, optional
-            Exposure catalog with finalized psf models and aperture correction
-            maps to be applied.  Catalog uses the detector id for the catalog
-            id, sorted on id for fast lookup. Deprecated in favor of
-            ``visitSummary``, and will be removed after v26.
         visitSummary : `lsst.afw.table.ExposureCatalog`, optional
             Exposure catalog with external calibrations to be applied. Catalog
             uses the detector id for the catalog id, sorted on id for fast
-            lookup. Ignored (for temporary backwards compatibility) if
-            ``finalizedPsfApCorrCatalog`` is provided.
+            lookup.
 
         Returns
         -------
@@ -367,15 +357,6 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             Raised if fraction of good pixels, defined as not having NO_DATA
             set, is less then the configured requiredTemplateFraction
         """
-
-        if finalizedPsfApCorrCatalog is not None:
-            warnings.warn(
-                "The finalizedPsfApCorrCatalog argument is deprecated in favor of the visitSummary "
-                "argument, and will be removed after v26.",
-                FutureWarning,
-                stacklevel=find_outside_stacklevel("lsst.ip.diffim"),
-            )
-            visitSummary = finalizedPsfApCorrCatalog
 
         self._prepareInputs(template, science, visitSummary=visitSummary)
 
