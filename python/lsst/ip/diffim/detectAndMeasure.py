@@ -221,6 +221,10 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
             "STREAK", "INJECTED", "INJECTED_TEMPLATE"]
         self.skySources.avoidMask = ["DETECTED", "DETECTED_NEGATIVE", "BAD", "NO_DATA", "EDGE"]
 
+        # Set the streak mask along the entire fit line, not only where the
+        # detected mask is set.
+        self.maskStreaks.onlyMaskDetected = False
+
 
 class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
     """Detect and measure sources on a difference image.
@@ -642,15 +646,23 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                 Distance from center of detected streak.
             ``sigma`` : `np.ndarray`
                 Width of streak profile.
+            ``reducedChi2`` : `np.ndarray`
+                Reduced chi2 of the best-fit streak profile.
+            ``modelMaximum`` : `np.ndarray`
+                Peak value of the fit line profile.
         """
         streaks = self.maskStreaks.run(maskedImage)
         if self.config.writeStreakInfo:
             rhos = np.array([line.rho for line in streaks.lines])
             thetas = np.array([line.theta for line in streaks.lines])
             sigmas = np.array([line.sigma for line in streaks.lines])
-            streakInfo = {'rho': rhos, 'theta': thetas, 'sigma': sigmas}
+            chi2s = np.array([line.reducedChi2 for line in streaks.lines])
+            modelMaximums = np.array([line.modelMaximum for line in streaks.lines])
+            streakInfo = {'rho': rhos, 'theta': thetas, 'sigma': sigmas, 'reducedChi2': chi2s,
+                          'modelMaximum': modelMaximums}
         else:
-            streakInfo = {'rho': np.array([]), 'theta': np.array([]), 'sigma': np.array([])}
+            streakInfo = {'rho': np.array([]), 'theta': np.array([]), 'sigma': np.array([]),
+                          'reducedChi2': np.array([]), 'modelMaximum': np.array([])}
         return pipeBase.Struct(maskedStreaks=streakInfo)
 
 
