@@ -24,9 +24,10 @@ import unittest
 
 import lsst.geom
 from lsst.ip.diffim import detectAndMeasure, subtractImages
-from lsst.ip.diffim.utils import makeTestImage
 from lsst.pipe.base import InvalidQuantumError
 import lsst.utils.tests
+
+from utils import makeTestImage
 
 
 class DetectAndMeasureTestBase:
