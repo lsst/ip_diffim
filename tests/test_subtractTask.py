@@ -33,9 +33,10 @@ from lsst.pipe.base import NoWorkFound
 import lsst.utils.tests
 import numpy as np
 from lsst.ip.diffim.utils import (computeRobustStatistics, computePSFNoiseEquivalentArea,
-                                  evaluateMeanPsfFwhm, getPsfFwhm, makeStats, makeTestImage,
-                                  CustomCoaddPsf)
+                                  evaluateMeanPsfFwhm, getPsfFwhm)
 from lsst.pex.exceptions import InvalidParameterError
+
+from utils import makeStats, makeTestImage, CustomCoaddPsf
 
 
 class AlardLuptonSubtractTestBase:

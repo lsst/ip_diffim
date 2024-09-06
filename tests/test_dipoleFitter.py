@@ -30,7 +30,7 @@ import numpy as np
 import lsst.utils.tests
 import lsst.afw.table as afwTable
 from lsst.ip.diffim.dipoleFitTask import (DipoleFitAlgorithm, DipoleFitTask)
-import lsst.ip.diffim.utils as ipUtils
+import utils
 
 
 class DipoleTestImage:
@@ -65,7 +65,7 @@ class DipoleTestImage:
         self.generateTestImage()
 
     def generateTestImage(self):
-        self.testImage = ipUtils.DipoleTestImage(
+        self.testImage = utils.DipoleTestImage(
             w=100, h=100,
             xcenPos=self.xc + self.offsets,
             ycenPos=self.yc + self.offsets,
