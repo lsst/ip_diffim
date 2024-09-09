@@ -54,6 +54,14 @@ class AlardLuptonSubtractTestBase:
         """
         config = self.subtractTask.ConfigClass()
         config.doSubtractBackground = False
+        config.sourceSelector.signalToNoise.fluxField = "truth_instFlux"
+        config.sourceSelector.signalToNoise.errField = "truth_instFluxErr"
+        config.sourceSelector.doUnresolved = True
+        config.sourceSelector.doIsolated = True
+        config.sourceSelector.doRequirePrimary = True
+        config.sourceSelector.doFlags = True
+        config.sourceSelector.doSignalToNoise = True
+        config.sourceSelector.flags.bad = ["base_PsfFlux_flag", ]
         config.update(**kwargs)
 
         return self.subtractTask(config=config)
@@ -441,17 +449,18 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
                                          xSize=xSize, ySize=ySize)
         template, _ = makeTestImage(psfSize=2.0, nSrc=nSourcesSimulated,
                                     xSize=xSize, ySize=ySize, doApplyCalibration=True)
-        badSourceFlag = "slot_Centroid_flag"
 
         def _run_and_check_sources(sourcesIn, maxKernelSources=1000, minKernelSources=3):
             sources = sourcesIn.copy(deep=True)
-            # Verify that source flags are not set in the input catalog
-            self.assertEqual(np.sum(sources[badSourceFlag]), 0)
 
-            task = self._setup_subtraction(badSourceFlags=[badSourceFlag, ],
-                                           maxKernelSources=maxKernelSources,
+            task = self._setup_subtraction(maxKernelSources=maxKernelSources,
                                            minKernelSources=minKernelSources,
                                            )
+            # Verify that source flags are not set in the input catalog
+            # Note that this will use the last flag in the list for the rest of
+            #  the test.
+            for badSourceFlag in task.sourceSelector.config.flags.bad:
+                self.assertEqual(np.sum(sources[badSourceFlag]), 0)
             nSources = len(sources)
             # Flag a third of the sources
             sources[0:: 3][badSourceFlag] = True
@@ -538,7 +547,9 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
         # Don't use ``self._setup_subtraction()`` here.
         # Modifying the config of a subtask is messy.
         config = subtractImages.AlardLuptonSubtractTask.ConfigClass()
-        
+
+        config.sourceSelector.signalToNoise.fluxField = "truth_instFlux"
+        config.sourceSelector.signalToNoise.errField = "truth_instFluxErr"
         config.doSubtractBackground = True
 
         config.makeKernel.kernel.name = "AL"
@@ -1140,7 +1151,9 @@ class AlardLuptonPreconvolveSubtractTest(AlardLuptonSubtractTestBase, lsst.utils
         # Don't use ``self._setup_subtraction()`` here.
         # Modifying the config of a subtask is messy.
         config = subtractImages.AlardLuptonPreconvolveSubtractTask.ConfigClass()
-        
+
+        config.sourceSelector.signalToNoise.fluxField = "truth_instFlux"
+        config.sourceSelector.signalToNoise.errField = "truth_instFluxErr"
         config.doSubtractBackground = True
 
         config.makeKernel.kernel.name = "AL"

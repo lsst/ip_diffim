@@ -488,6 +488,8 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         template_fake_masked = (template.mask.array & template_fake_bitmask) > 0
 
         subtractConfig = subtractImages.AlardLuptonSubtractTask.ConfigClass()
+        subtractConfig.sourceSelector.signalToNoise.fluxField = "truth_instFlux"
+        subtractConfig.sourceSelector.signalToNoise.errField = "truth_instFluxErr"
         subtractTask = subtractImages.AlardLuptonSubtractTask(config=subtractConfig)
         subtraction = subtractTask.run(template, science, sources)
 

@@ -27,7 +27,7 @@ import lsst.afw.image
 import lsst.afw.math
 import lsst.geom
 from lsst.ip.diffim.utils import evaluateMeanPsfFwhm, getPsfFwhm
-from lsst.meas.algorithms import ScaleVarianceTask
+from lsst.meas.algorithms import ScaleVarianceTask, ScienceSourceSelectorTask
 import lsst.pex.config
 import lsst.pipe.base
 import lsst.pex.exceptions
@@ -173,6 +173,10 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
         dtype=bool,
         default=False,
     )
+    sourceSelector = lsst.pex.config.ConfigurableField(
+        target=ScienceSourceSelectorTask,
+        doc="Task to select sources to be used for PSF matching.",
+    )
     detectionThreshold = lsst.pex.config.Field(
         dtype=float,
         default=10,
@@ -206,6 +210,8 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
                  "base_PixelFlags_flag_saturated",
                  "base_PixelFlags_flag_bad",
                  ),
+        deprecated="This field is no longer used and will be removed after v28."
+        "Set the equivalent field for the sourceSelector subtask instead.",
     )
     excludeMaskPlanes = lsst.pex.config.ListField(
         dtype=str,
@@ -240,6 +246,13 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
         self.makeKernel.kernel.active.fitForBackground = self.doSubtractBackground
         self.makeKernel.kernel.active.spatialKernelOrder = 1
         self.makeKernel.kernel.active.spatialBgOrder = 2
+        self.sourceSelector.doUnresolve = True  # apply star-galaxy separation
+        self.sourceSelector.doIsolated = True
+        self.sourceSelector.requirePrimary = True
+        self.sourceSelector.doSkySources = False  # Do not include sky sources
+        self.sourceSelector.doSignalToNoise = True  # apply signal to noise filter
+        self.sourceSelector.signalToNoise.minimum = 10
+        self.sourceSelector.signalToNoise.maximum = 500
 
 
 class AlardLuptonSubtractConfig(AlardLuptonSubtractBaseConfig, lsst.pipe.base.PipelineTaskConfig,
@@ -265,6 +278,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         super().__init__(**kwargs)
         self.makeSubtask("decorrelate")
         self.makeSubtask("makeKernel")
+        self.makeSubtask("sourceSelector")
         if self.config.doScaleVariance:
             self.makeSubtask("scaleVariance")
 
@@ -772,26 +786,23 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             If there are too few sources to compute the PSF matching kernel
             remaining after source selection.
         """
-        flags = np.ones(len(sources), dtype=bool)
-        for flag in self.config.badSourceFlags:
-            try:
-                flags *= ~sources[flag]
-            except Exception as e:
-                self.log.warning("Could not apply source flag: %s", e)
-        signalToNoise = sources.getPsfInstFlux()/sources.getPsfInstFluxErr()
-        sToNFlag = signalToNoise > self.config.detectionThreshold
-        flags *= sToNFlag
-        sToNFlagMax = signalToNoise < self.config.detectionThresholdMax
-        flags *= sToNFlagMax
-        flags *= self._checkMask(mask, sources, self.config.excludeMaskPlanes)
-        selectSources = sources[flags].copy(deep=True)
+
+        selected = self.sourceSelector.selectSources(sources).selected
+        nInitialSelected = np.count_nonzero(selected)
+        selected *= self._checkMask(mask, sources, self.config.excludeMaskPlanes)
+        nSelected = np.count_nonzero(selected)
+        self.log.info("Rejecting %i candidate sources: an excluded template mask plane is set.",
+                      nInitialSelected - nSelected)
+        selectSources = sources[selected].copy(deep=True)
+        # Trim selectSources if they exceed ``maxKernelSources``.
+        # Keep the highest signal-to-noise sources of those selected.
         if (len(selectSources) > self.config.maxKernelSources) & (self.config.maxKernelSources > 0):
             signalToNoise = selectSources.getPsfInstFlux()/selectSources.getPsfInstFluxErr()
             indices = np.argsort(signalToNoise)
             indices = indices[-self.config.maxKernelSources:]
-            flags = np.zeros(len(selectSources), dtype=bool)
-            flags[indices] = True
-            selectSources = selectSources[flags].copy(deep=True)
+            selected = np.zeros(len(selectSources), dtype=bool)
+            selected[indices] = True
+            selectSources = selectSources[selected].copy(deep=True)
 
         self.log.info("%i/%i=%.1f%% of sources selected for PSF matching from the input catalog",
                       len(selectSources), len(sources), 100*len(selectSources)/len(sources))
