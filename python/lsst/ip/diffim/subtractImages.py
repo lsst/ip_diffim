@@ -816,8 +816,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         return selectSources
 
     @staticmethod
-    def _checkMask(mask, sources, excludeMaskPlanes):
-        """Exclude sources that are located on masked pixels.
+    def _checkMask(mask, sources, excludeMaskPlanes, checkAdjacent=True):
+        """Exclude sources that are located on or adjacent to masked pixels.
 
         Parameters
         ----------
@@ -842,11 +842,18 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
 
         excludePixelMask = mask.getPlaneBitMask(setExcludeMaskPlanes)
 
-        xv = np.rint(sources.getX() - mask.getX0())
-        yv = np.rint(sources.getY() - mask.getY0())
+        xv = (np.rint(sources.getX() - mask.getX0())).astype(int)
+        yv = (np.rint(sources.getY() - mask.getY0())).astype(int)
 
-        mv = mask.array[yv.astype(int), xv.astype(int)]
-        flags = np.bitwise_and(mv, excludePixelMask) == 0
+        flags = np.ones(len(sources), dtype=bool)
+        if checkAdjacent:
+            pixRange = (0, -1, 1)
+        else:
+            pixRange = (0,)
+        for j in pixRange:
+            for i in pixRange:
+                mv = mask.array[yv + j, xv + i]
+                flags *= np.bitwise_and(mv, excludePixelMask) == 0
         return flags
 
     def _prepareInputs(self, template, science, visitSummary=None):
