@@ -246,9 +246,9 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
         self.makeKernel.kernel.active.fitForBackground = self.doSubtractBackground
         self.makeKernel.kernel.active.spatialKernelOrder = 1
         self.makeKernel.kernel.active.spatialBgOrder = 2
-        self.sourceSelector.doUnresolve = True  # apply star-galaxy separation
-        self.sourceSelector.doIsolated = True
-        self.sourceSelector.requirePrimary = True
+        self.sourceSelector.doUnresolved = True  # apply star-galaxy separation
+        self.sourceSelector.doIsolated = True  # apply isolated star selection
+        self.sourceSelector.doRequirePrimary = True  # apply primary flag selection
         self.sourceSelector.doSkySources = False  # Do not include sky sources
         self.sourceSelector.doSignalToNoise = True  # apply signal to noise filter
         self.sourceSelector.signalToNoise.minimum = 10
