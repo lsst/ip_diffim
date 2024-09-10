@@ -1095,6 +1095,8 @@ def detectTestSources(exposure, addMaskPlanes=None):
         addMaskPlanes = ["STREAK", "INJECTED", "INJECTED_TEMPLATE"]
 
     schema = afwTable.SourceTable.makeMinimalSchema()
+    # Add coordinate error fields:
+    afwTable.CoordKey.addErrorFields(schema)
     selectDetection = measAlg.SourceDetectionTask(schema=schema)
     selectMeasurement = measBase.SingleFrameMeasurementTask(schema=schema)
     table = afwTable.SourceTable.make(schema)
@@ -1267,6 +1269,8 @@ def _makeTruthSchema():
         Calib, Ap, and Psf flux slots all are set to ``truth_instFlux``.
     """
     schema = afwTable.SourceTable.makeMinimalSchema()
+    # Add coordinate error fields:
+    afwTable.CoordKey.addErrorFields(schema)
     keys = {}
     # Don't use a FluxResultKey so we can manage the flux and err separately.
     keys["instFlux"] = schema.addField("truth_instFlux", type=np.float64,
