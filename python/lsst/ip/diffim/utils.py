@@ -1095,6 +1095,8 @@ def detectTestSources(exposure, addMaskPlanes=None):
         addMaskPlanes = ["STREAK", "INJECTED", "INJECTED_TEMPLATE"]
 
     schema = afwTable.SourceTable.makeMinimalSchema()
+    # Add coordinate error fields:
+    afwTable.CoordKey.addErrorFields(schema)
     selectDetection = measAlg.SourceDetectionTask(schema=schema)
     selectMeasurement = measBase.SingleFrameMeasurementTask(schema=schema)
     table = afwTable.SourceTable.make(schema)
@@ -1267,6 +1269,8 @@ def _makeTruthSchema():
         Calib, Ap, and Psf flux slots all are set to ``truth_instFlux``.
     """
     schema = afwTable.SourceTable.makeMinimalSchema()
+    # Add coordinate error fields:
+    afwTable.CoordKey.addErrorFields(schema)
     keys = {}
     # Don't use a FluxResultKey so we can manage the flux and err separately.
     keys["instFlux"] = schema.addField("truth_instFlux", type=np.float64,
@@ -1280,6 +1284,11 @@ def _makeTruthSchema():
     schema.addField("base_PixelFlags_flag_interpolated", "Flag", "testing flag.")
     schema.addField("base_PixelFlags_flag_saturated", "Flag", "testing flag.")
     schema.addField("base_PixelFlags_flag_bad", "Flag", "testing flag.")
+    schema.addField("base_PixelFlags_flag_edge", "Flag", "testing flag.")
+    schema.addField("base_PsfFlux_flag", "Flag", "testing flag.")
+    schema.addField("base_ClassificationSizeExtendedness_value", "Flag", "testing flag.")
+    schema.addField("deblend_nChild", "Flag", "testing flag.")
+    schema.addField("detect_isPrimary", "Flag", "testing flag.")
     schema.getAliasMap().set("slot_Centroid", "truth")
     schema.getAliasMap().set("slot_CalibFlux", "truth")
     schema.getAliasMap().set("slot_ApFlux", "truth")
@@ -1315,6 +1324,11 @@ def _fillTruthCatalog(injectList):
         footprint = afwDetection.Footprint(afwGeom.SpanSet.fromShape(circle))
         footprint.addPeak(x, y, flux)
         record.setFootprint(footprint)
+
+        # Set source records for isolated stars
+        record["base_ClassificationSizeExtendedness_value"] = 0
+        record["deblend_nChild"] = 0
+        record["detect_isPrimary"] = True
 
     return catalog
 
