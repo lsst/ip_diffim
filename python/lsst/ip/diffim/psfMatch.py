@@ -19,7 +19,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-__all__ = ["DetectionConfig", "PsfMatchConfig", "PsfMatchConfigAL", "PsfMatchConfigDF", "PsfMatchTask"]
+__all__ = ["PsfMatchConfig", "PsfMatchConfigAL", "PsfMatchConfigDF", "PsfMatchTask"]
 
 import abc
 import time
@@ -38,98 +38,6 @@ from . import utils as diutils
 from . import diffimLib
 
 
-# Remove this class on DM-42980.
-# Not deprecated-decorated to prevent excessive warnings when using PsfMatchTask.
-class DetectionConfig(pexConfig.Config):
-    """Configuration for detecting sources on images for building a
-    PSF-matching kernel
-
-    Configuration for turning detected lsst.afw.detection.FootPrints into an
-    acceptable (unmasked, high signal-to-noise, not too large or not too small)
-    list of `lsst.ip.diffim.KernelSources` that are used to build the
-    Psf-matching kernel"""
-
-    detThreshold = pexConfig.Field(
-        deprecated="This field is no longer used and will be removed after v27.",
-        dtype=float,
-        doc="Value of footprint detection threshold",
-        default=10.0,
-        check=lambda x: x >= 3.0
-    )
-    detThresholdType = pexConfig.ChoiceField(
-        deprecated="This field is no longer used and will be removed after v27.",
-        dtype=str,
-        doc="Type of detection threshold",
-        default="pixel_stdev",
-        allowed={
-            "value": "Use counts as the detection threshold type",
-            "stdev": "Use standard deviation of image plane",
-            "variance": "Use variance of image plane",
-            "pixel_stdev": "Use stdev derived from variance plane"
-        }
-    )
-    detOnTemplate = pexConfig.Field(
-        dtype=bool,
-        doc="""If true run detection on the template (image to convolve);
-                 if false run detection on the science image""",
-        deprecated="This field is no longer used and will be removed after v27.",
-        default=True
-    )
-    badMaskPlanes = pexConfig.ListField(
-        dtype=str,
-        doc="""Mask planes that lead to an invalid detection.
-                 Options: NO_DATA EDGE SAT BAD CR INTRP""",
-        default=("NO_DATA", "EDGE", "SAT")
-    )
-    fpNpixMin = pexConfig.Field(
-        dtype=int,
-        doc="Minimum number of pixels in an acceptable Footprint",
-        default=5,
-        deprecated="This field is no longer used and will be removed after v27.",
-        check=lambda x: x >= 5
-    )
-    fpNpixMax = pexConfig.Field(
-        dtype=int,
-        doc="""Maximum number of pixels in an acceptable Footprint;
-                 too big and the subsequent convolutions become unwieldy""",
-        default=500,
-        deprecated="This field is no longer used and will be removed after v27.",
-        check=lambda x: x <= 500
-    )
-    fpGrowKernelScaling = pexConfig.Field(
-        dtype=float,
-        doc="""If config.scaleByFwhm, grow the footprint based on
-                 the final kernelSize.  Each footprint will be
-                 2*fpGrowKernelScaling*kernelSize x
-                 2*fpGrowKernelScaling*kernelSize.  With the value
-                 of 1.0, the remaining pixels in each KernelCandiate
-                 after convolution by the basis functions will be
-                 equal to the kernel size itself.""",
-        default=1.0,
-        deprecated="This field is no longer used and will be removed after v27.",
-        check=lambda x: x >= 1.0
-    )
-    fpGrowPix = pexConfig.Field(
-        dtype=int,
-        doc="""Growing radius (in pixels) for each raw detection
-                 footprint.  The smaller the faster; however the
-                 kernel sum does not converge if the stamp is too
-                 small; and the kernel is not constrained at all if
-                 the stamp is the size of the kernel.  The grown stamp
-                 is 2 * fpGrowPix pixels larger in each dimension.
-                 This is overridden by fpGrowKernelScaling if scaleByFwhm""",
-        default=30,
-        deprecated="This field is no longer used and will be removed after v27.",
-        check=lambda x: x >= 10
-    )
-    scaleByFwhm = pexConfig.Field(
-        dtype=bool,
-        doc="Scale fpGrowPix by input Fwhm?",
-        deprecated="This field is no longer used and will be removed after v27.",
-        default=True,
-    )
-
-
 class PsfMatchConfig(pexConfig.Config):
     """Base configuration for Psf-matching
 
@@ -138,11 +46,6 @@ class PsfMatchConfig(pexConfig.Config):
 
     warpingConfig = pexConfig.ConfigField("Config for warping exposures to a common alignment",
                                           afwMath.WarperConfig)
-    # Remove this field on DM-42980.
-    detectionConfig = pexConfig.ConfigField(
-        "Controlling the detection of sources for kernel building",
-        DetectionConfig,
-        deprecated="This field is no longer used and will be removed after v27.")
     afwBackgroundConfig = pexConfig.ConfigField("Controlling the Afw background fitting",
                                                 SubtractBackgroundConfig)
 
