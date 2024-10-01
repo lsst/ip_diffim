@@ -22,6 +22,8 @@
 import numpy as np
 
 import lsst.afw.detection as afwDetection
+import lsst.afw.image as afwImage
+import lsst.afw.math as afwMath
 import lsst.afw.table as afwTable
 import lsst.daf.base as dafBase
 import lsst.geom
@@ -168,6 +170,12 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         target=MaskStreaksTask,
         doc="Subtask for masking streaks. Only used if doMaskStreaks is True. "
             "Adds a mask plane to an exposure, with the mask plane name set by streakMaskName.",
+    )
+    streakBinFactor = pexConfig.Field(
+        dtype=int,
+        default=4,
+        doc="Bin scale factor to use when rerunning detection for masking streaks. "
+            "Only used if doMaskStreaks is True.",
     )
     writeStreakInfo = pexConfig.Field(
         dtype=bool,
@@ -444,7 +452,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         self.metadata["nMergedDiaSources"] = len(initialDiaSources)
 
         if self.config.doMaskStreaks:
-            streakInfo = self._runStreakMasking(difference.maskedImage)
+            streakInfo = self._runStreakMasking(difference)
 
         if self.config.doSkySources:
             self.addSkySources(initialDiaSources, difference.mask, difference.info.id)
@@ -657,14 +665,20 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                 self.metadata["%s_mask_fraction"%maskPlane.lower()] = -1
                 self.log.info("Unable to calculate metrics for mask plane %s: not in image"%maskPlane)
 
-    def _runStreakMasking(self, maskedImage):
+    def _runStreakMasking(self, difference):
         """Do streak masking and optionally save the resulting streak
         fit parameters in a catalog.
 
+        Only returns non-empty streakInfo if self.config.writeStreakInfo
+        is set. The difference image is binned by self.config.streakBinFactor
+        (and detection is run a second time) so that regions with lower
+        surface brightness streaks are more likely to fall above the
+        detection threshold.
+
         Parameters
         ----------
-        maskedImage: `lsst.afw.image.maskedImage`
-            The image in which to search for streaks. Must have a detection
+        difference: `lsst.afw.image.Exposure`
+            The exposure in which to search for streaks. Must have a detection
             mask.
 
         Returns
@@ -681,7 +695,31 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             ``modelMaximum`` : `np.ndarray`
                 Peak value of the fit line profile.
         """
-        streaks = self.maskStreaks.run(maskedImage)
+        maskedImage = difference.maskedImage
+        # Bin the diffim to enhance low surface brightness streaks
+        binnedMaskedImage = afwMath.binImage(maskedImage,
+                                             self.config.streakBinFactor,
+                                             self.config.streakBinFactor)
+        binnedExposure = afwImage.ExposureF(binnedMaskedImage.getBBox())
+        binnedExposure.setMaskedImage(binnedMaskedImage)
+        binnedExposure.setPsf(difference.psf)  # exposure must have a PSF
+        # Rerun detection to set the DETECTED mask plane on binnedExposure
+        _table = afwTable.SourceTable.make(self.schema)
+        self.detection.run(table=_table, exposure=binnedExposure, doSmooth=True)
+        binnedDetectedMaskPlane = binnedExposure.mask.array & binnedExposure.mask.getPlaneBitMask('DETECTED')
+        rescaledDetectedMaskPlane = binnedDetectedMaskPlane.repeat(self.config.streakBinFactor,
+                                                                   axis=0).repeat(self.config.streakBinFactor,
+                                                                                  axis=1)
+        # Create new version of a diffim with DETECTED based on binnedExposure
+        streakMaskedImage = maskedImage.clone()
+        ysize, xsize = rescaledDetectedMaskPlane.shape
+        streakMaskedImage.mask.array[:ysize, :xsize] |= rescaledDetectedMaskPlane
+        # Detect streaks on this new version of the diffim
+        streaks = self.maskStreaks.run(streakMaskedImage)
+        streakMaskPlane = streakMaskedImage.mask.array & streakMaskedImage.mask.getPlaneBitMask('STREAK')
+        # Apply the new STREAK mask to the original diffim
+        maskedImage.mask.array |= streakMaskPlane
+
         if self.config.writeStreakInfo:
             rhos = np.array([line.rho for line in streaks.lines])
             thetas = np.array([line.theta for line in streaks.lines])
