@@ -20,8 +20,11 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
+from scipy.interpolate import interpn as scipyInterpn
 
 import lsst.afw.detection as afwDetection
+import lsst.afw.image as afwImage
+import lsst.afw.math as afwMath  # FOR TESTING BINNING
 import lsst.afw.table as afwTable
 import lsst.daf.base as dafBase
 import lsst.geom
@@ -414,7 +417,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         self.metadata.add("nMergedDiaSources", len(initialDiaSources))
 
         if self.config.doMaskStreaks:
-            streakInfo = self._runStreakMasking(difference.maskedImage)
+            streakInfo = self._runStreakMasking(difference)
 
         if self.config.doSkySources:
             self.addSkySources(initialDiaSources, difference.mask, difference.info.id)
@@ -627,14 +630,15 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                 self.metadata.add("%s_mask_fraction"%maskPlane.lower(), -1)
                 self.log.info("Unable to calculate metrics for mask plane %s: not in image"%maskPlane)
 
-    def _runStreakMasking(self, maskedImage):
+    def _runStreakMasking(self, difference):
         """Do streak masking and optionally save the resulting streak
         fit parameters in a catalog.
+        TODO add explainer about binning shenanigans
 
         Parameters
         ----------
-        maskedImage: `lsst.afw.image.maskedImage`
-            The image in which to search for streaks. Must have a detection
+        difference: `lsst.afw.image.Exposure`
+            The exposure in which to search for streaks. Must have a detection
             mask.
 
         Returns
@@ -651,7 +655,34 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             ``modelMaximum`` : `np.ndarray`
                 Peak value of the fit line profile.
         """
-        streaks = self.maskStreaks.run(maskedImage)
+        maskedImage = difference.maskedImage
+        # bin the diffim
+        # rerun detection on small, binned diffim
+        # apply our weird detected mask plane to full size diffim
+        # run maskStreaks on that
+        bscale = 10  # TODO make this a config parameter
+        binnedMaskedImage = afwMath.binImage(maskedImage, bscale, bscale)
+        binnedExposure = afwImage.ExposureF(binnedMaskedImage.getBBox())
+        binnedExposure.setMaskedImage(binnedMaskedImage)
+        binnedExposure.setPsf(difference.psf)  # exposure must have a PSF
+        # Rerun detection to set the DETECTED mask plane on binnedExposure
+        _table = afwTable.SourceTable.make(self.schema)
+        self.detection.run(table=_table, exposure=binnedExposure, doSmooth=True)
+        binnedDetectedMaskPlane = binnedExposure.mask.array & binnedExposure.mask.getPlaneBitMask('DETECTED')
+        binnedCoords = (np.arange(binnedDetectedMaskPlane.shape[0]),
+                        np.arange(binnedDetectedMaskPlane.shape[1]))
+        rescaledCoords = (np.arange(maskedImage.mask.array.shape[0])/bscale,
+                          np.arange(maskedImage.mask.array.shape[1])/bscale)
+        rescaledDetectedMaskPlane = scipyInterpn(binnedCoords,
+                                                 binnedDetectedMaskPlane,
+                                                 rescaledCoords,
+                                                 method='nearest')
+        streakMaskedImage = maskedImage.copy(deep=True)
+        streakMaskedImage.mask.array |= rescaledDetectedMaskPlane
+        streaks = self.maskStreaks.run(streakMaskedImage)
+        streakMaskPlane = streakMaskedImage.mask.array & streakMaskedImage.mask.getPlaneBitMask('STREAK')
+        maskedImage.mask.array |= streakMaskPlane
+
         if self.config.writeStreakInfo:
             rhos = np.array([line.rho for line in streaks.lines])
             thetas = np.array([line.theta for line in streaks.lines])
