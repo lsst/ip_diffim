@@ -22,7 +22,13 @@
 """Support utilities for Measuring sources"""
 
 # Export DipoleTestImage to expose fake image generating funcs
-__all__ = ["DipoleTestImage", "evaluateMeanPsfFwhm", "getPsfFwhm", "getKernelCenterDisplacement"]
+__all__ = [
+    "DipoleTestImage",
+    "evaluateMaskFraction",
+    "evaluateMeanPsfFwhm",
+    "getPsfFwhm",
+    "getKernelCenterDisplacement",
+]
 
 import itertools
 import numpy as np
