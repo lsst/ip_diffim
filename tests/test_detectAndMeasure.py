@@ -140,6 +140,10 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         """Basic functionality test with non-zero x0 and y0.
         """
         # Set up the simulated images
+        import pydevd_pycharm
+        pydevd_pycharm.settrace('localhost', port=8888, stdoutToServer=True,
+                                stderrToServer=True)
+
         noiseLevel = 1.
         staticSeed = 1
         fluxLevel = 500
@@ -401,6 +405,10 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
     def test_exclude_mask_detections(self):
         """Sources with certain bad mask planes set should not be detected.
         """
+        import pydevd_pycharm
+        pydevd_pycharm.settrace('localhost', port=8888, stdoutToServer=True,
+                                stderrToServer=True)
+
         # Set up the simulated images
         noiseLevel = 1.
         staticSeed = 1

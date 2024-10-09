@@ -20,6 +20,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
+import requests
 
 import lsst.afw.detection as afwDetection
 import lsst.afw.table as afwTable
@@ -424,6 +425,12 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
         self.measureDiaSources(initialDiaSources, science, difference, matchedTemplate)
         diaSources = self._removeBadSources(initialDiaSources)
+        import pydevd_pycharm
+        pydevd_pycharm.settrace('localhost', port=8888, stdoutToServer=True,
+                                stderrToServer=True)
+
+        diaSources = self.filterSatellites(diaSources, science, positiveFootprints, negativeFootprints)
+        # Do I want science or difference for the wcs?
 
         if self.config.doForcedMeasurement:
             self.measureForcedSources(diaSources, science, difference.getWcs())
@@ -462,6 +469,11 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         def makeFootprints(sources):
             footprints = afwDetection.FootprintSet(difference.getBBox())
             footprints.setFootprints([src.getFootprint() for src in sources])
+            import pydevd_pycharm
+            pydevd_pycharm.settrace('localhost', port=8888,
+                                    stdoutToServer=True,
+                                    stderrToServer=True)
+
             return footprints
 
         def deblend(footprints):
@@ -627,6 +639,20 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                 self.metadata.add("%s_mask_fraction"%maskPlane.lower(), -1)
                 self.log.info("Unable to calculate metrics for mask plane %s: not in image"%maskPlane)
 
+    def filterSatellites(self, diaSources, science, footprints):
+
+        #for source in diaSources.iterrows():
+
+
+
+        #sat_mask = requests.put(sattle_endpoint,
+        #                        data={'bboxes': [list_of_radecs]})
+
+        #diaSources = diaSources[sat_mask].copy(deep=True)
+
+        return diaSources
+
+
     def _runStreakMasking(self, maskedImage):
         """Do streak masking and optionally save the resulting streak
         fit parameters in a catalog.
@@ -747,6 +773,9 @@ class DetectAndMeasureScoreTask(DetectAndMeasureTask):
         sources, positives, negatives = self._deblend(difference,
                                                       results.positive,
                                                       results.negative)
+        import pydevd_pycharm
+        pydevd_pycharm.settrace('localhost', port=8888, stdoutToServer=True,
+                                stderrToServer=True)
 
         return self.processResults(science, matchedTemplate, difference, sources, idFactory,
                                    positiveFootprints=positives, negativeFootprints=negatives)
