@@ -1295,6 +1295,7 @@ def _makeTruthSchema():
     schema.addField("base_ClassificationSizeExtendedness_value", "Flag", "testing flag.")
     schema.addField("deblend_nChild", "Flag", "testing flag.")
     schema.addField("detect_isPrimary", "Flag", "testing flag.")
+    schema.addField("calib_psf_used", "Flag", "testing flag.")
     schema.getAliasMap().set("slot_Centroid", "truth")
     schema.getAliasMap().set("slot_CalibFlux", "truth")
     schema.getAliasMap().set("slot_ApFlux", "truth")
@@ -1335,6 +1336,7 @@ def _fillTruthCatalog(injectList):
         record["base_ClassificationSizeExtendedness_value"] = 0
         record["deblend_nChild"] = 0
         record["detect_isPrimary"] = True
+        record["calib_psf_used"] = True
 
     return catalog
 
