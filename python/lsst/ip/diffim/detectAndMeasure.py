@@ -37,6 +37,9 @@ from lsst.pex.exceptions import InvalidParameterError
 import lsst.pipe.base as pipeBase
 import lsst.utils
 from lsst.utils.timer import timeMethod
+import sys
+sys.path.append('/Users/bsmart/LSST/code/sattle/python/lsst/sattle')
+import sattlePy
 
 from . import DipoleFitTask
 
@@ -425,11 +428,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
         self.measureDiaSources(initialDiaSources, science, difference, matchedTemplate)
         diaSources = self._removeBadSources(initialDiaSources)
-        import pydevd_pycharm
-        pydevd_pycharm.settrace('localhost', port=8888, stdoutToServer=True,
-                                stderrToServer=True)
 
-        diaSources = self.filterSatellites(diaSources, science, positiveFootprints, negativeFootprints)
+        diaSources = self.filterSatellites(diaSources, science)
         # Do I want science or difference for the wcs?
 
         if self.config.doForcedMeasurement:
@@ -469,10 +469,6 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         def makeFootprints(sources):
             footprints = afwDetection.FootprintSet(difference.getBBox())
             footprints.setFootprints([src.getFootprint() for src in sources])
-            import pydevd_pycharm
-            pydevd_pycharm.settrace('localhost', port=8888,
-                                    stdoutToServer=True,
-                                    stderrToServer=True)
 
             return footprints
 
@@ -639,16 +635,34 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                 self.metadata.add("%s_mask_fraction"%maskPlane.lower(), -1)
                 self.log.info("Unable to calculate metrics for mask plane %s: not in image"%maskPlane)
 
-    def filterSatellites(self, diaSources, science, footprints):
+    def filterSatellites(self, diaSources, science):
 
-        #for source in diaSources.iterrows():
+        wcs = science.getWcs()
+        nbbox = []
 
+        for source in diaSources:
+            fp = source.getFootprint()
+            source_bbox = fp.getBBox()
 
+            corners = [wcs.pixelToSky(source_bbox.beginX, source_bbox.beginY),
+                       wcs.pixelToSky(source_bbox.beginX, source_bbox.endY),
+                       wcs.pixelToSky(source_bbox.endX, source_bbox.endY),
+                       wcs.pixelToSky(source_bbox.endX, source_bbox.beginY)]
 
-        #sat_mask = requests.put(sattle_endpoint,
-        #                        data={'bboxes': [list_of_radecs]})
+            tmp = []
+            for c, corner in enumerate(corners):
+                tmp.append([corner.getRa().asDegrees(), corner.getDec().asDegrees()])
+            nbbox.append(tmp)
 
-        #diaSources = diaSources[sat_mask].copy(deep=True)
+        satTask = sattlePy.SattleFilterTask()
+        sattle_output = satTask.run(nbbox, diaSources['id'], science.getInfo().getVisitInfo())
+        #r = requests.put('sattle_endpoint', data={'bboxes': [nbbox]})
+        #r = requests.get('sattle_endpoint')
+
+        # dia source id + true false to ensure accuracy
+        # Add configuration, if we don't get response back, it has to fail.
+        # Add a check to make sure the paired ID and sat mask values match
+        diaSources = diaSources[~np.array(sattle_output.sat_mask)].copy(deep=True)
 
         return diaSources
 
@@ -773,9 +787,6 @@ class DetectAndMeasureScoreTask(DetectAndMeasureTask):
         sources, positives, negatives = self._deblend(difference,
                                                       results.positive,
                                                       results.negative)
-        import pydevd_pycharm
-        pydevd_pycharm.settrace('localhost', port=8888, stdoutToServer=True,
-                                stderrToServer=True)
 
         return self.processResults(science, matchedTemplate, difference, sources, idFactory,
                                    positiveFootprints=positives, negativeFootprints=negatives)
