@@ -61,8 +61,6 @@ class GetTemplateConnections(pipeBase.PipelineTaskConnections,
         dimensions=("skymap", ),
         storageClass="SkyMap",
     )
-    # TODO DM-31292: Add option to use global external wcs from jointcal
-    # Needed for DRP HSC
     coaddExposures = pipeBase.connectionTypes.Input(
         doc="Input template to match and subtract from the exposure",
         dimensions=("tract", "patch", "skymap", "band"),
