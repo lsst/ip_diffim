@@ -44,19 +44,19 @@ class GetTemplateConnections(pipeBase.PipelineTaskConnections,
                                                "warpTypeSuffix": "",
                                                "fakesType": ""}):
     bbox = pipeBase.connectionTypes.Input(
-        doc="BBoxes of calexp used determine geometry of output template",
+        doc="Bounding box of exposure to determine the geometry of the output template.",
         name="{fakesType}calexp.bbox",
         storageClass="Box2I",
         dimensions=("instrument", "visit", "detector"),
     )
     wcs = pipeBase.connectionTypes.Input(
-        doc="WCS of the calexp that we want to fetch the template for",
+        doc="WCS of the exposure that we will construct the template for.",
         name="{fakesType}calexp.wcs",
         storageClass="Wcs",
         dimensions=("instrument", "visit", "detector"),
     )
     skyMap = pipeBase.connectionTypes.Input(
-        doc="Input definition of geometry/bbox and projection/wcs for template exposures",
+        doc="Geometry of the tracts and patches that the coadds are defined on.",
         name=BaseSkyMap.SKYMAP_DATASET_TYPE_NAME,
         dimensions=("skymap", ),
         storageClass="SkyMap",
@@ -64,15 +64,17 @@ class GetTemplateConnections(pipeBase.PipelineTaskConnections,
     # TODO DM-31292: Add option to use global external wcs from jointcal
     # Needed for DRP HSC
     coaddExposures = pipeBase.connectionTypes.Input(
-        doc="Input template to match and subtract from the exposure",
+        doc="Coadds that may overlap the desired region, as possible inputs to the template."
+            " Will be restricted to those that directly overlap the projected bounding box.",
         dimensions=("tract", "patch", "skymap", "band"),
         storageClass="ExposureF",
         name="{fakesType}{coaddName}Coadd{warpTypeSuffix}",
         multiple=True,
         deferLoad=True
     )
+
     template = pipeBase.connectionTypes.Output(
-        doc="Warped template used to create `subtractedExposure`.",
+        doc="Warped template, pixel matched to the bounding box and WCS.",
         dimensions=("instrument", "visit", "detector"),
         storageClass="ExposureF",
         name="{fakesType}{coaddName}Diff_templateExp{warpTypeSuffix}",
