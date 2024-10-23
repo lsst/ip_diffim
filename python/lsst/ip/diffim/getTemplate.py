@@ -44,19 +44,19 @@ class GetTemplateConnections(pipeBase.PipelineTaskConnections,
                                                "warpTypeSuffix": "",
                                                "fakesType": ""}):
     bbox = pipeBase.connectionTypes.Input(
-        doc="BBoxes of calexp used determine geometry of output template",
+        doc="Bounding box of exposure to determine the geometry of the output template.",
         name="{fakesType}calexp.bbox",
         storageClass="Box2I",
         dimensions=("instrument", "visit", "detector"),
     )
     wcs = pipeBase.connectionTypes.Input(
-        doc="WCS of the calexp that we want to fetch the template for",
+        doc="WCS of the exposure that we will construct the template for.",
         name="{fakesType}calexp.wcs",
         storageClass="Wcs",
         dimensions=("instrument", "visit", "detector"),
     )
     skyMap = pipeBase.connectionTypes.Input(
-        doc="Input definition of geometry/bbox and projection/wcs for template exposures",
+        doc="Geometry of the tracts and patches that the coadds are defined on.",
         name=BaseSkyMap.SKYMAP_DATASET_TYPE_NAME,
         dimensions=("skymap", ),
         storageClass="SkyMap",
@@ -64,15 +64,17 @@ class GetTemplateConnections(pipeBase.PipelineTaskConnections,
     # TODO DM-31292: Add option to use global external wcs from jointcal
     # Needed for DRP HSC
     coaddExposures = pipeBase.connectionTypes.Input(
-        doc="Input template to match and subtract from the exposure",
+        doc="Coadds that may overlap the desired region, as possible inputs to the template."
+            " Will be restricted to those that directly overlap the projected bounding box.",
         dimensions=("tract", "patch", "skymap", "band"),
         storageClass="ExposureF",
         name="{fakesType}{coaddName}Coadd{warpTypeSuffix}",
         multiple=True,
         deferLoad=True
     )
+
     template = pipeBase.connectionTypes.Output(
-        doc="Warped template used to create `subtractedExposure`.",
+        doc="Warped template, pixel matched to the bounding box and WCS.",
         dimensions=("instrument", "visit", "detector"),
         storageClass="ExposureF",
         name="{fakesType}{coaddName}Diff_templateExp{warpTypeSuffix}",
@@ -115,37 +117,48 @@ class GetTemplateTask(pipeBase.PipelineTask):
 
     def runQuantum(self, butlerQC, inputRefs, outputRefs):
         inputs = butlerQC.get(inputRefs)
-        results = self.getOverlappingExposures(inputs)
-        del inputs["skyMap"]  # Only needed for the above.
-        inputs["coaddExposures"] = results.coaddExposures
-        inputs["dataIds"] = results.dataIds
-        inputs["physical_filter"] = butlerQC.quantum.dataId["physical_filter"]
-        outputs = self.run(**inputs)
+        bbox = inputs.pop("bbox")
+        wcs = inputs.pop("wcs")
+        coaddExposures = inputs.pop('coaddExposures')
+        skymap = inputs.pop("skyMap")
+
+        # This should not happen with a properly configured execution context.
+        assert not inputs, "runQuantum got more inputs than expected"
+
+        results = self.getOverlappingExposures(coaddExposures, bbox, skymap, wcs)
+        physical_filter = butlerQC.quantum.dataId["physical_filter"]
+        outputs = self.run(coaddExposures=results.coaddExposures,
+                           bbox=bbox,
+                           wcs=wcs,
+                           dataIds=results.dataIds,
+                           physical_filter=physical_filter)
         butlerQC.put(outputs, outputRefs)
 
-    def getOverlappingExposures(self, inputs):
-        """Return lists of coadds and their corresponding dataIds that overlap
-        the detector.
+    def getOverlappingExposures(self, coaddExposures, bbox, skymap, wcs):
+        """Return a data structure containing the coadds that overlap the
+        specified bbox projected onto the sky, and a corresponding data
+        structure of their dataIds.
+        These are the appropriate inputs to this task's `run` method.
 
         The spatial index in the registry has generous padding and often
         supplies patches near, but not directly overlapping the detector.
-        Filters inputs so that we don't have to read in all input coadds.
+        This filters the inputs so that we don't have to read in all
+        possibly-matching coadds.
 
         Parameters
         ----------
-        inputs : `dict` of task Inputs, containing:
-            - coaddExposures : `list` \
-                              [`lsst.daf.butler.DeferredDatasetHandle` of \
-                               `lsst.afw.image.Exposure`]
-                Data references to exposures that might overlap the detector.
-            - bbox : `lsst.geom.Box2I`
-                Template Bounding box of the detector geometry onto which to
-                resample the coaddExposures.
-            - skyMap : `lsst.skymap.SkyMap`
-                Input definition of geometry/bbox and projection/wcs for
-                template exposures.
-            - wcs : `lsst.afw.geom.SkyWcs`
-                Template WCS onto which to resample the coaddExposures.
+        coaddExposures : `list` \
+                          [`lsst.daf.butler.DeferredDatasetHandle` of \
+                           `lsst.afw.image.Exposure`]
+            Data references to exposures that might overlap the desired
+            region.
+        bbox : `lsst.geom.Box2I`
+            Template bounding box of the pixel geometry onto which the
+            coaddExposures will be resampled.
+        skyMap : `lsst.skymap.SkyMap`
+            Geometry of the tracts and patches the coadds are defined on.
+        wcs : `lsst.afw.geom.SkyWcs`
+            Template WCS onto which the coadds will be resampled, .
 
         Returns
         -------
@@ -153,41 +166,40 @@ class GetTemplateTask(pipeBase.PipelineTask):
            A struct with attributes:
 
            ``coaddExposures``
-               Dict of Coadd exposures that overlap the detector, indexed on
-               tract id (`dict` [`int`, `list` [`lsst.afw.image.Exposure`] ]).
+               Dict of coadd exposures that overlap the projected bbox,
+               indexed on tract id
+               (`dict` [`int`, `list` [`lsst.afw.image.Exposure`] ]).
            ``dataIds``
                Dict of data IDs of the coadd exposures that overlap the
-               detector, indexed on tract id
+               projected bbox, indexed on tract id
                (`dict` [`int`, `list [`lsst.daf.butler.DataCoordinate`] ]).
 
         Raises
         ------
         NoWorkFound
-            Raised if no patches overlap the input detector bbox.
+            Raised if no patches overlap the input detector bbox, or the input
+            WCS is None.
         """
-        # Check that the patches actually overlap the detector
+        if wcs is None:
+            raise pipeBase.NoWorkFound("Exposure has no WCS; cannot create a template.")
+
         # Exposure's validPolygon would be more accurate
-        detectorPolygon = geom.Box2D(inputs['bbox'])
+        detectorPolygon = geom.Box2D(bbox)
         overlappingArea = 0
         coaddExposures = collections.defaultdict(list)
         dataIds = collections.defaultdict(list)
-        for coaddRef in inputs['coaddExposures']:
+
+        for coaddRef in coaddExposures:
             dataId = coaddRef.dataId
-            patchWcs = inputs['skyMap'][dataId['tract']].getWcs()
-            patchBBox = inputs['skyMap'][dataId['tract']][dataId['patch']].getOuterBBox()
+            patchWcs = skymap[dataId['tract']].getWcs()
+            patchBBox = skymap[dataId['tract']][dataId['patch']].getOuterBBox()
             patchCorners = patchWcs.pixelToSky(geom.Box2D(patchBBox).getCorners())
-            inputsWcs = inputs['wcs']
-            if inputsWcs is not None:
-                patchPolygon = afwGeom.Polygon(inputsWcs.skyToPixel(patchCorners))
-                if patchPolygon.intersection(detectorPolygon):
-                    overlappingArea += patchPolygon.intersectionSingle(detectorPolygon).calculateArea()
-                    self.log.info("Using template input tract=%s, patch=%s" %
-                                  (dataId['tract'], dataId['patch']))
-                    coaddExposures[dataId['tract']].append(coaddRef.get())
-                    dataIds[dataId['tract']].append(dataId)
-            else:
-                self.log.warning("Exposure %s has no WCS, so cannot include it in the template.",
-                                 coaddRef)
+            patchPolygon = afwGeom.Polygon(wcs.skyToPixel(patchCorners))
+            if patchPolygon.intersection(detectorPolygon):
+                overlappingArea += patchPolygon.intersectionSingle(detectorPolygon).calculateArea()
+                self.log.info("Using template input tract=%s, patch=%s", dataId['tract'], dataId['patch'])
+                coaddExposures[dataId['tract']].append(coaddRef.get())
+                dataIds[dataId['tract']].append(dataId)
 
         if not overlappingArea:
             raise pipeBase.NoWorkFound('No patches overlap detector')
@@ -196,7 +208,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
                                dataIds=dataIds)
 
     @timeMethod
-    def run(self, coaddExposures, bbox, wcs, dataIds, physical_filter):
+    def run(self, *, coaddExposures, bbox, wcs, dataIds, physical_filter):
         """Warp coadds from multiple tracts and patches to form a template to
         subtract from a science image.
 
