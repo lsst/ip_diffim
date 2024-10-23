@@ -170,29 +170,27 @@ class GetTemplateTask(pipeBase.PipelineTask):
             Raised if no patches overlap the input detector bbox, or the input
             WCS is None.
         """
-        # Check that the patches actually overlap the detector
+        if (wcs := inputs['wcs']) is None:
+            raise pipeBase.NoWorkFound("Exposure has no WCS; cannot create a template.")
+
         # Exposure's validPolygon would be more accurate
         detectorPolygon = geom.Box2D(inputs['bbox'])
         overlappingArea = 0
         coaddExposures = collections.defaultdict(list)
         dataIds = collections.defaultdict(list)
+
+        skymap = inputs['skyMap']
         for coaddRef in inputs['coaddExposures']:
             dataId = coaddRef.dataId
-            patchWcs = inputs['skyMap'][dataId['tract']].getWcs()
-            patchBBox = inputs['skyMap'][dataId['tract']][dataId['patch']].getOuterBBox()
+            patchWcs = skymap[dataId['tract']].getWcs()
+            patchBBox = skymap[dataId['tract']][dataId['patch']].getOuterBBox()
             patchCorners = patchWcs.pixelToSky(geom.Box2D(patchBBox).getCorners())
-            inputsWcs = inputs['wcs']
-            if inputsWcs is not None:
-                patchPolygon = afwGeom.Polygon(inputsWcs.skyToPixel(patchCorners))
-                if patchPolygon.intersection(detectorPolygon):
-                    overlappingArea += patchPolygon.intersectionSingle(detectorPolygon).calculateArea()
-                    self.log.info("Using template input tract=%s, patch=%s" %
-                                  (dataId['tract'], dataId['patch']))
-                    coaddExposures[dataId['tract']].append(coaddRef.get())
-                    dataIds[dataId['tract']].append(dataId)
-            else:
-                self.log.warning("Exposure %s has no WCS, so cannot include it in the template.",
-                                 coaddRef)
+            patchPolygon = afwGeom.Polygon(wcs.skyToPixel(patchCorners))
+            if patchPolygon.intersection(detectorPolygon):
+                overlappingArea += patchPolygon.intersectionSingle(detectorPolygon).calculateArea()
+                self.log.info("Using template input tract=%s, patch=%s", dataId['tract'], dataId['patch'])
+                coaddExposures[dataId['tract']].append(coaddRef.get())
+                dataIds[dataId['tract']].append(dataId)
 
         if not overlappingArea:
             raise pipeBase.NoWorkFound('No patches overlap detector')
