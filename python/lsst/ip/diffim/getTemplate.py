@@ -124,12 +124,15 @@ class GetTemplateTask(pipeBase.PipelineTask):
         butlerQC.put(outputs, outputRefs)
 
     def getOverlappingExposures(self, inputs):
-        """Return lists of coadds and their corresponding dataIds that overlap
-        the detector.
+        """Return a data structure containing the coadds that overlap the
+        specified bbox projected onto the sky, and a corresponding data
+        structure of their dataIds.
+        These are the appropriate inputs to this task's `run` method.
 
-        The spatial index in the registry has generous padding and often
-        supplies patches near, but not directly overlapping the detector.
-        Filters inputs so that we don't have to read in all input coadds.
+        The spatial index in the butler registry has generous padding and often
+        supplies patches near, but not directly overlapping the desired region.
+        This method filters the inputs so that `run` does not have to read in
+        all possibly-matching coadd exposures.
 
         Parameters
         ----------
@@ -137,15 +140,15 @@ class GetTemplateTask(pipeBase.PipelineTask):
             - coaddExposures : `list` \
                               [`lsst.daf.butler.DeferredDatasetHandle` of \
                                `lsst.afw.image.Exposure`]
-                Data references to exposures that might overlap the detector.
+                Data references to exposures that might overlap the desired
+                region.
             - bbox : `lsst.geom.Box2I`
-                Template Bounding box of the detector geometry onto which to
-                resample the coaddExposures.
+                Template bounding box of the pixel geometry onto which the
+                coaddExposures will be resampled.
             - skyMap : `lsst.skymap.SkyMap`
-                Input definition of geometry/bbox and projection/wcs for
-                template exposures.
+                Geometry of the tracts and patches the coadds are defined on.
             - wcs : `lsst.afw.geom.SkyWcs`
-                Template WCS onto which to resample the coaddExposures.
+                Template WCS onto which the coadds will be resampled.
 
         Returns
         -------
@@ -153,17 +156,19 @@ class GetTemplateTask(pipeBase.PipelineTask):
            A struct with attributes:
 
            ``coaddExposures``
-               Dict of Coadd exposures that overlap the detector, indexed on
-               tract id (`dict` [`int`, `list` [`lsst.afw.image.Exposure`] ]).
+               Dict of coadd exposures that overlap the projected bbox,
+               indexed on tract id
+               (`dict` [`int`, `list` [`lsst.afw.image.Exposure`] ]).
            ``dataIds``
                Dict of data IDs of the coadd exposures that overlap the
-               detector, indexed on tract id
+               projected bbox, indexed on tract id
                (`dict` [`int`, `list [`lsst.daf.butler.DataCoordinate`] ]).
 
         Raises
         ------
         NoWorkFound
-            Raised if no patches overlap the input detector bbox.
+            Raised if no patches overlap the input detector bbox, or the input
+            WCS is None.
         """
         # Check that the patches actually overlap the detector
         # Exposure's validPolygon would be more accurate
