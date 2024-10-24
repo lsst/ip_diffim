@@ -49,12 +49,13 @@ class DipoleTestImage:
         Pixel coordinates between lobes of dipoles.
     """
 
-    def __init__(self, xc=None, yc=None, flux=None, offsets=None, gradientParams=None):
+    def __init__(self, xc=None, yc=None, flux=None, offsets=None, gradientParams=None, edgeWidth=None):
         self.xc = xc if xc is not None else [65.3, 24.2]
         self.yc = yc if yc is not None else [38.6, 78.5]
         self.offsets = offsets if offsets is not None else np.array([-2., 2.])
         self.flux = flux if flux is not None else [2500., 2345.]
         self.gradientParams = gradientParams if gradientParams is not None else [10., 3., 5.]
+        self.edgeWidth = edgeWidth if edgeWidth is not None else 8
 
         # The default tolerance for comparisons of fitted parameters with input values.
         # Given the noise in the input images (default noise value of 2.), this is a
@@ -72,7 +73,8 @@ class DipoleTestImage:
             ycenNeg=self.yc - self.offsets,
             flux=self.flux, fluxNeg=self.flux,
             noise=2.,  # Note the input noise - this affects the relative tolerances used.
-            gradientParams=self.gradientParams)
+            gradientParams=self.gradientParams,
+            edgeWidth=self.edgeWidth)
 
 
 class DipoleFitTest(lsst.utils.tests.TestCase):
@@ -277,10 +279,15 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
         not detected.
         """
 
-        dipoleTestImage = DipoleTestImage(xc=[5.3, 4.8], yc=[4.6, 96.5])
+        # with no edge we should detect both dipole sources
+        dipoleTestImage = DipoleTestImage(xc=[5.3, 4.8], yc=[4.6, 86.5], flux=[200, 210], edgeWidth=0)
         sources = self._runDetection(dipoleTestImage)
+        self.assertEqual(len(sources), 2)
 
-        self.assertTrue(len(sources) == 0)
+        # with a wide edge we should not detect any sources
+        dipoleTestImage = DipoleTestImage(xc=[5.3, 4.8], yc=[4.6, 86.5], flux=[200, 210], edgeWidth=20)
+        sources = self._runDetection(dipoleTestImage)
+        self.assertEqual(len(sources), 0)
 
     def testDipoleFootprintTooLarge(self):
         """Test that the footprint area cut flags sources."""
