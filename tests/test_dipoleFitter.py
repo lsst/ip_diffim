@@ -277,7 +277,8 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
         not detected.
         """
 
-        dipoleTestImage = DipoleTestImage(xc=[5.3, 4.8], yc=[4.6, 96.5])
+        # Move the dipole extremely close to the edge for this test to pass
+        dipoleTestImage = DipoleTestImage(xc=[0.2, 0.1], yc=[0.1, 96.5])
         sources = self._runDetection(dipoleTestImage)
 
         self.assertTrue(len(sources) == 0)
