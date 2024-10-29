@@ -100,6 +100,12 @@ class SubtractImageOutputConnections(lsst.pipe.base.PipelineTaskConnections,
         storageClass="MatchingKernel",
         name="{fakesType}{coaddName}Diff_psfMatchKernel",
     )
+    kernelSources = connectionTypes.Output(
+        doc="Final selection of sources used for psf matching.",
+        dimensions=("instrument", "visit", "detector"),
+        storageClass="SourceCatalog",
+        name="{fakesType}{coaddName}Diff_psfMatchSources"
+    )
 
 
 class SubtractScoreOutputConnections(lsst.pipe.base.PipelineTaskConnections,
@@ -116,6 +122,12 @@ class SubtractScoreOutputConnections(lsst.pipe.base.PipelineTaskConnections,
         dimensions=("instrument", "visit", "detector"),
         storageClass="MatchingKernel",
         name="{fakesType}{coaddName}Diff_psfScoreMatchKernel",
+    )
+    kernelSources = connectionTypes.Output(
+        doc="Final selection of sources used for psf matching.",
+        dimensions=("instrument", "visit", "detector"),
+        storageClass="SourceCatalog",
+        name="{fakesType}{coaddName}Diff_psfScoreMatchSources"
     )
 
 
@@ -247,7 +259,7 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
         self.makeKernel.kernel.active.spatialKernelOrder = 1
         self.makeKernel.kernel.active.spatialBgOrder = 2
         self.sourceSelector.doFlags = True
-        self.sourceSelector.flags.good = ["calib_psf_used",]
+        self.sourceSelector.flags.good = ["calib_psf_used", ]
         self.sourceSelector.doSignalToNoise = True  # apply signal to noise filter
         self.sourceSelector.signalToNoise.minimum = 10
         self.sourceSelector.signalToNoise.maximum = 500
@@ -529,7 +541,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                                      matchedTemplate=matchedTemplate,
                                      matchedScience=science,
                                      backgroundModel=kernelResult.backgroundModel,
-                                     psfMatchingKernel=kernelResult.psfMatchingKernel)
+                                     psfMatchingKernel=kernelResult.psfMatchingKernel,
+                                     kernelSources=kernelSources)
 
     def runConvolveScience(self, template, science, selectSources):
         """Convolve the science image with a PSF-matching kernel and subtract
@@ -595,7 +608,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                                      matchedTemplate=matchedTemplate,
                                      matchedScience=matchedScience,
                                      backgroundModel=kernelResult.backgroundModel,
-                                     psfMatchingKernel=kernelResult.psfMatchingKernel,)
+                                     psfMatchingKernel=kernelResult.psfMatchingKernel,
+                                     kernelSources=kernelSources)
 
     def finalize(self, template, science, difference, kernel,
                  templateMatched=True,
@@ -1127,7 +1141,8 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
                                      matchedTemplate=matchedTemplate,
                                      matchedScience=matchedScience,
                                      backgroundModel=kernelResult.backgroundModel,
-                                     psfMatchingKernel=kernelResult.psfMatchingKernel)
+                                     psfMatchingKernel=kernelResult.psfMatchingKernel,
+                                     kernelSources=kernelSources)
 
 
 def checkTemplateIsSufficient(templateExposure, logger, requiredTemplateFraction=0.,
