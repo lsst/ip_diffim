@@ -416,8 +416,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                                                  )
         self.log.info("Science PSF FWHM: %f pixels", sciencePsfSize)
         self.log.info("Template PSF FWHM: %f pixels", templatePsfSize)
-        self.metadata.add("sciencePsfSize", sciencePsfSize)
-        self.metadata.add("templatePsfSize", templatePsfSize)
+        self.metadata["sciencePsfSize"] = sciencePsfSize
+        self.metadata["templatePsfSize"] = templatePsfSize
 
         #  Calculate estimated image depths, i.e., limiting magnitudes
         maglim_science = self._calculateMagLim(science, fallbackPsfSize=sciencePsfSize)
@@ -429,9 +429,9 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         else:
             fluxlim_template = (maglim_template*u.ABmag).to_value(u.nJy)
             maglim_diffim = (np.sqrt(fluxlim_science**2 + fluxlim_template**2)*u.nJy).to(u.ABmag).value
-        self.metadata.add("scienceLimitingMagnitude", maglim_science)
-        self.metadata.add("templateLimitingMagnitude", maglim_template)
-        self.metadata.add("diffimLimitingMagnitude", maglim_diffim)
+        self.metadata["scienceLimitingMagnitude"] = maglim_science
+        self.metadata["templateLimitingMagnitude"] = maglim_template
+        self.metadata["diffimLimitingMagnitude"] = maglim_diffim
 
         if self.config.mode == "auto":
             convolveTemplate = _shapeTest(template,
@@ -460,10 +460,10 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             sourceMask.array |= template[science.getBBox()].mask.array
             selectSources = self._sourceSelector(sources, sourceMask)
             if convolveTemplate:
-                self.metadata.add("convolvedExposure", "Template")
+                self.metadata["convolvedExposure"] = "Template"
                 subtractResults = self.runConvolveTemplate(template, science, selectSources)
             else:
-                self.metadata.add("convolvedExposure", "Science")
+                self.metadata["convolvedExposure"] = "Science"
                 subtractResults = self.runConvolveScience(template, science, selectSources)
 
         except (RuntimeError, lsst.pex.exceptions.Exception) as e:
@@ -766,7 +766,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         if interpolateBadMaskPlanes and self.config.badMaskPlanes is not None:
             nInterp = _interpolateImage(convolvedExposure.maskedImage,
                                         self.config.badMaskPlanes)
-            self.metadata.add("nInterpolated", nInterp)
+            self.metadata["nInterpolated"] = nInterp
         convolvedImage = lsst.afw.image.MaskedImageF(convolvedExposure.getBBox())
         lsst.afw.math.convolve(convolvedImage, convolvedExposure.maskedImage, kernel, convolutionControl)
         convolvedExposure.setMaskedImage(convolvedImage)
@@ -823,7 +823,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                            "%i selected but %i needed for the calculation.",
                            len(selectSources), self.config.minKernelSources)
             raise RuntimeError("Cannot compute PSF matching kernel: too few sources selected.")
-        self.metadata.add("nPsfSources", len(selectSources))
+        self.metadata["nPsfSources"] = len(selectSources)
 
         return selectSources
 
@@ -893,7 +893,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             exceptionMessage="Not attempting subtraction. To force subtraction,"
             " set config requiredTemplateFraction=0"
         )
-        self.metadata.add("templateCoveragePercent", 100*templateCoverageFraction)
+        self.metadata["templateCoveragePercent"] = 100*templateCoverageFraction
 
         if self.config.doScaleVariance:
             # Scale the variance of the template and science images before
@@ -902,9 +902,9 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             templateVarFactor = self.scaleVariance.run(template.maskedImage)
             sciVarFactor = self.scaleVariance.run(science.maskedImage)
             self.log.info("Template variance scaling factor: %.2f", templateVarFactor)
-            self.metadata.add("scaleTemplateVarianceFactor", templateVarFactor)
+            self.metadata["scaleTemplateVarianceFactor"] = templateVarFactor
             self.log.info("Science variance scaling factor: %.2f", sciVarFactor)
-            self.metadata.add("scaleScienceVarianceFactor", sciVarFactor)
+            self.metadata["scaleScienceVarianceFactor"] = sciVarFactor
 
         # Erase existing detection mask planes.
         #  We don't want the detection mask from the science image
@@ -1055,7 +1055,7 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
         scienceKernel = science.psf.getKernel()
         matchedScience = self._convolveExposure(science, scienceKernel, self.convolutionControl,
                                                 interpolateBadMaskPlanes=True)
-        self.metadata.add("convolvedExposure", "Preconvolution")
+        self.metadata["convolvedExposure"] = "Preconvolution"
         try:
             selectSources = self._sourceSelector(sources, matchedScience.mask)
             subtractResults = self.runPreconvolve(template, science, matchedScience,
