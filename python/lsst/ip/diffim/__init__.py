@@ -38,6 +38,7 @@ from .detectAndMeasure import *
 from .imageDecorrelation import *
 from .imageMapReduce import *
 from .subtractImages import *
+from .nightly import *
 from .version import *
 
 # automatically register ip_diffim Algorithms;
