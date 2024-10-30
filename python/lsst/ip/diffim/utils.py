@@ -721,7 +721,7 @@ class DipoleTestImage:
     """
 
     def __init__(self, w=101, h=101, xcenPos=[27.], ycenPos=[25.], xcenNeg=[23.], ycenNeg=[25.],
-                 psfSigma=2., flux=[30000.], fluxNeg=None, noise=10., gradientParams=None):
+                 psfSigma=2., flux=[30000.], fluxNeg=None, noise=10., gradientParams=None, edgeWidth=8):
         self.w = w
         self.h = h
         self.xcenPos = xcenPos
@@ -735,6 +735,7 @@ class DipoleTestImage:
             self.fluxNeg = self.flux
         self.noise = noise
         self.gradientParams = gradientParams
+        self.edgeWidth = edgeWidth
         self._makeDipoleImage()
 
     def _makeDipoleImage(self):
@@ -767,6 +768,13 @@ class DipoleTestImage:
         if schema is None:
             schema = TestDataset.makeMinimalSchema()
         exposure, catalog = dataset.realize(noise=self.noise, schema=schema, randomSeed=randomSeed)
+
+        # set EDGE by masking the whole exposure and un-masking an inner bbox
+        edgeMask = exposure.mask.getPlaneBitMask('EDGE')
+        exposure.mask.array |= edgeMask
+        inner_bbox = exposure.getBBox()
+        inner_bbox.grow(-self.edgeWidth)
+        exposure[inner_bbox].mask.array &= ~edgeMask
 
         if self.gradientParams is not None:
             y, x = np.mgrid[:self.w, :self.h]
