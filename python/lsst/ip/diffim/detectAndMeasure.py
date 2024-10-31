@@ -397,7 +397,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             ``diaSources``  : `lsst.afw.table.SourceCatalog`
                 The catalog of detected sources.
         """
-        self.metadata.add("nUnmergedDiaSources", len(sources))
+        self.metadata["nUnmergedDiaSources"] = len(sources)
         if self.config.doMerge:
             fpSet = positiveFootprints
             fpSet.merge(negativeFootprints, self.config.growFootprint,
@@ -416,7 +416,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         initialDiaSources.getTable().setIdFactory(idFactory)
         initialDiaSources.setMetadata(self.algMetadata)
 
-        self.metadata.add("nMergedDiaSources", len(initialDiaSources))
+        self.metadata["nMergedDiaSources"] = len(initialDiaSources)
 
         if self.config.doMaskStreaks:
             streakInfo = self._runStreakMasking(difference.maskedImage)
@@ -514,7 +514,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                 self.log.debug("Found %d unphysical sources with flag %s.", nBad, flag)
                 selector &= ~flags
         nBadTotal = np.count_nonzero(~selector)
-        self.metadata.add("nRemovedBadFlaggedSources", nBadTotal)
+        self.metadata["nRemovedBadFlaggedSources"] = nBadTotal
         self.log.info("Removed %d unphysical sources.", nBadTotal)
         return diaSources[selector].copy(deep=True)
 
@@ -535,7 +535,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         if subtask is None:
             subtask = self.skySources
         skySourceFootprints = subtask.run(mask=mask, seed=seed, catalog=diaSources)
-        self.metadata.add(f"n_{subtask.getName()}", len(skySourceFootprints))
+        self.metadata[f"n_{subtask.getName()}"] = len(skySourceFootprints)
 
     def measureDiaSources(self, diaSources, science, difference, matchedTemplate):
         """Use (matched) template and science image to constrain dipole fitting.
@@ -613,23 +613,23 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         """
         mask = difference.mask
         badPix = (mask.array & mask.getPlaneBitMask(self.config.detection.excludeMaskPlanes)) > 0
-        self.metadata.add("nGoodPixels", np.sum(~badPix))
-        self.metadata.add("nBadPixels", np.sum(badPix))
+        self.metadata["nGoodPixels"] = np.sum(~badPix)
+        self.metadata["nBadPixels"] = np.sum(badPix)
         detPosPix = (mask.array & mask.getPlaneBitMask("DETECTED")) > 0
         detNegPix = (mask.array & mask.getPlaneBitMask("DETECTED_NEGATIVE")) > 0
-        self.metadata.add("nPixelsDetectedPositive", np.sum(detPosPix))
-        self.metadata.add("nPixelsDetectedNegative", np.sum(detNegPix))
+        self.metadata["nPixelsDetectedPositive"] = np.sum(detPosPix)
+        self.metadata["nPixelsDetectedNegative"] = np.sum(detNegPix)
         detPosPix &= badPix
         detNegPix &= badPix
-        self.metadata.add("nBadPixelsDetectedPositive", np.sum(detPosPix))
-        self.metadata.add("nBadPixelsDetectedNegative", np.sum(detNegPix))
+        self.metadata["nBadPixelsDetectedPositive"] = np.sum(detPosPix)
+        self.metadata["nBadPixelsDetectedNegative"] = np.sum(detNegPix)
 
         metricsMaskPlanes = list(mask.getMaskPlaneDict().keys())
         for maskPlane in metricsMaskPlanes:
             try:
-                self.metadata.add("%s_mask_fraction"%maskPlane.lower(), evaluateMaskFraction(mask, maskPlane))
+                self.metadata["%s_mask_fraction"%maskPlane.lower()] = evaluateMaskFraction(mask, maskPlane)
             except InvalidParameterError:
-                self.metadata.add("%s_mask_fraction"%maskPlane.lower(), -1)
+                self.metadata["%s_mask_fraction"%maskPlane.lower()] = -1
                 self.log.info("Unable to calculate metrics for mask plane %s: not in image"%maskPlane)
 
     def _runStreakMasking(self, maskedImage):
