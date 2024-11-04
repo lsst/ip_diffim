@@ -822,7 +822,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             self.log.error("Too few sources to calculate the PSF matching kernel: "
                            "%i selected but %i needed for the calculation.",
                            len(selectSources), self.config.minKernelSources)
-            raise RuntimeError("Cannot compute PSF matching kernel: too few sources selected.")
+            if not self.config.allowKernelSourceDetection:
+                raise RuntimeError("Cannot compute PSF matching kernel: too few sources selected.")
         self.metadata["nPsfSources"] = len(selectSources)
 
         return selectSources
