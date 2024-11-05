@@ -189,6 +189,11 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
                  "base_PixelFlags_flag_saturatedCenterAll",
                  ),
     )
+    clearMaskPlanes = lsst.pex.config.ListField(
+        dtype=str,
+        doc="Mask planes to clear before running detection.",
+        default=("DETECTED", "DETECTED_NEGATIVE", "NOT_DEBLENDED", "STREAK"),
+    )
     idGenerator = DetectorVisitIdGeneratorConfig.make_field()
 
     def setDefaults(self):
@@ -339,13 +344,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         if idFactory is None:
             idFactory = lsst.meas.base.IdGenerator().make_table_id_factory()
 
-        # Ensure that we start with an empty detection and deblended mask.
-        mask = difference.mask
-        clearMaskPlanes = ["DETECTED", "DETECTED_NEGATIVE", "NOT_DEBLENDED", "STREAK"]
-        for mp in clearMaskPlanes:
-            if mp not in mask.getMaskPlaneDict():
-                mask.addMaskPlane(mp)
-        mask &= ~mask.getPlaneBitMask(clearMaskPlanes)
+        self._prepareInputs(difference)
 
         # Don't use the idFactory until after deblend+merge, so that we aren't
         # generating ids that just get thrown away (footprint merge doesn't
@@ -364,6 +363,31 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         return self.processResults(science, matchedTemplate, difference, sources, idFactory,
                                    positiveFootprints=positives,
                                    negativeFootprints=negatives)
+
+    def _prepareInputs(self, difference):
+        """Ensure that we start with an empty detection and deblended mask.
+
+        Parameters
+        ----------
+        difference : `lsst.afw.image.ExposureF`
+            The difference image that will be used for detecting diaSources.
+            The mask plane will be modified in place.
+
+        Raises
+        ------
+        lsst.pipe.base.UpstreamFailureNoWorkFound
+            If the PSF is not usable for measurement.
+        """
+        # Check that we have a valid PSF now before we do more work
+        sigma = difference.psf.computeShape(difference.psf.getAveragePosition()).getDeterminantRadius()
+        if np.isnan(sigma):
+            raise pipeBase.UpstreamFailureNoWorkFound("Invalid PSF detected! PSF width evaluates to NaN.")
+        # Ensure that we start with an empty detection and deblended mask.
+        mask = difference.mask
+        for mp in self.config.clearMaskPlanes:
+            if mp not in mask.getMaskPlaneDict():
+                mask.addMaskPlane(mp)
+        mask &= ~mask.getPlaneBitMask(self.config.clearMaskPlanes)
 
     def processResults(self, science, matchedTemplate, difference, sources, idFactory,
                        positiveFootprints=None, negativeFootprints=None,):
@@ -733,9 +757,7 @@ class DetectAndMeasureScoreTask(DetectAndMeasureTask):
         if idFactory is None:
             idFactory = lsst.meas.base.IdGenerator().make_table_id_factory()
 
-        # Ensure that we start with an empty detection mask.
-        mask = scoreExposure.mask
-        mask &= ~(mask.getPlaneBitMask("DETECTED") | mask.getPlaneBitMask("DETECTED_NEGATIVE"))
+        self._prepareInputs(scoreExposure)
 
         # Don't use the idFactory until after deblend+merge, so that we aren't
         # generating ids that just get thrown away (footprint merge doesn't
