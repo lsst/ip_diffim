@@ -194,6 +194,13 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         doc="Mask planes to clear before running detection.",
         default=("DETECTED", "DETECTED_NEGATIVE", "NOT_DEBLENDED", "STREAK"),
     )
+    fallbackPsfSigma = pexConfig.Field(
+        dtype=float,
+        optional=True,
+        doc="PSF sigma to use for computing the maximum likelihood image if "
+            "the calculation of the PSF width fails.",
+        default=3.,
+    )
     idGenerator = DetectorVisitIdGeneratorConfig.make_field()
 
     def setDefaults(self):
@@ -386,6 +393,10 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                 mask.addMaskPlane(mp)
         mask &= ~mask.getPlaneBitMask(self.config.clearMaskPlanes)
         sigma = difference.psf.computeShape(difference.psf.getAveragePosition()).getDeterminantRadius()
+        if np.isnan(sigma):
+            sigma = self.config.fallbackPsfSigma
+            self.log.warning("Could not determine average width of the difference image PSF. "
+                             "Using the default sigma of %d", self.config.fallbackPsfSigma)
         return sigma
 
     def processResults(self, science, matchedTemplate, difference, sources, idFactory,
