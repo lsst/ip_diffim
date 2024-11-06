@@ -22,6 +22,7 @@
 import numpy as np
 import unittest
 
+import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.geom
@@ -570,7 +571,9 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         noiseLevel = 1.
         staticSeed = 1
         fluxLevel = 500
-        kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel}
+        xSize = 400
+        ySize = 400
+        kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel, "xSize": xSize, "ySize": ySize}
         science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
         matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
 
@@ -593,6 +596,35 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         streakMask = output.subtractedMeasuredExposure.mask.getPlaneBitMask("STREAK")
         streakMaskSet = (outMask & streakMask) > 0
         self.assertTrue(np.all(streakMaskSet[20:23, 40:200]))
+
+        # Add a more trapezoid shaped streak across an image that is
+        # fainter and check that it is also detected
+        bbox = science.getBBox()
+        difference = science.clone()
+        difference.maskedImage -= matchedTemplate.maskedImage
+        width = 100
+        amplitude = 5
+        x0 = -100 + bbox.getBeginX()
+        y0 = -100 + bbox.getBeginY()
+        x1 = xSize + x0 + 100
+        y1 = ySize/2
+        corner_coords = [lsst.geom.Point2D(x0, y0),
+                         lsst.geom.Point2D(x0, y0 + width),
+                         lsst.geom.Point2D(x1, y1),
+                         lsst.geom.Point2D(x1 + width, y1)]
+        streak_trapezoid = afwGeom.Polygon(corner_coords)
+        streak_image = streak_trapezoid.createImage(bbox)
+        streak_image *= amplitude
+        difference.image.array += streak_image.array
+        output = detectionTask.run(science, matchedTemplate, difference)
+        outMask = output.subtractedMeasuredExposure.mask.array
+        streakMask = output.subtractedMeasuredExposure.mask.getPlaneBitMask("STREAK")
+        streakMaskSet = (outMask & streakMask) > 0
+        # Check that pixel values in streak_image equal the streak amplitude
+        streak_check = np.where(streak_image.array == amplitude)
+        self.assertTrue(np.all(streakMaskSet[streak_check]))
+        # Check that the entire image was not masked STREAK
+        self.assertFalse(np.all(streakMaskSet))
 
 
 class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
