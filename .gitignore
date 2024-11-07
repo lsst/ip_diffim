@@ -27,3 +27,4 @@ examples/spatialKernel
 examples/testSpatialCell
 tests/SpatialModelVisitors_1
 tests/basisSetRegMatrix
+.coverage*
