@@ -279,10 +279,13 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
         not detected.
         """
 
-        # with no edge we should detect both dipole sources
+        # with no edge, and masks growing due to convolution,
+        # we should not detect any dipole sources
+        # (If we were to keep the original mask instead, as in DM-45318 that
+        # was subsequently canceled in DM-47385, we will detect 2 sources)
         dipoleTestImage = DipoleTestImage(xc=[5.3, 4.8], yc=[4.6, 86.5], flux=[200, 210], edgeWidth=0)
         sources = self._runDetection(dipoleTestImage)
-        self.assertEqual(len(sources), 2)
+        self.assertEqual(len(sources), 0)
 
         # with a wide edge we should not detect any sources
         dipoleTestImage = DipoleTestImage(xc=[5.3, 4.8], yc=[4.6, 86.5], flux=[200, 210], edgeWidth=20)
