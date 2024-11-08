@@ -22,9 +22,12 @@
 import numpy as np
 import unittest
 
+import lsst.afw.image as afwImage
+import lsst.afw.math as afwMath
 import lsst.geom
 from lsst.ip.diffim import detectAndMeasure, subtractImages
-from lsst.pipe.base import InvalidQuantumError
+import lsst.meas.algorithms as measAlg
+from lsst.pipe.base import InvalidQuantumError, UpstreamFailureNoWorkFound
 import lsst.utils.tests
 
 from utils import makeTestImage
@@ -160,6 +163,34 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         # Catalog ids should be very large from this id generator.
         self.assertTrue(all(output.diaSources['id'] > 1000000000))
         self.assertImagesEqual(subtractedMeasuredExposure.image, difference.image)
+
+    def test_raise_bad_psf(self):
+        """Detection should raise if the PSF width is NaN
+        """
+        # Set up the simulated images
+        noiseLevel = 1.
+        staticSeed = 1
+        fluxLevel = 500
+        kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel, "x0": 12345, "y0": 67890}
+        science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
+        matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
+        difference = science.clone()
+
+        psfShape = difference.getPsf().computeBBox(lsst.geom.Point2D(0, 0)).getDimensions()
+        psfcI = afwImage.ImageD(lsst.geom.Extent2I(psfShape[1], psfShape[0]))
+        psfNew = np.zeros(psfShape)
+        psfNew[0, :] = 1
+        psfcI.array = psfNew
+        psfcK = afwMath.FixedKernel(psfcI)
+        psf = measAlg.KernelPsf(psfcK)
+        difference.setPsf(psf)
+
+        # Configure the detection Task
+        detectionTask = self._setup_detection()
+
+        # Run detection and check the results
+        with self.assertRaises(UpstreamFailureNoWorkFound):
+            detectionTask.run(science, matchedTemplate, difference)
 
     def test_measurements_finite(self):
         """Measured fluxes and centroids should always be finite.
