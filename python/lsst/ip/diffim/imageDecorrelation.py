@@ -274,7 +274,10 @@ class DecorrelateALKernelTask(pipeBase.Task):
             corr = self.computeDiffimCorrection(kArr, varianceMean, targetVarianceMean)
 
         correctedImage = self.computeCorrectedImage(corr.corrft, subtractedExposure.image.array)
-        correctedPsf = self.computeCorrectedDiffimPsf(corr.corrft, psfImg.array)
+        # TODO DM-47461: only decorrelate the PSF if it is calculated for the
+        # difference image. If it is taken directly from the science (or template)
+        # image the decorrelation calculation is incorrect.
+        # correctedPsf = self.computeCorrectedDiffimPsf(corr.corrft, psfImg.array)
 
         # The subtracted exposure variance plane is already correlated, we cannot propagate
         # it through another convolution; instead we need to use the uncorrelated originals
@@ -300,7 +303,8 @@ class DecorrelateALKernelTask(pipeBase.Task):
             correctedVariance /= kSumSq
         subtractedExposure.image.array[...] = correctedImage  # Allow for numpy type casting
         subtractedExposure.variance.array[...] = correctedVariance
-        subtractedExposure.setPsf(correctedPsf)
+        # TODO DM-47461
+        # subtractedExposure.setPsf(correctedPsf)
 
         newVarMean = self.computeVarianceMean(subtractedExposure)
         self.log.info("Variance plane mean of corrected diffim: %.5e", newVarMean)
