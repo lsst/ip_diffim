@@ -203,6 +203,7 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
                  "base_PixelFlags_flag_interpolatedCenterAll",
                  "base_PixelFlags_flag_badCenterAll",
                  "base_PixelFlags_flag_edgeCenterAll",
+                 "base_PixelFlags_flag_nodataCenterAll",
                  "base_PixelFlags_flag_saturatedCenterAll",
                  ),
     )
