@@ -212,19 +212,6 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
         default=3,
         doc="Minimum number of sources needed for calculating the PSF matching kernel."
     )
-    badSourceFlags = lsst.pex.config.ListField(
-        dtype=str,
-        doc="Flags that, if set, the associated source should not "
-        "be used to determine the PSF matching kernel.",
-        default=("sky_source", "slot_Centroid_flag",
-                 "slot_ApFlux_flag", "slot_PsfFlux_flag",
-                 "base_PixelFlags_flag_interpolated",
-                 "base_PixelFlags_flag_saturated",
-                 "base_PixelFlags_flag_bad",
-                 ),
-        deprecated="This field is no longer used and will be removed after v28."
-        "Set the equivalent field for the sourceSelector subtask instead.",
-    )
     excludeMaskPlanes = lsst.pex.config.ListField(
         dtype=str,
         default=("NO_DATA", "BAD", "SAT", "EDGE", "FAKE"),
