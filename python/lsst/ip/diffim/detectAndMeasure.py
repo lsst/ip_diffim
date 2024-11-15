@@ -214,6 +214,7 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
                                            "base_LocalWcs",
                                            "ext_shapeHSM_HsmSourceMoments",
                                            "ext_shapeHSM_HsmPsfMoments",
+                                           "base_ClassificationSizeExtendedness",
                                            ]
         self.measurement.slots.psfShape = "ext_shapeHSM_HsmPsfMoments"
         self.measurement.slots.shape = "ext_shapeHSM_HsmSourceMoments"
