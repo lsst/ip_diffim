@@ -21,8 +21,9 @@
 
 import numpy as np
 import unittest
+from unittest import mock
+import json as json_package
 
-import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.geom
 from lsst.ip.diffim import detectAndMeasure, subtractImages
@@ -36,7 +37,7 @@ import lsst.geom as geom
 import lsst.utils.tests
 
 from utils import makeTestImage
-def makeVisitInfo():
+def makeVisitInfo(id = 1):
     """Return a non-NaN visitInfo."""
     return afwImage.VisitInfo(exposureTime=900.01,
                               darkTime=11.02,
@@ -54,6 +55,31 @@ def makeVisitInfo():
                               weather=Weather(1.1, 2.2, 34.5),
                               )
 
+def mocked_requests_put(url, json = None):
+
+    data = json
+    class MockResponse:
+        def __init__(self, json_data, status_code):
+            self.content = json_package.dumps(json_data)
+            self.status_code = status_code
+
+        def json(self):
+            return self.json_data
+
+    # Most sources are filtered.
+    if data['visit_id'] == 0:
+        return MockResponse({"allow_list": [1,5]}, 200)
+    # We assume that visit_id 1 is missing from sattle and so will not produce and will fail
+    elif data['visit_id'] == 1:
+        return MockResponse({}, 404)
+    # All sources are allowed
+    elif data['visit_id'] == 2:
+        return MockResponse({"allow_list": [1,2,3,4,5,6,7,8,9]}, 200)
+    # ALl sources are filtered, bad things happen
+    elif data['visit_id'] == 3:
+        return MockResponse({"allow_list": []}, 200)
+
+    return MockResponse(None, 404)
 
 class DetectAndMeasureTestBase:
 
@@ -119,7 +145,7 @@ class DetectAndMeasureTestBase:
         if maxValue is not None:
             self.assertTrue(np.all(values <= maxValue))
 
-    def _setup_detection(self, doSkySources=False, nSkySources=5, **kwargs):
+    def _setup_detection(self, doSkySources=False, nSkySources=5, doSattle=False, **kwargs):
         """Setup and configure the detection and measurement PipelineTask.
 
         Parameters
@@ -140,6 +166,7 @@ class DetectAndMeasureTestBase:
         config.doSkySources = doSkySources
         if doSkySources:
             config.skySources.nSources = nSkySources
+        config.doSattle= doSattle
         config.update(**kwargs)
 
         # Make a realistic id generator so that output catalog ids are useful.
@@ -166,10 +193,6 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         """Basic functionality test with non-zero x0 and y0.
         """
         # Set up the simulated images
-        import pydevd_pycharm
-        pydevd_pycharm.settrace('localhost', port=8888, stdoutToServer=True,
-                                stderrToServer=True)
-
         noiseLevel = 1.
         staticSeed = 1
         fluxLevel = 500
@@ -466,10 +489,6 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
     def test_exclude_mask_detections(self):
         """Sources with certain bad mask planes set should not be detected.
         """
-        import pydevd_pycharm
-        pydevd_pycharm.settrace('localhost', port=8888, stdoutToServer=True,
-                                stderrToServer=True)
-
         # Set up the simulated images
         noiseLevel = 1.
         staticSeed = 1
@@ -633,6 +652,112 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         streakMask = output.subtractedMeasuredExposure.mask.getPlaneBitMask("STREAK")
         streakMaskSet = (outMask & streakMask) > 0
         self.assertTrue(np.all(streakMaskSet[20:23, 40:200]))
+
+    @mock.patch('requests.put', side_effect=mocked_requests_put)
+    def test_filter_id_not_in_sattle(self, mock_get):
+        noiseLevel = 1.
+        staticSeed = 1
+        fluxLevel = 500
+        kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel,
+                  "x0": 12345, "y0": 67890}
+        science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6,
+                                         **kwargs)
+        science.getInfo().setVisitInfo(makeVisitInfo())
+        detector = DetectorWrapper(numAmps=0).detector
+        science.setDetector(detector)
+        science.getInfo().setId(1)
+        matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel / 4,
+                                           noiseSeed=7, **kwargs)
+        difference = science.clone()
+
+        # Configure the detection Task
+        detectionTask = self._setup_detection(doSattle=True)
+
+        # Run detection and check the results
+        output = detectionTask.run(science, matchedTemplate, difference, idFactory=None)
+
+        # Catalog ids should be very large from this id generator.
+        self.assertTrue(all(output.diaSources['id'] > 1000000000))
+    @mock.patch('requests.put', side_effect=mocked_requests_put)
+    def test_filter_satellites_one_allowed(self, mock_get):
+        noiseLevel = 1.
+        staticSeed = 1
+        fluxLevel = 500
+        kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel,
+                  "x0": 12345, "y0": 67890}
+        science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6,
+                                         **kwargs)
+        science.getInfo().setVisitInfo(makeVisitInfo())
+        science.getInfo().setId(0)
+        detector = DetectorWrapper(numAmps=1).detector
+        science.setDetector(detector)
+        matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel / 4,
+                                           noiseSeed=7, **kwargs)
+        difference = science.clone()
+
+        # Configure the detection Task
+        detectionTask = self._setup_detection(doSattle=True)
+
+        # Run detection and check the results
+        output = detectionTask.run(science, matchedTemplate, difference, idFactory=None)
+
+        # Catalog ids should be very large from this id generator.
+        self.assertTrue(all(output.diaSources['id'] > 1000000000))
+
+    @mock.patch('requests.put', side_effect=mocked_requests_put)
+    def test_filter_satellites_all_allowed(self, mock_get):
+        import pydevd_pycharm
+        pydevd_pycharm.settrace('localhost', port=8888, stdoutToServer=True,
+                                stderrToServer=True)
+        noiseLevel = 1.
+        staticSeed = 1
+        fluxLevel = 500
+        kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel,
+                  "x0": 12345, "y0": 67890}
+        science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6,
+                                         **kwargs)
+        science.getInfo().setVisitInfo(makeVisitInfo())
+        detector = DetectorWrapper(numAmps=1).detector
+        science.setDetector(detector)
+        science.getInfo().setId(3)
+        matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel / 4,
+                                           noiseSeed=7, **kwargs)
+        difference = science.clone()
+
+        # Configure the detection Task
+        detectionTask = self._setup_detection(doSattle=True)
+
+        # Run detection and check the results
+        output = detectionTask.run(science, matchedTemplate, difference, idFactory=None)
+
+        # Catalog ids should be very large from this id generator.
+        self.assertTrue(all(output.diaSources['id'] > 1000000000))
+
+    @mock.patch('requests.put', side_effect=mocked_requests_put)
+    def test_filter_satellites_all_allowed(self, mock_get):
+        import pydevd_pycharm
+        pydevd_pycharm.settrace('localhost', port=8888, stdoutToServer=True,
+                                stderrToServer=True)
+        noiseLevel = 1.
+        staticSeed = 1
+        fluxLevel = 500
+        kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel,
+                  "x0": 12345, "y0": 67890}
+        science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6,
+                                         **kwargs)
+        science.getInfo().setVisitInfo(makeVisitInfo())
+        detector = DetectorWrapper(numAmps=1).detector
+        science.setDetector(detector)
+        science.getInfo().setId(4)
+        matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel / 4,
+                                           noiseSeed=7, **kwargs)
+        difference = science.clone()
+
+        # Configure the detection Task
+        detectionTask = self._setup_detection(doSattle=True)
+
+        # Run detection and check the results
+        output = detectionTask.run(science, matchedTemplate, difference, idFactory=None)
 
 
 class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):

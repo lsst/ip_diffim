@@ -202,17 +202,17 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
     doSattle = pexConfig.Field(
         dtype=bool,
         default=True,
-        doc="WRITE STUFF HERE."
+        doc="Turn on satellite filtering."
     )
     sattle_host = pexConfig.Field(
         dtype=str,
         default='http://127.0.0.1',
-        doc="Don't delete next time."
+        doc="The API host where sattle will run."
     )
     sattle_port = pexConfig.Field(
         dtype=int,
         default=9999,
-        doc="More stuf."
+        doc="The api port where sattle will run."
     )
     idGenerator = DetectorVisitIdGeneratorConfig.make_field()
 
@@ -475,8 +475,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         self.measureDiaSources(initialDiaSources, science, difference, matchedTemplate)
         diaSources = self._removeBadSources(initialDiaSources)
 
-        diaSources = self.filterSatellites(diaSources, science)
-        # Do I want science or difference for the wcs?
+        if self.config.doSattle:
+            diaSources = self.filterSatellites(diaSources, science)
 
         if self.config.doForcedMeasurement:
             self.measureForcedSources(diaSources, science, difference.getWcs())
