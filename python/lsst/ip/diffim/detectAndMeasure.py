@@ -20,6 +20,10 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
+import requests
+import json
+import os
+from astropy.time import Time
 
 import lsst.afw.detection as afwDetection
 import lsst.afw.image as afwImage
@@ -302,6 +306,30 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         dtype=bool,
         default=True,
         doc="Raise an algorithm error if no diaSources are detected.",
+    )
+    doSattle = pexConfig.Field(
+        dtype=bool,
+        default=False,
+        doc="If true, dia source bounding boxes will be sent for verification"
+            "to the sattle service."
+    )
+    sattle_host = pexConfig.Field(
+        dtype=str,
+        default=os.getenv("SATTLE_HOST"),
+        doc="Host address for sattle service.",
+        optional=True
+    )
+    sattle_port = pexConfig.Field(
+        dtype=int,
+        default=os.getenv("SATTLE_PORT"),
+        doc="Port to connect to sattle.",
+        optional=True
+    )
+    sattle_historical = pexConfig.Field(
+        dtype=bool,
+        default=False,
+        doc="If set to true, sattle service checks against historical "
+            "catalogs."
     )
     idGenerator = DetectorVisitIdGeneratorConfig.make_field()
 
@@ -692,6 +720,13 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         self.measureDiaSources(initialDiaSources, science, difference, matchedTemplate)
         diaSources = self._removeBadSources(initialDiaSources)
 
+        if self.config.doSattle:
+            if not self.config.sattle_host or not self.config.sattle_port:
+                self.log.error("Sattle filtering is on but service endpoints"
+                               "not set.")
+                raise RuntimeError("Sattle filtering is on but service endpoints not set.")
+            diaSources = self.filterSatellites(diaSources, science)
+
         if self.config.doForcedMeasurement:
             self.measureForcedSources(diaSources, science, difference.getWcs())
 
@@ -948,6 +983,101 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             if metrics.differenceFootprintRatioStdev > self.config.badSubtractionVariationThreshold:
                 raise BadSubtractionError(ratio=metrics.differenceFootprintRatioStdev,
                                           threshold=self.config.badSubtractionVariationThreshold)
+
+    def filterSatellites(self, diaSources, science):
+
+        wcs = science.getWcs()
+        nbbox = []
+
+        for source in diaSources:
+            fp = source.getFootprint()
+            source_bbox = fp.getBBox()
+
+            corners = [wcs.pixelToSky(source_bbox.beginX, source_bbox.beginY),
+                       wcs.pixelToSky(source_bbox.beginX, source_bbox.endY),
+                       wcs.pixelToSky(source_bbox.endX, source_bbox.endY),
+                       wcs.pixelToSky(source_bbox.endX, source_bbox.beginY)]
+
+            tmp = []
+            for c, corner in enumerate(corners):
+                tmp.append([corner.getRa().asDegrees(), corner.getDec().asDegrees()])
+            nbbox.append(tmp)
+
+        detector_id = science.getDetector().getId()
+        visit_id = science.getInfo().getVisitInfo().getId()
+
+        dia_sources_json = []
+        for i, source in enumerate(diaSources):
+            dia_sources_json.append(
+                {"diasource_id": source['id'], "bbox": nbbox[i]})
+
+        sattle_output = requests.put(
+            f'{self.config.sattle_host}:{self.config.sattle_port}/diasource_allow_list',
+            json={"visit_id": visit_id, "detector_id": detector_id, "diasources": dia_sources_json})
+
+        if sattle_output.status_code != 200:
+            # Check if the cache is missing the visit and retry once
+            if sattle_output.status_code == 404:
+                try:
+                    self.log.info('Visit not found in sattle cache, re-sending')
+
+                    visit_id = science.getInfo().getVisitInfo().id
+
+                    visit_date = Time(
+                        science.getInfo().getVisitInfo().getDate().toPython()).jd
+
+                    exposure_time_jd = science.getInfo().getVisitInfo().getExposureTime() / 86400.0
+                    exposure_end_jd = visit_date + exposure_time_jd / 2.0
+                    exposure_start_jd = visit_date - exposure_time_jd / 2.0
+
+                    boresight_ra = science.getInfo().getVisitInfo().boresightRaDec[0].asDegrees()
+                    boresight_dec = science.getInfo().getVisitInfo().boresightRaDec[1].asDegrees()
+
+                    r = requests.put(
+                        f'{self.config.sattle_host}:{self.config.sattle_port}/visit_cache',
+                        json={"visit_id": visit_id,
+                              "exposure_start_mjd": exposure_start_jd,
+                              "exposure_end_mjd": exposure_end_jd,
+                              "boresight_ra": boresight_ra,
+                              "boresight_dec": boresight_dec,
+                              "historical": self.config.sattle_historical})
+
+                    if r.status_code != 200:
+                        raise RuntimeError(r.text)
+
+                    sattle_output = requests.put(
+                        f'{self.config.sattle_host}:{self.config.sattle_port}/'
+                        'diasource_allow_list',
+                        json={"visit_id": visit_id, "detector_id": detector_id,
+                              "diasources": dia_sources_json})
+
+                    # fail on any non-success
+                    if sattle_output.status_code != 200:
+                        raise RuntimeError(sattle_output.text)
+
+                except (requests.RequestException, ConnectionError) as e:
+                    raise RuntimeError(sattle_output.text) from e
+
+            else:
+                raise RuntimeError(sattle_output.text)
+
+        sattle_output_array = json.loads(sattle_output.content)
+
+        if sattle_output_array['allow_list'] == []:
+            self.log.warning('Sattle output array is empty, all sources removed')
+            diaSources = diaSources[0:0].copy(deep=True)
+        else:
+
+            allowed_ids = []
+            for source in diaSources:
+                if source['id'] in sattle_output_array['allow_list']:
+                    allowed_ids.append(True)
+                else:
+                    allowed_ids.append(False)
+
+            diaSources = diaSources[np.array(allowed_ids)].copy(deep=True)
+
+        return diaSources
 
     def _runStreakMasking(self, difference):
         """Do streak masking and optionally save the resulting streak
