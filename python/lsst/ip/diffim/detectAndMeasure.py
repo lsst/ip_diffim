@@ -20,6 +20,8 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
+import requests
+import json
 
 import lsst.afw.detection as afwDetection
 import lsst.afw.table as afwTable
@@ -36,6 +38,9 @@ from lsst.pex.exceptions import InvalidParameterError
 import lsst.pipe.base as pipeBase
 import lsst.utils
 from lsst.utils.timer import timeMethod
+import sys
+sys.path.append('/Users/bsmart/LSST/code/sattle/python/lsst/sattle')
+import sattlePy
 
 from . import DipoleFitTask
 
@@ -193,6 +198,21 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         dtype=str,
         doc="Mask planes to clear before running detection.",
         default=("DETECTED", "DETECTED_NEGATIVE", "NOT_DEBLENDED", "STREAK"),
+    )
+    doSattle = pexConfig.Field(
+        dtype=bool,
+        default=True,
+        doc="WRITE STUFF HERE."
+    )
+    sattle_host = pexConfig.Field(
+        dtype=str,
+        default='http://127.0.0.1',
+        doc="Don't delete next time."
+    )
+    sattle_port = pexConfig.Field(
+        dtype=int,
+        default=9999,
+        doc="More stuf."
     )
     idGenerator = DetectorVisitIdGeneratorConfig.make_field()
 
@@ -455,6 +475,9 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         self.measureDiaSources(initialDiaSources, science, difference, matchedTemplate)
         diaSources = self._removeBadSources(initialDiaSources)
 
+        diaSources = self.filterSatellites(diaSources, science)
+        # Do I want science or difference for the wcs?
+
         if self.config.doForcedMeasurement:
             self.measureForcedSources(diaSources, science, difference.getWcs())
 
@@ -492,6 +515,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         def makeFootprints(sources):
             footprints = afwDetection.FootprintSet(difference.getBBox())
             footprints.setFootprints([src.getFootprint() for src in sources])
+
             return footprints
 
         def deblend(footprints):
@@ -656,6 +680,52 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             except InvalidParameterError:
                 self.metadata["%s_mask_fraction"%maskPlane.lower()] = -1
                 self.log.info("Unable to calculate metrics for mask plane %s: not in image"%maskPlane)
+
+    def filterSatellites(self, diaSources, science):
+
+        wcs = science.getWcs()
+        nbbox = []
+
+        for source in diaSources:
+            fp = source.getFootprint()
+            source_bbox = fp.getBBox()
+
+            corners = [wcs.pixelToSky(source_bbox.beginX, source_bbox.beginY),
+                       wcs.pixelToSky(source_bbox.beginX, source_bbox.endY),
+                       wcs.pixelToSky(source_bbox.endX, source_bbox.endY),
+                       wcs.pixelToSky(source_bbox.endX, source_bbox.beginY)]
+
+            tmp = []
+            for c, corner in enumerate(corners):
+                tmp.append([corner.getRa().asDegrees(), corner.getDec().asDegrees()])
+            nbbox.append(tmp)
+
+        detector_id = science.getDetector().getId()
+        visit_id = science.getInfo().getVisitInfo().getId()
+
+        dia_sources_json = []
+        for i, source in enumerate(diaSources):
+            dia_sources_json.append(
+                {"diasource_id": source['id'], "bbox": nbbox[i]})
+
+        sattle_output = requests.put(
+            f'{self.config.sattle_host}:{self.config.sattle_port}/diasource_allow_list', json=
+            {"visit_id": visit_id, "detector_id": detector_id, "diasources": dia_sources_json})  ##
+        if sattle_output.status_code == 404:
+            self.log.error(sattle_output.text)
+
+        sattle_output_array=json.loads(sattle_output.content)
+
+        allowed_ids = []
+        for source in diaSources:
+            if source['id'] in sattle_output_array['allow_list']:
+                allowed_ids.append(True)
+            else:
+                allowed_ids.append(False)
+
+        diaSources = diaSources[np.array(allowed_ids)].copy(deep=True)
+
+        return diaSources
 
     def _runStreakMasking(self, maskedImage):
         """Do streak masking and optionally save the resulting streak
