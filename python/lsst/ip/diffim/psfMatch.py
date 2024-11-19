@@ -302,25 +302,26 @@ class PsfMatchConfigAL(PsfMatchConfig):
         dtype=int,
         doc="Polynomial order of spatial modification of base Gaussians. "
             "List length must be `alardNGauss`.",
-        default=(4, 2, 2),
+        default=(0, 4, 2),
     )
     alardSigGauss = pexConfig.ListField(
         dtype=float,
         doc="Default sigma values in pixels of base Gaussians. "
-            "List length must be `alardNGauss`.",
-        default=(0.7, 1.5, 3.0),
+            "List length must be `alardNGauss`. "
+            "Only used if `scaleByFwhm=False`",
+        default=(0.25, 0.7, 1.5),
     )
     alardGaussBeta = pexConfig.Field(
         dtype=float,
         doc="Used if `scaleByFwhm==True`, scaling multiplier of base "
             "Gaussian sigmas for automated sigma determination",
-        default=2.0,
+        default=np.sqrt(np.e),
         check=lambda x: x >= 0.0,
     )
     alardMinSig = pexConfig.Field(
         dtype=float,
         doc="Used if `scaleByFwhm==True`, minimum sigma (pixels) for base Gaussians",
-        default=0.7,
+        default=0.25,
         check=lambda x: x >= 0.25
     )
     alardDegGaussDeconv = pexConfig.Field(
@@ -334,7 +335,7 @@ class PsfMatchConfigAL(PsfMatchConfig):
         dtype=float,
         doc="Used if `scaleByFwhm==True`, minimum sigma (pixels) for base Gaussians during deconvolution; "
             "make smaller than `alardMinSig` as this is only indirectly used",
-        default=0.4,
+        default=0.25,
         check=lambda x: x >= 0.25
     )
     alardNGaussDeconv = pexConfig.Field(

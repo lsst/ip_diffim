@@ -242,6 +242,7 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
             else:
                 basisSigmaGauss.append(kernelSigma)
                 nAppended = 1
+        print("Predicted sigma %f, minimum sigma used %f" % (kernelSigma, np.min(basisSigmaGauss)))
 
         # Any other Gaussians above basisNGauss=1 come from a scaling
         # relationship: Sig_i+1 / Sig_i = basisGaussBeta
@@ -267,6 +268,7 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
         basisMinSigma = config.alardMinSigDeconv
 
         kernelSigma = np.sqrt(targetSigma**2 - referenceSigma**2)
+        logger.info("Predicted sigma %d", kernelSigma)
         if kernelSigma < basisMinSigma:
             kernelSigma = basisMinSigma
 
@@ -281,27 +283,30 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
 
         for i in range(nAppended, basisNGauss):
             basisSigmaGauss.append(basisSigmaGauss[-1]*basisGaussBeta)
+        print("Predicted sigma %f, minimum sigma (not) used " % (kernelSigma), basisSigmaGauss)
 
         kernelSize = int(fwhmScaling * basisSigmaGauss[-1])
         kernelSize += 0 if kernelSize%2 else 1  # Make sure it's odd
         kernelSize = min(config.kernelSizeMax, max(kernelSize, config.kernelSizeMin))
 
-        # Now build a deconvolution set from these sigmas
-        sig0 = basisSigmaGauss[0]
-        sig1 = basisSigmaGauss[1]
-        sig2 = basisSigmaGauss[2]
-        basisSigmaGauss = []
-        for n in range(1, 3):
-            for j in range(n):
-                sigma2jn = (n - j)*sig1**2
-                sigma2jn += j * sig2**2
-                sigma2jn -= (n + 1)*sig0**2
-                sigmajn = np.sqrt(sigma2jn)
-                basisSigmaGauss.append(sigmajn)
+        # # Now build a deconvolution set from these sigmas
+        # sig0 = basisSigmaGauss[0]
+        # sig1 = basisSigmaGauss[1]
+        # sig2 = basisSigmaGauss[2]
+        # basisSigmaGauss = []
+        # for n in range(1, 3):
+        #     for j in range(n):
+        #         sigma2jn = (n - j)*sig1**2
+        #         sigma2jn += j * sig2**2
+        #         sigma2jn -= (n + 1)*sig0**2
+        #         sigmajn = np.sqrt(sigma2jn)
+        #         basisSigmaGauss.append(sigmajn)
+        basisSigmaGauss = [1/g for g in basisSigmaGauss]
 
         basisSigmaGauss.sort()
+        print("Predicted sigma %f, minimum sigma used " % (kernelSigma), basisSigmaGauss)
         basisNGauss = len(basisSigmaGauss)
-        basisDegGauss = [config.alardDegGaussDeconv for x in basisSigmaGauss]
+        # basisDegGauss = [config.alardDegGaussDeconv for x in basisSigmaGauss]
 
     if metadata is not None:
         metadata.add("ALBasisNGauss", basisNGauss)
