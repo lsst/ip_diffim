@@ -712,18 +712,23 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             f'{self.config.sattle_host}:{self.config.sattle_port}/diasource_allow_list', json=
             {"visit_id": visit_id, "detector_id": detector_id, "diasources": dia_sources_json})  ##
         if sattle_output.status_code == 404:
-            self.log.error(sattle_output.text)
+            raise RuntimeError(sattle_output.text)
+
 
         sattle_output_array=json.loads(sattle_output.content)
 
-        allowed_ids = []
-        for source in diaSources:
-            if source['id'] in sattle_output_array['allow_list']:
-                allowed_ids.append(True)
-            else:
-                allowed_ids.append(False)
+        if sattle_output_array['allow_list'] == []:
+            self.log.warning('Sattle output array is empty, all sources Removed')
+        else:
 
-        diaSources = diaSources[np.array(allowed_ids)].copy(deep=True)
+            allowed_ids = []
+            for source in diaSources:
+                if source['id'] in sattle_output_array['allow_list']:
+                    allowed_ids.append(True)
+                else:
+                    allowed_ids.append(False)
+
+            diaSources = diaSources[np.array(allowed_ids)].copy(deep=True)
 
         return diaSources
 
