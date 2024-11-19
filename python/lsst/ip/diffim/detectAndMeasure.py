@@ -20,6 +20,9 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
+import requests
+import json
+from astropy.time import Time
 
 import lsst.afw.detection as afwDetection
 import lsst.afw.image as afwImage
@@ -302,6 +305,28 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         dtype=bool,
         default=True,
         doc="Raise an algorithm error if no diaSources are detected.",
+    )
+    doSattle = pexConfig.Field(
+        dtype=bool,
+        default=False,
+        doc="If true, dia source bounding boxes will be sent for verification"
+            "to the sattle service."
+    )
+    sattle_host = pexConfig.Field(
+        dtype=str,
+        default='http://127.0.0.1',
+        doc="Host address for sattle service."
+    )
+    sattle_port = pexConfig.Field(
+        dtype=int,
+        default=9999,
+        doc="Port to connect to sattle."
+    )
+    sattle_historical = pexConfig.Field(
+        dtype=bool,
+        default=False,
+        doc="If set to true, sattel service checks against historical "
+            "catalogs."
     )
     idGenerator = DetectorVisitIdGeneratorConfig.make_field()
 
@@ -692,6 +717,9 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         self.measureDiaSources(initialDiaSources, science, difference, matchedTemplate)
         diaSources = self._removeBadSources(initialDiaSources)
 
+        diaSources = self.filterSatellites(diaSources, science)
+        # Do I want science or difference for the wcs?
+
         if self.config.doForcedMeasurement:
             self.measureForcedSources(diaSources, science, difference.getWcs())
 
@@ -948,6 +976,93 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             if metrics.differenceFootprintRatioStdev > self.config.badSubtractionVariationThreshold:
                 raise BadSubtractionError(ratio=metrics.differenceFootprintRatioStdev,
                                           threshold=self.config.badSubtractionVariationThreshold)
+
+    def filterSatellites(self, diaSources, science):
+
+        wcs = science.getWcs()
+        nbbox = []
+
+        for source in diaSources:
+            fp = source.getFootprint()
+            source_bbox = fp.getBBox()
+
+            corners = [wcs.pixelToSky(source_bbox.beginX, source_bbox.beginY),
+                       wcs.pixelToSky(source_bbox.beginX, source_bbox.endY),
+                       wcs.pixelToSky(source_bbox.endX, source_bbox.endY),
+                       wcs.pixelToSky(source_bbox.endX, source_bbox.beginY)]
+
+            tmp = []
+            for c, corner in enumerate(corners):
+                tmp.append([corner.getRa().asDegrees(), corner.getDec().asDegrees()])
+            nbbox.append(tmp)
+
+        detector_id = science.getDetector().getId()
+        visit_id = science.getInfo().getVisitInfo().getId()
+
+        dia_sources_json = []
+        for i, source in enumerate(diaSources):
+            dia_sources_json.append(
+                {"diasource_id": source['id'], "bbox": nbbox[i]})
+
+        sattle_output = requests.put(
+            f'{self.config.sattle_host}:{self.config.sattle_port}/diasource_allow_list', json=
+            {"visit_id": visit_id, "detector_id": detector_id, "diasources": dia_sources_json})  ##
+        if sattle_output.status_code != 200:
+            # Check if the cache is missing the visit and retry once
+            if sattle_output.status_code == 404:
+                try:
+                    self.log.info('Sending data to the visit cache')
+
+                    visit_id = science.exposure.getInfo().getVisitInfo().id
+
+                    visit_date = Time(
+                        science.exposure.getInfo().getVisitInfo().getDate().toPython()).jd
+
+                    exposure_time_jd = science.exposure.getInfo().getVisitInfo().getExposureTime() / 86400.0
+
+                    exposure_end_jd = visit_date + exposure_time_jd / 2.0
+
+                    exposure_start_jd = visit_date - exposure_time_jd / 2.0
+
+                    boresight_ra = \
+                    science.exposure.getInfo().getVisitInfo().boresightRaDec[
+                        0].asDegrees()
+                    boresight_dec = \
+                    science.exposure.getInfo().getVisitInfo().boresightRaDec[
+                        1].asDegrees()
+
+                    r = requests.put(
+                        f'{self.config.sattle_host}:{self.config.sattle_port}/visit_cache',
+                        json=
+                        {"visit_id": visit_id,
+                         "exposure_start_mjd": exposure_start_jd,
+                         "exposure_end_mjd": exposure_end_jd,
+                         "boresight_ra": boresight_ra,
+                         "boresight_dec": boresight_dec,
+                         "historical": self.config.sattle_historical})
+
+                    self.log.info(f'status code: {r.status_code}')
+                except:
+                    raise RuntimeError(sattle_output.text)
+            else:
+                raise RuntimeError(sattle_output.text)
+
+        sattle_output_array=json.loads(sattle_output.content)
+
+        if sattle_output_array['allow_list'] == []:
+            self.log.warning('Sattle output array is empty, all sources removed')
+        else:
+
+            allowed_ids = []
+            for source in diaSources:
+                if source['id'] in sattle_output_array['allow_list']:
+                    allowed_ids.append(True)
+                else:
+                    allowed_ids.append(False)
+
+            diaSources = diaSources[np.array(allowed_ids)].copy(deep=True)
+
+        return diaSources
 
     def _runStreakMasking(self, difference):
         """Do streak masking and optionally save the resulting streak

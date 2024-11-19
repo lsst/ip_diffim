@@ -31,6 +31,9 @@ import lsst.meas.algorithms as measAlg
 from lsst.pipe.base import InvalidQuantumError, UpstreamFailureNoWorkFound, AlgorithmError
 import lsst.utils.tests
 import lsst.meas.base.tests
+import lsst.daf.base as dafBase
+from lsst.afw.coord import Observatory, Weather
+import lsst.geom as geom
 
 from utils import makeTestImage, checkMask
 
@@ -154,6 +157,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         fluxLevel = 500
         kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel, "x0": 12345, "y0": 67890}
         science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
+        science.getInfo().setVisitInfo(makeVisitInfo())
         matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
         difference = science.clone()
 
@@ -223,6 +227,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
                   "xSize": xSize, "ySize": ySize}
         science, sources = makeTestImage(seed=staticSeed, noiseLevel=noiseLevel, noiseSeed=6,
                                          nSrc=1, **kwargs)
+        science.getInfo().setVisitInfo(makeVisitInfo())
         matchedTemplate, _ = makeTestImage(seed=staticSeed, noiseLevel=noiseLevel/4, noiseSeed=7,
                                            nSrc=1, **kwargs)
         rng = np.random.RandomState(3)
@@ -269,6 +274,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         kwargs = {"psfSize": 2.4, "xSize": xSize, "ySize": ySize}
         science, sources = makeTestImage(seed=staticSeed, noiseLevel=noiseLevel, noiseSeed=6,
                                          nSrc=1, **kwargs)
+        science.getInfo().setVisitInfo(makeVisitInfo())
         matchedTemplate, _ = makeTestImage(seed=staticSeed, noiseLevel=noiseLevel/4, noiseSeed=7,
                                            nSrc=1, **kwargs)
         transients, transientSources = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=8, nSrc=1, **kwargs)
@@ -403,6 +409,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         kwargs = {"psfSize": 2.4, "fluxLevel": fluxLevel, "addMaskPlanes": []}
         # Use different seeds for the science and template so every source is a diaSource
         science, sources = makeTestImage(seed=5, noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
+        science.getInfo().setVisitInfo(makeVisitInfo())
         matchedTemplate, _ = makeTestImage(seed=6, noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
 
         difference = science.clone()
@@ -434,6 +441,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
                   "xSize": xSize, "ySize": ySize}
         dipoleFlag = "ip_diffim_DipoleFit_classification"
         science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
+        science.getInfo().setVisitInfo(makeVisitInfo())
         matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
         difference = science.clone()
         matchedTemplate.image.array[...] = np.roll(matchedTemplate.image.array[...], offset, axis=0)
@@ -473,6 +481,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         fluxLevel = 500
         kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel}
         science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
+        science.getInfo().setVisitInfo(makeVisitInfo())
         matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
         transients, transientSources = makeTestImage(seed=transientSeed, psfSize=2.4,
                                                      nSrc=10, fluxLevel=transientFluxLevel,
@@ -509,6 +518,10 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
     def test_exclude_mask_detections(self):
         """Sources with certain bad mask planes set should not be detected.
         """
+        import pydevd_pycharm
+        pydevd_pycharm.settrace('localhost', port=8888, stdoutToServer=True,
+                                stderrToServer=True)
+
         # Set up the simulated images
         noiseLevel = 1.
         staticSeed = 1
@@ -517,6 +530,9 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         radius = 2
         kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel}
         science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
+        science.getInfo().setVisitInfo(makeVisitInfo())
+        detector = DetectorWrapper(numAmps=1).detector
+        science.setDetector(detector)
         matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
 
         # Configure the detection Task
@@ -960,6 +976,7 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         radius = 2
         kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel}
         science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
+        science.getInfo().setVisitInfo(makeVisitInfo())
         matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
 
         subtractTask = subtractImages.AlardLuptonPreconvolveSubtractTask()
@@ -1150,6 +1167,23 @@ class TestNegativePeaks(lsst.utils.tests.TestCase):
         # set, independent of how deblending/merging of negative sources is
         # handled.
         self.assertEqual((~result.diaSources["is_negative"]).sum(), 3)
+
+def makeVisitInfo():
+    """Return a non-NaN visitInfo."""
+    return afwImage.VisitInfo(exposureTime=10.01,
+                              darkTime=11.02,
+                              date=dafBase.DateTime(65321.1, dafBase.DateTime.MJD, dafBase.DateTime.TAI),
+                              ut1=12345.1,
+                              era=45.1*geom.degrees,
+                              boresightRaDec=geom.SpherePoint(23.1, 73.2, geom.degrees),
+                              boresightAzAlt=geom.SpherePoint(134.5, 33.3, geom.degrees),
+                              boresightAirmass=1.73,
+                              boresightRotAngle=73.2*geom.degrees,
+                              rotType=afwImage.RotType.SKY,
+                              observatory=Observatory(
+                                  11.1*geom.degrees, 22.2*geom.degrees, 0.333),
+                              weather=Weather(1.1, 2.2, 34.5),
+                              )
 
 
 def setup_module(module):
