@@ -19,12 +19,9 @@ Their respective algorithm control classes are defined in
 DipoleCentroidControl and DipoleFluxControl. Each centroid and flux
 measurement will have _neg (negative) and _pos (positive lobe) fields.
 
-The first set of measurements uses a "naive" algorithm for centroid and flux
-measurements, implemented in NaiveDipoleCentroidControl and
-NaiveDipoleFluxControl. The algorithm uses a naive 3x3 weighted moment around
-the nominal centroids of each peak in the Source Footprint.  These algorithms
-fill the table fields ip_diffim_NaiveDipoleCentroid* and
-ip_diffim_NaiveDipoleFlux*
+The first set of measurements uses the SDSS algorithm for centroid and flux
+measurements.
+This centroid will be used as a fallback, if the below dipole fit fails or if the source does not have a positive and negative peak to attempt a dipole fit to.
 
 The second set of measurements undertakes a joint-Psf model on the negative and
 positive lobe simultaneously. This fit simultaneously solves for the negative

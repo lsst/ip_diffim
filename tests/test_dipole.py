@@ -131,41 +131,6 @@ class DipoleAlgorithmTest(lsst.utils.tests.TestCase):
         self.w, self.h = 100, 100  # size of image
         self.xc, self.yc = 50, 50  # location of center of dipole
 
-    # Remove this test on DM-44030
-    def testNaiveDipoleCentroid(self):
-        control = ipDiffim.DipoleCentroidControl()
-        psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc)
-        plugin, cat = makePluginAndCat(ipDiffim.NaiveDipoleCentroid, "test", control, centroid="centroid")
-        source = cat.addNew()
-        source.set("centroid_x", 50)
-        source.set("centroid_y", 50)
-        source.setFootprint(s.getFootprint())
-        plugin.measure(source, exposure)
-        for key in ("_pos_x", "_pos_y", "_pos_xErr", "_pos_yErr", "_pos_flag",
-                    "_neg_x", "_neg_y", "_neg_xErr", "_neg_yErr", "_neg_flag"):
-            try:
-                source.get("test" + key)
-            except Exception:
-                self.fail()
-
-    # Remove this test on DM-44030
-    def testNaiveDipoleFluxControl(self):
-        psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc)
-        control = ipDiffim.DipoleFluxControl()
-        psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc)
-        plugin, cat = makePluginAndCat(ipDiffim.NaiveDipoleFlux, "test", control, centroid="centroid")
-        source = cat.addNew()
-        source.set("centroid_x", 50)
-        source.set("centroid_y", 50)
-        source.setFootprint(s.getFootprint())
-        plugin.measure(source, exposure)
-        for key in ("_pos_instFlux", "_pos_instFluxErr", "_pos_flag", "_npos",
-                    "_neg_instFlux", "_neg_instFluxErr", "_neg_flag", "_nneg"):
-            try:
-                source.get("test" + key)
-            except Exception:
-                self.fail()
-
     def testPsfDipoleFluxControl(self):
         psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc)
         psf, psfSum, exposure, s = createDipole(self.w, self.h, self.xc, self.yc)
