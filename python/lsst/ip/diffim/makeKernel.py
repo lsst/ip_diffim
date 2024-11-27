@@ -276,7 +276,7 @@ class MakeKernelTask(PsfMatchTask):
         return selectSources
 
     def makeCandidateList(self, convolved, reference, kernelSize,
-                          candidateList, preconvolved=False):
+                          candidateList, preconvolved=False, sigma=None):
         """Make a list of acceptable KernelCandidates.
 
         Generate a list of candidate sources for Psf-matching, remove sources
@@ -309,7 +309,7 @@ class MakeKernelTask(PsfMatchTask):
             If ``candidateList`` is empty after sub-selection.
         """
         if candidateList is None:
-            candidateList = self.getSelectSources(reference, doSmooth=not preconvolved)
+            candidateList = self.getSelectSources(reference, doSmooth=not preconvolved, sigma=sigma)
             if len(candidateList) < 1:
                 raise RuntimeError("No kernel candidates after detection and measurement.")
 

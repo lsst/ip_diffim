@@ -505,8 +505,14 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             if self.config.allowKernelSourceDetection:
                 self.log.warning("Error encountered trying to construct the matching kernel"
                                  f" Running source detection and retrying. {e}")
+                kernelSize = self.makeKernel.makeKernelBasisList(
+                    self.templatePsfSize, self.sciencePsfSize)[0].getWidth()
+                sigmaToFwhm = 2*np.log(2*np.sqrt(2))
+                candidateList = self.makeKernel.makeCandidateList(template, science, kernelSize,
+                                                                  candidateList=None,
+                                                                  sigma=self.sciencePsfSize/sigmaToFwhm)
                 kernelSources = self.makeKernel.selectKernelSources(template, science,
-                                                                    candidateList=None,
+                                                                    candidateList=candidateList,
                                                                     preconvolved=False)
                 kernelResult = self.makeKernel.run(template, science, kernelSources,
                                                    preconvolved=False)
