@@ -389,29 +389,29 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         # 2. RangeError, in case the template coverage is so poor that we end
         #    up near a region with no data.
         try:
-            templatePsfSize = getPsfFwhm(template.psf)
-            sciencePsfSize = getPsfFwhm(science.psf)
+            self.templatePsfSize = getPsfFwhm(template.psf)
+            self.sciencePsfSize = getPsfFwhm(science.psf)
         except (lsst.pex.exceptions.InvalidParameterError, lsst.pex.exceptions.RangeError):
             self.log.info("Unable to evaluate PSF at the average position. "
                           "Evaluting PSF on a grid of points."
                           )
-            templatePsfSize = evaluateMeanPsfFwhm(template,
-                                                  fwhmExposureBuffer=fwhmExposureBuffer,
-                                                  fwhmExposureGrid=fwhmExposureGrid
-                                                  )
-            sciencePsfSize = evaluateMeanPsfFwhm(science,
-                                                 fwhmExposureBuffer=fwhmExposureBuffer,
-                                                 fwhmExposureGrid=fwhmExposureGrid
-                                                 )
-        self.log.info("Science PSF FWHM: %f pixels", sciencePsfSize)
-        self.log.info("Template PSF FWHM: %f pixels", templatePsfSize)
-        self.metadata["sciencePsfSize"] = sciencePsfSize
-        self.metadata["templatePsfSize"] = templatePsfSize
+            self.templatePsfSize = evaluateMeanPsfFwhm(template,
+                                                       fwhmExposureBuffer=fwhmExposureBuffer,
+                                                       fwhmExposureGrid=fwhmExposureGrid
+                                                       )
+            self.sciencePsfSize = evaluateMeanPsfFwhm(science,
+                                                      fwhmExposureBuffer=fwhmExposureBuffer,
+                                                      fwhmExposureGrid=fwhmExposureGrid
+                                                      )
+        self.log.info("Science PSF FWHM: %f pixels", self.sciencePsfSize)
+        self.log.info("Template PSF FWHM: %f pixels", self.templatePsfSize)
+        self.metadata["sciencePsfSize"] = self.sciencePsfSize
+        self.metadata["templatePsfSize"] = self.templatePsfSize
 
         #  Calculate estimated image depths, i.e., limiting magnitudes
-        maglim_science = self._calculateMagLim(science, fallbackPsfSize=sciencePsfSize)
+        maglim_science = self._calculateMagLim(science, fallbackPsfSize=self.sciencePsfSize)
         fluxlim_science = (maglim_science*u.ABmag).to_value(u.nJy)
-        maglim_template = self._calculateMagLim(template, fallbackPsfSize=templatePsfSize)
+        maglim_template = self._calculateMagLim(template, fallbackPsfSize=self.templatePsfSize)
         if np.isnan(maglim_template):
             self.log.info("Cannot evaluate template limiting mag; adopting science limiting mag for diffim")
             maglim_diffim = maglim_science
@@ -428,7 +428,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                                           fwhmExposureBuffer=fwhmExposureBuffer,
                                           fwhmExposureGrid=fwhmExposureGrid)
             if convolveTemplate:
-                if sciencePsfSize < templatePsfSize:
+                if self.sciencePsfSize < self.templatePsfSize:
                     self.log.info("Average template PSF size is greater, "
                                   "but science PSF greater in one dimension: convolving template image.")
                 else:
@@ -505,8 +505,14 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             if self.config.allowKernelSourceDetection:
                 self.log.warning("Error encountered trying to construct the matching kernel"
                                  f" Running source detection and retrying. {e}")
+                kernelSize = self.makeKernel.makeKernelBasisList(
+                    self.templatePsfSize, self.sciencePsfSize)[0].getWidth()
+                sigmaToFwhm = 2*np.log(2*np.sqrt(2))
+                candidateList = self.makeKernel.makeCandidateList(template, science, kernelSize,
+                                                                  candidateList=None,
+                                                                  sigma=self.sciencePsfSize/sigmaToFwhm)
                 kernelSources = self.makeKernel.selectKernelSources(template, science,
-                                                                    candidateList=None,
+                                                                    candidateList=candidateList,
                                                                     preconvolved=False)
                 kernelResult = self.makeKernel.run(template, science, kernelSources,
                                                    preconvolved=False)
