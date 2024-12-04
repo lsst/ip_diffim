@@ -873,9 +873,8 @@ def detectTestSources(exposure, addMaskPlanes=None):
         Source catalog containing candidates
     """
     if addMaskPlanes is None:
-        # add empty streak mask plane in lieu of maskStreaksTask
         # And add empty INJECTED and INJECTED_TEMPLATE mask planes
-        addMaskPlanes = ["STREAK", "INJECTED", "INJECTED_TEMPLATE"]
+        addMaskPlanes = ["INJECTED", "INJECTED_TEMPLATE"]
 
     schema = afwTable.SourceTable.makeMinimalSchema()
 
