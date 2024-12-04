@@ -243,6 +243,8 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         # Set the streak mask along the entire fit line, not only where the
         # detected mask is set.
         self.maskStreaks.onlyMaskDetected = False
+        # Restrict streak masking from growing too large
+        self.maskStreaks.maxStreakWidth = 100
 
 
 class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
