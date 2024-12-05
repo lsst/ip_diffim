@@ -176,7 +176,7 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
                                          dipoleTestImage.yc[i] - offsets[i], rtol=rtol)
             # Note this is dependent on the noise (variance) being realistic in the image.
             # otherwise it throws off the chi2 estimate, which is used for classification:
-            self.assertTrue(result['ip_diffim_DipoleFit_flag_classification'])
+            self.assertTrue(result['ip_diffim_DipoleFit_classification'])
 
             # compare to the original ip_diffim_PsfDipoleFlux measurements
             result2 = r1.extract("ip_diffim_PsfDipoleFlux*")
