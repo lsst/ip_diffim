@@ -121,6 +121,10 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         target=SourceDetectionTask,
         doc="Final source detection for diaSource measurement",
     )
+    streakDetection = pexConfig.ConfigurableField(
+        target=SourceDetectionTask,
+        doc="Separate source detection used only for streak masking",
+    )
     deblend = pexConfig.ConfigurableField(
         target=lsst.meas.deblender.SourceDeblendTask,
         doc="Task to split blended sources into their components."
@@ -240,11 +244,28 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
             "STREAK", "INJECTED", "INJECTED_TEMPLATE"]
         self.skySources.avoidMask = ["DETECTED", "DETECTED_NEGATIVE", "BAD", "NO_DATA", "EDGE"]
 
+        self.streakDetection.thresholdPolarity = "positive"
+        self.streakDetection.minPixels = 50
+        self.streakDetection.nSigmaToGrow = 0  # Do not grow detected mask for streaks
+        self.streakDetection.thresholdValue = 3.0
+        self.streakDetection.thresholdType = "pixel_stdev"
+        self.streakDetection.reEstimateBackground = False
+        self.streakDetection.thresholdType = "variance"
+        self.streakDetection.doTempLocalBackground = False  # No background subtraction, since we want streaks
+        self.streakDetection.excludeMaskPlanes = ["EDGE",
+                                                  "SAT",
+                                                  "BAD",
+                                                  "INTRP",
+                                                  "NO_DATA",
+                                                  ]
         # Set the streak mask along the entire fit line, not only where the
         # detected mask is set.
         self.maskStreaks.onlyMaskDetected = False
         # Restrict streak masking from growing too large
         self.maskStreaks.maxStreakWidth = 100
+        self.maskStreaks.maxFitIter = 10
+        # Only mask to 2 sigma in width
+        self.maskStreaks.nSigmaMask = 2
 
 
 class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
@@ -297,6 +318,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             self.makeSubtask("skySources", schema=self.schema)
         if self.config.doMaskStreaks:
             self.makeSubtask("maskStreaks")
+            self.makeSubtask("streakDetection")
 
         # Check that the schema and config are consistent
         for flag in self.config.badSourceFlags:
@@ -707,8 +729,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         # Rerun detection to set the DETECTED mask plane on binnedExposure
         sigma = difference.psf.computeShape(difference.psf.getAveragePosition()).getDeterminantRadius()
         _table = afwTable.SourceTable.make(afwTable.SourceTable.makeMinimalSchema())
-        self.detection.run(table=_table, exposure=binnedExposure, doSmooth=True,
-                           sigma=sigma/self.config.streakBinFactor)
+        self.streakDetection.run(table=_table, exposure=binnedExposure, doSmooth=True,
+                                 sigma=sigma/self.config.streakBinFactor)
         binnedDetectedMaskPlane = binnedExposure.mask.array & binnedExposure.mask.getPlaneBitMask('DETECTED')
         rescaledDetectedMaskPlane = binnedDetectedMaskPlane.repeat(self.config.streakBinFactor,
                                                                    axis=0).repeat(self.config.streakBinFactor,
