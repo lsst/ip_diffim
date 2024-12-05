@@ -704,10 +704,11 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                                              self.config.streakBinFactor)
         binnedExposure = afwImage.ExposureF(binnedMaskedImage.getBBox())
         binnedExposure.setMaskedImage(binnedMaskedImage)
-        binnedExposure.setPsf(difference.psf)  # exposure must have a PSF
         # Rerun detection to set the DETECTED mask plane on binnedExposure
-        _table = afwTable.SourceTable.make(self.schema)
-        self.detection.run(table=_table, exposure=binnedExposure, doSmooth=True)
+        sigma = difference.psf.computeShape(difference.psf.getAveragePosition()).getDeterminantRadius()
+        _table = afwTable.SourceTable.make(afwTable.SourceTable.makeMinimalSchema())
+        self.detection.run(table=_table, exposure=binnedExposure, doSmooth=True,
+                           sigma=sigma/self.config.streakBinFactor)
         binnedDetectedMaskPlane = binnedExposure.mask.array & binnedExposure.mask.getPlaneBitMask('DETECTED')
         rescaledDetectedMaskPlane = binnedDetectedMaskPlane.repeat(self.config.streakBinFactor,
                                                                    axis=0).repeat(self.config.streakBinFactor,
