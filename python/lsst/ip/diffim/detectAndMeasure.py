@@ -262,6 +262,8 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         self.maskStreaks.onlyMaskDetected = False
         # Restrict streak masking from growing too large
         self.maskStreaks.maxStreakWidth = 100
+        # Restrict the number of iterations allowed for fitting streaks
+        # When the fit is good it should solve quickly, and exit a bad fit quickly
         self.maskStreaks.maxFitIter = 10
         # Only mask to 2 sigma in width
         self.maskStreaks.nSigmaMask = 2
