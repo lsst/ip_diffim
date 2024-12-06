@@ -1041,11 +1041,11 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
             doc="Estimated signal-to-noise of dipole fit")
 
         self.classificationFlagKey = schema.addField(
-            schema.join(name, "classification"), type="Flag",
+            schema.join(name, "flag", "classification"), type="Flag",
             doc="Flag indicating diaSource is classified as a dipole")
 
         self.classificationAttemptedFlagKey = schema.addField(
-            schema.join(name, "classificationAttempted"), type="Flag",
+            schema.join(name, "flag", "classificationAttempted"), type="Flag",
             doc="Flag indicating diaSource was attempted to be classified as a dipole")
 
         self.flagKey = schema.addField(
