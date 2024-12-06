@@ -284,7 +284,7 @@ class SpatiallySampledMetricsTask(lsst.pipe.base.PipelineTask):
         src.setCoord(science.wcs.pixelToSky(peak['i_x'], peak['i_y']))
         selectSources = diaSources[bbox.contains(diaSources.getX(), diaSources.getY())]
         sourceDensity = len(selectSources)/area
-        dipoleSources = selectSources[selectSources["ip_diffim_DipoleFit_classification"]]
+        dipoleSources = selectSources[selectSources["ip_diffim_DipoleFit_flag_classification"]]
         dipoleDensity = len(dipoleSources)/area
 
         if dipoleSources:

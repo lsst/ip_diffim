@@ -360,11 +360,11 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         # Avoid placing sources near the edge for this test, so that we can
         # easily check that the correct number of sources are detected.
         templateBorderSize = kernelSize//2
-        dipoleFlag = "ip_diffim_DipoleFit_classification"
+        dipoleFlag = "ip_diffim_DipoleFit_flag_classification"
         kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel, "fluxRange": fluxRange,
                   "nSrc": nSources, "templateBorderSize": templateBorderSize, "kernelSize": kernelSize,
                   "xSize": xSize, "ySize": ySize}
-        dipoleFlag = "ip_diffim_DipoleFit_classification"
+        dipoleFlag = "ip_diffim_DipoleFit_flag_classification"
         science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
         matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
         difference = science.clone()
@@ -773,7 +773,7 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         # Avoid placing sources near the edge for this test, so that we can
         # easily check that the correct number of sources are detected.
         templateBorderSize = kernelSize//2
-        dipoleFlag = "ip_diffim_DipoleFit_classification"
+        dipoleFlag = "ip_diffim_DipoleFit_flag_classification"
         kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel, "fluxRange": fluxRange,
                   "nSrc": nSources, "templateBorderSize": templateBorderSize, "kernelSize": kernelSize,
                   "xSize": xSize, "ySize": ySize}
