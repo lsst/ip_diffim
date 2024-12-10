@@ -245,12 +245,11 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         self.skySources.avoidMask = ["DETECTED", "DETECTED_NEGATIVE", "BAD", "NO_DATA", "EDGE"]
 
         self.streakDetection.thresholdPolarity = "positive"
-        self.streakDetection.minPixels = 20
+        # self.streakDetection.minPixels = 20
         self.streakDetection.nSigmaToGrow = 0  # Do not grow detected mask for streaks
-        self.streakDetection.thresholdValue = 3.0
+        self.streakDetection.thresholdValue = 5.0
         self.streakDetection.thresholdType = "pixel_stdev"
         self.streakDetection.reEstimateBackground = False
-        self.streakDetection.doTempLocalBackground = False  # No background subtraction, since we want streaks
         self.streakDetection.excludeMaskPlanes = ["EDGE",
                                                   "SAT",
                                                   "BAD",
@@ -267,6 +266,7 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         self.maskStreaks.maxFitIter = 10
         # Only mask to 2 sigma in width
         self.maskStreaks.nSigmaMask = 2
+        self.maskStreaks.absMinimumKernelHeight = 2
 
 
 class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
@@ -741,7 +741,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         # Create new version of a diffim with DETECTED based on binnedExposure
         streakMaskedImage = maskedImage.clone()
         ysize, xsize = rescaledDetectedMaskPlane.shape
-        streakMaskedImage.mask.array[:ysize, :xsize] = rescaledDetectedMaskPlane
+        streakMaskedImage.mask.array[:ysize, :xsize] |= rescaledDetectedMaskPlane
         # Detect streaks on this new version of the diffim
         streaks = self.maskStreaks.run(streakMaskedImage)
         streakMaskPlane = streakMaskedImage.mask.array & streakMaskedImage.mask.getPlaneBitMask('STREAK')
