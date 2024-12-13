@@ -895,6 +895,18 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
         template_good, _ = makeTestImage(psfSize=2.4, doApplyCalibration=True)
         template_bad, _ = makeTestImage(psfSize=9.5, doApplyCalibration=True)
 
+        # Add a few sky objects; sky footprints are needed for some metrics.
+        config = measAlg.SkyObjectsTask.ConfigClass()
+        config.nSources = 3
+        skyTask = measAlg.SkyObjectsTask(config=config, name="skySources")
+        skyTask.skySourceKey = sources.schema["sky_source"].asKey()
+        skyTask.run(science.mask, 10, catalog=sources)
+        sources = sources.copy(deep=True)
+        # Add centroids, since these sources were added post-measurement.
+        for record in sources[sources["sky_source"]]:
+            record["truth_x"] = record.getFootprint().getPeaks()[0].getFx()
+            record["truth_y"] = record.getFootprint().getPeaks()[0].getFy()
+
         # The metadata fields are attached to the subtractTask, so we do
         # need to run that; run it for both "good" and "bad" seeing templates
 
@@ -954,6 +966,10 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
         # Test that several other expected metadata metrics exist
         self.assertIn('scienceLimitingMagnitude', subtractTask_good.metadata)
         self.assertIn('templateLimitingMagnitude', subtractTask_good.metadata)
+
+        # The mean ratio metric should be much worse on the "bad" subtraction.
+        self.assertLess(subtractTask_good.metadata['differenceFootprintRatioMean'], 0.2)
+        self.assertGreater(subtractTask_bad.metadata['differenceFootprintRatioMean'], 1.0)
 
 
 class AlardLuptonPreconvolveSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.TestCase):
