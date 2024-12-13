@@ -370,7 +370,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             Raised if fraction of good pixels, defined as not having NO_DATA
             set, is less then the configured requiredTemplateFraction
         """
-
+        # Save this mask for use in metrics calculations, before we clear it.
+        science_mask = science.mask.clone()
         self._prepareInputs(template, science, visitSummary=visitSummary)
 
         # In the event that getPsfFwhm fails, evaluate the PSF on a grid.
@@ -465,7 +466,30 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             #  checkTemplateIsSufficient did not raise NoWorkFound, so raise original exception
             raise e
 
+        self._variance_metrics(science_mask, subtractResults.difference)
+
         return subtractResults
+
+    def _variance_metrics(self, science_mask, difference):
+        """Compute the variance of the difference image within the DETECTED mask
+        of the science image.
+        """
+        detected = science_mask.array & science_mask.getPlaneBitMask("DETECTED")
+        # use the diffim mask for these, as they could have come from the template
+        interpolated = difference.mask.array & difference.mask.getPlaneBitMask("INTRP")
+        # TODO: I think these aren't necessary, as they would always be interpolated.
+        # bad = difference.mask.array & difference.mask.getPlaneBitMask("BAD")
+        # saturated = difference.mask.array & difference.mask.getPlaneBitMask("SAT")
+        no_data = difference.mask.array & difference.mask.getPlaneBitMask("NO_DATA")
+        nan = difference.mask.array & difference.mask.getPlaneBitMask("UNMASKEDNAN")
+        masked = np.ma.masked_array(difference.image.array,
+                                    mask=(detected == 0) | (interpolated != 0) | (no_data != 0) | (nan != 0))
+
+        self.metadata["differenceMaskedCount"] = masked.count()
+        self.metadata["differenceMaskedMean"] = masked.mean()
+        self.metadata["differenceMaskedMax"] = masked.max()
+        self.metadata["differenceMaskedMin"] = masked.min()
+        self.metadata["differenceMaskedVar"] = masked.var()
 
     def runConvolveTemplate(self, template, science, selectSources):
         """Convolve the template image with a PSF-matching kernel and subtract

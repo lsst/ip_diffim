@@ -895,6 +895,11 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
         template_good, _ = makeTestImage(psfSize=2.4, doApplyCalibration=True)
         template_bad, _ = makeTestImage(psfSize=9.5, doApplyCalibration=True)
 
+        # Mark a single pixel as interpolated in one of the science sources;
+        # this will let us check that the count of pixels that went into the
+        # variance metric is correct.
+        science.mask[sources[0].getCentroid()] |= science.mask.getPlaneBitMask("INTRP")
+
         # The metadata fields are attached to the subtractTask, so we do
         # need to run that; run it for both "good" and "bad" seeing templates
 
@@ -954,6 +959,9 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
         # Test that several other expected metadata metrics exist
         self.assertIn('scienceLimitingMagnitude', subtractTask_good.metadata)
         self.assertIn('templateLimitingMagnitude', subtractTask_good.metadata)
+
+        detected = (science.mask.array & science.mask.getPlaneBitMask("DETECTED") != 0).sum()
+        self.assertEqual(subtractTask_good.metadata['differenceMaskedCount'], detected - 1)
 
 
 class AlardLuptonPreconvolveSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.TestCase):
