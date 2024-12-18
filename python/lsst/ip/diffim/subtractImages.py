@@ -466,30 +466,63 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             #  checkTemplateIsSufficient did not raise NoWorkFound, so raise original exception
             raise e
 
-        self._variance_metrics(science_mask, subtractResults.difference)
+        self._variance_metrics(science, science_mask, subtractResults.difference, sources)
 
         return subtractResults
 
-    def _variance_metrics(self, science_mask, difference):
+    def _variance_metrics(self, science, science_mask, difference, stars):
         """Compute the variance of the difference image within the DETECTED mask
         of the science image.
         """
+        self.log.info("Computing diffim metrics")
         detected = science_mask.array & science_mask.getPlaneBitMask("DETECTED")
         # use the diffim mask for these, as they could have come from the template
+        # TODO: A problem is that the ones that come from the template are expanded too much
         interpolated = difference.mask.array & difference.mask.getPlaneBitMask("INTRP")
         # TODO: I think these aren't necessary, as they would always be interpolated.
         # bad = difference.mask.array & difference.mask.getPlaneBitMask("BAD")
         # saturated = difference.mask.array & difference.mask.getPlaneBitMask("SAT")
         no_data = difference.mask.array & difference.mask.getPlaneBitMask("NO_DATA")
         nan = difference.mask.array & difference.mask.getPlaneBitMask("UNMASKEDNAN")
-        masked = np.ma.masked_array(difference.image.array,
-                                    mask=(detected == 0) | (interpolated != 0) | (no_data != 0) | (nan != 0))
+        diff_masked = np.ma.masked_array(difference.image.array,
+                                         mask=(detected == 0) | (interpolated != 0) | (no_data != 0) | (nan != 0))
+        diff_abs = np.ma.masked_array(np.abs(difference.image.array),
+                                      mask=(detected == 0) | (interpolated != 0) | (no_data != 0) | (nan != 0))
+        science_masked = np.ma.masked_array(science.image.array,
+                                            mask=(detected == 0) | (interpolated != 0) | (no_data != 0) | (nan != 0))
 
-        self.metadata["differenceMaskedCount"] = masked.count()
-        self.metadata["differenceMaskedMean"] = masked.mean()
-        self.metadata["differenceMaskedMax"] = masked.max()
-        self.metadata["differenceMaskedMin"] = masked.min()
-        self.metadata["differenceMaskedVar"] = masked.var()
+        def footprint_mean(sources, sky=0):
+            science_footprint_mean = np.zeros(n)
+            difference_footprint_mean = np.zeros(n)
+            ratio = np.zeros(n)
+            for i, record in enumerate(sources):
+                footprint = record.getFootprint()
+                heavy = lsst.afw.detection.makeHeavyFootprint(footprint, science.maskedImage)
+                heavy_diff = lsst.afw.detection.makeHeavyFootprint(footprint, difference.maskedImage)
+                science_footprint_mean[i] = heavy.getImageArray().mean()
+                difference_footprint_mean[i] = abs(heavy_diff.getImageArray()).mean()
+                ratio[i] = (difference_footprint_mean[i] - sky) / science_footprint_mean[i]
+                return science_footprint_mean, difference_footprint_mean, ratio
+
+        sky = stars["sky_source"]
+        n = len(stars[~sky])
+        sky_science_mean, sky_difference_mean, sky_ratio = footprint_mean(stars[sky])
+        science_footprint_mean, difference_footprint_mean, ratio = footprint_mean(stars[~sky],
+                                                                                  sky_difference_mean.mean())
+
+        self.metadata["differenceMaskedCount"] = int(diff_masked.count())
+        self.metadata["differenceMaskedMean"] = diff_masked.mean()
+        self.metadata["differenceMaskedMax"] = diff_masked.max()
+        self.metadata["differenceMaskedMin"] = diff_masked.min()
+        self.metadata["differenceMaskedVar"] = diff_masked.var()
+        self.metadata["differenceAbsMean"] = diff_abs.mean()
+        self.metadata["differenceScienceMean"] = science_masked.mean()
+        self.metadata["differenceScienceFootprintMean"] = science_footprint_mean.mean()
+        self.metadata["differenceDifferenceFootprintMean"] = difference_footprint_mean.mean()
+        self.metadata["differenceFootprintRatio"] = ratio.mean()
+        self.metadata["differenceScienceSkyMean"] = sky_science_mean.mean()
+        self.metadata["differenceDifferenceSkyMean"] = sky_difference_mean.mean()
+        self.metadata["differenceSkyRatio"] = sky_ratio.mean()
 
     def runConvolveTemplate(self, template, science, selectSources):
         """Convolve the template image with a PSF-matching kernel and subtract
