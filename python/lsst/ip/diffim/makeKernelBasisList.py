@@ -139,10 +139,7 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
           If it's larger than ``config.alardMinSig * config.alardGaussBeta``, make it the
           second kernel. Else make it the smallest kernel, unless only 1 kernel is asked for.
         - If ``referenceFwhmPix < targetFwhmPix`` (deconvolution):
-          Define the progression of Gaussians using a
-          method to derive a deconvolution sum-of-Gaussians from it's
-          convolution counterpart. [1]_ Only use 3 since the algorithm
-          assumes 3 components.
+          Compute the basis list with a significantly smaller ``config.alardMinSig``.
 
     **Metadata fields**
 
@@ -226,82 +223,32 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
         # only 1 kernel is asked for.
         logger.debug("Reference psf fwhm is the greater, normal convolution mode")
         basisMode = "convolution"
-        kernelSigma = np.sqrt(referenceSigma**2 - targetSigma**2)
-        if kernelSigma < basisMinSigma:
-            kernelSigma = basisMinSigma
 
-        basisSigmaGauss = []
-        if basisNGauss == 1:
-            basisSigmaGauss.append(kernelSigma)
-            nAppended = 1
-        else:
-            if (kernelSigma/basisGaussBeta) > basisMinSigma:
-                basisSigmaGauss.append(kernelSigma/basisGaussBeta)
-                basisSigmaGauss.append(kernelSigma)
-                nAppended = 2
-            else:
-                basisSigmaGauss.append(kernelSigma)
-                nAppended = 1
-
-        # Any other Gaussians above basisNGauss=1 come from a scaling
-        # relationship: Sig_i+1 / Sig_i = basisGaussBeta
-        for i in range(nAppended, basisNGauss):
-            basisSigmaGauss.append(basisSigmaGauss[-1]*basisGaussBeta)
-
-        kernelSize = int(fwhmScaling * basisSigmaGauss[-1])
-        kernelSize += 0 if kernelSize%2 else 1  # Make sure it's odd
-        kernelSize = min(config.kernelSizeMax, max(kernelSize, config.kernelSizeMin))
+        basisSigmaGauss = _calculateBasisSigmas(referenceSigma,
+                                                targetSigma,
+                                                basisMinSigma,
+                                                basisGaussBeta,
+                                                basisNGauss,
+                                                )
 
     else:
-        # Deconvolution; Define the progression of Gaussians using a
-        # method to derive a deconvolution sum-of-Gaussians from it's
-        # convolution counterpart.  Only use 3 since the algorithm
-        # assumes 3 components.
-        #
-        # http://iopscience.iop.org/0266-5611/26/8/085002  Equation 40
-
-        # Use specializations for deconvolution
+        # Swap order of reference and target sigmas,
+        #  and potentially allow smaller basis modes.
         logger.debug("Target psf fwhm is the greater, deconvolution mode")
         basisMode = "deconvolution"
-        basisNGauss = config.alardNGaussDeconv
         basisMinSigma = config.alardMinSigDeconv
+        basisSigmaGauss = _calculateBasisSigmas(targetSigma,
+                                                referenceSigma,
+                                                basisMinSigma,
+                                                basisGaussBeta,
+                                                basisNGauss,
+                                                )
 
-        kernelSigma = np.sqrt(targetSigma**2 - referenceSigma**2)
-        if kernelSigma < basisMinSigma:
-            kernelSigma = basisMinSigma
+    basisNGauss = len(basisSigmaGauss)
 
-        basisSigmaGauss = []
-        if (kernelSigma/basisGaussBeta) > basisMinSigma:
-            basisSigmaGauss.append(kernelSigma/basisGaussBeta)
-            basisSigmaGauss.append(kernelSigma)
-            nAppended = 2
-        else:
-            basisSigmaGauss.append(kernelSigma)
-            nAppended = 1
-
-        for i in range(nAppended, basisNGauss):
-            basisSigmaGauss.append(basisSigmaGauss[-1]*basisGaussBeta)
-
-        kernelSize = int(fwhmScaling * basisSigmaGauss[-1])
-        kernelSize += 0 if kernelSize%2 else 1  # Make sure it's odd
-        kernelSize = min(config.kernelSizeMax, max(kernelSize, config.kernelSizeMin))
-
-        # Now build a deconvolution set from these sigmas
-        sig0 = basisSigmaGauss[0]
-        sig1 = basisSigmaGauss[1]
-        sig2 = basisSigmaGauss[2]
-        basisSigmaGauss = []
-        for n in range(1, 3):
-            for j in range(n):
-                sigma2jn = (n - j)*sig1**2
-                sigma2jn += j * sig2**2
-                sigma2jn -= (n + 1)*sig0**2
-                sigmajn = np.sqrt(sigma2jn)
-                basisSigmaGauss.append(sigmajn)
-
-        basisSigmaGauss.sort()
-        basisNGauss = len(basisSigmaGauss)
-        basisDegGauss = [config.alardDegGaussDeconv for x in basisSigmaGauss]
+    kernelSize = int(fwhmScaling * basisSigmaGauss[-1])
+    kernelSize += 0 if kernelSize%2 else 1  # Make sure it's odd
+    kernelSize = min(config.kernelSizeMax, max(kernelSize, config.kernelSizeMin))
 
     if metadata is not None:
         metadata.add("ALBasisNGauss", basisNGauss)
@@ -315,3 +262,43 @@ def generateAlardLuptonBasisList(config, targetFwhmPix=None, referenceFwhmPix=No
                  ','.join(['{:d}'.format(v) for v in basisDegGauss]))
 
     return diffimLib.makeAlardLuptonBasisList(kernelSize//2, basisNGauss, basisSigmaGauss, basisDegGauss)
+
+
+def _calculateBasisSigmas(referenceSigma, targetSigma, basisMinSigma, basisGaussBeta, basisNGauss):
+    """Calculate a series of Gaussian sigmas to use for fitting the matching
+    kernel between the reference and target images.
+
+    Parameters
+    ----------
+    referenceSigma : `float`
+        Sigma (pixel) of the reference exposure characteristic psf.
+    targetSigma : `float`
+        Sigma (pixel) of the science exposure characteristic psf.
+    basisMinSigma : `float`
+        Minimum sigma (pixels) for base Gaussians.
+    basisGaussBeta : `float`
+        Scaling multiplier of base Gaussian sigmas for automated sigma
+        determination
+    basisNGauss : `int`
+        The number of base Gaussians in the AL basis functions.
+
+    Returns
+    -------
+    basisSigmaGauss : `list` of `float`
+        Sigmas (widths) of the basis modes, in pixels.
+    """
+    kernelSigma = np.sqrt(referenceSigma**2 - targetSigma**2)
+    if kernelSigma < basisMinSigma:
+        kernelSigma = basisMinSigma
+
+    # If more than one gaussian is requested and kernelSigma is more than a
+    #  factor of basisGaussBeta larger than the minimum sigma, use
+    #  kernelSigma/basisGaussBeta as the size of the first gaussian.
+    if ((kernelSigma/basisGaussBeta) > basisMinSigma) & (basisNGauss > 1):
+        basisSigmaGauss = [kernelSigma/basisGaussBeta, ]
+    else:
+        basisSigmaGauss = [kernelSigma, ]
+
+    for i in range(1, basisNGauss):
+        basisSigmaGauss.append(basisSigmaGauss[-1]*basisGaussBeta)
+    return basisSigmaGauss

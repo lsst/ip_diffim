@@ -307,7 +307,8 @@ class PsfMatchConfigAL(PsfMatchConfig):
     alardSigGauss = pexConfig.ListField(
         dtype=float,
         doc="Default sigma values in pixels of base Gaussians. "
-            "List length must be `alardNGauss`.",
+            "List length must be `alardNGauss`."
+            "Only used if the template and science image PSFs have equal size.",
         default=(0.7, 1.5, 3.0),
     )
     alardGaussBeta = pexConfig.Field(
@@ -328,7 +329,8 @@ class PsfMatchConfigAL(PsfMatchConfig):
         doc="Used if `scaleByFwhm==True`, degree of spatial modification of ALL base Gaussians "
             "in AL basis during deconvolution",
         default=3,
-        check=lambda x: x >= 1
+        check=lambda x: x >= 1,
+        deprecated="No longer used. Will be removed after v29"
     )
     alardMinSigDeconv = pexConfig.Field(
         dtype=float,
@@ -341,7 +343,8 @@ class PsfMatchConfigAL(PsfMatchConfig):
         dtype=int,
         doc="Used if `scaleByFwhm==True`, number of base Gaussians in AL basis during deconvolution",
         default=3,
-        check=lambda x: x >= 1
+        check=lambda x: x >= 1,
+        deprecated="No longer used. Will be removed after v29"
     )
 
 
