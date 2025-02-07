@@ -520,9 +520,9 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                 footprint = record.getFootprint()
                 heavy = lsst.afw.detection.makeHeavyFootprint(footprint, science.maskedImage)
                 heavy_diff = lsst.afw.detection.makeHeavyFootprint(footprint, difference.maskedImage)
-                science_footprints[i] = heavy.getImageArray().sum()
-                difference_footprints[i] = abs(heavy_diff.getImageArray()).sum()
-                ratio[i] = (difference_footprints[i] - sky) / science_footprints[i]
+                science_footprints[i] = abs(heavy.getImageArray()).mean()
+                difference_footprints[i] = abs(heavy_diff.getImageArray()).mean()
+                ratio[i] = abs((difference_footprints[i] - sky)/science_footprints[i])
             return science_footprints, difference_footprints, ratio
 
         sky = stars["sky_source"]
