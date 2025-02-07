@@ -558,17 +558,21 @@ class GetDcrTemplateTask(GetTemplateTask):
         """
         # Check that the patches actually overlap the detector
         # Exposure's validPolygon would be more accurate
+        if (wcs := inputs['wcs']) is None:
+            raise pipeBase.NoWorkFound("Exposure has no WCS; cannot create a template.")
+
         detectorPolygon = geom.Box2D(inputs["bbox"])
         overlappingArea = 0
         coaddExposureRefList = []
-        dataIds = []
+        dataIds = collections.defaultdict(list)
         patchList = dict()
+        skymap = inputs['skyMap']
         for coaddRef in inputs["dcrCoadds"]:
             dataId = coaddRef.dataId
-            patchWcs = inputs["skyMap"][dataId['tract']].getWcs()
-            patchBBox = inputs["skyMap"][dataId['tract']][dataId['patch']].getOuterBBox()
+            patchWcs = skymap[dataId['tract']].getWcs()
+            patchBBox = skymap[dataId['tract']][dataId['patch']].getOuterBBox()
             patchCorners = patchWcs.pixelToSky(geom.Box2D(patchBBox).getCorners())
-            patchPolygon = afwGeom.Polygon(inputs["wcs"].skyToPixel(patchCorners))
+            patchPolygon = afwGeom.Polygon(wcs.skyToPixel(patchCorners))
             if patchPolygon.intersection(detectorPolygon):
                 overlappingArea += patchPolygon.intersectionSingle(detectorPolygon).calculateArea()
                 self.log.info("Using template input tract=%s, patch=%s, subfilter=%s" %
@@ -578,14 +582,21 @@ class GetDcrTemplateTask(GetTemplateTask):
                     patchList[dataId['tract']].append(dataId['patch'])
                 else:
                     patchList[dataId['tract']] = [dataId['patch'], ]
-                dataIds.append(dataId)
+                dataIds[dataId['tract']].append(dataId)
 
         if not overlappingArea:
             raise pipeBase.NoWorkFound('No patches overlap detector')
 
         self.checkPatchList(patchList)
 
-        coaddExposures = self.getDcrModel(patchList, inputs['dcrCoadds'], inputs['visitInfo'])
+        # coaddExposures = self.getDcrModel(patchList, inputs['dcrCoadds'], inputs['visitInfo'])
+        coaddExposures = dict()
+        for dataId['tract'] in patchList:
+            coaddExposures[dataId['tract']].append(self.getDcrModel(dataId['patch'],
+                                                                    inputs['dcrCoadds'],
+                                                                    inputs['visitInfo']))
+        del inputs['visitInfo']
+        del inputs['dcrCoadds']
         return pipeBase.Struct(coaddExposures=coaddExposures,
                                dataIds=dataIds)
 
