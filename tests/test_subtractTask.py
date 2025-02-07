@@ -891,9 +891,11 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
         that the difference image limiting magnitude is calculated correctly,
         both with a "good" and "bad" seeing template.
         """
-        science, sources = makeTestImage(psfSize=1.8, doApplyCalibration=True)
-        template_good, _ = makeTestImage(psfSize=2.4, doApplyCalibration=True)
-        template_bad, _ = makeTestImage(psfSize=9.5, doApplyCalibration=True)
+        science, sources = makeTestImage(psfSize=2.8, noiseLevel=1)
+        template_good, _ = makeTestImage(psfSize=2.4, doApplyCalibration=True, noiseLevel=0.25,
+                                         templateBorderSize=20)
+        template_bad, _ = makeTestImage(psfSize=9.5, doApplyCalibration=True, noiseLevel=0.25,
+                                        templateBorderSize=20)
 
         # Add a few sky objects; sky footprints are needed for some metrics.
         config = measAlg.SkyObjectsTask.ConfigClass()
@@ -968,8 +970,8 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
         self.assertIn('templateLimitingMagnitude', subtractTask_good.metadata)
 
         # The mean ratio metric should be much worse on the "bad" subtraction.
-        self.assertLess(subtractTask_good.metadata['differenceFootprintRatioMean'], 0.2)
-        self.assertGreater(subtractTask_bad.metadata['differenceFootprintRatioMean'], 1.0)
+        self.assertLess(subtractTask_good.metadata['differenceFootprintRatioMean'], 0.02)
+        self.assertGreater(subtractTask_bad.metadata['differenceFootprintRatioMean'], 0.25)
 
 
 class AlardLuptonPreconvolveSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.TestCase):
