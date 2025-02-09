@@ -545,11 +545,13 @@ class GetDcrTemplateTask(GetTemplateTask):
            A struct with attibutes:
 
            ``coaddExposures``
-               Coadd exposures that overlap the detector (`list`
-               [`lsst.afw.image.Exposure`]).
+               Dict of coadd exposures that overlap the projected bbox,
+               indexed on tract id
+               (`dict` [`int`, `list` [`lsst.afw.image.Exposure`] ]).
            ``dataIds``
-               Data IDs of the coadd exposures that overlap the detector
-               (`list` [`lsst.daf.butler.DataCoordinate`]).
+               Dict of data IDs of the coadd exposures that overlap the
+               projected bbox, indexed on tract id
+               (`dict` [`int`, `list [`lsst.daf.butler.DataCoordinate`] ]).
 
         Raises
         ------
@@ -563,7 +565,6 @@ class GetDcrTemplateTask(GetTemplateTask):
 
         detectorPolygon = geom.Box2D(inputs["bbox"])
         overlappingArea = 0
-        coaddExposureRefList = []
         dataIds = collections.defaultdict(list)
         patchList = dict()
         skymap = inputs['skyMap']
@@ -577,7 +578,6 @@ class GetDcrTemplateTask(GetTemplateTask):
                 overlappingArea += patchPolygon.intersectionSingle(detectorPolygon).calculateArea()
                 self.log.info("Using template input tract=%s, patch=%s, subfilter=%s" %
                               (dataId['tract'], dataId['patch'], dataId["subfilter"]))
-                coaddExposureRefList.append(coaddRef)
                 if dataId['tract'] in patchList:
                     patchList[dataId['tract']].append(dataId['patch'])
                 else:
@@ -589,12 +589,7 @@ class GetDcrTemplateTask(GetTemplateTask):
 
         self.checkPatchList(patchList)
 
-        # coaddExposures = self.getDcrModel(patchList, inputs['dcrCoadds'], inputs['visitInfo'])
-        coaddExposures = dict()
-        for dataId['tract'] in patchList:
-            coaddExposures[dataId['tract']].append(self.getDcrModel(dataId['patch'],
-                                                                    inputs['dcrCoadds'],
-                                                                    inputs['visitInfo']))
+        coaddExposures = self.getDcrModel(patchList, inputs['dcrCoadds'], inputs['visitInfo'])
         del inputs['visitInfo']
         del inputs['dcrCoadds']
         return pipeBase.Struct(coaddExposures=coaddExposures,
@@ -639,7 +634,7 @@ class GetDcrTemplateTask(GetTemplateTask):
         coaddExposures : `list` [`lsst.afw.image.Exposure`]
             Coadd exposures that overlap the detector.
         """
-        coaddExposures = []
+        coaddExposures = collections.defaultdict(list)
         for tract in patchList:
             for patch in set(patchList[tract]):
                 coaddRefList = [coaddRef for coaddRef in coaddRefs
@@ -649,7 +644,7 @@ class GetDcrTemplateTask(GetTemplateTask):
                                                 self.config.effectiveWavelength,
                                                 self.config.bandwidth,
                                                 self.config.numSubfilters)
-                coaddExposures.append(dcrModel.buildMatchedExposure(visitInfo=visitInfo))
+                coaddExposures[tract].append(dcrModel.buildMatchedExposure(visitInfo=visitInfo))
         return coaddExposures
 
 
