@@ -29,6 +29,7 @@ import lsst.geom
 from lsst.ip.diffim import detectAndMeasure, subtractImages
 import lsst.meas.algorithms as measAlg
 from lsst.pipe.base import InvalidQuantumError, UpstreamFailureNoWorkFound
+from lsst.skymap.ringsSkyMap import RingsSkyMap
 import lsst.utils.tests
 import lsst.meas.base.tests
 
@@ -585,11 +586,16 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         science_fake_masked = (science.mask.array & science_fake_bitmask) > 0
         template_fake_masked = (template.mask.array & template_fake_bitmask) > 0
 
+        config = RingsSkyMap.ConfigClass()
+        config.numRings = 3
+        config.tractBuilder = "cells"
+
+        skymap = RingsSkyMap(config=config)
         subtractConfig = subtractImages.AlardLuptonSubtractTask.ConfigClass()
         subtractConfig.sourceSelector.signalToNoise.fluxField = "truth_instFlux"
         subtractConfig.sourceSelector.signalToNoise.errField = "truth_instFluxErr"
         subtractTask = subtractImages.AlardLuptonSubtractTask(config=subtractConfig)
-        subtraction = subtractTask.run(template, science, sources)
+        subtraction = subtractTask.run(template, science, sources, skymap=skymap)
 
         # check subtraction mask plane is set where we set the previous masks
         diff_mask = subtraction.difference.mask
