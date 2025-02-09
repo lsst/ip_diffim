@@ -214,12 +214,13 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         self.detection.thresholdValue = 5.0
         self.detection.reEstimateBackground = False
         self.detection.thresholdType = "pixel_stdev"
-        self.detection.excludeMaskPlanes = ["EDGE",
-                                            "SAT",
-                                            "BAD",
-                                            "INTRP",
-                                            "NO_DATA",
-                                            ]
+        self.detection.excludeMaskPlanes = []
+#        ["EDGE",
+#                                            "SAT",
+#                                            "BAD",
+#                                            "INTRP",
+#                                            "NO_DATA",
+#                                            ]
 
         # Copy configs for binned streak detection from the base detection task
         self.streakDetection.thresholdType = self.detection.thresholdType
@@ -389,13 +390,13 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             doSmooth=True,
         )
 
-        sources, positives, negatives = self._deblend(difference,
-                                                      results.positive,
-                                                      results.negative)
+#        sources, positives, negatives = self._deblend(difference,
+#                                                      results.positive,
+#                                                      results.negative)
 
-        return self.processResults(science, matchedTemplate, difference, sources, idFactory,
-                                   positiveFootprints=positives,
-                                   negativeFootprints=negatives)
+        return self.processResults(science, matchedTemplate, difference, results.sources, idFactory,
+                                   positiveFootprints=results.positive,
+                                   negativeFootprints=results.negative)
 
     def _prepareInputs(self, difference):
         """Ensure that we start with an empty detection and deblended mask.
