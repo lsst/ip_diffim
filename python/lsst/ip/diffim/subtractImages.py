@@ -461,15 +461,18 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
 
                 # boxS = science.getBBox()
                 # boxS = boxS.clippedTo(patchBBox)
-                if convolveTemplate:
-                    subtractResults = self.runConvolveTemplate(template, science, selectSources1)
-                else:
-                    subtractResults = self.runConvolveScience(template, science, selectSources1)
-                patchWeight = patchPolygon.createImage(template.getBBox())
-                patchWeightConvolved = lsst.afw.image.ImageF(template.getBBox())
-                lsst.afw.math.convolve(patchWeightConvolved, patchWeight, science.psf.getKernel(),
-                                       self.convolutionControl)
-                weight = patchWeightConvolved[science.getBBox()].array
+                try:
+                    if convolveTemplate:
+                        subtractResults = self.runConvolveTemplate(template, science, selectSources1)
+                    else:
+                        subtractResults = self.runConvolveScience(template, science, selectSources1)
+                except (RuntimeError, lsst.pex.exceptions.Exception) as e:
+                    self.log.warning(f"Failed to fit patch {patch}: {e}")
+                    continue
+                patchOuterCorners = patch.wcs.pixelToSky(lsst.geom.Box2D(patch.getOuterBBox()).getCorners())
+                patchOuterPolygon = afwGeom.Polygon(template.wcs.skyToPixel(patchOuterCorners))
+                patchWeight = patchOuterPolygon.createImage(template.getBBox())
+                weight = patchWeight[science.getBBox()].array
                 patchWeights.append(weight)
                 matchingKernels.append(subtractResults.psfMatchingKernel)
                 matchedTemplates.append(subtractResults.matchedTemplate)
