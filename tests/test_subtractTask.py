@@ -913,7 +913,7 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
         config.nSources = 3
         skyTask = measAlg.SkyObjectsTask(config=config, name="skySources")
         skyTask.skySourceKey = sources.schema["sky_source"].asKey()
-        skyTask.run(science.mask, 10, catalog=sources, skymap=self.skymap)
+        skyTask.run(science.mask, 10, catalog=sources)
         sources = sources.copy(deep=True)
         # Add centroids, since these sources were added post-measurement.
         for record in sources[sources["sky_source"]]:
