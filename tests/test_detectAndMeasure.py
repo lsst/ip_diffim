@@ -30,6 +30,7 @@ from lsst.ip.diffim import detectAndMeasure, subtractImages
 import lsst.meas.algorithms as measAlg
 from lsst.pipe.base import InvalidQuantumError, UpstreamFailureNoWorkFound
 import lsst.utils.tests
+import lsst.meas.base.tests
 
 from utils import makeTestImage
 
@@ -305,33 +306,9 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         kwargs["nSrc"] = 10
         kwargs["fluxLevel"] = 1000
 
-        blendedKwargs = kwargs
-        blendedKwargs["nSrc"] = 1
-
         # Run detection and check the results
         def _detection_wrapper(positive=True):
             transients, transientSources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=8, **kwargs)
-            # Make a nearby transient source that doesn't fall off the image
-            # so we can test deblending
-            transientsBbox = transients.getBBox()
-            oneSourceX = transientSources[0].getX()
-            oneSourceY = transientSources[0].getY()
-            if oneSourceX < transientsBbox.getCenter()[0]:
-                blendedSourceX = oneSourceX + 10
-            else:
-                blendedSourceX = oneSourceX - 10
-            if oneSourceY < transientsBbox.getCenter()[1]:
-                blendedSourceY = oneSourceY + 10
-            else:
-                blendedSourceY = oneSourceY - 10
-            blendedTransients, blendedTransientSources = makeTestImage(noiseLevel=0,
-                                                                       noiseSeed=8,
-                                                                       xLoc=[blendedSourceX,],
-                                                                       yLoc=[blendedSourceY,],
-                                                                       **blendedKwargs)
-            blendedTransientSources["id"][0] = np.max(transientSources["id"]) + 1
-            transientSources.extend(blendedTransientSources)
-            transients.maskedImage += blendedTransients.maskedImage
             difference = science.clone()
             difference.maskedImage -= matchedTemplate.maskedImage
             if positive:
@@ -346,7 +323,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
             refIds = []
             scale = 1. if positive else -1.
             for diaSource in output.diaSources:
-                self._check_diaSource(transientSources.copy(deep=True), diaSource, refIds=refIds, scale=scale)
+                self._check_diaSource(transientSources, diaSource, refIds=refIds, scale=scale)
         _detection_wrapper(positive=True)
         _detection_wrapper(positive=False)
 
@@ -928,6 +905,62 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
                     self._check_diaSource(transientSources, diaSource, refIds=refIds)
         _detection_wrapper(setFlags=False)
         _detection_wrapper(setFlags=True)
+
+
+class TestNegativePeaks(lsst.utils.tests.TestCase):
+    """Tests of deblending and merging negative peaks, to test fixes for the
+    various problems found on DM-48596.
+    """
+
+    def testDeblendNegatives(self):
+        """Test that negative peaks get deblended and not destroyed: DM-48704.
+        This is only a test of deblending, not of merging.
+        """
+        # Make a science image with one blend of two positive sources, to
+        # subtract from an empty template, resulting in a negative diffim.
+        bbox = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(100, 100))
+        dataset = lsst.meas.base.tests.TestDataset(bbox)
+        delta = 10
+        with dataset.addBlend() as family:
+            family.addChild(instFlux=2E5, centroid=lsst.geom.Point2D(50, 72))
+            family.addChild(instFlux=2.5E5, centroid=lsst.geom.Point2D(50+delta, 74))
+        science, catalog = dataset.realize(noise=1.0,
+                                           schema=lsst.meas.base.tests.TestDataset.makeMinimalSchema())
+        dataset = lsst.meas.base.tests.TestDataset(bbox)
+        template, _ = dataset.realize(noise=1.0,
+                                      schema=lsst.meas.base.tests.TestDataset.makeMinimalSchema())
+        difference = template.clone()
+        difference.image -= science.image
+
+        config = detectAndMeasure.DetectAndMeasureTask.ConfigClass()
+        config.doDeblend = True
+        task = detectAndMeasure.DetectAndMeasureTask(config=config)
+        # prelude steps taken from `detectAndMeasure.run`
+        task._prepareInputs(difference)
+        table = lsst.afw.table.SourceTable.make(task.schema)
+        results = task.detection.run(table=table, exposure=difference, doSmooth=True)
+        # Just run the deblend step so we can check the footprints independently.
+        sources, positives, negatives = task._deblend(difference, results.positive, results.negative)
+
+        # DM-48704 fixed a problem where the peaks were in the footprints, but
+        # the spans were empty.
+        footprints = negatives.getFootprints()
+        self.assertEqual(len(negatives.getFootprints()), 2)
+        self.assertEqual(len(positives.getFootprints()), 0)
+        self.assertGreater(footprints[0].getSpans().getArea(), 0)
+        self.assertGreater(footprints[1].getSpans().getArea(), 0)
+        # Deblended children are HeavyFootprints; we have to make sure the
+        # pixel values in those are correct (though DetectAndMeasureTask
+        # doesn't use the fact that they're Heavy).
+        # The sources are positive in the science image, and negative in the
+        # diffim, so the minimum value in the deblended negative footprint is
+        # the maximum value in the science catalog footprint (ignoring the
+        # noise in the science and template, hence rtol).
+        # (catalog[0] is the parent; we want the children)
+        self.assertFloatsAlmostEqual(footprints[0].getImageArray().min(),
+                                     -catalog[1].getFootprint().getImageArray().max(), rtol=1e-4)
+        self.assertFloatsAlmostEqual(footprints[1].getImageArray().min(),
+                                     -catalog[2].getFootprint().getImageArray().max(), rtol=1e-4)
 
 
 def setup_module(module):
