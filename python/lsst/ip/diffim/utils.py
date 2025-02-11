@@ -516,8 +516,8 @@ def divideExposureByPatches(exposure, skymap, overlapThreshold=0.1):
             patchCandidates.append(patch)
             overlapFraction.append(overlappingArea/area)
 
-    # Sort the patches by overlap fraction, largest last
-    patchCandidates = [p[1] for p in sorted(zip(overlapFraction, patchCandidates), reverse=False)]
+    # Sort the patches by overlap fraction, largest first
+    patchCandidates = [p[1] for p in sorted(zip(overlapFraction, patchCandidates), reverse=True)]
     return patchCandidates
 
 
