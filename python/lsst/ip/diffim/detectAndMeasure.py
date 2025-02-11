@@ -215,10 +215,7 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         self.detection.reEstimateBackground = False
         self.detection.thresholdType = "pixel_stdev"
         self.detection.excludeMaskPlanes = ["EDGE",
-                                            "SAT",
                                             "BAD",
-                                            "INTRP",
-                                            "NO_DATA",
                                             ]
 
         # Copy configs for binned streak detection from the base detection task
