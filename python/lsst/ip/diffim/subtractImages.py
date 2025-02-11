@@ -251,6 +251,12 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
         doc="Re-run source detection for kernel candidates if an error is"
         " encountered while calculating the matching kernel."
     )
+    restrictPsfMatchByPatch = lsst.pex.config.Field(
+        dtype=bool,
+        default=True,
+        doc="Fit the PSF matching kernel independently in each patch of the"
+        " skymap."
+    )
 
     def setDefaults(self):
         self.makeKernel.kernel.name = "AL"
@@ -427,73 +433,22 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             convolveTemplate = False
         else:
             raise RuntimeError("Cannot handle AlardLuptonSubtract mode: %s", self.config.mode)
-        subtractResults = None
-        try:
-            sourceMask = science.mask.clone()
-            sourceMask.array |= template[science.getBBox()].mask.array
-            selectSources = self._sourceSelector(sources, sourceMask)
-            if convolveTemplate:
-                self.metadata["convolvedExposure"] = "Template"
-                # subtractResults = self.runConvolveTemplate(template, science, selectSources)
-            else:
-                self.metadata["convolvedExposure"] = "Science"
-                # subtractResults = self.runConvolveScience(template, science, selectSources)
-            patches = divideExposureByPatches(template, skymap, overlapThreshold=0.1)
-            patchWeights = []
-            matchingKernels = []
-            matchedTemplates = []
-            diffims = []
-            matchedTemplate = np.zeros_like(science.image.array)
-            difference = np.zeros_like(science.image.array)
-            totalWeight = np.zeros_like(science.image.array)
-            # Create a SpatialCellSet with the desired cell size
-            # cellSize = 128  # Adjust this value based on your image scale
-            # spatialCellSet = lsst.afw.math.SpatialCellSet(science.getBBox(), cellSize)
-            # Loop through the overlapping patches, from smallest to largest overlap
-            for patch in patches:
-                patchCorners = patch.wcs.pixelToSky(lsst.geom.Box2D(patch.getInnerBBox()).getCorners())
-                patchPolygon = afwGeom.Polygon(template.wcs.skyToPixel(patchCorners))
-                inds = patchPolygon.contains(selectSources.getX(), selectSources.getY())
-                selectSources1 = selectSources[inds]
-                # patchOuterCorners = patch.wcs.pixelToSky(lsst.geom.Box2D(patch.getOuterBBox()).getCorners())
-                # patchOuterPolygon = afwGeom.Polygon(template.wcs.skyToPixel(patchOuterCorners))
-                # patchBBox = lsst.geom.Box2I(patchOuterPolygon.getBBox())
-                # boxT = template.getBBox()
-                # boxT = boxT.clippedTo(patchBBox)
+        if convolveTemplate:
+            self.metadata["convolvedExposure"] = "Template"
+            convolveMethod = self.runConvolveTemplate
+        else:
+            self.metadata["convolvedExposure"] = "Science"
+            convolveMethod = self.runConvolveScience
+        sourceMask = science.mask.clone()
+        sourceMask.array |= template[science.getBBox()].mask.array
+        selectSources = self._sourceSelector(sources, sourceMask)
 
-                # boxS = science.getBBox()
-                # boxS = boxS.clippedTo(patchBBox)
-                try:
-                    if convolveTemplate:
-                        subtractResults = self.runConvolveTemplate(template, science, selectSources1)
-                    else:
-                        subtractResults = self.runConvolveScience(template, science, selectSources1)
-                except (RuntimeError, lsst.pex.exceptions.Exception) as e:
-                    self.log.warning(f"Failed to fit patch {patch}: {e}")
-                    continue
-                patchOuterCorners = patch.wcs.pixelToSky(lsst.geom.Box2D(patch.getOuterBBox()).getCorners())
-                patchOuterPolygon = afwGeom.Polygon(template.wcs.skyToPixel(patchOuterCorners))
-                patchWeight = patchOuterPolygon.createImage(template.getBBox())
-                weight = patchWeight[science.getBBox()].array
-                patchWeights.append(weight)
-                matchingKernels.append(subtractResults.psfMatchingKernel)
-                matchedTemplates.append(subtractResults.matchedTemplate)
-                diffims.append(subtractResults.difference)
-                matchedTemplate += subtractResults.matchedTemplate.image.array*weight
-                difference += subtractResults.difference.image.array*weight
-                totalWeight += weight
-                # candidate = MyKernelSpatialCellCandidate(patchPolygon, subtractResults.psfMatchingKernel)
-                # spatialCellSet.insertCandidate(candidate)
-            inds = totalWeight > 0
-            matchedTemplate[inds] /= totalWeight[inds]
-            difference[inds] /= totalWeight[inds]
-            # matchedTemplate[~inds] = subtractResults.matchedTemplate.image.array[~inds]
-            # difference[~inds] = subtractResults.difference.image.array[~inds]
-            if subtractResults is None:
-                raise RuntimeError(f"Failed to fit any patch from {patches}")
-            subtractResults.matchedTemplate.image.array = matchedTemplate
-            subtractResults.difference.image.array = difference
-            # subtractResults.psfMatchingKernel = CoaddPsf(spatialCellSet)
+        try:
+            if self.config.restrictPsfMatchByPatch:
+                subtractResults = self.matchPsfByPatch(template, science, selectSources, skymap,
+                                                       convolveMethod)
+            else:
+                subtractResults = convolveMethod(template, science, selectSources)
 
         except (RuntimeError, lsst.pex.exceptions.Exception) as e:
             self.log.warning("Failed to match template. Checking coverage")
@@ -516,6 +471,73 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                       self.metadata["differenceFootprintRatioMean"],
                       self.metadata["differenceFootprintRatioStdev"])
 
+        return subtractResults
+
+    def matchPsfByPatch(self, template, science, sources, skymap, convolveMethod, subtractResults=None):
+        patches = divideExposureByPatches(template, skymap, overlapThreshold=0.1)
+        # patchWeights = []
+        # matchingKernels = []
+        # matchedTemplates = []
+        # diffims = []
+        matchedTemplate = np.zeros_like(science.image.array)
+        difference = np.zeros_like(science.image.array)
+        totalWeight = np.zeros_like(science.image.array)
+
+        templateBorderSize = (template.getBBox().getDimensions()[0] - science.getBBox().getDimensions()[0])//2
+        # Create a SpatialCellSet with the desired cell size
+        # cellSize = 128  # Adjust this value based on your image scale
+        # spatialCellSet = lsst.afw.math.SpatialCellSet(science.getBBox(), cellSize)
+
+        # Loop through the overlapping patches, from largest to smallest overlap
+        for patch in patches:
+            patchCorners = patch.wcs.pixelToSky(lsst.geom.Box2D(patch.getInnerBBox()).getCorners())
+            patchPolygon = afwGeom.Polygon(template.wcs.skyToPixel(patchCorners))
+            inds = patchPolygon.contains(sources.getX(), sources.getY())
+            selectSources = sources[inds]
+            patchOuterCorners = patch.wcs.pixelToSky(lsst.geom.Box2D(patch.getOuterBBox()).getCorners())
+            patchOuterPolygon = afwGeom.Polygon(template.wcs.skyToPixel(patchOuterCorners))
+            patchBBox = lsst.geom.Box2I(patchOuterPolygon.getBBox())
+            boxS = science.getBBox()
+            if subtractResults is None:
+                boxT = template.getBBox()
+                firstPatch = True
+            else:
+                boxT = boxS.clippedTo(patchBBox)
+                boxT.grow(templateBorderSize)
+                boxS = boxS.clippedTo(patchBBox)
+                firstPatch = False
+            try:
+                subtractResults1 = convolveMethod(template[boxT], science[boxS], selectSources)
+            except (RuntimeError, lsst.pex.exceptions.Exception) as e:
+                self.log.warning(f"Failed to fit patch {patch}: {e}")
+                continue
+            weight = patchOuterPolygon.createImage(boxS).array
+            box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), boxS.getDimensions())
+            # weight = patchWeight[science.getBBox()].array
+            # patchWeights.append(weight)
+            # matchingKernels.append(subtractResults.psfMatchingKernel)
+            # matchedTemplates.append(subtractResults.matchedTemplate)
+            # diffims.append(subtractResults.difference)
+            if firstPatch:
+                notInPatch = weight < 1
+                weight[notInPatch] += 0.05
+                subtractResults = subtractResults1
+            matchedTemplate[box.getSlices()] += subtractResults.matchedTemplate.image.array*weight
+            difference[box.getSlices()] += subtractResults.difference.image.array*weight
+            totalWeight[box.getSlices()] += weight
+            # candidate = MyKernelSpatialCellCandidate(patchPolygon, subtractResults.psfMatchingKernel)
+            # spatialCellSet.insertCandidate(candidate)
+        if subtractResults is None:
+            raise RuntimeError(f"Failed to fit any patch from {patches}")
+
+        inds = totalWeight > 0
+        matchedTemplate[inds] /= totalWeight[inds]
+        difference[inds] /= totalWeight[inds]
+        # matchedTemplate[~inds] = subtractResults.matchedTemplate.image.array[~inds]
+        # difference[~inds] = subtractResults.difference.image.array[~inds]
+        subtractResults.matchedTemplate.image.array = matchedTemplate
+        subtractResults.difference.image.array = difference
+        # subtractResults.psfMatchingKernel = CoaddPsf(spatialCellSet)
         return subtractResults
 
     def runConvolveTemplate(self, template, science, selectSources):
