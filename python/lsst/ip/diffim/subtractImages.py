@@ -445,8 +445,13 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
 
         try:
             if self.config.restrictPsfMatchByPatch:
-                subtractResults = self.matchPsfByPatch(template, science, selectSources, skymap,
-                                                       convolveMethod)
+                try:
+                    subtractResults = self.matchPsfByPatch(template, science, selectSources, skymap,
+                                                           convolveMethod)
+
+                except (RuntimeError, lsst.pex.exceptions.Exception) as e:
+                    self.log.warning(f"Error while running per patch: {e}")
+                    subtractResults = convolveMethod(template, science, selectSources)
             else:
                 subtractResults = convolveMethod(template, science, selectSources)
 
