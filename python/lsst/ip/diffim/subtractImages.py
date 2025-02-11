@@ -506,13 +506,15 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                 boxT.grow(templateBorderSize)
                 boxS = boxS.clippedTo(patchBBox)
                 firstPatch = False
-            try:
-                subtractResults1 = convolveMethod(template[boxT], science[boxS], selectSources)
-            except (RuntimeError, lsst.pex.exceptions.Exception) as e:
-                self.log.warning(f"Failed to fit patch {patch}: {e}")
-                continue
+            # try:
+            subtractResultsPatch = convolveMethod(template[boxT], science[boxS], selectSources)
+            # except (RuntimeError, lsst.pex.exceptions.Exception) as e:
+            #     self.log.warning(f"Failed to fit patch {patch}: {e}")
+            #     continue
             weight = patchOuterPolygon.createImage(boxS).array
-            box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), boxS.getDimensions())
+            arrayBegin = lsst.geom.Point2I(0, 0)
+            arrayBegin.shift(boxS.getBegin() - science.getBBox().getBegin())
+            box = lsst.geom.Box2I(arrayBegin, boxS.getDimensions())
             # weight = patchWeight[science.getBBox()].array
             # patchWeights.append(weight)
             # matchingKernels.append(subtractResults.psfMatchingKernel)
@@ -521,9 +523,9 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             if firstPatch:
                 notInPatch = weight < 1
                 weight[notInPatch] += 0.05
-                subtractResults = subtractResults1
-            matchedTemplate[box.getSlices()] += subtractResults.matchedTemplate.image.array*weight
-            difference[box.getSlices()] += subtractResults.difference.image.array*weight
+                subtractResults = subtractResultsPatch
+            matchedTemplate[box.getSlices()] += subtractResultsPatch.matchedTemplate.image.array*weight
+            difference[box.getSlices()] += subtractResultsPatch.difference.image.array*weight
             totalWeight[box.getSlices()] += weight
             # candidate = MyKernelSpatialCellCandidate(patchPolygon, subtractResults.psfMatchingKernel)
             # spatialCellSet.insertCandidate(candidate)
