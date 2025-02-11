@@ -427,6 +427,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             convolveTemplate = False
         else:
             raise RuntimeError("Cannot handle AlardLuptonSubtract mode: %s", self.config.mode)
+        subtractResults = None
         try:
             sourceMask = science.mask.clone()
             sourceMask.array |= template[science.getBBox()].mask.array
@@ -488,6 +489,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             difference[inds] /= totalWeight[inds]
             # matchedTemplate[~inds] = subtractResults.matchedTemplate.image.array[~inds]
             # difference[~inds] = subtractResults.difference.image.array[~inds]
+            if subtractResults is None:
+                raise RuntimeError(f"Failed to fit any patch from {patches}")
             subtractResults.matchedTemplate.image.array = matchedTemplate
             subtractResults.difference.image.array = difference
             # subtractResults.psfMatchingKernel = CoaddPsf(spatialCellSet)
