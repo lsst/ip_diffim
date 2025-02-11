@@ -125,6 +125,11 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         target=SourceDetectionTask,
         doc="Separate source detection used only for streak masking",
     )
+    doDeblend = pexConfig.Field(
+        dtype=bool,
+        default=False,
+        doc="Deblend DIASources after detection?"
+    )
     deblend = pexConfig.ConfigurableField(
         target=lsst.meas.deblender.SourceDeblendTask,
         doc="Task to split blended sources into their components."
@@ -215,10 +220,7 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         self.detection.reEstimateBackground = False
         self.detection.thresholdType = "pixel_stdev"
         self.detection.excludeMaskPlanes = ["EDGE",
-                                            "SAT",
                                             "BAD",
-                                            "INTRP",
-                                            "NO_DATA",
                                             ]
 
         # Copy configs for binned streak detection from the base detection task
@@ -282,7 +284,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
         self.algMetadata = dafBase.PropertyList()
         self.makeSubtask("detection", schema=self.schema)
-        self.makeSubtask("deblend", schema=self.schema)
+        if self.config.doDeblend:
+            self.makeSubtask("deblend", schema=self.schema)
         self.makeSubtask("setPrimaryFlags", schema=self.schema, isSingleFrame=True)
         self.makeSubtask("measurement", schema=self.schema,
                          algMetadata=self.algMetadata)
@@ -389,13 +392,21 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             doSmooth=True,
         )
 
-        sources, positives, negatives = self._deblend(difference,
-                                                      results.positive,
-                                                      results.negative)
+        if self.config.doDeblend:
+            sources, positives, negatives = self._deblend(difference,
+                                                          results.positive,
+                                                          results.negative)
 
-        return self.processResults(science, matchedTemplate, difference, sources, idFactory,
-                                   positiveFootprints=positives,
-                                   negativeFootprints=negatives)
+            return self.processResults(science, matchedTemplate, difference,
+                                       sources, idFactory,
+                                       positiveFootprints=positives,
+                                       negativeFootprints=negatives)
+
+        else:
+            return self.processResults(science, matchedTemplate, difference,
+                                       results.sources, idFactory,
+                                       positiveFootprints=results.positive,
+                                       negativeFootprints=results.negative)
 
     def _prepareInputs(self, difference):
         """Ensure that we start with an empty detection and deblended mask.
@@ -859,9 +870,18 @@ class DetectAndMeasureScoreTask(DetectAndMeasureTask):
         # Copy the detection mask from the Score image to the difference image
         difference.mask.assign(scoreExposure.mask, scoreExposure.getBBox())
 
-        sources, positives, negatives = self._deblend(difference,
-                                                      results.positive,
-                                                      results.negative)
+        if self.config.doDeblend:
+            sources, positives, negatives = self._deblend(difference,
+                                                          results.positive,
+                                                          results.negative)
 
-        return self.processResults(science, matchedTemplate, difference, sources, idFactory,
-                                   positiveFootprints=positives, negativeFootprints=negatives)
+            return self.processResults(science, matchedTemplate, difference,
+                                       sources, idFactory,
+                                       positiveFootprints=positives,
+                                       negativeFootprints=negatives)
+
+        else:
+            return self.processResults(science, matchedTemplate, difference,
+                                       results.sources, idFactory,
+                                       positiveFootprints=results.positive,
+                                       negativeFootprints=results.negative)
