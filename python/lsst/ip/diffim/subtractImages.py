@@ -28,9 +28,10 @@ import lsst.afw.image
 import lsst.afw.math
 import lsst.geom
 from lsst.ip.diffim.utils import (evaluateMeanPsfFwhm, getPsfFwhm, computeDifferenceImageMetrics,
-                                  divideExposureByPatches, MyKernelSpatialCellCandidate,
+                                  divideExposureByPatches,
                                   )
-from lsst.meas.algorithms import ScaleVarianceTask, ScienceSourceSelectorTask, SpatialCellSet, makeCoaddPsf
+from lsst.meas.algorithms import ScaleVarianceTask, ScienceSourceSelectorTask
+
 import lsst.pex.config
 import lsst.pipe.base
 import lsst.pex.exceptions
@@ -445,8 +446,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             difference = np.zeros_like(science.image.array)
             totalWeight = np.zeros_like(science.image.array)
             # Create a SpatialCellSet with the desired cell size
-            cellSize = 128  # Adjust this value based on your image scale
-            spatialCellSet = SpatialCellSet(science.getBBox(), cellSize)
+            # cellSize = 128  # Adjust this value based on your image scale
+            # spatialCellSet = lsst.afw.math.SpatialCellSet(science.getBBox(), cellSize)
             # Loop through the overlapping patches, from smallest to largest overlap
             for patch in patches:
                 patchCorners = patch.wcs.pixelToSky(lsst.geom.Box2D(patch.getInnerBBox()).getCorners())
@@ -480,16 +481,16 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                 matchedTemplate += subtractResults.matchedTemplate.image.array*weight
                 difference += subtractResults.difference.image.array*weight
                 totalWeight += weight
-                candidate = MyKernelSpatialCellCandidate(patchPolygon, subtractResults.psfMatchingKernel)
-                spatialCellSet.insertCandidate(candidate)
+                # candidate = MyKernelSpatialCellCandidate(patchPolygon, subtractResults.psfMatchingKernel)
+                # spatialCellSet.insertCandidate(candidate)
             inds = totalWeight > 0
             matchedTemplate[inds] /= totalWeight[inds]
             difference[inds] /= totalWeight[inds]
-            matchedTemplate[~inds] = subtractResults.matchedTemplate.image.array[~inds]
-            difference[~inds] = subtractResults.difference.image.array[~inds]
+            # matchedTemplate[~inds] = subtractResults.matchedTemplate.image.array[~inds]
+            # difference[~inds] = subtractResults.difference.image.array[~inds]
             subtractResults.matchedTemplate.image.array = matchedTemplate
             subtractResults.difference.image.array = difference
-            subtractResults.psfMatchingKernel = makeCoaddPsf(spatialCellSet)
+            # subtractResults.psfMatchingKernel = CoaddPsf(spatialCellSet)
 
         except (RuntimeError, lsst.pex.exceptions.Exception) as e:
             self.log.warning("Failed to match template. Checking coverage")

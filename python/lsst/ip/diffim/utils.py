@@ -34,7 +34,6 @@ import lsst.afw.detection as afwDetection
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
-from lsst.meas.algorithms import SpatialCellCandidate
 from lsst.pex.exceptions import InvalidParameterError, RangeError
 import lsst.pipe.base
 from lsst.utils.logging import getLogger
@@ -503,7 +502,7 @@ def divideExposureByPatches(exposure, skymap, overlapThreshold=0.1):
             tractCheck = tractInfo.contains(exposure.wcs.pixelToSky(detectorPolygon.getCenter()))
             tractContainsList.append(tractCheck)
         tractUse = np.argmax(tractContainsList)
-        
+
     tractInfo, patchList = tractList.pop(tractUse)
     for patch in patchList:
         # Switch to using the inner BBox
@@ -516,13 +515,13 @@ def divideExposureByPatches(exposure, skymap, overlapThreshold=0.1):
         if overlappingArea/area >= overlapThreshold:
             patchCandidates.append(patch)
             overlapFraction.append(overlappingArea/area)
-    
+
     # Sort the patches by overlap fraction, largest last
     patchCandidates = [p[1] for p in sorted(zip(overlapFraction, patchCandidates), reverse=False)]
     return patchCandidates
 
 
-class MyKernelSpatialCellCandidate(SpatialCellCandidate):
+class MyKernelSpatialCellCandidate(afwMath.SpatialCellCandidate):
     def __init__(self, region, kernel):
         """Initialize with position, region, and kernel.
 
