@@ -155,7 +155,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         difference = science.clone()
 
         # Configure the detection Task
-        detectionTask = self._setup_detection()
+        detectionTask = self._setup_detection(doDeblend=True)
 
         # Run detection and check the results
         output = detectionTask.run(science, matchedTemplate, difference,
@@ -165,6 +165,12 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         # Catalog ids should be very large from this id generator.
         self.assertTrue(all(output.diaSources['id'] > 1000000000))
         self.assertImagesEqual(subtractedMeasuredExposure.image, difference.image)
+
+        # all of the sources should have been detected
+        self.assertEqual(len(output.diaSources), len(sources))
+        refIds = []
+        for source in sources:
+            self._check_diaSource(output.diaSources, source, refIds=refIds)
 
     def test_raise_bad_psf(self):
         """Detection should raise if the PSF width is NaN
@@ -647,7 +653,7 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         score = subtractTask._convolveExposure(difference, scienceKernel, subtractTask.convolutionControl)
 
         # Configure the detection Task
-        detectionTask = self._setup_detection()
+        detectionTask = self._setup_detection(doDeblend=True)
 
         # Run detection and check the results
         output = detectionTask.run(science, matchedTemplate, difference, score,
@@ -658,6 +664,16 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         subtractedMeasuredExposure = output.subtractedMeasuredExposure
 
         self.assertImagesEqual(subtractedMeasuredExposure.image, difference.image)
+
+        # Not all of the sources will be detected: preconvolution results in
+        # a larger edge mask, so we miss an edge source.
+        self.assertEqual(len(output.diaSources), len(sources)-1)
+        # TODO DM-41496: restore this block once we handle detections on edge
+        # pixels better; at least one of these sources currently has a bad
+        # centroid because most of the source is rejected as EDGE.
+        # refIds = []
+        # for source in sources:
+        #     self._check_diaSource(output.diaSources, source, refIds=refIds)
 
     def test_measurements_finite(self):
         """Measured fluxes and centroids should always be finite.
