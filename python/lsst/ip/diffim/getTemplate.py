@@ -68,7 +68,8 @@ class GetTemplateConnections(pipeBase.PipelineTaskConnections,
         storageClass="ExposureF",
         name="{fakesType}{coaddName}Coadd{warpTypeSuffix}",
         multiple=True,
-        deferLoad=True
+        deferLoad=True,
+        deferGraphConstraint=True
     )
 
     template = pipeBase.connectionTypes.Output(
