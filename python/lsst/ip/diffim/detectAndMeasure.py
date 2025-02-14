@@ -399,14 +399,18 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
             return self.processResults(science, matchedTemplate, difference,
                                        sources, idFactory,
-                                       positiveFootprints=positives,
-                                       negativeFootprints=negatives)
+                                       positives=positives,
+                                       negatives=negatives)
 
         else:
+            positives = afwTable.SourceCatalog(self.schema)
+            results.positive.makeSources(positives)
+            negatives = afwTable.SourceCatalog(self.schema)
+            results.negative.makeSources(negatives)
             return self.processResults(science, matchedTemplate, difference,
                                        results.sources, idFactory,
-                                       positiveFootprints=results.positive,
-                                       negativeFootprints=results.negative)
+                                       positives=positives,
+                                       negatives=negatives)
 
     def _prepareInputs(self, difference):
         """Ensure that we start with an empty detection and deblended mask.
@@ -434,7 +438,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         mask &= ~mask.getPlaneBitMask(self.config.clearMaskPlanes)
 
     def processResults(self, science, matchedTemplate, difference, sources, idFactory,
-                       positiveFootprints=None, negativeFootprints=None,):
+                       positives=None, negatives=None,):
         """Measure and process the results of source detection.
 
         Parameters
@@ -451,9 +455,9 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         idFactory : `lsst.afw.table.IdFactory`
             Generator object used to assign ids to detected sources in the
             difference image.
-        positiveFootprints : `lsst.afw.detection.FootprintSet`, optional
+        positives : `lsst.afw.table.SourceCatalog`, optional
             Positive polarity footprints.
-        negativeFootprints : `lsst.afw.detection.FootprintSet`, optional
+        negatives : `lsst.afw.table.SourceCatalog`, optional
             Negative polarity footprints.
 
         Returns
@@ -467,11 +471,22 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         """
         self.metadata["nUnmergedDiaSources"] = len(sources)
         if self.config.doMerge:
-            fpSet = positiveFootprints
-            fpSet.merge(negativeFootprints, self.config.growFootprint,
-                        self.config.growFootprint, False)
-            initialDiaSources = afwTable.SourceCatalog(self.schema)
-            fpSet.makeSources(initialDiaSources)
+            # preserve peak schema, if there are any footprints
+            if len(positives) > 0:
+                schema = positives[0].getFootprint().peaks.schema
+            elif len(negatives) > 0:
+                schema = negatives[0].getFootprint().peaks.schema
+            else:
+                schema = afwDetection.PeakTable.makeMinimalSchema()
+            mergeList = lsst.afw.detection.FootprintMergeList(afwTable.SourceTable.makeMinimalSchema(),
+                                                              ["positive", "negative"], schema)
+            initialDiaSources = lsst.afw.table.SourceCatalog(positives.schema)
+            # Start with positive, as FootprintMergeList will self-merge the
+            # subsequent added catalogs, and we want to try to preserve
+            # deblended positive sources.
+            mergeList.addCatalog(initialDiaSources.table, positives, "positive", minNewPeakDist=0)
+            mergeList.addCatalog(initialDiaSources.table, negatives, "negative", minNewPeakDist=0)
+            mergeList.getFinalSources(initialDiaSources)
             self.log.info("Merging detections into %d sources", len(initialDiaSources))
         else:
             initialDiaSources = sources
@@ -528,14 +543,10 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         -------
         sources : `lsst.afw.table.SourceCatalog`
             Positive and negative deblended children.
-        positives, negatives : `lsst.afw.detection.FootprintSet`
-            Deblended positive and negative polarity footprints measured on
-            ``difference``.
+        positives, negatives : `lsst.afw.table.SourceCatalog`
+            Deblended positive and negative polarity sources with footprints
+            detected on ``difference``.
         """
-        def makeFootprints(sources):
-            footprints = afwDetection.FootprintSet(difference.getBBox())
-            footprints.setFootprints([src.getFootprint() for src in sources])
-            return footprints
 
         def deblend(footprints, negative=False):
             """Deblend a positive or negative footprint set,
@@ -580,7 +591,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         sources.reserve(len(positives) + len(negatives))
         sources.extend(positives, deep=True)
         sources.extend(negatives, deep=True)
-        return sources, makeFootprints(positives), makeFootprints(negatives)
+        return sources, positives, negatives
 
     def _removeBadSources(self, diaSources):
         """Remove unphysical diaSources from the catalog.
@@ -877,11 +888,15 @@ class DetectAndMeasureScoreTask(DetectAndMeasureTask):
 
             return self.processResults(science, matchedTemplate, difference,
                                        sources, idFactory,
-                                       positiveFootprints=positives,
-                                       negativeFootprints=negatives)
+                                       positives=positives,
+                                       negatives=negatives)
 
         else:
+            positives = afwTable.SourceCatalog(self.schema)
+            results.positive.makeSources(positives)
+            negatives = afwTable.SourceCatalog(self.schema)
+            results.negative.makeSources(negatives)
             return self.processResults(science, matchedTemplate, difference,
                                        results.sources, idFactory,
-                                       positiveFootprints=results.positive,
-                                       negativeFootprints=results.negative)
+                                       positives=positives,
+                                       negatives=negatives)

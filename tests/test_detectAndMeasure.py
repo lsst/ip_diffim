@@ -155,7 +155,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         difference = science.clone()
 
         # Configure the detection Task
-        detectionTask = self._setup_detection()
+        detectionTask = self._setup_detection(doDeblend=True)
 
         # Run detection and check the results
         output = detectionTask.run(science, matchedTemplate, difference,
@@ -165,6 +165,12 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         # Catalog ids should be very large from this id generator.
         self.assertTrue(all(output.diaSources['id'] > 1000000000))
         self.assertImagesEqual(subtractedMeasuredExposure.image, difference.image)
+
+        # all of the sources should have been detected
+        self.assertEqual(len(output.diaSources), len(sources))
+        refIds = []
+        for source in sources:
+            self._check_diaSource(output.diaSources, source, refIds=refIds)
 
     def test_raise_bad_psf(self):
         """Detection should raise if the PSF width is NaN
@@ -647,7 +653,7 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         score = subtractTask._convolveExposure(difference, scienceKernel, subtractTask.convolutionControl)
 
         # Configure the detection Task
-        detectionTask = self._setup_detection()
+        detectionTask = self._setup_detection(doDeblend=True)
 
         # Run detection and check the results
         output = detectionTask.run(science, matchedTemplate, difference, score,
@@ -658,6 +664,16 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         subtractedMeasuredExposure = output.subtractedMeasuredExposure
 
         self.assertImagesEqual(subtractedMeasuredExposure.image, difference.image)
+
+        # Not all of the sources will be detected: preconvolution results in
+        # a larger edge mask, so we miss an edge source.
+        self.assertEqual(len(output.diaSources), len(sources)-1)
+        # TODO DM-41496: restore this block once we handle detections on edge
+        # pixels better; at least one of these sources currently has a bad
+        # centroid because most of the source is rejected as EDGE.
+        # refIds = []
+        # for source in sources:
+        #     self._check_diaSource(output.diaSources, source, refIds=refIds)
 
     def test_measurements_finite(self):
         """Measured fluxes and centroids should always be finite.
@@ -944,11 +960,10 @@ class TestNegativePeaks(lsst.utils.tests.TestCase):
 
         # DM-48704 fixed a problem where the peaks were in the footprints, but
         # the spans were empty.
-        footprints = negatives.getFootprints()
-        self.assertEqual(len(negatives.getFootprints()), 2)
-        self.assertEqual(len(positives.getFootprints()), 0)
-        self.assertGreater(footprints[0].getSpans().getArea(), 0)
-        self.assertGreater(footprints[1].getSpans().getArea(), 0)
+        self.assertEqual(len(negatives), 2)
+        self.assertEqual(len(positives), 0)
+        self.assertGreater(negatives[0].getFootprint().getSpans().getArea(), 0)
+        self.assertGreater(negatives[1].getFootprint().getSpans().getArea(), 0)
         # Deblended children are HeavyFootprints; we have to make sure the
         # pixel values in those are correct (though DetectAndMeasureTask
         # doesn't use the fact that they're Heavy).
@@ -957,10 +972,79 @@ class TestNegativePeaks(lsst.utils.tests.TestCase):
         # the maximum value in the science catalog footprint (ignoring the
         # noise in the science and template, hence rtol).
         # (catalog[0] is the parent; we want the children)
-        self.assertFloatsAlmostEqual(footprints[0].getImageArray().min(),
+        self.assertFloatsAlmostEqual(negatives[0].getFootprint().getImageArray().min(),
                                      -catalog[1].getFootprint().getImageArray().max(), rtol=1e-4)
-        self.assertFloatsAlmostEqual(footprints[1].getImageArray().min(),
+        self.assertFloatsAlmostEqual(negatives[1].getFootprint().getImageArray().min(),
                                      -catalog[2].getFootprint().getImageArray().max(), rtol=1e-4)
+
+    def testMergeFootprints(self):
+        """Test that merging footprints does not cause negative ones to
+        disappear (e.g. get merged into non-connected footprints).
+        """
+        # Make a science image with multiple blends, designed to trigger the
+        # negative-footprint-related bug in `FootprintSet.merge`.
+        bbox = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(400, 200))
+        dataset = lsst.meas.base.tests.TestDataset(bbox)
+        dataset.addSource(instFlux=.5E5, centroid=lsst.geom.Point2D(25, 26))
+        dataset.addSource(instFlux=.7E5, centroid=lsst.geom.Point2D(75, 24),
+                          shape=lsst.afw.geom.Quadrupole(12, 7, 2))
+        delta = 10
+        with dataset.addBlend() as family:
+            family.addChild(instFlux=1E5, centroid=lsst.geom.Point2D(150, 72))
+            family.addChild(instFlux=1.5E5, centroid=lsst.geom.Point2D(150+delta, 74))
+        with dataset.addBlend() as family:
+            family.addChild(instFlux=2E5, centroid=lsst.geom.Point2D(250, 72))
+            family.addChild(instFlux=2.5E5, centroid=lsst.geom.Point2D(250+delta, 74))
+        with dataset.addBlend() as family:
+            family.addChild(instFlux=3E5, centroid=lsst.geom.Point2D(350, 72))
+            family.addChild(instFlux=3.5E5, centroid=lsst.geom.Point2D(350+delta, 74))
+        dataset.addSource(instFlux=4E5, centroid=lsst.geom.Point2D(75, 124))
+        dataset.addSource(instFlux=5E5, centroid=lsst.geom.Point2D(175, 124))
+        template, catalog = dataset.realize(noise=100.0,
+                                            schema=lsst.meas.base.tests.TestDataset.makeMinimalSchema())
+        # These will be positive sources on the diffim.
+        template.image.subset(lsst.geom.Box2I(lsst.geom.Point2I(15, 15),
+                                              lsst.geom.Point2I(35, 35))).array *= -1
+        template.image.subset(lsst.geom.Box2I(lsst.geom.Point2I(230, 60),
+                                              lsst.geom.Point2I(270, 85))).array *= -1
+        dataset = lsst.meas.base.tests.TestDataset(bbox)
+        science, _ = dataset.realize(noise=100.0,
+                                     schema=lsst.meas.base.tests.TestDataset.makeMinimalSchema())
+        difference = science.clone()
+        difference.image -= template.image
+
+        config = detectAndMeasure.DetectAndMeasureTask.ConfigClass()
+        config.doDeblend = True
+        task = detectAndMeasure.DetectAndMeasureTask(config=config)
+        result = task.run(science, template, difference)
+
+        # The original bug manifested as the (175,124) source disappaering in
+        # the merge step, and being included in the peaks of a duplicated
+        # (75,124) source, even though their footprints are not connected.
+        mask = np.isclose(result.diaSources["slot_Centroid_x"], 75) & \
+            np.isclose(result.diaSources["slot_Centroid_y"], 124)
+        self.assertEqual(mask.sum(), 1)
+        peaks = result.diaSources[mask][0].getFootprint().peaks
+        self.assertEqual(len(peaks), 1)
+        self.assertEqual(peaks[0].getIx(), 75)
+        self.assertEqual(peaks[0].getIy(), 124)
+
+        mask = np.isclose(result.diaSources["slot_Centroid_x"], 175) & \
+            np.isclose(result.diaSources["slot_Centroid_y"], 124)
+        self.assertEqual(mask.sum(), 1)
+        peaks = result.diaSources[mask][0].getFootprint().peaks
+        self.assertEqual(len(peaks), 1)
+        self.assertEqual(peaks[0].getIx(), 175)
+        self.assertEqual(peaks[0].getIy(), 124)
+
+        # This checks that all the returned footprints have exactly one peak;
+        # it's a more general test than the above, but I'm keeping that for
+        # the more explicit test of the original bugged sources.
+        peak_x = np.array([peak['f_x'] for src in result.diaSources for peak in src.getFootprint().peaks])
+        peak_y = np.array([peak['f_y'] for src in result.diaSources for peak in src.getFootprint().peaks])
+        peaks = np.column_stack((peak_x, peak_y))
+        unique_peaks, counts = np.unique(peaks, axis=0, return_counts=True)
+        self.assertEqual(np.sum(counts > 1), 0)
 
 
 def setup_module(module):
