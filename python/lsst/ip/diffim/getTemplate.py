@@ -270,6 +270,37 @@ class GetTemplateTask(pipeBase.PipelineTask):
 
         return pipeBase.Struct(coaddExposures=coaddExposures, dataIds=dataIds)
 
+    def checkPatch(self, coaddPatch, dataId):
+        """Check for invalid pixels in the coadd and raise warning if value is
+        non-zero.
+
+        Parameters
+        ----------
+        coaddPatch: `dict` [`int`, `list` [`lsst.afw.image.Exposure`]]
+            Coadd to be mosaicked, indexed on tract id.
+        dataId: `dict` [`int`, `list` [`lsst.daf.butler.DataCoordinate`]]
+            Record of the tract and patch of coaddPatch, indexed on
+            tract id.
+
+        Raises
+        ------
+        Warning
+            If invalid pixels are found in the coadd.
+        """
+        bad = np.logical_not(np.isfinite(coaddPatch.image.array))
+        y, x = np.nonzero(bad)
+        badN = len(np.nonzero(bad)[0])
+        if badN > 0:
+            print(dataId)
+            self.log.warning(
+                "%s invalid pixels in coadd using input tract=%s, patch=%s",
+                badN,
+                dataId['tract'],
+                dataId['patch'],
+            )
+        # modify patch to set mask planes correctly & get rid of invalid pixels
+        return coaddPatch
+
     @timeMethod
     def run(self, *, coaddExposureHandles, bbox, wcs, dataIds, physical_filter):
         """Warp coadds from multiple tracts and patches to form a template to
@@ -473,7 +504,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
         """
         catalog = afwTable.ExposureCatalog(self.schema)
         catalog.reserve(len(exposureRefs))
-        exposures = (exposureRef.get() for exposureRef in exposureRefs)
+        exposures = (self.checkPatch(exposureRef.get()) for exposureRef in exposureRefs)
         images = {}
         totalBox = geom.Box2I()
 
