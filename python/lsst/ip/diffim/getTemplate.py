@@ -406,16 +406,17 @@ class GetTemplateTask(pipeBase.PipelineTask):
             maskedImage.variance.array[bad] = 0.0
             # Reset mask, too, since these pixels don't contribute to sum.
             maskedImage.mask.array[bad] = 0
+            # Clear the NaNs to ensure that areas missing from this input are
+            # masked with NO_DATA after the loop.
+            weight.array[np.isnan(weight.array)] = 0
             # Cannot use `merged.maskedImage *= weight` because that operator
             # multiplies the variance by the weight twice; in this case
             # `weight` are the exact values we want to scale by.
             maskedImage.image *= weight
             maskedImage.variance *= weight
             merged.maskedImage[maskedImage.getBBox()] += maskedImage
-            # Clear the NaNs to ensure that areas missing from this input are
-            # masked with NO_DATA after the loop.
-            weight.array[np.isnan(weight.array)] = 0
             weights[maskedImage.getBBox()] += weight
+
         # Cannot use `merged.maskedImage /= weights` because that operator
         # divides the variance by the weight twice; in this case `weights` are
         # the exact values we want to scale by.
