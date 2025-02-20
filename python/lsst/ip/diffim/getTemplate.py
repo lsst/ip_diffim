@@ -418,12 +418,14 @@ class GetTemplateTask(pipeBase.PipelineTask):
             merged.maskedImage[maskedImage.getBBox()] += maskedImage
             weights[maskedImage.getBBox()] += weight
 
+        bad = np.isnan(weights.array) | (weights.array == 0)
+        weights.array[bad] = np.inf
         # Cannot use `merged.maskedImage /= weights` because that operator
         # divides the variance by the weight twice; in this case `weights` are
         # the exact values we want to scale by.
         merged.image /= weights
         merged.variance /= weights
-        merged.mask.array |= merged.mask.getPlaneBitMask("NO_DATA") * (weights.array == 0)
+        merged.mask.array |= merged.mask.getPlaneBitMask("NO_DATA") * bad
 
         return merged
 
