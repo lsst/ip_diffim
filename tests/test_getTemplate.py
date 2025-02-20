@@ -263,9 +263,9 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         # Task modifies the input bbox, so pass a copy.
         result = task.run(self.patches, lsst.geom.Box2I(box), self.exposure.wcs, self.dataIds, "a_test")
         no_data = (result.template.mask.array & result.template.mask.getPlaneBitMask("NO_DATA")) != 0
-        self.assertTrue(all(np.isnan(result.template.image.array[no_data])))
-        self.assertTrue(all(np.isnan(result.template.variance.array[no_data])))
-        self.assertEqual(no_data.sum(), 21548)
+        self.assertTrue(np.isfinite(result.template.image.array).all())
+        self.assertTrue(np.isfinite(result.template.variance.array).all())
+        self.assertEqual(no_data.sum(), 20990)
 
 
 def setup_module(module):
