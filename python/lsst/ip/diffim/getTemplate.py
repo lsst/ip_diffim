@@ -375,7 +375,8 @@ class GetTemplateTask(pipeBase.PipelineTask):
 
         return images, catalog, totalBox
 
-    def _merge(self, maskedImages, bbox, wcs):
+    @staticmethod
+    def _merge(maskedImages, bbox, wcs):
         """Merge the images that came from one tract into one larger image,
         ignoring NaN pixels and non-finite variance pixels from individual
         exposures.
