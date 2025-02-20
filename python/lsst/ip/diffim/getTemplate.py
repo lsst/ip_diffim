@@ -407,8 +407,9 @@ class GetTemplateTask(pipeBase.PipelineTask):
             # Reset mask, too, since these pixels don't contribute to sum.
             maskedImage.mask.array[bad] = 0
             # Clear the NaNs to ensure that areas missing from this input are
-            # masked with NO_DATA after the loop.
-            weight.array[np.isnan(weight.array)] = 0
+            # masked with NO_DATA after the loop. Limiting to finite values
+            # can also handle the case where the input variance was zeros.
+            weight.array[~np.isfinite(weight.array)] = 0
             # Cannot use `merged.maskedImage *= weight` because that operator
             # multiplies the variance by the weight twice; in this case
             # `weight` are the exact values we want to scale by.
