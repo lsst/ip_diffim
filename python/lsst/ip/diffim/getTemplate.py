@@ -229,11 +229,12 @@ class GetTemplateTask(pipeBase.PipelineTask):
         y, x = np.nonzero(bad)
         badN = len(np.nonzero(bad)[0])
         if badN > 0:
+            print(dataId)
             self.log.warning(
                 "%s invalid pixels in coadd using input tract=%s, patch=%s",
                 badN,
-                dataId["tract"],
-                dataId["patch"],
+                dataId['tract'],
+                dataId['patch'],
             )
 
     @timeMethod
