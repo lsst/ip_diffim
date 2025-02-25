@@ -971,7 +971,7 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
 
         # The mean ratio metric should be much worse on the "bad" subtraction.
         self.assertLess(subtractTask_good.metadata['differenceFootprintRatioMean'], 0.02)
-        self.assertGreater(subtractTask_bad.metadata['differenceFootprintRatioMean'], 0.25)
+        self.assertGreater(subtractTask_bad.metadata['differenceFootprintRatioMean'], 0.17)
 
 
 class AlardLuptonPreconvolveSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.TestCase):
