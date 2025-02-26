@@ -529,8 +529,11 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
         measurementResults = pipeBase.Struct(
             subtractedMeasuredExposure=difference,
-            diaSources=diaSources,
         )
+
+        if len(diaSources) > 0:
+            measurementResults.diaSources = diaSources
+
         if self.config.doMaskStreaks and self.config.writeStreakInfo:
             measurementResults.mergeItems(streakInfo, 'maskedStreaks')
 

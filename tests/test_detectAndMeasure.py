@@ -483,14 +483,15 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
             goodSrcFlags = _checkMask(difference.mask, transientSources, excludeMaskPlanes)
             if setFlags:
                 self.assertEqual(np.sum(~goodSrcFlags), nBad)
+                self.assertFalse(hasattr(output, "diaSources"))
             else:
                 self.assertEqual(np.sum(~goodSrcFlags), 0)
-            for diaSource, goodSrcFlag in zip(output.diaSources, goodSrcFlags):
-                if ~goodSrcFlag:
-                    with self.assertRaises(AssertionError):
+                for diaSource, goodSrcFlag in zip(output.diaSources, goodSrcFlags):
+                    if ~goodSrcFlag:
+                        with self.assertRaises(AssertionError):
+                            self._check_diaSource(transientSources, diaSource, refIds=refIds)
+                    else:
                         self._check_diaSource(transientSources, diaSource, refIds=refIds)
-                else:
-                    self._check_diaSource(transientSources, diaSource, refIds=refIds)
         _detection_wrapper(setFlags=False)
         _detection_wrapper(setFlags=True)
 
@@ -917,14 +918,15 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
             goodSrcFlags = subtractTask._checkMask(difference.mask, transientSources, excludeMaskPlanes)
             if setFlags:
                 self.assertEqual(np.sum(~goodSrcFlags), nBad)
+                self.assertFalse(hasattr(output, "diaSources"))
             else:
                 self.assertEqual(np.sum(~goodSrcFlags), 0)
-            for diaSource, goodSrcFlag in zip(output.diaSources, goodSrcFlags):
-                if ~goodSrcFlag:
-                    with self.assertRaises(AssertionError):
+                for diaSource, goodSrcFlag in zip(output.diaSources, goodSrcFlags):
+                    if ~goodSrcFlag:
+                        with self.assertRaises(AssertionError):
+                            self._check_diaSource(transientSources, diaSource, refIds=refIds)
+                    else:
                         self._check_diaSource(transientSources, diaSource, refIds=refIds)
-                else:
-                    self._check_diaSource(transientSources, diaSource, refIds=refIds)
         _detection_wrapper(setFlags=False)
         _detection_wrapper(setFlags=True)
 
