@@ -324,6 +324,10 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             self.makeSubtask("maskStreaks")
             self.makeSubtask("streakDetection")
 
+        # To get the "merge_*" fields in the schema; have to re-initialize
+        # this later, once we have a peak schema post-detection.
+        lsst.afw.detection.FootprintMergeList(self.schema, ["positive", "negative"])
+
         # Check that the schema and config are consistent
         for flag in self.config.badSourceFlags:
             if flag not in self.schema:
@@ -474,20 +478,24 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         if self.config.doMerge:
             # preserve peak schema, if there are any footprints
             if len(positives) > 0:
-                schema = positives[0].getFootprint().peaks.schema
+                peakSchema = positives[0].getFootprint().peaks.schema
             elif len(negatives) > 0:
-                schema = negatives[0].getFootprint().peaks.schema
+                peakSchema = negatives[0].getFootprint().peaks.schema
             else:
-                schema = afwDetection.PeakTable.makeMinimalSchema()
-            mergeList = lsst.afw.detection.FootprintMergeList(afwTable.SourceTable.makeMinimalSchema(),
-                                                              ["positive", "negative"], schema)
-            initialDiaSources = lsst.afw.table.SourceCatalog(positives.schema)
+                peakSchema = afwDetection.PeakTable.makeMinimalSchema()
+            mergeList = afwDetection.FootprintMergeList(self.schema,
+                                                        ["positive", "negative"], peakSchema)
+            initialDiaSources = afwTable.SourceCatalog(self.schema)
             # Start with positive, as FootprintMergeList will self-merge the
             # subsequent added catalogs, and we want to try to preserve
             # deblended positive sources.
             mergeList.addCatalog(initialDiaSources.table, positives, "positive", minNewPeakDist=0)
             mergeList.addCatalog(initialDiaSources.table, negatives, "negative", minNewPeakDist=0)
             mergeList.getFinalSources(initialDiaSources)
+            # Flag as negative those sources that *only* came from the negative
+            # footprint set.
+            initialDiaSources["is_negative"] = initialDiaSources["merge_footprint_negative"] & \
+                ~initialDiaSources["merge_footprint_positive"]
             self.log.info("Merging detections into %d sources", len(initialDiaSources))
         else:
             initialDiaSources = sources
@@ -592,6 +600,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         sources.reserve(len(positives) + len(negatives))
         sources.extend(positives, deep=True)
         sources.extend(negatives, deep=True)
+        if len(negatives) > 0:
+            sources[-len(negatives):]["is_negative"] = True
         return sources, positives, negatives
 
     def _removeBadSources(self, diaSources):

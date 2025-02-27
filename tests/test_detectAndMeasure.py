@@ -168,6 +168,8 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
 
         # all of the sources should have been detected
         self.assertEqual(len(output.diaSources), len(sources))
+        # no sources should be flagged as negative
+        self.assertEqual(len(~output.diaSources["is_negative"]), len(output.diaSources))
         refIds = []
         for source in sources:
             self._check_diaSource(output.diaSources, source, refIds=refIds)
@@ -383,6 +385,8 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         detectionTask = self._setup_detection(doMerge=True)
         output = detectionTask.run(science, matchedTemplate, difference)
         self.assertEqual(len(output.diaSources), len(sources))
+        # no sources should be flagged as negative
+        self.assertEqual(len(~output.diaSources["is_negative"]), len(output.diaSources))
         refIds = []
         for diaSource in output.diaSources:
             if diaSource[dipoleFlag]:
@@ -668,6 +672,8 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         # Not all of the sources will be detected: preconvolution results in
         # a larger edge mask, so we miss an edge source.
         self.assertEqual(len(output.diaSources), len(sources)-1)
+        # no sources should be flagged as negative
+        self.assertEqual(len(~output.diaSources["is_negative"]), len(output.diaSources))
         # TODO DM-41496: restore this block once we handle detections on edge
         # pixels better; at least one of these sources currently has a bad
         # centroid because most of the source is rejected as EDGE.
@@ -977,32 +983,47 @@ class TestNegativePeaks(lsst.utils.tests.TestCase):
         self.assertFloatsAlmostEqual(negatives[1].getFootprint().getImageArray().min(),
                                      -catalog[2].getFootprint().getImageArray().max(), rtol=1e-4)
 
+        self.assertEqual(sources["is_negative"].sum(), 2)
+
     def testMergeFootprints(self):
         """Test that merging footprints does not cause negative ones to
         disappear (e.g. get merged into non-connected footprints).
+
+        As implemented, the diffim will have three positive sources (one a
+        blended pair), and 7 negative sources (two a blended pair).
         """
-        # Make a science image with multiple blends, designed to trigger the
+        # Make a template image with multiple blends, designed to trigger the
         # negative-footprint-related bug in `FootprintSet.merge`.
         bbox = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(400, 200))
         dataset = lsst.meas.base.tests.TestDataset(bbox)
+        # Because these sources are on the template, they will be negative on
+        # the diffim, unless the pixels are explicitly made negative via
+        # `template.image.subset` below.
+        # positive isolated source on diffim
         dataset.addSource(instFlux=.5E5, centroid=lsst.geom.Point2D(25, 26))
+        # negative isolated source on diffim
         dataset.addSource(instFlux=.7E5, centroid=lsst.geom.Point2D(75, 24),
                           shape=lsst.afw.geom.Quadrupole(12, 7, 2))
         delta = 10
+        # negative blended pair on diffim
         with dataset.addBlend() as family:
             family.addChild(instFlux=1E5, centroid=lsst.geom.Point2D(150, 72))
             family.addChild(instFlux=1.5E5, centroid=lsst.geom.Point2D(150+delta, 74))
+        # positive blended pair on diffim
         with dataset.addBlend() as family:
             family.addChild(instFlux=2E5, centroid=lsst.geom.Point2D(250, 72))
             family.addChild(instFlux=2.5E5, centroid=lsst.geom.Point2D(250+delta, 74))
+        # negative blended pair on diffim
         with dataset.addBlend() as family:
             family.addChild(instFlux=3E5, centroid=lsst.geom.Point2D(350, 72))
             family.addChild(instFlux=3.5E5, centroid=lsst.geom.Point2D(350+delta, 74))
+        # negative isolated source on diffim
         dataset.addSource(instFlux=4E5, centroid=lsst.geom.Point2D(75, 124))
+        # negative isolated source on diffim
         dataset.addSource(instFlux=5E5, centroid=lsst.geom.Point2D(175, 124))
         template, catalog = dataset.realize(noise=100.0,
                                             schema=lsst.meas.base.tests.TestDataset.makeMinimalSchema())
-        # These will be positive sources on the diffim.
+        # These will be positive sources on the diffim (as noted above).
         template.image.subset(lsst.geom.Box2I(lsst.geom.Point2I(15, 15),
                                               lsst.geom.Point2I(35, 35))).array *= -1
         template.image.subset(lsst.geom.Box2I(lsst.geom.Point2I(230, 60),
@@ -1045,6 +1066,11 @@ class TestNegativePeaks(lsst.utils.tests.TestCase):
         peaks = np.column_stack((peak_x, peak_y))
         unique_peaks, counts = np.unique(peaks, axis=0, return_counts=True)
         self.assertEqual(np.sum(counts > 1), 0)
+
+        # There are three positive sources that should not have `is_negative`
+        # set, independent of how deblending/merging of negative sources is
+        # handled.
+        self.assertEqual((~result.diaSources["is_negative"]).sum(), 3)
 
 
 def setup_module(module):
