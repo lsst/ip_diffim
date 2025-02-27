@@ -375,7 +375,8 @@ class GetTemplateTask(pipeBase.PipelineTask):
 
         return images, catalog, totalBox
 
-    def _merge(self, maskedImages, bbox, wcs):
+    @staticmethod
+    def _merge(maskedImages, bbox, wcs):
         """Merge the images that came from one tract into one larger image,
         ignoring NaN pixels and non-finite variance pixels from individual
         exposures.
@@ -406,22 +407,26 @@ class GetTemplateTask(pipeBase.PipelineTask):
             maskedImage.variance.array[bad] = 0.0
             # Reset mask, too, since these pixels don't contribute to sum.
             maskedImage.mask.array[bad] = 0
+            # Clear the NaNs to ensure that areas missing from this input are
+            # masked with NO_DATA after the loop. Limiting to finite values
+            # can also handle the case where the input variance was zeros.
+            weight.array[~np.isfinite(weight.array)] = 0
             # Cannot use `merged.maskedImage *= weight` because that operator
             # multiplies the variance by the weight twice; in this case
             # `weight` are the exact values we want to scale by.
             maskedImage.image *= weight
             maskedImage.variance *= weight
             merged.maskedImage[maskedImage.getBBox()] += maskedImage
-            # Clear the NaNs to ensure that areas missing from this input are
-            # masked with NO_DATA after the loop.
-            weight.array[np.isnan(weight.array)] = 0
             weights[maskedImage.getBBox()] += weight
+
+        bad = np.isnan(weights.array) | (weights.array == 0)
+        weights.array[bad] = np.inf
         # Cannot use `merged.maskedImage /= weights` because that operator
         # divides the variance by the weight twice; in this case `weights` are
         # the exact values we want to scale by.
         merged.image /= weights
         merged.variance /= weights
-        merged.mask.array |= merged.mask.getPlaneBitMask("NO_DATA") * (weights.array == 0)
+        merged.mask.array |= merged.mask.getPlaneBitMask("NO_DATA") * bad
 
         return merged
 
