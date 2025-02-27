@@ -214,7 +214,9 @@ class GetTemplateTask(pipeBase.PipelineTask):
             if patchPolygon.intersection(detectorPolygon):
                 overlappingArea += patchPolygon.intersectionSingle(detectorPolygon).calculateArea()
                 self.log.info("Using template input tract=%s, patch=%s", dataId['tract'], dataId['patch'])
-                coaddExposures[dataId['tract']].append(coaddRef.get())
+                coaddPatch = coaddRef.get()
+                self.checkPatch(coaddPatch, dataId)
+                coaddExposures[dataId['tract']].append(coaddPatch)
                 dataIds[dataId['tract']].append(dataId)
 
         if not overlappingArea:
@@ -222,6 +224,35 @@ class GetTemplateTask(pipeBase.PipelineTask):
 
         return pipeBase.Struct(coaddExposures=coaddExposures,
                                dataIds=dataIds)
+
+    def checkPatch(self, coaddPatch, dataId):
+        """Check for invalid pixels in the coadd and raise warning if value is
+        non-zero.
+
+        Parameters
+        ----------
+        coaddPatch: `dict` [`int`, `list` [`lsst.afw.image.Exposure`]]
+            Coadd to be mosaicked, indexed on tract id.
+        dataId: `dict` [`int`, `list` [`lsst.daf.butler.DataCoordinate`]]
+            Record of the tract and patch of coaddPatch, indexed on
+            tract id.
+
+        Raises
+        ------
+        Warning
+            If invalid pixels are found in the coadd.
+        """
+        bad = np.logical_not(np.isfinite(coaddPatch.image.array))
+        y, x = np.nonzero(bad)
+        badN = len(np.nonzero(bad)[0])
+        if badN > 0:
+            print(dataId)
+            self.log.warning(
+                "%s invalid pixels in coadd using input tract=%s, patch=%s",
+                badN,
+                dataId['tract'],
+                dataId['patch'],
+            )
 
     @timeMethod
     def run(self, *, coaddExposures, bbox, wcs, dataIds, physical_filter):
