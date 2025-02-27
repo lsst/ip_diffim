@@ -492,7 +492,7 @@ class GetDcrTemplateConfig(GetTemplateConfig,
         default=3,
     )
     effectiveWavelength = pexConfig.Field(
-        doc="Effective wavelength of the filter.",
+        doc="Effective wavelength of the filter in nm.",
         optional=False,
         dtype=float,
     )
@@ -513,7 +513,37 @@ class GetDcrTemplateTask(GetTemplateTask):
     ConfigClass = GetDcrTemplateConfig
     _DefaultName = "getDcrTemplate"
 
+    def runQuantum(self, butlerQC, inputRefs, outputRefs):
+        inputs = butlerQC.get(inputRefs)
+        bbox = inputs.pop("bbox")
+        wcs = inputs.pop("wcs")
+        dcrCoaddExposureHandles = inputs.pop('dcrCoadds')
+        skymap = inputs.pop("skyMap")
+        visitInfo = inputs.pop("visitInfo")
+
+        # This should not happen with a properly configured execution context.
+        assert not inputs, "runQuantum got more inputs than expected"
+
+        results = self.getExposures(dcrCoaddExposureHandles, bbox, skymap, wcs, visitInfo)
+        physical_filter = butlerQC.quantum.dataId["physical_filter"]
+        outputs = self.run(coaddExposures=results.coaddExposures,
+                           bbox=bbox,
+                           wcs=wcs,
+                           dataIds=results.dataIds,
+                           physical_filter=physical_filter)
+        butlerQC.put(outputs, outputRefs)
+
+    @deprecated(reason="Replaced by getExposures, which uses explicit arguments instead of a kwargs dict. "
+                "This method will be removed after v29.",
+                version="v29.0", category=FutureWarning)
     def getOverlappingExposures(self, inputs):
+        return self.getExposures(inputs["dcrCoadds"],
+                                 inputs["bbox"],
+                                 inputs["skyMap"],
+                                 inputs["wcs"],
+                                 inputs["visitInfo"])
+
+    def getExposures(self, dcrCoaddExposureHandles, bbox, skymap, wcs, visitInfo):
         """Return lists of coadds and their corresponding dataIds that overlap
         the detector.
 
@@ -523,21 +553,20 @@ class GetDcrTemplateTask(GetTemplateTask):
 
         Parameters
         ----------
-        inputs : `dict` of task Inputs, containing:
-            - coaddExposureRefs : `list` \
+        dcrCoaddExposureHandles :  `list` \
                                   [`lsst.daf.butler.DeferredDatasetHandle` of \
                                   `lsst.afw.image.Exposure`]
-                Data references to exposures that might overlap the detector.
-            - bbox : `lsst.geom.Box2I`
-                Template Bounding box of the detector geometry onto which to
-                resample the coaddExposures.
-            - skyMap : `lsst.skymap.SkyMap`
-                Input definition of geometry/bbox and projection/wcs for
-                template exposures.
-            - wcs : `lsst.afw.geom.SkyWcs`
-                Template WCS onto which to resample the coaddExposures.
-            - visitInfo : `lsst.afw.image.VisitInfo`
-                Metadata for the science image.
+            Data references to exposures that might overlap the detector.
+        bbox : `lsst.geom.Box2I`
+            Template Bounding box of the detector geometry onto which to
+            resample the coaddExposures.
+        skymap : `lsst.skymap.SkyMap`
+            Input definition of geometry/bbox and projection/wcs for
+            template exposures.
+        wcs : `lsst.afw.geom.SkyWcs`
+            Template WCS onto which to resample the coaddExposures.
+        visitInfo : `lsst.afw.image.VisitInfo`
+            Metadata for the science image.
 
         Returns
         -------
@@ -545,47 +574,50 @@ class GetDcrTemplateTask(GetTemplateTask):
            A struct with attibutes:
 
            ``coaddExposures``
-               Coadd exposures that overlap the detector (`list`
-               [`lsst.afw.image.Exposure`]).
+               Dict of coadd exposures that overlap the projected bbox,
+               indexed on tract id
+               (`dict` [`int`, `list` [`lsst.afw.image.Exposure`] ]).
            ``dataIds``
-               Data IDs of the coadd exposures that overlap the detector
-               (`list` [`lsst.daf.butler.DataCoordinate`]).
+               Dict of data IDs of the coadd exposures that overlap the
+               projected bbox, indexed on tract id
+               (`dict` [`int`, `list [`lsst.daf.butler.DataCoordinate`] ]).
 
         Raises
         ------
-        NoWorkFound
+        pipeBase.NoWorkFound
             Raised if no patches overlatp the input detector bbox.
         """
         # Check that the patches actually overlap the detector
         # Exposure's validPolygon would be more accurate
-        detectorPolygon = geom.Box2D(inputs["bbox"])
+        if wcs is None:
+            raise pipeBase.NoWorkFound("Exposure has no WCS; cannot create a template.")
+
+        detectorPolygon = geom.Box2D(bbox)
         overlappingArea = 0
-        coaddExposureRefList = []
-        dataIds = []
+        dataIds = collections.defaultdict(list)
         patchList = dict()
-        for coaddRef in inputs["dcrCoadds"]:
+        for coaddRef in dcrCoaddExposureHandles:
             dataId = coaddRef.dataId
-            patchWcs = inputs["skyMap"][dataId['tract']].getWcs()
-            patchBBox = inputs["skyMap"][dataId['tract']][dataId['patch']].getOuterBBox()
+            patchWcs = skymap[dataId['tract']].getWcs()
+            patchBBox = skymap[dataId['tract']][dataId['patch']].getOuterBBox()
             patchCorners = patchWcs.pixelToSky(geom.Box2D(patchBBox).getCorners())
-            patchPolygon = afwGeom.Polygon(inputs["wcs"].skyToPixel(patchCorners))
+            patchPolygon = afwGeom.Polygon(wcs.skyToPixel(patchCorners))
             if patchPolygon.intersection(detectorPolygon):
                 overlappingArea += patchPolygon.intersectionSingle(detectorPolygon).calculateArea()
                 self.log.info("Using template input tract=%s, patch=%s, subfilter=%s" %
                               (dataId['tract'], dataId['patch'], dataId["subfilter"]))
-                coaddExposureRefList.append(coaddRef)
                 if dataId['tract'] in patchList:
                     patchList[dataId['tract']].append(dataId['patch'])
                 else:
                     patchList[dataId['tract']] = [dataId['patch'], ]
-                dataIds.append(dataId)
+                dataIds[dataId['tract']].append(dataId)
 
         if not overlappingArea:
             raise pipeBase.NoWorkFound('No patches overlap detector')
 
         self.checkPatchList(patchList)
 
-        coaddExposures = self.getDcrModel(patchList, inputs['dcrCoadds'], inputs['visitInfo'])
+        coaddExposures = self.getDcrModel(patchList, dcrCoaddExposureHandles, visitInfo)
         return pipeBase.Struct(coaddExposures=coaddExposures,
                                dataIds=dataIds)
 
@@ -628,7 +660,7 @@ class GetDcrTemplateTask(GetTemplateTask):
         coaddExposures : `list` [`lsst.afw.image.Exposure`]
             Coadd exposures that overlap the detector.
         """
-        coaddExposures = []
+        coaddExposures = collections.defaultdict(list)
         for tract in patchList:
             for patch in set(patchList[tract]):
                 coaddRefList = [coaddRef for coaddRef in coaddRefs
@@ -638,7 +670,7 @@ class GetDcrTemplateTask(GetTemplateTask):
                                                 self.config.effectiveWavelength,
                                                 self.config.bandwidth,
                                                 self.config.numSubfilters)
-                coaddExposures.append(dcrModel.buildMatchedExposure(visitInfo=visitInfo))
+                coaddExposures[tract].append(dcrModel.buildMatchedExposure(visitInfo=visitInfo))
         return coaddExposures
 
 
