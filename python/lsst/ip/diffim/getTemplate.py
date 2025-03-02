@@ -398,7 +398,9 @@ class GetTemplateTask(pipeBase.PipelineTask):
         merged = afwImage.ExposureF(bbox, wcs)
         weights = afwImage.ImageF(bbox)
         for maskedImage in maskedImages:
-            weight = afwImage.ImageF(maskedImage.variance.array**(-0.5))
+            goodPix = maskedImage.variance.array > 0
+            weight = afwImage.ImageF(maskedImage.getBBox())
+            weight.array[goodPix] = maskedImage.variance.array[goodPix]**(-0.5)
             bad = np.isnan(maskedImage.image.array) | ~np.isfinite(maskedImage.variance.array)
             # Note that modifying the patch MaskedImage in place is fine;
             # we're throwing it away at the end anyway.
@@ -419,9 +421,13 @@ class GetTemplateTask(pipeBase.PipelineTask):
         # Cannot use `merged.maskedImage /= weights` because that operator
         # divides the variance by the weight twice; in this case `weights` are
         # the exact values we want to scale by.
-        merged.image /= weights
-        merged.variance /= weights
-        merged.mask.array |= merged.mask.getPlaneBitMask("NO_DATA") * (weights.array == 0)
+        invWeights = np.zeros_like(weights.array)
+        goodPix = weights.array > 0
+        invWeights[goodPix] = 1/weights.array[goodPix]
+
+        merged.image.array *= invWeights
+        merged.variance.array *= invWeights
+        merged.mask.array |= merged.mask.getPlaneBitMask("NO_DATA") * (invWeights == 0)
 
         return merged
 

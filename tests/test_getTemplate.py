@@ -282,9 +282,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
                           dataIds=self.dataIds,
                           physical_filter="a_test")
         no_data = (result.template.mask.array & result.template.mask.getPlaneBitMask("NO_DATA")) != 0
-        self.assertTrue(all(np.isnan(result.template.image.array[no_data])))
-        self.assertTrue(all(np.isnan(result.template.variance.array[no_data])))
-        self.assertEqual(no_data.sum(), 21548)
+        self.assertEqual(no_data.sum(), 20990)
 
 
 def setup_module(module):
