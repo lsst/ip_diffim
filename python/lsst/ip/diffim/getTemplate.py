@@ -415,8 +415,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
         for maskedImage in maskedImages:
             # Catch both zero-value and NaN variance plane pixels
             good = maskedImage.variance.array > 0
-            weight = afwImage.ImageF(maskedImage.getBBox())
-            weight.array[good] = maskedImage.variance.array[good]**(-0.5)
+            weight = maskedImage.variance.array[good]**(-0.5)
             bad = np.isnan(maskedImage.image.array) | ~good
             # Note that modifying the patch MaskedImage in place is fine;
             # we're throwing it away at the end anyway.
@@ -427,10 +426,12 @@ class GetTemplateTask(pipeBase.PipelineTask):
             # Cannot use `merged.maskedImage *= weight` because that operator
             # multiplies the variance by the weight twice; in this case
             # `weight` are the exact values we want to scale by.
-            maskedImage.image *= weight
-            maskedImage.variance *= weight
+            maskedImage.image.array[good] *= weight
+            maskedImage.variance.array[good] *= weight
+            weights[maskedImage.getBBox()].array[good] += weight
+            # Free memory before creating new large arrays
+            del weight
             merged.maskedImage[maskedImage.getBBox()] += maskedImage
-            weights[maskedImage.getBBox()] += weight
 
         good = weights.array > 0
 
