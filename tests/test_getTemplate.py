@@ -32,8 +32,11 @@ import lsst.geom
 import lsst.ip.diffim
 import lsst.meas.algorithms
 import lsst.meas.base.tests
+import lsst.pipe.base as pipeBase
 import lsst.skymap
 import lsst.utils.tests
+
+from utils import generate_data_id
 
 # Change this to True, `setup display_ds9`, and open ds9 (or use another afw
 # display backend) to show the tract/patch layouts on the image.
@@ -155,7 +158,16 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
             warpedPsf = lsst.meas.algorithms.WarpedPsf(self.exposure.psf, xyTransform)
             warped = warper.warpExposure(patch.wcs, self.exposure, destBBox=box)
             warped.setPsf(warpedPsf)
-            self.patches[tract.tract_id].append(warped)
+            dataRef = pipeBase.InMemoryDatasetHandle(
+                warped,
+                storageClass="ExposureF",
+                copy=True,
+                dataId=generate_data_id(
+                    tract=tract,
+                    patch=patch,
+                )
+            )
+            self.patches[tract.tract_id].append(dataRef)
             self.dataIds[tract.tract_id].append({"tract": tract.tract_id,
                                                  "patch": patchId,
                                                  "band": "a"})
@@ -168,7 +180,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         self.assertEqual(template.getBBox(), expectedBox)
         # WCS should match our exposure, not any of the coadd tracts.
         for tract in self.patches:
-            self.assertNotEqual(template.wcs, self.patches[tract][0].wcs)
+            self.assertNotEqual(template.wcs, self.patches[tract][0].get().wcs)
         self.assertEqual(template.wcs, self.exposure.wcs)
         self.assertEqual(template.photoCalib, self.exposure.photoCalib)
         self.assertEqual(template.getXY0(), expectedBox.getMin())
@@ -209,7 +221,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         task = lsst.ip.diffim.GetTemplateTask()
         # Restrict to tract 0, since the box fits in just that tract.
         # Task modifies the input bbox, so pass a copy.
-        result = task.run(coaddExposures={0: self.patches[0]},
+        result = task.run(coaddExposureHandles={0: self.patches[0]},
                           bbox=lsst.geom.Box2I(box),
                           wcs=self.exposure.wcs,
                           dataIds={0: self.dataIds[0]},
@@ -227,7 +239,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
         task = lsst.ip.diffim.GetTemplateTask()
         # Task modifies the input bbox, so pass a copy.
-        result = task.run(coaddExposures=self.patches,
+        result = task.run(coaddExposureHandles=self.patches,
                           bbox=lsst.geom.Box2I(box),
                           wcs=self.exposure.wcs,
                           dataIds=self.dataIds,
@@ -243,7 +255,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         box = lsst.geom.Box2I(lsst.geom.Point2I(200, 200), lsst.geom.Point2I(600, 600))
         task = lsst.ip.diffim.GetTemplateTask()
         # Task modifies the input bbox, so pass a copy.
-        result = task.run(coaddExposures=self.patches,
+        result = task.run(coaddExposureHandles=self.patches,
                           bbox=lsst.geom.Box2I(box),
                           wcs=self.exposure.wcs,
                           dataIds=self.dataIds,
@@ -259,7 +271,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         box = lsst.geom.Box2I(lsst.geom.Point2I(1200, 1200), lsst.geom.Point2I(1600, 1600))
         task = lsst.ip.diffim.GetTemplateTask()
         with self.assertRaisesRegex(lsst.pipe.base.NoWorkFound, "No patches found"):
-            task.run(coaddExposures=self.patches,
+            task.run(coaddExposureHandles=self.patches,
                      bbox=lsst.geom.Box2I(box),
                      wcs=self.exposure.wcs,
                      dataIds=self.dataIds,
@@ -276,7 +288,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
         task = lsst.ip.diffim.GetTemplateTask()
         # Task modifies the input bbox, so pass a copy.
-        result = task.run(coaddExposures=self.patches,
+        result = task.run(coaddExposureHandles=self.patches,
                           bbox=lsst.geom.Box2I(box),
                           wcs=self.exposure.wcs,
                           dataIds=self.dataIds,
@@ -295,8 +307,9 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
     )
     def testNanInputs(self, box=None, nInput=None):
         """Test that the template has finite values when some of the input pixels have NaN as variance."""
-        for tract, patchCoadds in self.patches.items():
-            for patchCoadd in patchCoadds:
+        for tract, patchRefs in self.patches.items():
+            for patchRef in patchRefs:
+                patchCoadd = patchRef.get()
                 bbox = lsst.geom.Box2I()
                 bbox.include(lsst.geom.Point2I(patchCoadd.getBBox().getCenter()))
                 bbox.grow(3)
@@ -304,7 +317,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
 
         box = lsst.geom.Box2I(lsst.geom.Point2I(200, 200), lsst.geom.Point2I(600, 600))
         task = lsst.ip.diffim.GetTemplateTask()
-        result = task.run(coaddExposures=self.patches,
+        result = task.run(coaddExposureHandles=self.patches,
                           bbox=lsst.geom.Box2I(box),
                           wcs=self.exposure.wcs,
                           dataIds=self.dataIds,

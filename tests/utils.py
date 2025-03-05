@@ -33,6 +33,7 @@ import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.afw.table as afwTable
+from lsst.daf.butler import DataCoordinate, DimensionUniverse
 import lsst.meas.algorithms as measAlg
 import lsst.meas.base as measBase
 from lsst.meas.algorithms.testUtils import plantSources
@@ -1147,3 +1148,76 @@ class CustomCoaddPsf(measAlg.CoaddPsf):
     """
     def getAveragePosition(self):
         return geom.Point2D(-10000, -10000)
+
+
+def generate_data_id(*,
+                     tract: int = 9813,
+                     patch: int = 42,
+                     cell_x: int = 4,
+                     cell_y: int = 2,
+                     band: str = "notR",
+                     ) -> DataCoordinate:
+    """Generate a DataCoordinate instance to use as data_id.
+
+    Modified from ``generate_data_id`` in ``lsst.cell_coadds.test_utils``
+
+    Parameters
+    ----------
+    tract : `int`, optional
+        Tract ID for the data_id
+    patch : `int`, optional
+        Patch ID for the data_id
+    cell_x : `int`, optional
+        X index of the cell this patch corresponds to
+    cell_y : `int`, optional
+        Y index of the cell this patch corresponds to
+    band : `str`, optional
+        Band for the data_id
+
+    Returns
+    -------
+    data_id : `lsst.daf.butler.DataCoordinate`
+        An expanded data_id instance.
+    """
+    universe = DimensionUniverse()
+
+    instrument = universe["instrument"]
+    instrument_record = instrument.RecordClass(
+        name="DummyCam",
+        class_name="lsst.obs.base.instrument_tests.DummyCam",
+    )
+
+    skymap = universe["skymap"]
+    skymap_record = skymap.RecordClass(name="test_skymap")
+
+    band_element = universe["band"]
+    band_record = band_element.RecordClass(name=band)
+
+    physical_filter = universe["physical_filter"]
+    physical_filter_record = physical_filter.RecordClass(name=band, instrument="test", band=band)
+
+    patch_element = universe["patch"]
+    patch_record = patch_element.RecordClass(
+        skymap="test_skymap", tract=tract, patch=patch, cell_x=cell_x, cell_y=cell_y
+    )
+
+    # A dictionary with all the relevant records.
+    record = {
+        "instrument": instrument_record,
+        "patch": patch_record,
+        "tract": 9813,
+        "band": band_record.name,
+        "skymap": skymap_record.name,
+        "physical_filter": physical_filter_record,
+    }
+
+    # A dictionary with all the relevant recordIds.
+    record_id = record.copy()
+    for key in (
+        "instrument",
+        "physical_filter",
+    ):
+        record_id[key] = record_id[key].name
+
+    data_id = DataCoordinate.standardize(record_id, universe=universe)
+    return data_id.expanded(record)
