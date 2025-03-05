@@ -282,9 +282,37 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
                           dataIds=self.dataIds,
                           physical_filter="a_test")
         no_data = (result.template.mask.array & result.template.mask.getPlaneBitMask("NO_DATA")) != 0
-        self.assertTrue(all(np.isnan(result.template.image.array[no_data])))
-        self.assertTrue(all(np.isnan(result.template.variance.array[no_data])))
-        self.assertEqual(no_data.sum(), 21548)
+        self.assertTrue(np.isfinite(result.template.image.array).all())
+        self.assertTrue(np.isfinite(result.template.variance.array).all())
+        self.assertEqual(no_data.sum(), 20990)
+
+    @lsst.utils.tests.methodParameters(
+        box=[
+            lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180)),
+            lsst.geom.Box2I(lsst.geom.Point2I(200, 200), lsst.geom.Point2I(600, 600)),
+        ],
+        nInput=[8, 16],
+    )
+    def testNanInputs(self, box=None, nInput=None):
+        """Test that the template has finite values when some of the input pixels have NaN as variance."""
+        for tract, patchCoadds in self.patches.items():
+            for patchCoadd in patchCoadds:
+                bbox = lsst.geom.Box2I()
+                bbox.include(lsst.geom.Point2I(patchCoadd.getBBox().getCenter()))
+                bbox.grow(3)
+                patchCoadd.variance[bbox].array *= np.nan
+
+        box = lsst.geom.Box2I(lsst.geom.Point2I(200, 200), lsst.geom.Point2I(600, 600))
+        task = lsst.ip.diffim.GetTemplateTask()
+        result = task.run(coaddExposures=self.patches,
+                          bbox=lsst.geom.Box2I(box),
+                          wcs=self.exposure.wcs,
+                          dataIds=self.dataIds,
+                          physical_filter="a_test")
+        self._checkMetadata(result.template, task.config, box, self.exposure.wcs, 16)
+        # We just check that the pixel values are all finite. We cannot check that pixel values
+        # in the template are closer to the original anymore.
+        self.assertTrue(np.isfinite(result.template.image.array).all())
 
 
 def setup_module(module):
