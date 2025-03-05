@@ -432,16 +432,16 @@ class GetTemplateTask(pipeBase.PipelineTask):
             merged.maskedImage[maskedImage.getBBox()] += maskedImage
             weights[maskedImage.getBBox()] += weight
 
-        inverseWeights = np.zeros_like(weights.array)
         good = weights.array > 0
-        inverseWeights[good] = 1/weights.array[good]
 
-        # Cannot use `merged.maskedImage *= inverseWeights` because that
+        # Cannot use `merged.maskedImage /= weights` because that
         # operator divides the variance by the weight twice; in this case
-        # `inverseWeights` are the exact values we want to scale by.
-        merged.image.array *= inverseWeights
-        merged.variance.array *= inverseWeights
-        merged.mask.array |= merged.mask.getPlaneBitMask("NO_DATA") * (inverseWeights == 0)
+        # `weights` are the exact values we want to scale by.
+        weights = weights.array[good]
+        merged.image.array[good] /= weights
+        merged.variance.array[good] /= weights
+
+        merged.mask.array[~good] |= merged.mask.getPlaneBitMask("NO_DATA")
 
         return merged
 
