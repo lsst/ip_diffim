@@ -414,7 +414,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
         weights = afwImage.ImageF(bbox)
         for maskedImage in maskedImages:
             # Catch both zero-value and NaN variance plane pixels
-            good = maskedImage.variance.array > 0
+            good = (maskedImage.variance.array > 0) & (np.isfinite(maskedImage.variance.array))
             weight = maskedImage.variance.array[good]**(-0.5)
             bad = np.isnan(maskedImage.image.array) | ~good
             # Note that modifying the patch MaskedImage in place is fine;
