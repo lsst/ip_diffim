@@ -279,8 +279,12 @@ class GetTemplateTask(pipeBase.PipelineTask):
                                                                         dataIds[tract])
             # Combine images from individual patches together.
             unwarped = self._merge(maskedImages, totalBox, catalog[0].wcs)
+            # Delete `maskedImages` after combining into one large image to reduce peak memory use
+            del maskedImages
             potentialInput = self.warper.warpExposure(wcs, unwarped, destBBox=bbox)
 
+            # Delete the single large `unwarped` image after warping to reduce peak memory use
+            del unwarped
             if not np.any(np.isfinite(potentialInput.image.array)):
                 self.log.info("No overlap from coadds in tract %s; not including in output.", tract)
                 continue
