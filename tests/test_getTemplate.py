@@ -28,6 +28,7 @@ import numpy as np
 import lsst.afw.geom
 import lsst.afw.image
 import lsst.afw.math
+from lsst.daf.butler import DataCoordinate, DimensionUniverse
 import lsst.geom
 import lsst.ip.diffim
 import lsst.meas.algorithms
@@ -168,9 +169,12 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
                 )
             )
             self.patches[tract.tract_id].append(dataRef)
-            self.dataIds[tract.tract_id].append({"tract": tract.tract_id,
-                                                 "patch": patchId,
-                                                 "band": "a"})
+            dataCoordinate = DataCoordinate.standardize({"tract": tract.tract_id,
+                                                         "patch": patchId,
+                                                         "band": "a",
+                                                         "skymap": "skymap"},
+                                                        universe=DimensionUniverse())
+            self.dataIds[tract.tract_id].append(dataCoordinate)
 
     def _checkMetadata(self, template, config, box, wcs, nInputs):
         """Check that the various metadata components were set correctly.
