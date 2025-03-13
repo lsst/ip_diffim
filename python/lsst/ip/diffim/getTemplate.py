@@ -27,6 +27,7 @@ import lsst.afw.image as afwImage
 import lsst.geom as geom
 import lsst.afw.geom as afwGeom
 import lsst.afw.table as afwTable
+from lsst.afw.math._warper import computeWarpedBBox
 import lsst.afw.math as afwMath
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
@@ -277,25 +278,33 @@ class GetTemplateTask(pipeBase.PipelineTask):
         for tract in coaddExposureHandles:
             maskedImages, catalog, totalBox = self._makeExposureCatalog(coaddExposureHandles[tract],
                                                                         dataIds[tract])
+            warpedBox = computeWarpedBBox(catalog[0].wcs, bbox, wcs)
+            warpedBox.grow(5)  # to ensure we catch all relevant input pixels
             # Combine images from individual patches together.
-            unwarped = self._merge(maskedImages, totalBox, catalog[0].wcs)
+            unwarped, count = self._merge(maskedImages, warpedBox, catalog[0].wcs)
             # Delete `maskedImages` after combining into one large image to reduce peak memory use
             del maskedImages
-            potentialInput = self.warper.warpExposure(wcs, unwarped, destBBox=bbox)
+            if count == 0:
+                self.log.info("No valid pixels from coadd patches in tract %s; not including in output.",
+                              tract)
+                continue
+            warpedBox.clip(totalBox)
+            potentialInput = self.warper.warpExposure(wcs, unwarped.subset(warpedBox), destBBox=bbox)
 
             # Delete the single large `unwarped` image after warping to reduce peak memory use
             del unwarped
-            if not np.any(np.isfinite(potentialInput.image.array)):
-                self.log.info("No overlap from coadds in tract %s; not including in output.", tract)
+            if np.all(potentialInput.mask.array & potentialInput.mask.getPlaneBitMask("NO_DATA")):
+                self.log.info("No overlap from coadd patches in tract %s; not including in output.", tract)
                 continue
 
             catalogs.append(catalog)
-            warped[tract] = potentialInput
-            warped[tract].setWcs(wcs)
+            warped[tract] = potentialInput.maskedImage
 
         if len(warped) == 0:
             raise pipeBase.NoWorkFound("No patches found to overlap science exposure.")
-        template = self._merge([x.maskedImage for x in warped.values()], bbox, wcs)
+        template, count = self._merge(warped, bbox, wcs)
+        if count == 0:
+            raise pipeBase.NoWorkFound("No valid pixels in warped template.")
 
         # Make a single catalog containing all the inputs that were accepted.
         catalog = afwTable.ExposureCatalog(self.schema)
@@ -362,7 +371,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
 
         Returns
         -------
-        images : `list` [`lsst.afw.image.MaskedImage`]
+        images : `dict` [`lsst.afw.image.MaskedImage`]
             MaskedImages of each of the input exposures, for warping.
         catalog : `lsst.afw.table.ExposureCatalog`
             Catalog of metadata for each exposure
@@ -372,11 +381,11 @@ class GetTemplateTask(pipeBase.PipelineTask):
         catalog = afwTable.ExposureCatalog(self.schema)
         catalog.reserve(len(exposureRefs))
         exposures = (exposureRef.get() for exposureRef in exposureRefs)
-        images = []
+        images = {}
         totalBox = geom.Box2I()
 
         for coadd, dataId in zip(exposures, dataIds):
-            images.append(coadd.maskedImage)
+            images[dataId] = coadd.maskedImage
             bbox = coadd.getBBox()
             totalBox = totalBox.expandedTo(bbox)
             record = catalog.addNew()
@@ -393,15 +402,15 @@ class GetTemplateTask(pipeBase.PipelineTask):
 
         return images, catalog, totalBox
 
-    @staticmethod
-    def _merge(maskedImages, bbox, wcs):
+    def _merge(self, maskedImages, bbox, wcs):
         """Merge the images that came from one tract into one larger image,
         ignoring NaN pixels and non-finite variance pixels from individual
         exposures.
 
         Parameters
         ----------
-        maskedImages : `list` [`lsst.afw.image.MaskedImage`]
+        maskedImages : `dict` [`lsst.afw.image.MaskedImage` or
+                               `lsst.afw.image.Exposure`]
             Images to be merged into one larger bounding box.
         bbox : `lsst.geom.Box2I`
             Bounding box defining the image to merge into.
@@ -413,10 +422,20 @@ class GetTemplateTask(pipeBase.PipelineTask):
         merged : `lsst.afw.image.MaskedImage`
             Merged image with all of the inputs at their respective bbox
             positions.
+        count : `int`
+            Count of the number of good pixels (those with positive weights)
+            in the merged image.
         """
         merged = afwImage.ExposureF(bbox, wcs)
         weights = afwImage.ImageF(bbox)
-        for maskedImage in maskedImages:
+        for dataId, maskedImage in maskedImages.items():
+            # Only merge into the trimmed box, to save memory
+            clippedBox = geom.Box2I(maskedImage.getBBox())
+            clippedBox.clip(bbox)
+            if clippedBox.area == 0:
+                self.log.debug("%s does not overlap template region.", dataId)
+                continue  # nothing in this image overlaps the output
+            maskedImage = maskedImage.subset(clippedBox)
             # Catch both zero-value and NaN variance plane pixels
             good = (maskedImage.variance.array > 0) & (np.isfinite(maskedImage.variance.array))
             weight = maskedImage.variance.array[good]**(-0.5)
@@ -432,10 +451,10 @@ class GetTemplateTask(pipeBase.PipelineTask):
             # `weight` are the exact values we want to scale by.
             maskedImage.image.array[good] *= weight
             maskedImage.variance.array[good] *= weight
-            weights[maskedImage.getBBox()].array[good] += weight
+            weights[clippedBox].array[good] += weight
             # Free memory before creating new large arrays
             del weight
-            merged.maskedImage[maskedImage.getBBox()] += maskedImage
+            merged.maskedImage[clippedBox] += maskedImage
 
         good = weights.array > 0
 
@@ -448,7 +467,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
 
         merged.mask.array[~good] |= merged.mask.getPlaneBitMask("NO_DATA")
 
-        return merged
+        return merged, good.sum()
 
     def _makePsf(self, template, catalog, wcs):
         """Return a PSF containing the PSF at each of the input regions.
