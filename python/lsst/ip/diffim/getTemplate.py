@@ -281,7 +281,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
             warpedBox = computeWarpedBBox(catalog[0].wcs, bbox, wcs)
             warpedBox.grow(5)  # to ensure we catch all relevant input pixels
             # Combine images from individual patches together.
-            unwarped, count = self._merge(maskedImages, warpedBox, catalog[0].wcs)
+            unwarped, count, included = self._merge(maskedImages, warpedBox, catalog[0].wcs)
             # Delete `maskedImages` after combining into one large image to reduce peak memory use
             del maskedImages
             if count == 0:
@@ -297,12 +297,18 @@ class GetTemplateTask(pipeBase.PipelineTask):
                 self.log.info("No overlap from coadd patches in tract %s; not including in output.", tract)
                 continue
 
-            catalogs.append(catalog)
+            # Trim the exposure catalog to just the patches that were used.
+            tempCatalog = afwTable.ExposureCatalog(self.schema)
+            tempCatalog.reserve(len(included))
+            for i in included:
+                tempCatalog.append(catalog[i])
+            catalogs.append(tempCatalog)
             warped[tract] = potentialInput.maskedImage
 
         if len(warped) == 0:
             raise pipeBase.NoWorkFound("No patches found to overlap science exposure.")
-        template, count = self._merge(warped, bbox, wcs)
+        # At this point, all entries will be valid, so we can ignore included.
+        template, count, _ = self._merge(warped, bbox, wcs)
         if count == 0:
             raise pipeBase.NoWorkFound("No valid pixels in warped template.")
 
@@ -425,10 +431,14 @@ class GetTemplateTask(pipeBase.PipelineTask):
         count : `int`
             Count of the number of good pixels (those with positive weights)
             in the merged image.
+        included : `list` [`int`]
+            List of indexes of patches that were included in the merged
+            result, to be used to trim the exposure catalog.
         """
         merged = afwImage.ExposureF(bbox, wcs)
         weights = afwImage.ImageF(bbox)
-        for dataId, maskedImage in maskedImages.items():
+        included = []  # which patches were included in the result
+        for i, (dataId, maskedImage) in enumerate(maskedImages.items()):
             # Only merge into the trimmed box, to save memory
             clippedBox = geom.Box2I(maskedImage.getBBox())
             clippedBox.clip(bbox)
@@ -455,6 +465,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
             # Free memory before creating new large arrays
             del weight
             merged.maskedImage[clippedBox] += maskedImage
+            included.append(i)
 
         good = weights.array > 0
 
@@ -467,7 +478,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
 
         merged.mask.array[~good] |= merged.mask.getPlaneBitMask("NO_DATA")
 
-        return merged, good.sum()
+        return merged, good.sum(), included
 
     def _makePsf(self, template, catalog, wcs):
         """Return a PSF containing the PSF at each of the input regions.

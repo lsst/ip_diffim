@@ -176,7 +176,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
                                                         universe=DimensionUniverse())
             self.dataIds[tract.tract_id].append(dataCoordinate)
 
-    def _checkMetadata(self, template, config, box, wcs, nInputs):
+    def _checkMetadata(self, template, config, box, wcs, nPsfs):
         """Check that the various metadata components were set correctly.
         """
         expectedBox = lsst.geom.Box2I(box)
@@ -190,7 +190,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         self.assertEqual(template.getXY0(), expectedBox.getMin())
         self.assertEqual(template.filter.bandLabel, "a")
         self.assertEqual(template.filter.physicalLabel, "a_test")
-        self.assertEqual(template.psf.getComponentCount(), nInputs)
+        self.assertEqual(template.psf.getComponentCount(), nPsfs)
 
     def _checkPixels(self, template, config, box):
         """Check that the pixel values in the template are close to the
@@ -250,7 +250,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
                           physical_filter="a_test")
 
         # All 4 patches from two tracts are included in this template.
-        self._checkMetadata(result.template, task.config, box, self.exposure.wcs, 8)
+        self._checkMetadata(result.template, task.config, box, self.exposure.wcs, 6)
         self._checkPixels(result.template, task.config, box)
 
     def testRunTwoTracts(self):
@@ -266,7 +266,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
                           physical_filter="a_test")
 
         # All 4 patches from all 4 tracts are included in this template
-        self._checkMetadata(result.template, task.config, box, self.exposure.wcs, 16)
+        self._checkMetadata(result.template, task.config, box, self.exposure.wcs, 9)
         self._checkPixels(result.template, task.config, box)
 
     def testRunNoTemplate(self):
@@ -326,7 +326,9 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
                           wcs=self.exposure.wcs,
                           dataIds=self.dataIds,
                           physical_filter="a_test")
-        self._checkMetadata(result.template, task.config, box, self.exposure.wcs, 16)
+        if debug:
+            _showTemplate(box, result.template)
+        self._checkMetadata(result.template, task.config, box, self.exposure.wcs, 9)
         # We just check that the pixel values are all finite. We cannot check that pixel values
         # in the template are closer to the original anymore.
         self.assertTrue(np.isfinite(result.template.image.array).all())
