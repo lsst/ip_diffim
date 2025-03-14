@@ -310,7 +310,9 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         nInput=[8, 16],
     )
     def testNanInputs(self, box=None, nInput=None):
-        """Test that the template has finite values when some of the input pixels have NaN as variance."""
+        """Test that the template has finite values when some of the input
+        pixels have NaN as variance.
+        """
         for tract, patchRefs in self.patches.items():
             for patchRef in patchRefs:
                 patchCoadd = patchRef.get()
