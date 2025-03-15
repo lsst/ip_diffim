@@ -28,6 +28,7 @@ import numpy as np
 import lsst.afw.geom
 import lsst.afw.image
 import lsst.afw.math
+from lsst.daf.butler import DataCoordinate, DimensionUniverse
 import lsst.geom
 import lsst.ip.diffim
 import lsst.meas.algorithms
@@ -168,11 +169,14 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
                 )
             )
             self.patches[tract.tract_id].append(dataRef)
-            self.dataIds[tract.tract_id].append({"tract": tract.tract_id,
-                                                 "patch": patchId,
-                                                 "band": "a"})
+            dataCoordinate = DataCoordinate.standardize({"tract": tract.tract_id,
+                                                         "patch": patchId,
+                                                         "band": "a",
+                                                         "skymap": "skymap"},
+                                                        universe=DimensionUniverse())
+            self.dataIds[tract.tract_id].append(dataCoordinate)
 
-    def _checkMetadata(self, template, config, box, wcs, nInputs):
+    def _checkMetadata(self, template, config, box, wcs, nPsfs):
         """Check that the various metadata components were set correctly.
         """
         expectedBox = lsst.geom.Box2I(box)
@@ -186,7 +190,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         self.assertEqual(template.getXY0(), expectedBox.getMin())
         self.assertEqual(template.filter.bandLabel, "a")
         self.assertEqual(template.filter.physicalLabel, "a_test")
-        self.assertEqual(template.psf.getComponentCount(), nInputs)
+        self.assertEqual(template.psf.getComponentCount(), nPsfs)
 
     def _checkPixels(self, template, config, box):
         """Check that the pixel values in the template are close to the
@@ -246,7 +250,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
                           physical_filter="a_test")
 
         # All 4 patches from two tracts are included in this template.
-        self._checkMetadata(result.template, task.config, box, self.exposure.wcs, 8)
+        self._checkMetadata(result.template, task.config, box, self.exposure.wcs, 6)
         self._checkPixels(result.template, task.config, box)
 
     def testRunTwoTracts(self):
@@ -262,7 +266,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
                           physical_filter="a_test")
 
         # All 4 patches from all 4 tracts are included in this template
-        self._checkMetadata(result.template, task.config, box, self.exposure.wcs, 16)
+        self._checkMetadata(result.template, task.config, box, self.exposure.wcs, 9)
         self._checkPixels(result.template, task.config, box)
 
     def testRunNoTemplate(self):
@@ -306,7 +310,9 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         nInput=[8, 16],
     )
     def testNanInputs(self, box=None, nInput=None):
-        """Test that the template has finite values when some of the input pixels have NaN as variance."""
+        """Test that the template has finite values when some of the input
+        pixels have NaN as variance.
+        """
         for tract, patchRefs in self.patches.items():
             for patchRef in patchRefs:
                 patchCoadd = patchRef.get()
@@ -322,7 +328,9 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
                           wcs=self.exposure.wcs,
                           dataIds=self.dataIds,
                           physical_filter="a_test")
-        self._checkMetadata(result.template, task.config, box, self.exposure.wcs, 16)
+        if debug:
+            _showTemplate(box, result.template)
+        self._checkMetadata(result.template, task.config, box, self.exposure.wcs, 9)
         # We just check that the pixel values are all finite. We cannot check that pixel values
         # in the template are closer to the original anymore.
         self.assertTrue(np.isfinite(result.template.image.array).all())
