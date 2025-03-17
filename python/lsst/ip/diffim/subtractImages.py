@@ -25,6 +25,7 @@ import numpy as np
 import lsst.afw.detection as afwDetection
 import lsst.afw.geom as afwGeom
 import lsst.afw.image
+from lsst.afw.math._warper import computeWarpedBBox
 import lsst.afw.math
 import lsst.geom
 from lsst.ip.diffim.utils import evaluateMeanPsfFwhm, getPsfFwhm, divideExposureByPatches
@@ -149,6 +150,10 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
         target=MakeKernelTask,
         doc="Task to construct a matching kernel for convolution.",
     )
+    makePatchKernel = lsst.pex.config.ConfigurableField(
+        target=MakeKernelTask,
+        doc="Task to construct a matching kernel for convolution within a patch.",
+    )
     doDecorrelation = lsst.pex.config.Field(
         dtype=bool,
         default=True,
@@ -260,6 +265,8 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
         self.makeKernel.kernel.active.fitForBackground = self.doSubtractBackground
         self.makeKernel.kernel.active.spatialKernelOrder = 1
         self.makeKernel.kernel.active.spatialBgOrder = 2
+        self.makePatchKernel.kernel = self.makeKernel.kernel
+        self.makePatchKernel.kernel.active.fitForBackground = False
         self.sourceSelector.doUnresolved = True  # apply star-galaxy separation
         self.sourceSelector.doIsolated = True  # apply isolated star selection
         self.sourceSelector.doRequirePrimary = True  # apply primary flag selection
@@ -292,6 +299,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         super().__init__(**kwargs)
         self.makeSubtask("decorrelate")
         self.makeSubtask("makeKernel")
+        self.makeSubtask("makePatchKernel")
         self.makeSubtask("sourceSelector")
         if self.config.doScaleVariance:
             self.makeSubtask("scaleVariance")
@@ -498,11 +506,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         return subtractResults
 
     def matchPsfByPatch(self, template, science, sources, skymap, convolveMethod, subtractResults=None):
-        patches = divideExposureByPatches(template, skymap, overlapThreshold=0.1)
-        # patchWeights = []
-        # matchingKernels = []
-        # matchedTemplates = []
-        # diffims = []
+        patches = divideExposureByPatches(template, skymap, overlapThreshold=0.05)
+
         matchedTemplate = np.zeros_like(science.image.array)
         difference = np.zeros_like(science.image.array)
         totalWeight = np.zeros_like(science.image.array)
@@ -512,29 +517,45 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         # cellSize = 128  # Adjust this value based on your image scale
         # spatialCellSet = lsst.afw.math.SpatialCellSet(science.getBBox(), cellSize)
 
+        # Use the full image to fit the background, and as a default for any
+        # patches that are too small
+        boxS = science.getBBox()
+        subtractResults = convolveMethod(template[boxS], science, sources, usePatch=False)
+        science2 = science.clone()
+        science2.maskedImage -= subtractResults.backgroundModel
+        totalWeight += .1
+        difference += subtractResults.difference.image.array*totalWeight
+
         # Loop through the overlapping patches, from largest to smallest overlap
+        failedPatches = []
+
         for patch in patches:
+            self.log.info(f"PSF matching patch {patch}")
             patchCorners = patch.wcs.pixelToSky(lsst.geom.Box2D(patch.getInnerBBox()).getCorners())
+            warpedPatchBox = computeWarpedBBox(patch.wcs, patch.getInnerBBox(), science.wcs)
+            warpedPatchBox.clip(science.getBBox())
+
             patchPolygon = afwGeom.Polygon(template.wcs.skyToPixel(patchCorners))
             inds = patchPolygon.contains(sources.getX(), sources.getY())
             selectSources = sources[inds]
             patchOuterCorners = patch.wcs.pixelToSky(lsst.geom.Box2D(patch.getOuterBBox()).getCorners())
             patchOuterPolygon = afwGeom.Polygon(template.wcs.skyToPixel(patchOuterCorners))
             patchBBox = lsst.geom.Box2I(patchOuterPolygon.getBBox())
+            templatePsfSize = getPsfFwhm(template[warpedPatchBox].psf, position=patchBBox.getCenter())
+            sciencePsfSize = getPsfFwhm(science[warpedPatchBox].psf, position=patchBBox.getCenter())
+            self.log.info(f"Science image PSF size in patch: {sciencePsfSize}")
+            self.log.info(f"Template image PSF size in patch: {templatePsfSize}")
             boxS = science.getBBox()
-            if subtractResults is None:
-                boxT = template.getBBox()
-                firstPatch = True
-            else:
-                boxT = boxS.clippedTo(patchBBox)
-                boxT.grow(templateBorderSize)
-                boxS = boxS.clippedTo(patchBBox)
-                firstPatch = False
-            # try:
-            subtractResultsPatch = convolveMethod(template[boxT], science[boxS], selectSources)
-            # except (RuntimeError, lsst.pex.exceptions.Exception) as e:
-            #     self.log.warning(f"Failed to fit patch {patch}: {e}")
-            #     continue
+            boxT = boxS.clippedTo(patchBBox)
+            boxT.grow(templateBorderSize)
+            boxS = boxS.clippedTo(patchBBox)
+            try:
+                subtractResultsPatch = convolveMethod(template[boxT], science2[boxS], selectSources,
+                                                      usePatch=True)
+            except (RuntimeError, lsst.pex.exceptions.Exception) as e:
+                self.log.warning(f"Failed to fit patch {patch}: {e}")
+                failedPatches.append(patch)
+                continue
             weight = patchOuterPolygon.createImage(boxS).array
             arrayBegin = lsst.geom.Point2I(0, 0)
             arrayBegin.shift(boxS.getBegin() - science.getBBox().getBegin())
@@ -544,25 +565,33 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             # matchingKernels.append(subtractResults.psfMatchingKernel)
             # matchedTemplates.append(subtractResults.matchedTemplate)
             # diffims.append(subtractResults.difference)
-            if firstPatch:
-                notInPatch = weight < 1
-                weight[notInPatch] += 0.05
-                subtractResults = subtractResultsPatch
+            # if firstPatch:
+            #     notInPatch = weight < 1
+            #     weight[notInPatch] += 0.01
+            #     subtractResults = subtractResultsPatch
             matchedTemplate[box.getSlices()] += subtractResultsPatch.matchedTemplate.image.array*weight
             difference[box.getSlices()] += subtractResultsPatch.difference.image.array*weight
             totalWeight[box.getSlices()] += weight
             # candidate = MyKernelSpatialCellCandidate(patchPolygon, subtractResults.psfMatchingKernel)
             # spatialCellSet.insertCandidate(candidate)
-        if subtractResults is None:
-            raise RuntimeError(f"Failed to fit any patch from {patches}")
+        # if subtractResults is None:
+        #     raise RuntimeError(f"Failed to fit any patch from {patches}")
 
         inds = totalWeight > 0
         matchedTemplate[inds] /= totalWeight[inds]
         difference[inds] /= totalWeight[inds]
+        inds = science.mask.array & science.mask.getPlaneBitMask("NO_DATA") > 0
+        matchedTemplate[inds] = 0
+        difference[inds] = 0
+
         # matchedTemplate[~inds] = subtractResults.matchedTemplate.image.array[~inds]
         # difference[~inds] = subtractResults.difference.image.array[~inds]
         subtractResults.matchedTemplate.image.array = matchedTemplate
         subtractResults.difference.image.array = difference
+        
+        subtractResults.difference = self.finalize(template, science, subtractResults.difference,
+                                                   subtractResults.psfMatchingKernel,
+                                                   templateMatched=True)
         # subtractResults.psfMatchingKernel = CoaddPsf(spatialCellSet)
         return subtractResults
 
@@ -636,7 +665,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                       self.metadata["differenceFootprintRatioMean"],
                       self.metadata["differenceFootprintRatioStdev"])
 
-    def runConvolveTemplate(self, template, science, selectSources):
+    def runConvolveTemplate(self, template, science, selectSources, usePatch=False):
         """Convolve the template image with a PSF-matching kernel and subtract
         from the science image.
 
@@ -665,27 +694,28 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                 Kernel used to PSF-match the template to the science image.
         """
         self.metadata["convolvedExposure"] = "Template"
+        kernelTask = self.makePatchKernel if usePatch else self.makeKernel
         try:
-            kernelSources = self.makeKernel.selectKernelSources(template, science,
-                                                                candidateList=selectSources,
-                                                                preconvolved=False)
-            kernelResult = self.makeKernel.run(template, science, kernelSources,
-                                               preconvolved=False)
+            kernelSources = kernelTask.selectKernelSources(template, science,
+                                                           candidateList=selectSources,
+                                                           preconvolved=False)
+            kernelResult = kernelTask.run(template, science, kernelSources,
+                                          preconvolved=False)
         except Exception as e:
             if self.config.allowKernelSourceDetection:
                 self.log.warning("Error encountered trying to construct the matching kernel"
                                  f" Running source detection and retrying. {e}")
-                kernelSize = self.makeKernel.makeKernelBasisList(
+                kernelSize = kernelTask.makeKernelBasisList(
                     self.templatePsfSize, self.sciencePsfSize)[0].getWidth()
                 sigmaToFwhm = 2*np.log(2*np.sqrt(2))
-                candidateList = self.makeKernel.makeCandidateList(template, science, kernelSize,
-                                                                  candidateList=None,
-                                                                  sigma=self.sciencePsfSize/sigmaToFwhm)
-                kernelSources = self.makeKernel.selectKernelSources(template, science,
-                                                                    candidateList=candidateList,
-                                                                    preconvolved=False)
-                kernelResult = self.makeKernel.run(template, science, kernelSources,
-                                                   preconvolved=False)
+                candidateList = kernelTask.makeCandidateList(template, science, kernelSize,
+                                                             candidateList=None,
+                                                             sigma=self.sciencePsfSize/sigmaToFwhm)
+                kernelSources = kernelTask.selectKernelSources(template, science,
+                                                               candidateList=candidateList,
+                                                               preconvolved=False)
+                kernelResult = kernelTask.run(template, science, kernelSources,
+                                              preconvolved=False)
             else:
                 raise e
 
@@ -695,21 +725,21 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                                                  psf=science.psf,
                                                  photoCalib=science.photoCalib)
 
+        if self.config.doSubtractBackground and ~ usePatch:
+            backgroundModel = kernelResult.backgroundModel
+        else:
+            backgroundModel = None
         difference = _subtractImages(science, matchedTemplate,
-                                     backgroundModel=(kernelResult.backgroundModel
-                                                      if self.config.doSubtractBackground else None))
-        correctedExposure = self.finalize(template, science, difference,
-                                          kernelResult.psfMatchingKernel,
-                                          templateMatched=True)
+                                     backgroundModel=backgroundModel)
 
-        return lsst.pipe.base.Struct(difference=correctedExposure,
+        return lsst.pipe.base.Struct(difference=difference,
                                      matchedTemplate=matchedTemplate,
                                      matchedScience=science,
-                                     backgroundModel=kernelResult.backgroundModel,
+                                     backgroundModel=backgroundModel,
                                      psfMatchingKernel=kernelResult.psfMatchingKernel,
                                      kernelSources=kernelSources)
 
-    def runConvolveScience(self, template, science, selectSources):
+    def runConvolveScience(self, template, science, selectSources, usePatch=False):
         """Convolve the science image with a PSF-matching kernel and subtract
         the template image.
 
@@ -739,12 +769,13 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                Kernel used to PSF-match the science image to the template.
         """
         self.metadata["convolvedExposure"] = "Science"
+        kernelTask = self.makePatchKernel if usePatch else self.makeKernel
         bbox = science.getBBox()
-        kernelSources = self.makeKernel.selectKernelSources(science, template,
-                                                            candidateList=selectSources,
-                                                            preconvolved=False)
-        kernelResult = self.makeKernel.run(science, template, kernelSources,
-                                           preconvolved=False)
+        kernelSources = kernelTask.selectKernelSources(science, template,
+                                                       candidateList=selectSources,
+                                                       preconvolved=False)
+        kernelResult = kernelTask.run(science, template, kernelSources,
+                                      preconvolved=False)
         modelParams = kernelResult.backgroundModel.getParameters()
         # We must invert the background model if the matching kernel is solved for the science image.
         kernelResult.backgroundModel.setParameters([-p for p in modelParams])
@@ -762,18 +793,21 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         matchedTemplate.maskedImage /= norm
         matchedTemplate.setPhotoCalib(science.photoCalib)
 
+        if self.config.doSubtractBackground and ~ usePatch:
+            backgroundModel = kernelResult.backgroundModel
+        else:
+            backgroundModel = None
         difference = _subtractImages(matchedScience, matchedTemplate,
-                                     backgroundModel=(kernelResult.backgroundModel
-                                                      if self.config.doSubtractBackground else None))
+                                     backgroundModel=backgroundModel)
 
-        correctedExposure = self.finalize(template, science, difference,
-                                          kernelResult.psfMatchingKernel,
-                                          templateMatched=False)
+        # correctedExposure = self.finalize(template, science, difference,
+        #                                   kernelResult.psfMatchingKernel,
+        #                                   templateMatched=False)
 
-        return lsst.pipe.base.Struct(difference=correctedExposure,
+        return lsst.pipe.base.Struct(difference=difference,
                                      matchedTemplate=matchedTemplate,
                                      matchedScience=matchedScience,
-                                     backgroundModel=kernelResult.backgroundModel,
+                                     backgroundModel=backgroundModel,
                                      psfMatchingKernel=kernelResult.psfMatchingKernel,
                                      kernelSources=kernelSources)
 
