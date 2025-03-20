@@ -375,7 +375,8 @@ class GetTemplateTask(pipeBase.PipelineTask):
 
         return images, catalog, totalBox
 
-    def _merge(self, maskedImages, bbox, wcs):
+    @staticmethod
+    def _merge(maskedImages, bbox, wcs):
         """Merge the images that came from one tract into one larger image,
         ignoring NaN pixels and non-finite variance pixels from individual
         exposures.
@@ -398,8 +399,11 @@ class GetTemplateTask(pipeBase.PipelineTask):
         merged = afwImage.ExposureF(bbox, wcs)
         weights = afwImage.ImageF(bbox)
         for maskedImage in maskedImages:
-            weight = afwImage.ImageF(maskedImage.variance.array**(-0.5))
-            bad = np.isnan(maskedImage.image.array) | ~np.isfinite(maskedImage.variance.array)
+            # Catch both zero-value and NaN variance plane pixels
+            good = maskedImage.variance.array > 0
+            weight = afwImage.ImageF(maskedImage.getBBox())
+            weight.array[good] = maskedImage.variance.array[good]**(-0.5)
+            bad = np.isnan(maskedImage.image.array) | ~good
             # Note that modifying the patch MaskedImage in place is fine;
             # we're throwing it away at the end anyway.
             maskedImage.image.array[bad] = 0.0
@@ -412,16 +416,18 @@ class GetTemplateTask(pipeBase.PipelineTask):
             maskedImage.image *= weight
             maskedImage.variance *= weight
             merged.maskedImage[maskedImage.getBBox()] += maskedImage
-            # Clear the NaNs to ensure that areas missing from this input are
-            # masked with NO_DATA after the loop.
-            weight.array[np.isnan(weight.array)] = 0
             weights[maskedImage.getBBox()] += weight
-        # Cannot use `merged.maskedImage /= weights` because that operator
-        # divides the variance by the weight twice; in this case `weights` are
-        # the exact values we want to scale by.
-        merged.image /= weights
-        merged.variance /= weights
-        merged.mask.array |= merged.mask.getPlaneBitMask("NO_DATA") * (weights.array == 0)
+
+        inverseWeights = np.zeros_like(weights.array)
+        good = weights.array > 0
+        inverseWeights[good] = 1/weights.array[good]
+
+        # Cannot use `merged.maskedImage *= inverseWeights` because that
+        # operator divides the variance by the weight twice; in this case
+        # `inverseWeights` are the exact values we want to scale by.
+        merged.image.array *= inverseWeights
+        merged.variance.array *= inverseWeights
+        merged.mask.array |= merged.mask.getPlaneBitMask("NO_DATA") * (inverseWeights == 0)
 
         return merged
 
