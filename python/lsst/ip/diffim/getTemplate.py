@@ -725,8 +725,17 @@ class GetDcrTemplateTask(GetTemplateTask):
                                                 self.config.effectiveWavelength,
                                                 self.config.bandwidth,
                                                 self.config.numSubfilters)
-                coaddExposures[tract].append(dcrModel.buildMatchedExposure(visitInfo=visitInfo))
+                dcrModel = wrapImageAsDataReference(dcrModel.buildMatchedExposure(visitInfo=visitInfo))
+                coaddExposures[tract].append(dcrModel)
         return coaddExposures
+
+
+class wrapImageAsDataReference:
+    def __init__(self, exposure):
+        self.exposure = exposure
+
+    def get(self):
+        return self.exposure
 
 
 def _selectDataRef(coaddRef, tract, patch):
