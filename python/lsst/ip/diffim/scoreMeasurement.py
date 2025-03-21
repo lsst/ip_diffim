@@ -94,15 +94,17 @@ class SingleFrameScoreMeasurementTask(lsst.meas.base.SingleFrameMeasurementTask)
         # kernelImage[box.getCenter()] = 1
         deconvolved = lsst.afw.image.ExposureD(box)
         shape = deconvolved.image.array.shape
-        cutout = lsst.afw.image.ImageD(box)
+        cutout = lsst.afw.image.ImageF(box)
         cutout[box].array = exposure.image[box].array
         # TODO: restore rfft2 once we've debugged things (will make slicing harder)
-        fftexp = np.fft.fft2(exposure.image[box].array, shape)
+        fftcutout = np.fft.fft2(exposure.image[box].array, shape)
         fftkernel = np.fft.fft2(np.roll(kernelImage.array, (0, 0)), shape)
+        # TODO: consider a blackman-harris windowing function on either the
+        # quotient or fftcutout.
         quotient = np.zeros_like(fftkernel)
-        # TODO: How do we choose the best region to remove
+        # TODO: How do we choose the best region to remove?
         slice = np.s_[12:17, 12:17]
-        quotient[slice] = np.fft.fftshift(fftexp / np.abs(fftkernel))[slice]
+        quotient[slice] = np.fft.fftshift(fftcutout / np.abs(fftkernel))[slice]
         deconvolved.image.array = np.fft.ifft2(np.fft.fftshift(quotient),
                                                deconvolved.image.array.shape).real
         temp = lsst.afw.image.ImageD(box)
@@ -113,57 +115,57 @@ class SingleFrameScoreMeasurementTask(lsst.meas.base.SingleFrameMeasurementTask)
         display.frame += 1
         display.image(cutout, title="exposure")
         display.frame += 1
-        temp.array = np.fft.fftshift(np.array(np.abs(fftexp), dtype=np.float64))
-        display.image(temp, title="fftexp")
+        temp.array = np.fft.fftshift(np.array(np.abs(fftcutout), dtype=np.float64))
+        display.image(temp, title="fftcutout")
         display.frame += 1
         temp.array = np.fft.fftshift(np.abs(fftkernel))
         display.image(temp, title="fftkernel")
         display.frame += 1
-        temp.array = np.abs(np.quotient)
-        display.image(temp, title="fftexp/fftkernel")
-        import os; print(os.getpid()); import ipdb; ipdb.set_trace();
+        temp.array = np.abs(quotient)
+        display.image(temp, title="fftcutout/fftkernel")
+
         # display.frame = 1
         # fftkernel = np.fft.fft2(np.roll(kernelImage.array, (0, 0))))
-        # deconvolved.image.array = np.fft.ifft2(fftexp/fftkernel),
+        # deconvolved.image.array = np.fft.ifft2(fftcutout/fftkernel),
         #                                        deconvolved.image.array.shape).real
         # display.image(deconvolved, title="no shift")
         # display.frame += 1
         # fftkernel = np.fft.fft2(np.roll(kernelImage.array, (1, 0))))
-        # deconvolved.image.array = np.fft.ifft2(fftexp/fftkernel),
+        # deconvolved.image.array = np.fft.ifft2(fftcutout/fftkernel),
         #                                        deconvolved.image.array.shape).real
         # display.image(deconvolved, title="x=1")
         # display.frame += 1
         # fftkernel = np.fft.fft2(np.roll(kernelImage.array, (-1, 0))))
-        # deconvolved.image.array = np.fft.ifft2(fftexp/fftkernel),
+        # deconvolved.image.array = np.fft.ifft2(fftcutout/fftkernel),
         #                                        deconvolved.image.array.shape).real
         # display.image(deconvolved, title="x=-1")
         # display.frame += 1
         # fftkernel = np.fft.fft2(np.roll(kernelImage.array, (0, 1))))
-        # deconvolved.image.array = np.fft.ifft2(fftexp/fftkernel),
+        # deconvolved.image.array = np.fft.ifft2(fftcutout/fftkernel),
         #                                        deconvolved.image.array.shape).real
         # display.image(deconvolved, title="y=1")
         # display.frame += 1
         # fftkernel = np.fft.fft2(np.roll(kernelImage.array, (0, -1))))
-        # deconvolved.image.array = np.fft.ifft2(fftexp/fftkernel),
+        # deconvolved.image.array = np.fft.ifft2(fftcutout/fftkernel),
         #                                        deconvolved.image.array.shape).real
         # display.image(deconvolved, title="y=-1")
         # display.frame += 1
         # fftkernel = np.fft.fft2(np.roll(kernelImage.array, (1, 1))))
-        # deconvolved.image.array = np.fft.ifft2(fftexp/fftkernel),
+        # deconvolved.image.array = np.fft.ifft2(fftcutout/fftkernel),
         #                                        deconvolved.image.array.shape).real
         # display.image(deconvolved, title="both=1")
         # display.frame += 1
         # fftkernel = np.fft.fft2(np.roll(kernelImage.array, (-1, -1))))
-        # deconvolved.image.array = np.fft.ifft2(fftexp/fftkernel),
+        # deconvolved.image.array = np.fft.ifft2(fftcutout/fftkernel),
         #                                        deconvolved.image.array.shape).real
         # display.image(deconvolved, title="both=-1")
 
         # # display.frame = 1
-        # # display.image(fftexp, title="fftexp")
+        # # display.image(fftcutout, title="fftcutout")
         # # display.frame = 1
         # # display.image(fftkernel, title="fftkernel")
         # # display.frame = 1
-        # # display.image(fftexp/fftkernel, title="fftexp/fftkernel")
+        # # display.image(fftcutout/fftkernel, title="fftcutout/fftkernel")
 
         import os; print(os.getpid()); import ipdb; ipdb.set_trace();
 
