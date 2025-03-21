@@ -25,6 +25,7 @@ import lsst.afw.math
 import lsst.afw.table
 import lsst.geom
 import lsst.ip.diffim
+from lsst.meas.algorithms import SourceDetectionTask
 from lsst.meas.base.pluginRegistry import register
 from lsst.meas.base.tests import TestDataset
 import lsst.utils.tests
@@ -57,23 +58,26 @@ class SingleFrameScoreMeasurementTest(lsst.utils.tests.TestCase):
     """
     def setUp(self):
         bbox = lsst.geom.Box2I(lsst.geom.Point2I(5, 4), lsst.geom.Point2I(155, 125))
-        dataset = TestDataset(bbox, psfSigma=4.0, psfDim=27)
+        # TODO: psfDim here shouldn't have to depend on the image cutout size.
+        dataset = TestDataset(bbox, psfSigma=4.0, psfDim=51)
         # two sources, separated by about twice our PSF image size.
+        # TODO: have to separate them more for now, because the convolve below
+        # grows them and detection doesn't deblend them.
         dataset.addSource(1e4, lsst.geom.Point2D(50, 50))
-        dataset.addSource(1e5, lsst.geom.Point2D(80, 50))
+        dataset.addSource(1e5, lsst.geom.Point2D(100, 50))
         self.exposure, self.catalog = dataset.realize(2.0, dataset.makeMinimalSchema())
 
         convolutionControl = lsst.afw.math.ConvolutionControl()
         # convolutionControl.setDoNormalize(False)
         # convolutionControl.setDoCopyEdge(True)
-        image = lsst.afw.image.MaskedImageD(self.exposure.getBBox())
         # import os; print(os.getpid()); import ipdb; ipdb.set_trace();
-        self.score = lsst.afw.math.convolve(image,
-                                            self.exposure.maskedImage,
-                                            self.exposure.psf.getLocalKernel(self.catalog[0].getCentroid()),
-                                            convolutionControl)
-        self.score = lsst.afw.image.ExposureD(self.exposure, deep=True)
-        self.score.maskedImage = image
+        # TODO: should this be a double or float, for reduction of numerical issues?
+        self.score = lsst.afw.image.ExposureF(self.exposure, deep=True)
+        lsst.afw.math.convolve(self.score.maskedImage,
+                               self.exposure.maskedImage,
+                               self.exposure.psf.getLocalKernel(self.catalog[0].getCentroid()),
+                               convolutionControl)
+        self.score.mask.clearMaskPlane(self.score.mask.getMaskPlane("DETECTED"))
 
     def test_callMeasure(self):
         schema = lsst.afw.table.SourceTable.makeMinimalSchema()
@@ -89,17 +93,24 @@ class SingleFrameScoreMeasurementTest(lsst.utils.tests.TestCase):
         config.slots.psfShape = None
         task = lsst.ip.diffim.SingleFrameScoreMeasurementTask(schema=schema,
                                                               config=config)
-        catalog = lsst.afw.table.SourceCatalog(schema)
-        catalog.addNew()
-        catalog[-1].setFootprint(self.catalog[0].getFootprint())
-        catalog.addNew()
-        catalog[-1].setFootprint(self.catalog[1].getFootprint())
 
-        # display = lsst.afw.display.Display()
-        # display.frame = 1
-        # display.image(self.exposure, title="exposure")
-        # display.frame = 2
-        # display.image(self.score, title="score")
+        config = SourceDetectionTask.ConfigClass()
+        config.nSigmaToGrow = 0
+        detection = SourceDetectionTask(config=config)
+        result = detection.run(lsst.afw.table.SourceCatalog(schema), self.score, doSmooth=False)
+        catalog = result.sources
+
+        # catalog = lsst.afw.table.SourceCatalog(schema)
+        # catalog.addNew()
+        # catalog[-1].setFootprint(self.catalog[0].getFootprint())
+        # catalog.addNew()
+        # catalog[-1].setFootprint(self.catalog[1].getFootprint())
+
+        display = lsst.afw.display.Display()
+        display.frame = 1
+        display.image(self.exposure, title="exposure")
+        display.frame = 2
+        display.image(self.score, title="score")
         # display.centroids(catalog, size=10, ctype="red", symbol="x")
         # for x in catalog:
         #     display.dot(x['id'], x.getX(), x.getY(), size=10, ctype="cyan")
