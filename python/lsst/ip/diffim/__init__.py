@@ -37,6 +37,7 @@ from .dipoleFitTask import *
 from .detectAndMeasure import *
 from .imageDecorrelation import *
 from .imageMapReduce import *
+from .scoreMeasurement import *
 from .subtractImages import *
 from .version import *
 
