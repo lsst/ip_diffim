@@ -631,7 +631,7 @@ class GetDcrTemplateTask(GetTemplateTask):
         )
         physical_filter = butlerQC.quantum.dataId["physical_filter"]
         outputs = self.run(
-            coaddExposures=results.coaddExposures,
+            coaddExposureHandles=results.coaddExposures,
             bbox=bbox,
             wcs=wcs,
             dataIds=results.dataIds,
@@ -794,14 +794,14 @@ class GetDcrTemplateTask(GetTemplateTask):
                     self.config.bandwidth,
                     self.config.numSubfilters,
                 )
-                dcrModel = wrapImageAsDataReference(
+                dcrModel = WrapImageAsDataReference(
                     dcrModel.buildMatchedExposure(visitInfo=visitInfo)
                 )
                 coaddExposures[tract].append(dcrModel)
         return coaddExposures
 
 
-class wrapImageAsDataReference:
+class WrapImageAsDataReference:
     def __init__(self, exposure):
         self.exposure = exposure
 
