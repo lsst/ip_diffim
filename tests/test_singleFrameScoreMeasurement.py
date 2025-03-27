@@ -59,7 +59,7 @@ class SingleFrameScoreMeasurementTest(lsst.utils.tests.TestCase):
     def setUp(self):
         bbox = lsst.geom.Box2I(lsst.geom.Point2I(5, 4), lsst.geom.Point2I(155, 125))
         # TODO: psfDim here shouldn't have to depend on the image cutout size.
-        dataset = TestDataset(bbox, psfSigma=4.0, psfDim=51)
+        dataset = TestDataset(bbox, psfSigma=4.0, psfDim=41)
         # two sources, separated by about twice our PSF image size.
         # TODO: have to separate them more for now, because the convolve below
         # grows them and detection doesn't deblend them.

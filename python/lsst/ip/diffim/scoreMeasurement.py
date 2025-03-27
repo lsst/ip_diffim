@@ -73,43 +73,70 @@ class SingleFrameScoreMeasurementTask(lsst.meas.base.SingleFrameMeasurementTask)
         # TODO: either we have to increase the size of the kernel image box, or
         # the size of the cutout, so that they match. Always use the largest size.
         box = record.getFootprint().getBBox()
-        # padded = lsst.geom.Box2I(box)
-        # padded.grow(box.height//2)
         dim = box.getDimensions()
-        dim.x += 1
-        dim.y += 1
+        if dim.x > dim.y:
+            dim.y += 1
+        elif dim.y > dim.x:
+            dim.x += 1
         box = lsst.geom.Box2I.makeCenteredBox(box.getCenter(), dim)
+        padded = lsst.geom.Box2I(box)
+        padded.grow(box.height//2)
         kernelBox = kernel.computeBBox(record.getCentroid())
-        # if (box.width < kernelBox.width) or (box.height < kernelBox.height):
-        #     raise RuntimeError("Can't handle this yet!")
+        if (box.width < kernelBox.width) or (box.height < kernelBox.height):
+            raise RuntimeError("Can't handle this yet!")
 
         # center = lsst.geom.Point2D(record.getCentroid())
         # center.shift(lsst.geom.Extent2D(1, 1))
         # localKernel = kernel.getLocalKernel(record.getCentroid())
-        kernelImage = lsst.afw.image.ImageD(box)
+        kernelImage = lsst.afw.image.ImageD(padded)
         # import os; print(os.getpid()); import ipdb; ipdb.set_trace();
         tempBox = lsst.geom.Box2I.makeCenteredBox(box.getCenter(), kernelBox.getDimensions())
         # localKernel.computeImage(kernelImage[tempBox], doNormalize=True)
         kernelImage[tempBox] = kernel.computeKernelImage(record.getCentroid())
         # kernelImage[box.getCenter()] = 1
-        deconvolved = lsst.afw.image.ExposureD(box)
+        deconvolved = lsst.afw.image.ExposureD(padded)
         shape = deconvolved.image.array.shape
-        cutout = lsst.afw.image.ImageF(box)
+        cutout = lsst.afw.image.ImageF(padded)
         cutout[box].array = exposure.image[box].array
+
         # TODO: restore rfft2 once we've debugged things (will make slicing harder)
-        fftcutout = np.fft.fft2(exposure.image[box].array, shape)
-        fftkernel = np.fft.fft2(np.roll(kernelImage.array, (0, 0)), shape)
         # TODO: consider a blackman-harris windowing function on either the
         # quotient or fftcutout.
+
+        import scipy.ndimage
+        import skimage.filters
+        window = np.zeros(shape, dtype=np.float64)
+        # xx = (18, 18)
+        xx = (dim.x//2, dim.y//2)
+        slice = np.s_[shape[0]//2 - xx[0]//2:shape[0]//2 + xx[0]//2,
+                      shape[1]//2 - xx[1]//2:shape[1]//2 + xx[1]//2]
+        window[slice] = skimage.filters.window('blackmanharris', xx)
+        # window = np.roll(window, (0, 0))
+        # window = scipy.ndimage.shift(window, (0.5, 0.5), order=0)
+        # window = skimage.filters.window('blackmanharris', shape)
+        fftwindow = np.fft.fft2(window, shape)
+        temp = lsst.afw.image.ImageD(box)
+
+        # Ensure cutout is double precision.
+        fftcutout = np.fft.fft2(np.float64(exposure.image[box].array), shape)
+        # TODO: we hopefully don't need np.roll, but what if the dimension is even?
+        fftkernel = np.fft.fft2(np.roll(kernelImage.array, (0, 0)), shape)
+
+        # bad = np.abs(fftkernel) < 1e-3
+        # fftcutout[bad] = 0
+
         quotient = np.zeros_like(fftkernel)
+        # import os; print(os.getpid()); import ipdb; ipdb.set_trace();
         # TODO: How do we choose the best region to remove?
-        slice = np.s_[12:17, 12:17]
-        quotient[slice] = np.fft.fftshift(fftcutout / np.abs(fftkernel))[slice]
+        # slice = np.s_[12:17, 12:17]
+        # quotient[slice] = np.fft.fftshift(fftcutout / np.abs(fftkernel))[slice]
+        quotient = np.fft.fftshift(fftcutout / np.abs(fftkernel))*window
         deconvolved.image.array = np.fft.ifft2(np.fft.fftshift(quotient),
                                                deconvolved.image.array.shape).real
-        temp = lsst.afw.image.ImageD(box)
-        display.frame += 1
-        display.image(kernelImage, title="kernelImage")
+
+        temp = lsst.afw.image.ImageD(padded)
+        # display.frame += 1
+        # display.image(kernelImage, title="kernelImage")
         display.frame += 1
         display.image(deconvolved, title="deconvolved")
         display.frame += 1
@@ -120,6 +147,9 @@ class SingleFrameScoreMeasurementTask(lsst.meas.base.SingleFrameMeasurementTask)
         display.frame += 1
         temp.array = np.fft.fftshift(np.abs(fftkernel))
         display.image(temp, title="fftkernel")
+        display.frame += 1
+        temp.array = window
+        display.image(temp, title="window")
         display.frame += 1
         temp.array = np.abs(quotient)
         display.image(temp, title="fftcutout/fftkernel")
