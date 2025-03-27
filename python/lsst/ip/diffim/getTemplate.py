@@ -31,6 +31,8 @@ from lsst.afw.math._warper import computeWarpedBBox
 import lsst.afw.math as afwMath
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
+
+from lsst.daf.butler import DeferredDatasetHandle
 from lsst.skymap import BaseSkyMap
 from lsst.ip.diffim.dcrModel import DcrModel
 from lsst.meas.algorithms import CoaddPsf, CoaddPsfConfig
@@ -372,6 +374,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
             Record of the tract and patch of each coaddExposure.
         coaddExposures : `dict` [`int`,  `list` of \
                           [`lsst.daf.butler.DeferredDatasetHandle` of \
+                           `lsst.afw.image.Exposure` or
                            `lsst.afw.image.Exposure`]]
             Coadds to be mosaicked.
 
@@ -392,11 +395,15 @@ class GetTemplateTask(pipeBase.PipelineTask):
         if len(bands) > 1:
             raise RuntimeError(f"GetTemplateTask called with multiple bands: {bands}")
         band = bands.pop()
-        photoCalibs = [
-            exposure.get(component="photoCalib")
-            for exposures in coaddExposures.values()
-            for exposure in exposures
-        ]
+        if isinstance(coaddExposures[0], DeferredDatasetHandle):
+            photoCalibs = [
+                exposure.get(component="photoCalib")
+                for exposures in coaddExposures.values()
+                for exposure in exposures
+            ]
+        else:
+            photoCalibs = [exposure.photoCalib for exposures in coaddExposures.values()
+                           for exposure in exposures]
         if not all([photoCalibs[0] == x for x in photoCalibs]):
             msg = f"GetTemplateTask called with exposures with different photoCalibs: {photoCalibs}"
             raise RuntimeError(msg)
