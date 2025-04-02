@@ -141,8 +141,12 @@ class SourceFlagChecker(object):
     """Functor class to check whether a diaSource has flags set that should cause it to be labeled bad."""
 
     def __init__(self, sources, badFlags=None):
-        self.badFlags = ['base_PixelFlags_flag_edge', 'base_PixelFlags_flag_interpolatedCenter',
-                         'base_PixelFlags_flag_saturatedCenter']
+        self.badFlags = [
+            "base_PixelFlags_flag_edge",
+            "base_PixelFlags_flag_nodata",
+            "base_PixelFlags_flag_interpolatedCenter",
+            "base_PixelFlags_flag_saturatedCenter",
+        ]
         if badFlags is not None:
             for flag in badFlags:
                 self.badFlags.append(flag)
