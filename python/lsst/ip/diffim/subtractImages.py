@@ -35,6 +35,9 @@ from lsst.pipe.base import connectionTypes
 from . import MakeKernelTask, DecorrelateALKernelTask
 from lsst.utils.timer import timeMethod
 
+from astropy.utils.iers import conf
+conf.auto_max_age = None
+
 __all__ = ["AlardLuptonSubtractConfig", "AlardLuptonSubtractTask",
            "AlardLuptonPreconvolveSubtractConfig", "AlardLuptonPreconvolveSubtractTask"]
 

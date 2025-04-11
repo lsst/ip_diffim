@@ -36,6 +36,9 @@ from lsst.ip.diffim.dcrModel import DcrModel
 from lsst.meas.algorithms import CoaddPsf, CoaddPsfConfig
 from lsst.utils.timer import timeMethod
 
+from astropy.utils.iers import conf
+conf.auto_max_age = None
+
 __all__ = ["GetTemplateTask", "GetTemplateConfig",
            "GetDcrTemplateTask", "GetDcrTemplateConfig"]
 

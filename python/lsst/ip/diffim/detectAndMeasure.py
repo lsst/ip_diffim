@@ -41,6 +41,9 @@ from lsst.utils.timer import timeMethod
 
 from . import DipoleFitTask
 
+from astropy.utils.iers import conf
+conf.auto_max_age = None
+
 __all__ = ["DetectAndMeasureConfig", "DetectAndMeasureTask",
            "DetectAndMeasureScoreConfig", "DetectAndMeasureScoreTask"]
 
