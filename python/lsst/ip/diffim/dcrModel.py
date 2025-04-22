@@ -25,6 +25,7 @@ from scipy import ndimage
 from lsst.afw.coord import differentialRefraction
 import lsst.afw.image as afwImage
 import lsst.geom as geom
+import lsst.pipe.base as pipeBase
 
 __all__ = ["DcrModel", "applyDcr", "calculateDcr", "calculateImageParallacticAngle"]
 
@@ -470,6 +471,48 @@ class DcrModel:
                                " you must also specify the photoCalib.")
         templateExposure.setPhotoCalib(self.photoCalib)
         return templateExposure
+
+    def buildMatchedExposureHandle(self, exposure=None, visitInfo=None, bbox=None, mask=None):
+        """Create in-memory butler dataset reference containing the DCR-matched
+        template.
+
+        Parameters
+        ----------
+        exposure : `lsst.afw.image.Exposure`, optional
+            The input exposure to build a matched template for.
+            May be omitted if all of the metadata is supplied separately
+        visitInfo : `lsst.afw.image.VisitInfo`, optional
+            Metadata for the exposure. Ignored if ``exposure`` is set.
+        bbox : `lsst.afw.geom.Box2I`, optional
+            Sub-region of the coadd, or use the entire coadd if not supplied.
+        mask : `lsst.afw.image.Mask`, optional
+            reference mask to use for the template image.
+
+        Returns
+        -------
+        templateExposureHandle: `lsst.pipe.base.InMemoryDatasetHandle`
+            In-memory butler dataset reference containing the DCR-matched
+            template.
+
+        Raises
+        ------
+        ValueError
+            If no `exposure` or `visitInfo` is set.
+        """
+        if exposure is not None:
+            visitInfo = exposure.visitInfo
+        elif visitInfo is None:
+            raise ValueError("Either exposure or visitInfo must be set.")
+        templateExposure = self.buildMatchedExposure(
+            exposure=exposure, visitInfo=visitInfo, bbox=bbox, mask=mask
+        )
+        templateExposureHandle = pipeBase.InMemoryDatasetHandle(
+            templateExposure,
+            storageClass="ExposureF",
+            copy=False,
+            photoCalib=self.photoCalib
+        )
+        return templateExposureHandle
 
     def conditionDcrModel(self, modelImages, bbox, gain=1.):
         """Average two iterations' solutions to reduce oscillations.
