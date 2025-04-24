@@ -68,11 +68,14 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
     combinations of one or multiple tracts.
     """
     def setUp(self):
+        self.getTemplateTask = lsst.ip.diffim.getTemplate.GetTemplateTask
+        self.expectedNoDataSum = 20990
         self.scale = 0.2  # arcsec/pixel
         self.skymap = self._makeSkymap()
         self.patches = collections.defaultdict(list)
         self.dataIds = collections.defaultdict(list)
         self.exposure = self._makeExposure()
+        self.useDcr = False
 
         if debug:
             display.image(self.exposure, "base exposure")
@@ -190,7 +193,11 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         self.assertEqual(template.getXY0(), expectedBox.getMin())
         self.assertEqual(template.filter.bandLabel, "a")
         self.assertEqual(template.filter.physicalLabel, "a_test")
-        self.assertEqual(template.psf.getComponentCount(), nPsfs)
+        # self.useDcr set in the right places, True & False in setup
+        if self.useDcr:
+            self.assertEqual(template.psf.getComponentCount(), nPsfs*self.dcrNumSubfilters)
+        else:
+            self.assertEqual(template.psf.getComponentCount(), nPsfs)
 
     def _checkPixels(self, template, config, box):
         """Check that the pixel values in the template are close to the
@@ -222,7 +229,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         tract input correctly.
         """
         box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
-        task = lsst.ip.diffim.GetTemplateTask()
+        task = self.getTemplateTask()
         # Restrict to tract 0, since the box fits in just that tract.
         # Task modifies the input bbox, so pass a copy.
         result = task.run(coaddExposureHandles={0: self.patches[0]},
@@ -241,7 +248,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         mostly NaN after warping are merged correctly in the output.
         """
         box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
-        task = lsst.ip.diffim.GetTemplateTask()
+        task = self.getTemplateTask()
         # Task modifies the input bbox, so pass a copy.
         result = task.run(coaddExposureHandles=self.patches,
                           bbox=lsst.geom.Box2I(box),
@@ -257,7 +264,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         """Test a bounding box that crosses tract boundaries.
         """
         box = lsst.geom.Box2I(lsst.geom.Point2I(200, 200), lsst.geom.Point2I(600, 600))
-        task = lsst.ip.diffim.GetTemplateTask()
+        task = self.getTemplateTask()
         # Task modifies the input bbox, so pass a copy.
         result = task.run(coaddExposureHandles=self.patches,
                           bbox=lsst.geom.Box2I(box),
@@ -273,7 +280,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         """A bounding box that doesn't overlap the patches will raise.
         """
         box = lsst.geom.Box2I(lsst.geom.Point2I(1200, 1200), lsst.geom.Point2I(1600, 1600))
-        task = lsst.ip.diffim.GetTemplateTask()
+        task = self.getTemplateTask()
         with self.assertRaisesRegex(lsst.pipe.base.NoWorkFound, "No patches found"):
             task.run(coaddExposureHandles=self.patches,
                      bbox=lsst.geom.Box2I(box),
@@ -290,7 +297,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         # tract=0, patch=1 is the lower-left corner, as displayed in DS9.
         self.patches[0].pop(1)
         box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
-        task = lsst.ip.diffim.GetTemplateTask()
+        task = self.getTemplateTask()
         # Task modifies the input bbox, so pass a copy.
         result = task.run(coaddExposureHandles=self.patches,
                           bbox=lsst.geom.Box2I(box),
@@ -300,7 +307,10 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         no_data = (result.template.mask.array & result.template.mask.getPlaneBitMask("NO_DATA")) != 0
         self.assertTrue(np.isfinite(result.template.image.array).all())
         self.assertTrue(np.isfinite(result.template.variance.array).all())
-        self.assertEqual(no_data.sum(), 20990)
+        if self.useDcr:
+            self.assertEqual(no_data.sum(), 0)
+        else:
+            self.assertEqual(no_data.sum(), self.expectedNoDataSum)
 
     @lsst.utils.tests.methodParameters(
         box=[
@@ -322,7 +332,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
                 patchCoadd.variance[bbox].array *= np.nan
 
         box = lsst.geom.Box2I(lsst.geom.Point2I(200, 200), lsst.geom.Point2I(600, 600))
-        task = lsst.ip.diffim.GetTemplateTask()
+        task = self.getTemplateTask()
         result = task.run(coaddExposureHandles=self.patches,
                           bbox=lsst.geom.Box2I(box),
                           wcs=self.exposure.wcs,
@@ -334,6 +344,127 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         # We just check that the pixel values are all finite. We cannot check that pixel values
         # in the template are closer to the original anymore.
         self.assertTrue(np.isfinite(result.template.image.array).all())
+
+
+class GetDcrTemplateTaskTestCase(GetTemplateTaskTestCase):
+    """Test that GetDcrTemplateTask works on both one tract and multiple tract
+    input coadd exposures.
+
+    Makes a synthetic exposure large enough to fit four small tracts with 2x2
+    (300x300 pixel) patches each, extracts pixels for those patches by warping,
+    and tests GetDCRTemplateTask's output against boxes that overlap various
+    combinations of one or multiple tracts.
+    """
+
+    def setUp(self):
+        self.dcrNumSubfilters = 3
+        super().setUp()
+        getTemplateTask = lsst.ip.diffim.getTemplate.GetDcrTemplateTask
+        self.useDcr = True
+        self.expectedNoDataSum = 0
+        config = getTemplateTask.ConfigClass()
+        config.bandwidth = 147.0
+        config.effectiveWavelength = 478.5
+        getTemplateTask = getTemplateTask(config=config)
+
+    def _makePatches(self, tract):
+        """Populate the patches and dataId dicts, keyed on tract id, with the
+        warps of the main exposure and minimal dataIds, respectively.
+        """
+        if debug:
+            color = ['red', 'green', 'cyan', 'yellow'][tract.tract_id]
+            point = self.exposure.wcs.skyToPixel(tract.ctr_coord)
+            # Show the tract center, colored by tract id.
+            display.dot("x", point.x, point.y, ctype=color, size=30)
+
+        # Use 5th order to minimize artifacts on the templates.
+        config = lsst.afw.math.Warper.ConfigClass()
+        config.warpingKernelName = "lanczos5"
+        warper = lsst.afw.math.Warper.fromConfig(config)
+        for patchId in range(tract.num_patches.x*tract.num_patches.y):
+            patch = tract.getPatchInfo(patchId)
+            box = patch.getOuterBBox()
+
+            if debug:
+                # Show the patch corners as patch ids, colored by tract id.
+                points = self.exposure.wcs.skyToPixel(patch.wcs.pixelToSky([lsst.geom.Point2D(x)
+                                                                           for x in box.getCorners()]))
+                for p in points:
+                    display.dot(patchId, p.x, p.y, ctype=color)
+
+            # This is mostly stolen from pipe_tasks warpAndPsfMatch, but
+            # ip_diffim cannot depend on pipe_tasks.
+            xyTransform = lsst.afw.geom.makeWcsPairTransform(self.exposure.wcs, patch.wcs)
+            warpedPsf = lsst.meas.algorithms.WarpedPsf(self.exposure.psf, xyTransform)
+            warped = warper.warpExposure(patch.wcs, self.exposure, destBBox=box)
+            warped.setPsf(warpedPsf)
+            for subfilter in range(self.dcrNumSubfilters):
+                dataId = generate_data_id(
+                    tract=tract,
+                    patch=patch,
+                    subfilter=subfilter
+                )
+                dataRef = pipeBase.InMemoryDatasetHandle(
+                    warped,
+                    storageClass="ExposureF",
+                    copy=True,
+                    dataId=dataId
+                )
+                self.patches[tract.tract_id].append(dataRef)
+                dataCoordinate = DataCoordinate.standardize({"tract": tract.tract_id,
+                                                             "patch": patchId,
+                                                             "band": "a",
+                                                             "subfilter": subfilter,
+                                                             "skymap": "skymap"},
+                                                            universe=DimensionUniverse())
+                self.dataIds[tract.tract_id].append(dataCoordinate)
+
+    def testValidate(self):
+        # Check that function does not raise ValueError when self.effectiveWavelength and self.bandwidth are
+        # not None.
+        self.getTemplateTask()
+
+        # Check that function raises ValueError if self.effectiveWavelength is None or self.bandwidth is None
+        with self.assertRaises(ValueError):
+            task = lsst.ip.diffim.getTemplate.GetDcrTemplateTask
+            valueConfig = task.ConfigClass()
+            task(config=valueConfig)
+
+    # def testGetDcrModel(self):
+    #     patchList =self.patches
+    #     visitInfo = self.exposure.visitInfo
+    #     coaddRefs =
+    #     task =
+
+    # def testGetExposures(self):
+    #     box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
+    #     bbox = lsst.geom.Box2I(box)
+    #     skymap = self.skymap
+    #     wcs = self.exposure.wcs
+    #     exposureHandles = []
+
+    #     # check that what we get out of expanding self.patches, we should get content of self.patches
+    #     for i, tract in enumerate(self.patches):
+    #         for patch in self.patches[i]:
+    #             exposureHandles.append(patch)
+
+    #     task = lsst.ip.diffim.getTemplate.GetTemplateTask()
+    #     result = task.getExposures(exposureHandles, bbox, skymap, wcs)
+    #     self.assertEqual(result, self.patches)
+
+    # def testSelectDataRef(self):
+    #     """Test that the input tract and patch match the tract and patch from the dataId.
+    #     """
+    #     coaddRef1 = self.patches[0][0]
+    #     coaddRef2 = self.patches[0][1]
+    #     tract = coaddRef1.dataId['tract']
+    #     patch = coaddRef1.dataId['patch']
+    #     selectDataRef = lsst.ip.diffim.getTemplate._selectDataRef(coaddRef1, tract, patch)
+    #     self.assertTrue(selectDataRef)
+
+    #     patch2 = coaddRef2.dataId['patch']
+    #     selectDataRef2 = lsst.ip.diffim.getTemplate._selectDataRef(coaddRef1, tract, patch2)
+    #     self.assertFalse(selectDataRef2)
 
 
 def setup_module(module):

@@ -1155,6 +1155,7 @@ def generate_data_id(*,
                      cell_x: int = 4,
                      cell_y: int = 2,
                      band: str = "notR",
+                     subfilter: int = 0
                      ) -> DataCoordinate:
     """Generate a DataCoordinate instance to use as data_id.
 
@@ -1200,14 +1201,18 @@ def generate_data_id(*,
         skymap="test_skymap", tract=tract, patch=patch, cell_x=cell_x, cell_y=cell_y
     )
 
+    subfilter_element = universe["subfilter"]
+    subfilter_record = subfilter_element.RecordClass(subfilter=subfilter, band=band)
+
     # A dictionary with all the relevant records.
     record = {
         "instrument": instrument_record,
         "patch": patch_record,
-        "tract": 9813,
+        "tract": tract,
         "band": band_record.name,
         "skymap": skymap_record.name,
         "physical_filter": physical_filter_record,
+        "subfilter": subfilter_record
     }
 
     # A dictionary with all the relevant recordIds.
