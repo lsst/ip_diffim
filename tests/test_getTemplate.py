@@ -153,8 +153,8 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
                 for p in points:
                     display.dot(patchId, p.x, p.y, ctype=color)
 
-            # This is mostly stolen from pipe_tasks warpAndPsfMatch, but
-            # ip_diffim cannot depend on pipe_tasks.
+            # This is mostly taken from drp_tasks makePsfMatchedWarp, but
+            # ip_diffim cannot depend on drp_tasks.
             xyTransform = lsst.afw.geom.makeWcsPairTransform(self.exposure.wcs, patch.wcs)
             warpedPsf = lsst.meas.algorithms.WarpedPsf(self.exposure.psf, xyTransform)
             warped = warper.warpExposure(patch.wcs, self.exposure, destBBox=box)
