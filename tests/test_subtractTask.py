@@ -528,6 +528,11 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
     def test_background_subtraction(self):
         """Check that we can recover the background,
         and that it is subtracted correctly in the difference image.
+
+        NOTE: Background subtraction is now turned off by default in
+        subtractImages. It is now run in detectAndMeasure instead, but since the
+        code to run background subtraction is not being removed this test should
+        stay to make sure it continues functioning as intended.
         """
         noiseLevel = 1.
         xSize = 512
@@ -971,7 +976,7 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
 
         # The mean ratio metric should be much worse on the "bad" subtraction.
         self.assertLess(subtractTask_good.metadata['differenceFootprintRatioMean'], 0.02)
-        self.assertGreater(subtractTask_bad.metadata['differenceFootprintRatioMean'], 0.17)
+        self.assertGreater(subtractTask_bad.metadata['differenceFootprintRatioMean'], 0.12)
 
 
 class AlardLuptonPreconvolveSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.TestCase):

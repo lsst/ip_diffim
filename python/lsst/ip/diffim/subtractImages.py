@@ -175,7 +175,7 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
     doSubtractBackground = lsst.pex.config.Field(
         doc="Subtract the background fit when solving the kernel?",
         dtype=bool,
-        default=True,
+        default=False,
     )
     doApplyExternalCalibrations = lsst.pex.config.Field(
         doc=(

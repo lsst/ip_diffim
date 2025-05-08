@@ -99,7 +99,7 @@ class DetectAndMeasureTestBase:
         if maxValue is not None:
             self.assertTrue(np.all(values <= maxValue))
 
-    def _setup_detection(self, doSkySources=False, nSkySources=5, **kwargs):
+    def _setup_detection(self, doSkySources=False, nSkySources=5, doSubtractBackground=False, **kwargs):
         """Setup and configure the detection and measurement PipelineTask.
 
         Parameters
@@ -134,6 +134,7 @@ class DetectAndMeasureTestBase:
         config.idGenerator.packer["observation"].n_detectors = 99
         config.idGenerator.n_releases = 8
         config.idGenerator.release_id = 2
+        config.doSubtractBackground = doSubtractBackground
         self.idGenerator = config.idGenerator.apply(dataId)
 
         return self.detectionTask(config=config)
@@ -332,6 +333,55 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
             scale = 1. if positive else -1.
             for diaSource in output.diaSources:
                 self._check_diaSource(transientSources, diaSource, refIds=refIds, scale=scale)
+        _detection_wrapper(positive=True)
+        _detection_wrapper(positive=False)
+
+    def test_detect_transients_with_background(self):
+        """Run detection on a difference image containing transients and a background.
+        """
+        # Set up the simulated images
+        noiseLevel = 1.
+        staticSeed = 1
+        transientSeed = 6
+        fluxLevel = 500
+        xSize = 512
+        ySize = 512
+        x0 = 123
+        y0 = 456
+        kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel,
+                  "xSize": xSize, "ySize": ySize, "x0": x0, "y0": y0}
+        params = [2.2, 2.1, 2.0, 1.2, 1.1, 1.0]
+
+        bbox2D = lsst.geom.Box2D(lsst.geom.Point2D(x0, y0), lsst.geom.Extent2D(xSize, ySize))
+        background_model = afwMath.Chebyshev1Function2D(params, bbox2D)
+        science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6,
+                                         background=background_model, **kwargs)
+        matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
+
+        # Configure the detection Task
+        detectionTask = self._setup_detection(doMerge=False, doSubtractBackground=True)
+        kwargs["seed"] = transientSeed
+        kwargs["nSrc"] = 10
+        kwargs["fluxLevel"] = 1000
+
+        # Run detection and check the results
+        def _detection_wrapper(positive=True):
+            transients, transientSources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=8, **kwargs)
+            difference = science.clone()
+            difference.maskedImage -= matchedTemplate.maskedImage
+            if positive:
+                difference.maskedImage += transients.maskedImage
+            else:
+                difference.maskedImage -= transients.maskedImage
+            # NOTE: NoiseReplacer (run by forcedMeasurement) can modify the
+            # science image if we've e.g. removed parents post-deblending.
+            # Pass a clone of the science image, so that it doesn't disrupt
+            # later tests.
+            output = detectionTask.run(science.clone(), matchedTemplate, difference)
+            refIds = []
+            scale = 1. if positive else -1.
+            for transient in transientSources:
+                self._check_diaSource(output.diaSources, transient, refIds=refIds, scale=scale)
         _detection_wrapper(positive=True)
         _detection_wrapper(positive=False)
 

@@ -85,6 +85,12 @@ class DetectAndMeasureConnections(pipeBase.PipelineTaskConnections,
         storageClass="ExposureF",
         name="{fakesType}{coaddName}Diff_differenceExp",
     )
+    differenceBackground = pipeBase.connectionTypes.Output(
+        doc="Background model that was subtracted from the difference image.",
+        dimensions=("instrument", "visit", "detector"),
+        storageClass="Background",
+        name="difference_background",
+    )
     maskedStreaks = pipeBase.connectionTypes.Output(
         doc='Catalog of streak fit parameters for the difference image.',
         storageClass="ArrowNumpyDict",
@@ -96,6 +102,8 @@ class DetectAndMeasureConnections(pipeBase.PipelineTaskConnections,
         super().__init__(config=config)
         if not (self.config.writeStreakInfo and self.config.doMaskStreaks):
             self.outputs.remove("maskedStreaks")
+        if not (self.config.doSubtractBackground and self.config.doWriteBackground):
+            self.outputs.remove("differenceBackground")
 
 
 class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
@@ -116,6 +124,24 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         dtype=bool,
         default=False,
         doc="Add columns to the source table to hold analysis metrics?"
+    )
+    doSubtractBackground = pexConfig.Field(
+        dtype=bool,
+        doc="Subtract a background model from the image before detection?",
+        default=True,
+    )
+    doWriteBackground = pexConfig.Field(
+        dtype=bool,
+        doc="Persist the fitted background model?",
+        default=False,
+    )
+    subtractInitialBackground = pexConfig.ConfigurableField(
+        target=lsst.meas.algorithms.SubtractBackgroundTask,
+        doc="Task to perform intial background subtraction, before first detection pass.",
+    )
+    subtractFinalBackground = pexConfig.ConfigurableField(
+        target=lsst.meas.algorithms.SubtractBackgroundTask,
+        doc="Task to perform final background subtraction, after first detection pass.",
     )
     detection = pexConfig.ConfigurableField(
         target=SourceDetectionTask,
@@ -215,6 +241,20 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
     idGenerator = DetectorVisitIdGeneratorConfig.make_field()
 
     def setDefaults(self):
+        # Background subtraction
+        # Use a small binsize for the first pass to reduce detections on glints
+        #  and extended structures. Should not affect the detectability of
+        #  faint diaSources
+        self.subtractInitialBackground.binSize = 8
+        self.subtractInitialBackground.useApprox = False
+        self.subtractInitialBackground.statisticsProperty = "MEDIAN"
+        self.subtractInitialBackground.doFilterSuperPixels = True
+        # Use a larger binsize for the final background subtraction, to reduce
+        #  over-subtraction of bright objects.
+        self.subtractFinalBackground.binSize = 32
+        self.subtractFinalBackground.useApprox = False
+        self.subtractFinalBackground.statisticsProperty = "MEDIAN"
+        self.subtractFinalBackground.doFilterSuperPixels = True
         # DiaSource Detection
         self.detection.thresholdPolarity = "both"
         self.detection.thresholdValue = 5.0
@@ -226,7 +266,7 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
 
         # Copy configs for binned streak detection from the base detection task
         self.streakDetection.thresholdType = self.detection.thresholdType
-        self.streakDetection.reEstimateBackground = self.detection.reEstimateBackground
+        self.streakDetection.reEstimateBackground = False
         self.streakDetection.excludeMaskPlanes = self.detection.excludeMaskPlanes
         self.streakDetection.thresholdValue = self.detection.thresholdValue
         # Only detect positive streaks
@@ -284,6 +324,9 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         afwTable.CoordKey.addErrorFields(self.schema)
 
         self.algMetadata = dafBase.PropertyList()
+        if self.config.doSubtractBackground:
+            self.makeSubtask("subtractInitialBackground")
+            self.makeSubtask("subtractFinalBackground")
         self.makeSubtask("detection", schema=self.schema)
         if self.config.doDeblend:
             self.makeSubtask("deblend", schema=self.schema)
@@ -381,11 +424,21 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                 Subtracted exposure with detection mask applied.
             ``diaSources``  : `lsst.afw.table.SourceCatalog`
                 The catalog of detected sources.
+            ``differenceBackground`` : `lsst.afw.math.BackgroundList`
+                Background that was subtracted from the difference image.
         """
         if idFactory is None:
             idFactory = lsst.meas.base.IdGenerator().make_table_id_factory()
 
-        self._prepareInputs(difference)
+        if self.config.doSubtractBackground:
+            # Run background subtraction before clearing the mask planes
+            detectionExposure = difference.clone()
+            background = self.subtractInitialBackground.run(detectionExposure).background
+        else:
+            detectionExposure = difference
+            background = afwMath.BackgroundList()
+
+        self._prepareInputs(detectionExposure)
 
         # Don't use the idFactory until after deblend+merge, so that we aren't
         # generating ids that just get thrown away (footprint merge doesn't
@@ -393,29 +446,48 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         table = afwTable.SourceTable.make(self.schema)
         results = self.detection.run(
             table=table,
-            exposure=difference,
+            exposure=detectionExposure,
             doSmooth=True,
+            background=background
         )
+
+        if self.config.doSubtractBackground:
+            # Run background subtraction again after detecting peaks
+            # but before measurement
+            # First update the mask using the detection image
+            difference.setMask(detectionExposure.mask)
+            background = self.subtractFinalBackground.run(difference).background
+
+            # Re-run detection to get final footprints
+            table = afwTable.SourceTable.make(self.schema)
+            results = self.detection.run(
+                table=table,
+                exposure=difference,
+                doSmooth=True,
+                background=background
+            )
 
         if self.config.doDeblend:
             sources, positives, negatives = self._deblend(difference,
                                                           results.positive,
                                                           results.negative)
 
-            return self.processResults(science, matchedTemplate, difference,
-                                       sources, idFactory,
-                                       positives=positives,
-                                       negatives=negatives)
-
+            result = self.processResults(science, matchedTemplate, difference,
+                                         sources, idFactory,
+                                         positives=positives,
+                                         negatives=negatives)
+            result.differenceBackground = background
         else:
             positives = afwTable.SourceCatalog(self.schema)
             results.positive.makeSources(positives)
             negatives = afwTable.SourceCatalog(self.schema)
             results.negative.makeSources(negatives)
-            return self.processResults(science, matchedTemplate, difference,
-                                       results.sources, idFactory,
-                                       positives=positives,
-                                       negatives=negatives)
+            result = self.processResults(science, matchedTemplate, difference,
+                                         results.sources, idFactory,
+                                         positives=positives,
+                                         negatives=negatives)
+            result.differenceBackground = background
+        return result
 
     def _prepareInputs(self, difference):
         """Ensure that we start with an empty detection and deblended mask.
