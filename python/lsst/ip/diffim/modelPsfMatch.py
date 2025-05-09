@@ -27,6 +27,7 @@ import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.geom as geom
 import lsst.pex.config as pexConfig
+import lsst.pex.exceptions as pexExceptions
 import lsst.pipe.base as pipeBase
 from lsst.utils.logging import getTraceLogger
 from lsst.utils.timer import timeMethod
@@ -34,7 +35,12 @@ from .makeKernelBasisList import makeKernelBasisList
 from .psfMatch import PsfMatchTask, PsfMatchConfigAL
 from . import utils as dituils
 
-__all__ = ("ModelPsfMatchTask", "ModelPsfMatchConfig")
+__all__ = (
+    "ModelPsfMatchTask",
+    "ModelPsfMatchConfig",
+    "WarpedPsfTransformTooBigError",
+    "PsfComputeShapeError",
+)
 
 sigma2fwhm = 2.*np.sqrt(2.*np.log(2.))
 
@@ -42,6 +48,26 @@ sigma2fwhm = 2.*np.sqrt(2.*np.log(2.))
 def nextOddInteger(x):
     nextInt = int(np.ceil(x))
     return nextInt + 1 if nextInt%2 == 0 else nextInt
+
+
+class WarpedPsfTransformTooBigError(pipeBase.AlgorithmError):
+    """Raised when the transform of a WarpedPsf is too large to compute
+    the FWHM of the PSF at a given position.
+    """
+    def metadata(self) -> dict:
+        return {}
+
+
+class PsfComputeShapeError(pipeBase.AlgorithmError):
+    def __init__(self, position):
+        message = f"Unable to compute the FWHM of the science Psf at {position}"
+        super().__init__(message)
+        self.position = position
+
+    def metadata(self) -> dict:
+        return {
+            "position": self.position,
+        }
 
 
 class ModelPsfMatchConfig(pexConfig.Config):
@@ -145,7 +171,15 @@ class ModelPsfMatchTask(PsfMatchTask):
         # exposure's bounding box in DM-32756.
         sciAvgPos = exposure.getPsf().getAveragePosition()
         modelAvgPos = referencePsfModel.getAveragePosition()
-        fwhmScience = exposure.getPsf().computeShape(sciAvgPos).getDeterminantRadius()*sigma2fwhm
+        try:
+            fwhmScience = exposure.getPsf().computeShape(sciAvgPos).getDeterminantRadius()*sigma2fwhm
+        except pexExceptions.RangeError:
+            raise WarpedPsfTransformTooBigError(
+                f"Unable to compute the FWHM of the science Psf at {sciAvgPos}"
+                "due to an unexpectedly large transform."
+            )
+        except pexExceptions.Exception:
+            raise PsfComputeShapeError(sciAvgPos)
         fwhmModel = referencePsfModel.computeShape(modelAvgPos).getDeterminantRadius()*sigma2fwhm
 
         basisList = makeKernelBasisList(self.kConfig, fwhmScience, fwhmModel, metadata=self.metadata)
