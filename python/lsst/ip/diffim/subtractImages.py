@@ -242,7 +242,9 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
 
     def setDefaults(self):
         self.makeKernel.kernel.name = "AL"
-        self.makeKernel.kernel.active.fitForBackground = self.doSubtractBackground
+        # Always include background fitting in the kernel fit,
+        # even if it is not subtracted
+        self.makeKernel.kernel.active.fitForBackground = True
         self.makeKernel.kernel.active.spatialKernelOrder = 1
         self.makeKernel.kernel.active.spatialBgOrder = 2
         self.sourceSelector.doUnresolved = True  # apply star-galaxy separation
