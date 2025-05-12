@@ -113,7 +113,7 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
                 s, rel_weight=0.5, separateNegParams=False,
                 verbose=verbose, display=display)
 
-            self.assertFloatsAlmostEqual((result.posFlux + abs(result.negFlux))/2.,
+            self.assertFloatsAlmostEqual((result.posFlux.instFlux + abs(result.negFlux.instFlux))/2.,
                                          dipoleTestImage.flux[i], rtol=rtol)
             self.assertFloatsAlmostEqual(result.posCentroid.x, dipoleTestImage.xc[i] + offsets[i], rtol=rtol)
             self.assertFloatsAlmostEqual(result.posCentroid.y, dipoleTestImage.yc[i] + offsets[i], rtol=rtol)
