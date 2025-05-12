@@ -821,6 +821,7 @@ class DipoleTestImage:
 
         # Start with a minimal schema - only the fields all SourceCatalogs need
         schema = afwTable.SourceTable.makeMinimalSchema()
+        afwTable.CoordKey.addErrorFields(schema)
 
         # Customize the detection task a bit (optional)
         detectConfig = measAlg.SourceDetectionConfig()
