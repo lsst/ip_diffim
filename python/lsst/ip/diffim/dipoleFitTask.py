@@ -928,36 +928,55 @@ class DipoleFitAlgorithm:
             self.log.warning('Unable to import matplotlib: %s', err)
             raise err
 
-        def display2dArray(arr, title='Data', extent=None):
+        def display2dArray(ax, arr, x, y, xErr, yErr, title, extent=None):
             """Use `matplotlib.pyplot.imshow` to display a 2-D array with a given coordinate range.
             """
-            fig = plt.imshow(arr, origin='lower', interpolation='none', cmap='gray', extent=extent)
-            plt.title(title)
-            plt.colorbar(fig, cmap='gray')
+            fig = ax.imshow(arr, origin='lower', interpolation='none', cmap='gray', extent=extent)
+            ax.set_title(title)
+            ax.errorbar(x["total"], y["total"], xErr["total"], yErr["total"], c="cyan")
+            ax.errorbar(x["Pos"], y["Pos"], xErr["Pos"], yErr["Pos"], c="green")
+            ax.errorbar(x["Neg"], y["Neg"], xErr["Neg"], yErr["Neg"], c="red")
             return fig
 
         z = result.data
         fit = result.best_fit
         bbox = footprint.getBBox()
         extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
-        if z.shape[0] == 3:
-            plt.figure(figsize=(8, 8))
-            for i in range(3):
-                plt.subplot(3, 3, i*3+1)
-                display2dArray(z[i, :], 'Data', extent=extent)
-                plt.subplot(3, 3, i*3+2)
-                display2dArray(fit[i, :], 'Model', extent=extent)
-                plt.subplot(3, 3, i*3+3)
-                display2dArray(z[i, :] - fit[i, :], 'Residual', extent=extent)
-        else:
-            plt.figure(figsize=(8, 2.5))
-            plt.subplot(1, 3, 1)
-            display2dArray(z, 'Data', extent=extent)
-            plt.subplot(1, 3, 2)
-            display2dArray(fit, 'Model', extent=extent)
-            plt.subplot(1, 3, 3)
-            display2dArray(z - fit, 'Residual', extent=extent)
 
+        if z.shape[0] == 3:
+            x, y, xErr, yErr = {}, {}, {}, {}
+            for name in ("Pos", "Neg"):
+                x[name] = result.best_values[f"xcen{name}"]
+                y[name] = result.best_values[f"ycen{name}"]
+                xErr[name] = result.params[f"xcen{name}"].stderr
+                yErr[name] = result.params[f"ycen{name}"].stderr
+            x["total"] = (result.best_values["xcenPos"] + result.best_values["xcenNeg"])/2
+            y["total"] = (result.best_values["ycenPos"] + result.best_values["ycenNeg"])/2
+            xErr["total"] = math.sqrt(xErr["Pos"]**2 + xErr["Neg"]**2)
+            yErr["total"] = math.sqrt(yErr["Pos"]**2 + yErr["Neg"]**2)
+
+            fig, axes = plt.subplots(nrows=3, ncols=3, sharex=True, sharey=True, figsize=(8, 8))
+            for i, label in enumerate(("total", "Pos", "Neg")):
+                display2dArray(axes[i][0], z[i, :], x, y, xErr, yErr,
+                               f'Data {label}', extent=extent)
+                display2dArray(axes[i][1], fit[i, :], x, y, xErr, yErr,
+                               f'Model {label}', extent=extent)
+                display2dArray(axes[i][2], z[i, :] - fit[i, :], x, y, xErr, yErr,
+                               f'Residual {label}', extent=extent)
+
+                plt.setp(axes[i][1].get_yticklabels(), visible=False)
+                plt.setp(axes[i][2].get_yticklabels(), visible=False)
+                if i != 2:  # remove top two row x-axis labels
+                    plt.setp(axes[i][0].get_xticklabels(), visible=False)
+                    plt.setp(axes[i][1].get_xticklabels(), visible=False)
+                    plt.setp(axes[i][2].get_xticklabels(), visible=False)
+        else:
+            fig, axes = plt.subplots(nrows=3, ncols=3, sharex=True, sharey=True, figsize=(10, 2.5))
+            display2dArray(axes[0], z, 'Data', extent=extent)
+            display2dArray(axes[1], 'Model', extent=extent)
+            display2dArray(axes[2], z - fit, 'Residual', extent=extent)
+
+        fig.tight_layout(pad=0, w_pad=0, h_pad=0)
         plt.show()
 
 
