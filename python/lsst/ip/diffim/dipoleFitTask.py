@@ -20,6 +20,7 @@
 # see <https://www.lsstcorp.org/LegalNotices/>.
 #
 
+import math
 import logging
 import numpy as np
 import warnings
@@ -863,8 +864,18 @@ class DipoleFitAlgorithm:
         if fitParams['flux'] <= 1.:   # usually around 0.1 -- the minimum flux allowed -- i.e. bad fit.
             return None, fitResult
 
-        centroid = ((fitParams['xcenPos'] + fitParams['xcenNeg']) / 2.,
-                    (fitParams['ycenPos'] + fitParams['ycenNeg']) / 2.)
+        # TODO: We could include covariances, which could be derived from
+        # `fitResult.params[name].correl`, but those are correlations.
+        posCentroid = measBase.CentroidResult(fitParams['xcenPos'], fitParams['ycenPos'],
+                                              fitResult.params['xcenPos'].stderr,
+                                              fitResult.params['ycenPos'].stderr)
+        negCentroid = measBase.CentroidResult(fitParams['xcenNeg'], fitParams['ycenNeg'],
+                                              fitResult.params['xcenNeg'].stderr,
+                                              fitResult.params['ycenNeg'].stderr)
+        centroid = measBase.CentroidResult((fitParams['xcenPos'] + fitParams['xcenNeg']) / 2,
+                                           (fitParams['ycenPos'] + fitParams['ycenNeg']) / 2.,
+                                           math.sqrt(posCentroid.xErr**2 + negCentroid.xErr**2),
+                                           math.sqrt(posCentroid.yErr**2 + negCentroid.yErr**2))
         dx, dy = fitParams['xcenPos'] - fitParams['xcenNeg'], fitParams['ycenPos'] - fitParams['ycenNeg']
         angle = np.arctan2(dy, dx)
 
@@ -892,10 +903,9 @@ class DipoleFitAlgorithm:
         except ZeroDivisionError:  # catch divide by zero - should never happen.
             signalToNoise = np.nan
 
-        out = Struct(posCentroidX=fitParams['xcenPos'], posCentroidY=fitParams['ycenPos'],
-                     negCentroidX=fitParams['xcenNeg'], negCentroidY=fitParams['ycenNeg'],
+        out = Struct(posCentroid=posCentroid, negCentroid=negCentroid, centroid=centroid,
                      posFlux=fluxVal, negFlux=-fluxValNeg, posFluxErr=fluxErr, negFluxErr=fluxErrNeg,
-                     centroidX=centroid[0], centroidY=centroid[1], orientation=angle,
+                     orientation=angle,
                      signalToNoise=signalToNoise, chi2=fitResult.chisqr, redChi2=fitResult.redchi,
                      nData=fitResult.ndata)
 
@@ -1010,11 +1020,11 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
         self.posCentroidKey = measBase.CentroidResultKey.addFields(schema,
                                                                    schema.join(name, "pos"),
                                                                    "Dipole positive lobe centroid position.",
-                                                                   measBase.UncertaintyEnum.NO_UNCERTAINTY)
+                                                                   measBase.UncertaintyEnum.SIGMA_ONLY)
         self.negCentroidKey = measBase.CentroidResultKey.addFields(schema,
                                                                    schema.join(name, "neg"),
                                                                    "Dipole negative lobe centroid position.",
-                                                                   measBase.UncertaintyEnum.NO_UNCERTAINTY)
+                                                                   measBase.UncertaintyEnum.SIGMA_ONLY)
         self.centroidKey = measBase.CentroidResultKey.addFields(schema,
                                                                 name,
                                                                 "Dipole centroid position.",
@@ -1133,21 +1143,21 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
         # Add the relevant values to the measRecord
         measRecord[self.posFluxKey.getInstFlux()] = result.posFlux
         measRecord[self.posFluxKey.getInstFluxErr()] = result.signalToNoise   # to be changed to actual sigma!
-        measRecord[self.posCentroidKey.getX()] = result.posCentroidX
+        self.posCentroidKey.set(measRecord, result.posCentroid)
         measRecord[self.posCentroidKey.getY()] = result.posCentroidY
 
         measRecord[self.negFluxKey.getInstFlux()] = result.negFlux
         measRecord[self.negFluxKey.getInstFluxErr()] = result.signalToNoise   # to be changed to actual sigma!
-        measRecord[self.negCentroidKey.getX()] = result.negCentroidX
+        self.negCentroidKey.set(measRecord, result.negCentroid)
         measRecord[self.negCentroidKey.getY()] = result.negCentroidY
 
         # Dia source flux: average of pos+neg
         measRecord[self.fluxKey.getInstFlux()] = (abs(result.posFlux) + abs(result.negFlux))/2.
         measRecord[self.orientationKey] = result.orientation
-        measRecord[self.separationKey] = np.sqrt((result.posCentroidX - result.negCentroidX)**2.
-                                                 + (result.posCentroidY - result.negCentroidY)**2.)
-        measRecord[self.centroidKey.getX()] = result.centroidX
-        measRecord[self.centroidKey.getY()] = result.centroidY
+        measRecord[self.separationKey] = np.sqrt((result.posCentroid.x - result.negCentroid.x)**2
+                                                 + (result.posCentroid.y - result.negCentroid.y)**2)
+
+        self.centroidKey.set(measRecord, result.centroid)
 
         measRecord[self.signalToNoiseKey] = result.signalToNoise
         measRecord[self.chi2dofKey] = result.redChi2
