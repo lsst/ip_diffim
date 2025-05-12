@@ -79,7 +79,7 @@ class DipoleFitPluginConfig(measBase.SingleFramePluginConfig):
 
     # Config params for classification of detected diaSources as dipole or not
     minSn = pexConfig.Field(
-        dtype=float, default=np.sqrt(2) * 5.0,
+        dtype=float, default=math.sqrt(2) * 5.0,
         doc="Minimum quadrature sum of positive+negative lobe S/N to be considered a dipole")
 
     maxFluxRatio = pexConfig.Field(
@@ -882,7 +882,7 @@ class DipoleFitAlgorithm:
         # Exctract flux value, compute signalToNoise from flux/variance_within_footprint
         # Also extract the stderr of flux estimate.
         def computeSumVariance(exposure, footprint):
-            return np.sqrt(np.nansum(exposure[footprint.getBBox(), afwImage.PARENT].variance.array))
+            return math.sqrt(np.nansum(exposure[footprint.getBBox(), afwImage.PARENT].variance.array))
 
         fluxVal = fluxVar = fitParams['flux']
         fluxErr = fluxErrNeg = fitResult.params['flux'].stderr
@@ -899,7 +899,7 @@ class DipoleFitAlgorithm:
             fluxVarNeg = computeSumVariance(self.negImage, source.getFootprint())
 
         try:
-            signalToNoise = np.sqrt((fluxVal/fluxVar)**2 + (fluxValNeg/fluxVarNeg)**2)
+            signalToNoise = math.sqrt((fluxVal/fluxVar)**2 + (fluxValNeg/fluxVarNeg)**2)
         except ZeroDivisionError:  # catch divide by zero - should never happen.
             signalToNoise = np.nan
 
@@ -1173,8 +1173,8 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
         # Dia source flux: average of pos+neg
         measRecord[self.fluxKey.getInstFlux()] = (abs(result.posFlux) + abs(result.negFlux))/2.
         measRecord[self.orientationKey] = result.orientation
-        measRecord[self.separationKey] = np.sqrt((result.posCentroid.x - result.negCentroid.x)**2
-                                                 + (result.posCentroid.y - result.negCentroid.y)**2)
+        measRecord[self.separationKey] = math.sqrt((result.posCentroid.x - result.negCentroid.x)**2
+                                                   + (result.posCentroid.y - result.negCentroid.y)**2)
 
         self.centroidKey.set(measRecord, result.centroid)
 
