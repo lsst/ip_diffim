@@ -860,23 +860,26 @@ class DipoleFitAlgorithm:
             fp = source.getFootprint()
             self.displayFitResults(fp, fitResult)
 
-        fitParams = fitResult.best_values
-        if fitParams['flux'] <= 1.:   # usually around 0.1 -- the minimum flux allowed -- i.e. bad fit.
+        # usually around 0.1 -- the minimum flux allowed -- i.e. bad fit.
+        if fitResult.params['flux'].value <= 1.:
             return None, fitResult
 
         # TODO: We could include covariances, which could be derived from
         # `fitResult.params[name].correl`, but those are correlations.
-        posCentroid = measBase.CentroidResult(fitParams['xcenPos'], fitParams['ycenPos'],
+        posCentroid = measBase.CentroidResult(fitResult.params['xcenPos'].value,
+                                              fitResult.params['ycenPos'].value,
                                               fitResult.params['xcenPos'].stderr,
                                               fitResult.params['ycenPos'].stderr)
-        negCentroid = measBase.CentroidResult(fitParams['xcenNeg'], fitParams['ycenNeg'],
+        negCentroid = measBase.CentroidResult(fitResult.params['xcenNeg'].value,
+                                              fitResult.params['ycenNeg'].value,
                                               fitResult.params['xcenNeg'].stderr,
                                               fitResult.params['ycenNeg'].stderr)
-        centroid = measBase.CentroidResult((fitParams['xcenPos'] + fitParams['xcenNeg']) / 2,
-                                           (fitParams['ycenPos'] + fitParams['ycenNeg']) / 2.,
+        centroid = measBase.CentroidResult((fitResult.params['xcenPos'] + fitResult.params['xcenNeg']) / 2,
+                                           (fitResult.params['ycenPos'] + fitResult.params['ycenNeg']) / 2.,
                                            math.sqrt(posCentroid.xErr**2 + negCentroid.xErr**2),
                                            math.sqrt(posCentroid.yErr**2 + negCentroid.yErr**2))
-        dx, dy = fitParams['xcenPos'] - fitParams['xcenNeg'], fitParams['ycenPos'] - fitParams['ycenNeg']
+        dx = fitResult.params['xcenPos'].value - fitResult.params['xcenNeg'].value
+        dy = fitResult.params['ycenPos'].value - fitResult.params['ycenNeg'].value
         angle = np.arctan2(dy, dx)
 
         # Exctract flux value, compute signalToNoise from flux/variance_within_footprint
@@ -885,6 +888,7 @@ class DipoleFitAlgorithm:
             return math.sqrt(np.nansum(exposure[footprint.getBBox(), afwImage.PARENT].variance.array))
 
         fluxVal = fluxVar = fitParams['flux']
+        fluxVal = fluxVar = fitResult.params['flux'].value
         fluxErr = fluxErrNeg = fitResult.params['flux'].stderr
         if self.posImage is not None:
             fluxVar = computeSumVariance(self.posImage, source.getFootprint())
@@ -893,7 +897,7 @@ class DipoleFitAlgorithm:
 
         fluxValNeg, fluxVarNeg = fluxVal, fluxVar
         if separateNegParams:
-            fluxValNeg = fitParams['fluxNeg']
+            fluxValNeg = fitResult.params['fluxNeg'].value
             fluxErrNeg = fitResult.params['fluxNeg'].stderr
         if self.negImage is not None:
             fluxVarNeg = computeSumVariance(self.negImage, source.getFootprint())
