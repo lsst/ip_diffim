@@ -884,32 +884,34 @@ class DipoleFitAlgorithm:
 
         # Exctract flux value, compute signalToNoise from flux/variance_within_footprint
         # Also extract the stderr of flux estimate.
+        # TODO: should this instead use the lmfit-computed uncertainty from
+        # `lmfitResult.result.uvars['flux'].std_dev`?
         def computeSumVariance(exposure, footprint):
             return math.sqrt(np.nansum(exposure[footprint.getBBox(), afwImage.PARENT].variance.array))
 
-        fluxVal = fluxVar = fitParams['flux']
-        fluxVal = fluxVar = fitResult.params['flux'].value
-        fluxErr = fluxErrNeg = fitResult.params['flux'].stderr
+        # NOTE: These will all be the same unless separateNegParams=True!
+        flux = measBase.FluxResult(fitResult.params["flux"].value, fitResult.params["flux"].stderr)
+        posFlux = measBase.FluxResult(fitResult.params["flux"].value, fitResult.params["flux"].stderr)
+        negFlux = measBase.FluxResult(fitResult.params["flux"].value, fitResult.params["flux"].stderr)
         if self.posImage is not None:
             fluxVar = computeSumVariance(self.posImage, source.getFootprint())
         else:
             fluxVar = computeSumVariance(self.diffim, source.getFootprint())
+        fluxVarNeg = fluxVar
 
-        fluxValNeg, fluxVarNeg = fluxVal, fluxVar
         if separateNegParams:
-            fluxValNeg = fitResult.params['fluxNeg'].value
-            fluxErrNeg = fitResult.params['fluxNeg'].stderr
+            negFlux.instFlux = fitResult.params['fluxNeg'].value
+            negFlux.instFluxErr = fitResult.params['fluxNeg'].stderr
         if self.negImage is not None:
             fluxVarNeg = computeSumVariance(self.negImage, source.getFootprint())
 
         try:
-            signalToNoise = math.sqrt((fluxVal/fluxVar)**2 + (fluxValNeg/fluxVarNeg)**2)
+            signalToNoise = math.sqrt((posFlux.instFlux/fluxVar)**2 + (negFlux.instFlux/fluxVarNeg)**2)
         except ZeroDivisionError:  # catch divide by zero - should never happen.
             signalToNoise = np.nan
 
         out = Struct(posCentroid=posCentroid, negCentroid=negCentroid, centroid=centroid,
-                     posFlux=fluxVal, negFlux=-fluxValNeg, posFluxErr=fluxErr, negFluxErr=fluxErrNeg,
-                     orientation=angle,
+                     posFlux=posFlux, negFlux=negFlux, flux=flux, orientation=angle,
                      signalToNoise=signalToNoise, chi2=fitResult.chisqr, redChi2=fitResult.redchi,
                      nData=fitResult.ndata)
 
@@ -1162,25 +1164,19 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
             self.fail(measRecord, measBase.MeasurementError("bad dipole fit", self.FAILURE_FIT))
             return
 
-        # add chi2, coord/flux uncertainties (TBD), dipole classification
-        # Add the relevant values to the measRecord
-        measRecord[self.posFluxKey.getInstFlux()] = result.posFlux
-        measRecord[self.posFluxKey.getInstFluxErr()] = result.signalToNoise   # to be changed to actual sigma!
+        # TODO: add chi2, dipole classification
+        self.posFluxKey.set(measRecord, result.posFlux)
         self.posCentroidKey.set(measRecord, result.posCentroid)
-        measRecord[self.posCentroidKey.getY()] = result.posCentroidY
 
-        measRecord[self.negFluxKey.getInstFlux()] = result.negFlux
-        measRecord[self.negFluxKey.getInstFluxErr()] = result.signalToNoise   # to be changed to actual sigma!
+        self.negFluxKey.set(measRecord, result.negFlux)
         self.negCentroidKey.set(measRecord, result.negCentroid)
-        measRecord[self.negCentroidKey.getY()] = result.negCentroidY
 
-        # Dia source flux: average of pos+neg
-        measRecord[self.fluxKey.getInstFlux()] = (abs(result.posFlux) + abs(result.negFlux))/2.
+        self.fluxKey.set(measRecord, result.flux)
+        self.centroidKey.set(measRecord, result.centroid)
+
         measRecord[self.orientationKey] = result.orientation
         measRecord[self.separationKey] = math.sqrt((result.posCentroid.x - result.negCentroid.x)**2
                                                    + (result.posCentroid.y - result.negCentroid.y)**2)
-
-        self.centroidKey.set(measRecord, result.centroid)
 
         measRecord[self.signalToNoiseKey] = result.signalToNoise
         measRecord[self.chi2dofKey] = result.redChi2
