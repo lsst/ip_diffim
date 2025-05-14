@@ -268,7 +268,6 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
         self.makeKernel.kernel.active.spatialKernelOrder = 1
         self.makeKernel.kernel.active.spatialBgOrder = 2
         self.makePatchKernel.kernel = self.makeKernel.kernel
-        self.makePatchKernel.kernel.active.fitForBackground = False
         self.sourceSelector.doUnresolved = True  # apply star-galaxy separation
         self.sourceSelector.doIsolated = True  # apply isolated star selection
         self.sourceSelector.doRequirePrimary = True  # apply primary flag selection
@@ -524,7 +523,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         boxS = science.getBBox()
         subtractResults = convolveMethod(template[boxS], science, sources, usePatch=False)
         science2 = science.clone()
-        science2.maskedImage -= subtractResults.backgroundModel
+        # science2.maskedImage -= subtractResults.backgroundModel
         totalWeight += .1
         difference += subtractResults.difference.image.array*totalWeight
 
@@ -810,9 +809,9 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         difference = _subtractImages(matchedScience, matchedTemplate,
                                      backgroundModel=backgroundModel)
 
-        # correctedExposure = self.finalize(template, science, difference,
-        #                                   kernelResult.psfMatchingKernel,
-        #                                   templateMatched=False)
+        correctedExposure = self.finalize(template, science, difference,
+                                          kernelResult.psfMatchingKernel,
+                                          templateMatched=False)
 
         return lsst.pipe.base.Struct(difference=difference,
                                      matchedTemplate=matchedTemplate,
