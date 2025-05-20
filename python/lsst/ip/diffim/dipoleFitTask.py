@@ -874,15 +874,21 @@ class DipoleFitAlgorithm:
                                               fitResult.params['ycenNeg'].value,
                                               fitResult.params['xcenNeg'].stderr,
                                               fitResult.params['ycenNeg'].stderr)
+        xposIdx = fitResult.var_names.index("xcenPos")
+        yposIdx = fitResult.var_names.index("ycenPos")
+        xnegIdx = fitResult.var_names.index("xcenNeg")
+        ynegIdx = fitResult.var_names.index("ycenNeg")
         centroid = measBase.CentroidResult((fitResult.params['xcenPos'] + fitResult.params['xcenNeg']) / 2,
                                            (fitResult.params['ycenPos'] + fitResult.params['ycenNeg']) / 2.,
-                                           math.sqrt(posCentroid.xErr**2 + negCentroid.xErr**2),
-                                           math.sqrt(posCentroid.yErr**2 + negCentroid.yErr**2))
+                                           math.sqrt(posCentroid.xErr**2 + negCentroid.xErr**2
+                                                     + 2*fitResult.covar[xposIdx, xnegIdx]) / 2.,
+                                           math.sqrt(posCentroid.yErr**2 + negCentroid.yErr**2
+                                                     + 2*fitResult.covar[yposIdx, ynegIdx]) / 2.)
         dx = fitResult.params['xcenPos'].value - fitResult.params['xcenNeg'].value
         dy = fitResult.params['ycenPos'].value - fitResult.params['ycenNeg'].value
         angle = np.arctan2(dy, dx)
 
-        # Exctract flux value, compute signalToNoise from flux/variance_within_footprint
+        # Extract flux value, compute signalToNoise from flux/variance_within_footprint
         # Also extract the stderr of flux estimate.
         # TODO: should this instead use the lmfit-computed uncertainty from
         # `lmfitResult.result.uvars['flux'].std_dev`?

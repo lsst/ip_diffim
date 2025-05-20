@@ -203,13 +203,15 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
                 self.assertFloatsAlmostEqual(record['ip_diffim_DipoleFit_neg_yErr'],
                                              .53*record["base_SdssCentroid_yErr"],
                                              rtol=0.1 if not noPreImages else 0.5)
+            # NOTE: these are smaller than the positive/negative uncertainties,
+            # because the of those covariance is negative!
             with self.subTest(i=i, type="xErr"):
                 self.assertFloatsAlmostEqual(record['ip_diffim_DipoleFit_xErr'],
-                                             .74*record["base_SdssCentroid_xErr"],
+                                             .34*record["base_SdssCentroid_xErr"],
                                              rtol=0.06 if not noPreImages else 0.5)
             with self.subTest(i=i, type="yErr"):
                 self.assertFloatsAlmostEqual(record['ip_diffim_DipoleFit_yErr'],
-                                             .75*record["base_SdssCentroid_yErr"],
+                                             .35*record["base_SdssCentroid_yErr"],
                                              rtol=0.06 if not noPreImages else 0.5)
 
             # Note this is dependent on the noise (variance) being realistic in the image.
