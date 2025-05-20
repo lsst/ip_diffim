@@ -101,8 +101,6 @@ class MakeKernelTask(PsfMatchTask):
                                                  parentTask=self)
 
         self.selectSchema = lsst.afw.table.SourceTable.makeMinimalSchema()
-        # Add coordinate error fields:
-        lsst.afw.table.CoordKey.addErrorFields(self.selectSchema)
         self.selectAlgMetadata = lsst.daf.base.PropertyList()
         self.makeSubtask("selectDetection", schema=self.selectSchema)
         self.makeSubtask("selectMeasurement", schema=self.selectSchema, algMetadata=self.selectAlgMetadata)

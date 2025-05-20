@@ -321,8 +321,6 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.schema = afwTable.SourceTable.makeMinimalSchema()
-        # Add coordinate error fields:
-        afwTable.CoordKey.addErrorFields(self.schema)
 
         self.algMetadata = dafBase.PropertyList()
         if self.config.doSubtractBackground:
