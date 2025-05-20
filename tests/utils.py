@@ -879,8 +879,6 @@ def detectTestSources(exposure, addMaskPlanes=None):
 
     schema = afwTable.SourceTable.makeMinimalSchema()
 
-    # Add coordinate error fields:
-    afwTable.CoordKey.addErrorFields(schema)
     selectDetection = measAlg.SourceDetectionTask(schema=schema)
     selectMeasurement = measBase.SingleFrameMeasurementTask(schema=schema)
     table = afwTable.SourceTable.make(schema)
