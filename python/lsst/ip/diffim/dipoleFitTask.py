@@ -20,6 +20,7 @@
 # see <https://www.lsstcorp.org/LegalNotices/>.
 #
 
+import math
 import logging
 import numpy as np
 import warnings
@@ -78,7 +79,7 @@ class DipoleFitPluginConfig(measBase.SingleFramePluginConfig):
 
     # Config params for classification of detected diaSources as dipole or not
     minSn = pexConfig.Field(
-        dtype=float, default=np.sqrt(2) * 5.0,
+        dtype=float, default=math.sqrt(2) * 5.0,
         doc="Minimum quadrature sum of positive+negative lobe S/N to be considered a dipole")
 
     maxFluxRatio = pexConfig.Field(
@@ -859,43 +860,64 @@ class DipoleFitAlgorithm:
             fp = source.getFootprint()
             self.displayFitResults(fp, fitResult)
 
-        fitParams = fitResult.best_values
-        if fitParams['flux'] <= 1.:   # usually around 0.1 -- the minimum flux allowed -- i.e. bad fit.
+        # usually around 0.1 -- the minimum flux allowed -- i.e. bad fit.
+        if fitResult.params['flux'].value <= 1.:
             return None, fitResult
 
-        centroid = ((fitParams['xcenPos'] + fitParams['xcenNeg']) / 2.,
-                    (fitParams['ycenPos'] + fitParams['ycenNeg']) / 2.)
-        dx, dy = fitParams['xcenPos'] - fitParams['xcenNeg'], fitParams['ycenPos'] - fitParams['ycenNeg']
+        # TODO: We could include covariances, which could be derived from
+        # `fitResult.params[name].correl`, but those are correlations.
+        posCentroid = measBase.CentroidResult(fitResult.params['xcenPos'].value,
+                                              fitResult.params['ycenPos'].value,
+                                              fitResult.params['xcenPos'].stderr,
+                                              fitResult.params['ycenPos'].stderr)
+        negCentroid = measBase.CentroidResult(fitResult.params['xcenNeg'].value,
+                                              fitResult.params['ycenNeg'].value,
+                                              fitResult.params['xcenNeg'].stderr,
+                                              fitResult.params['ycenNeg'].stderr)
+        xposIdx = fitResult.var_names.index("xcenPos")
+        yposIdx = fitResult.var_names.index("ycenPos")
+        xnegIdx = fitResult.var_names.index("xcenNeg")
+        ynegIdx = fitResult.var_names.index("ycenNeg")
+        centroid = measBase.CentroidResult((fitResult.params['xcenPos'] + fitResult.params['xcenNeg']) / 2,
+                                           (fitResult.params['ycenPos'] + fitResult.params['ycenNeg']) / 2.,
+                                           math.sqrt(posCentroid.xErr**2 + negCentroid.xErr**2
+                                                     + 2*fitResult.covar[xposIdx, xnegIdx]) / 2.,
+                                           math.sqrt(posCentroid.yErr**2 + negCentroid.yErr**2
+                                                     + 2*fitResult.covar[yposIdx, ynegIdx]) / 2.)
+        dx = fitResult.params['xcenPos'].value - fitResult.params['xcenNeg'].value
+        dy = fitResult.params['ycenPos'].value - fitResult.params['ycenNeg'].value
         angle = np.arctan2(dy, dx)
 
-        # Exctract flux value, compute signalToNoise from flux/variance_within_footprint
+        # Extract flux value, compute signalToNoise from flux/variance_within_footprint
         # Also extract the stderr of flux estimate.
+        # TODO: should this instead use the lmfit-computed uncertainty from
+        # `lmfitResult.result.uvars['flux'].std_dev`?
         def computeSumVariance(exposure, footprint):
-            return np.sqrt(np.nansum(exposure[footprint.getBBox(), afwImage.PARENT].variance.array))
+            return math.sqrt(np.nansum(exposure[footprint.getBBox(), afwImage.PARENT].variance.array))
 
-        fluxVal = fluxVar = fitParams['flux']
-        fluxErr = fluxErrNeg = fitResult.params['flux'].stderr
+        # NOTE: These will all be the same unless separateNegParams=True!
+        flux = measBase.FluxResult(fitResult.params["flux"].value, fitResult.params["flux"].stderr)
+        posFlux = measBase.FluxResult(fitResult.params["flux"].value, fitResult.params["flux"].stderr)
+        negFlux = measBase.FluxResult(fitResult.params["flux"].value, fitResult.params["flux"].stderr)
         if self.posImage is not None:
             fluxVar = computeSumVariance(self.posImage, source.getFootprint())
         else:
             fluxVar = computeSumVariance(self.diffim, source.getFootprint())
+        fluxVarNeg = fluxVar
 
-        fluxValNeg, fluxVarNeg = fluxVal, fluxVar
         if separateNegParams:
-            fluxValNeg = fitParams['fluxNeg']
-            fluxErrNeg = fitResult.params['fluxNeg'].stderr
+            negFlux.instFlux = fitResult.params['fluxNeg'].value
+            negFlux.instFluxErr = fitResult.params['fluxNeg'].stderr
         if self.negImage is not None:
             fluxVarNeg = computeSumVariance(self.negImage, source.getFootprint())
 
         try:
-            signalToNoise = np.sqrt((fluxVal/fluxVar)**2 + (fluxValNeg/fluxVarNeg)**2)
+            signalToNoise = math.sqrt((posFlux.instFlux/fluxVar)**2 + (negFlux.instFlux/fluxVarNeg)**2)
         except ZeroDivisionError:  # catch divide by zero - should never happen.
             signalToNoise = np.nan
 
-        out = Struct(posCentroidX=fitParams['xcenPos'], posCentroidY=fitParams['ycenPos'],
-                     negCentroidX=fitParams['xcenNeg'], negCentroidY=fitParams['ycenNeg'],
-                     posFlux=fluxVal, negFlux=-fluxValNeg, posFluxErr=fluxErr, negFluxErr=fluxErrNeg,
-                     centroidX=centroid[0], centroidY=centroid[1], orientation=angle,
+        out = Struct(posCentroid=posCentroid, negCentroid=negCentroid, centroid=centroid,
+                     posFlux=posFlux, negFlux=negFlux, flux=flux, orientation=angle,
                      signalToNoise=signalToNoise, chi2=fitResult.chisqr, redChi2=fitResult.redchi,
                      nData=fitResult.ndata)
 
@@ -918,36 +940,55 @@ class DipoleFitAlgorithm:
             self.log.warning('Unable to import matplotlib: %s', err)
             raise err
 
-        def display2dArray(arr, title='Data', extent=None):
+        def display2dArray(ax, arr, x, y, xErr, yErr, title, extent=None):
             """Use `matplotlib.pyplot.imshow` to display a 2-D array with a given coordinate range.
             """
-            fig = plt.imshow(arr, origin='lower', interpolation='none', cmap='gray', extent=extent)
-            plt.title(title)
-            plt.colorbar(fig, cmap='gray')
+            fig = ax.imshow(arr, origin='lower', interpolation='none', cmap='gray', extent=extent)
+            ax.set_title(title)
+            ax.errorbar(x["total"], y["total"], xErr["total"], yErr["total"], c="cyan")
+            ax.errorbar(x["Pos"], y["Pos"], xErr["Pos"], yErr["Pos"], c="green")
+            ax.errorbar(x["Neg"], y["Neg"], xErr["Neg"], yErr["Neg"], c="red")
             return fig
 
         z = result.data
         fit = result.best_fit
         bbox = footprint.getBBox()
         extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
-        if z.shape[0] == 3:
-            plt.figure(figsize=(8, 8))
-            for i in range(3):
-                plt.subplot(3, 3, i*3+1)
-                display2dArray(z[i, :], 'Data', extent=extent)
-                plt.subplot(3, 3, i*3+2)
-                display2dArray(fit[i, :], 'Model', extent=extent)
-                plt.subplot(3, 3, i*3+3)
-                display2dArray(z[i, :] - fit[i, :], 'Residual', extent=extent)
-        else:
-            plt.figure(figsize=(8, 2.5))
-            plt.subplot(1, 3, 1)
-            display2dArray(z, 'Data', extent=extent)
-            plt.subplot(1, 3, 2)
-            display2dArray(fit, 'Model', extent=extent)
-            plt.subplot(1, 3, 3)
-            display2dArray(z - fit, 'Residual', extent=extent)
 
+        if z.shape[0] == 3:
+            x, y, xErr, yErr = {}, {}, {}, {}
+            for name in ("Pos", "Neg"):
+                x[name] = result.best_values[f"xcen{name}"]
+                y[name] = result.best_values[f"ycen{name}"]
+                xErr[name] = result.params[f"xcen{name}"].stderr
+                yErr[name] = result.params[f"ycen{name}"].stderr
+            x["total"] = (result.best_values["xcenPos"] + result.best_values["xcenNeg"])/2
+            y["total"] = (result.best_values["ycenPos"] + result.best_values["ycenNeg"])/2
+            xErr["total"] = math.sqrt(xErr["Pos"]**2 + xErr["Neg"]**2)
+            yErr["total"] = math.sqrt(yErr["Pos"]**2 + yErr["Neg"]**2)
+
+            fig, axes = plt.subplots(nrows=3, ncols=3, sharex=True, sharey=True, figsize=(8, 8))
+            for i, label in enumerate(("total", "Pos", "Neg")):
+                display2dArray(axes[i][0], z[i, :], x, y, xErr, yErr,
+                               f'Data {label}', extent=extent)
+                display2dArray(axes[i][1], fit[i, :], x, y, xErr, yErr,
+                               f'Model {label}', extent=extent)
+                display2dArray(axes[i][2], z[i, :] - fit[i, :], x, y, xErr, yErr,
+                               f'Residual {label}', extent=extent)
+
+                plt.setp(axes[i][1].get_yticklabels(), visible=False)
+                plt.setp(axes[i][2].get_yticklabels(), visible=False)
+                if i != 2:  # remove top two row x-axis labels
+                    plt.setp(axes[i][0].get_xticklabels(), visible=False)
+                    plt.setp(axes[i][1].get_xticklabels(), visible=False)
+                    plt.setp(axes[i][2].get_xticklabels(), visible=False)
+        else:
+            fig, axes = plt.subplots(nrows=3, ncols=3, sharex=True, sharey=True, figsize=(10, 2.5))
+            display2dArray(axes[0], z, 'Data', extent=extent)
+            display2dArray(axes[1], 'Model', extent=extent)
+            display2dArray(axes[2], z - fit, 'Residual', extent=extent)
+
+        fig.tight_layout(pad=0, w_pad=0, h_pad=0)
         plt.show()
 
 
@@ -1010,11 +1051,11 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
         self.posCentroidKey = measBase.CentroidResultKey.addFields(schema,
                                                                    schema.join(name, "pos"),
                                                                    "Dipole positive lobe centroid position.",
-                                                                   measBase.UncertaintyEnum.NO_UNCERTAINTY)
+                                                                   measBase.UncertaintyEnum.SIGMA_ONLY)
         self.negCentroidKey = measBase.CentroidResultKey.addFields(schema,
                                                                    schema.join(name, "neg"),
                                                                    "Dipole negative lobe centroid position.",
-                                                                   measBase.UncertaintyEnum.NO_UNCERTAINTY)
+                                                                   measBase.UncertaintyEnum.SIGMA_ONLY)
         self.centroidKey = measBase.CentroidResultKey.addFields(schema,
                                                                 name,
                                                                 "Dipole centroid position.",
@@ -1129,25 +1170,19 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
             self.fail(measRecord, measBase.MeasurementError("bad dipole fit", self.FAILURE_FIT))
             return
 
-        # add chi2, coord/flux uncertainties (TBD), dipole classification
-        # Add the relevant values to the measRecord
-        measRecord[self.posFluxKey.getInstFlux()] = result.posFlux
-        measRecord[self.posFluxKey.getInstFluxErr()] = result.signalToNoise   # to be changed to actual sigma!
-        measRecord[self.posCentroidKey.getX()] = result.posCentroidX
-        measRecord[self.posCentroidKey.getY()] = result.posCentroidY
+        # TODO: add chi2, dipole classification
+        self.posFluxKey.set(measRecord, result.posFlux)
+        self.posCentroidKey.set(measRecord, result.posCentroid)
 
-        measRecord[self.negFluxKey.getInstFlux()] = result.negFlux
-        measRecord[self.negFluxKey.getInstFluxErr()] = result.signalToNoise   # to be changed to actual sigma!
-        measRecord[self.negCentroidKey.getX()] = result.negCentroidX
-        measRecord[self.negCentroidKey.getY()] = result.negCentroidY
+        self.negFluxKey.set(measRecord, result.negFlux)
+        self.negCentroidKey.set(measRecord, result.negCentroid)
 
-        # Dia source flux: average of pos+neg
-        measRecord[self.fluxKey.getInstFlux()] = (abs(result.posFlux) + abs(result.negFlux))/2.
+        self.fluxKey.set(measRecord, result.flux)
+        self.centroidKey.set(measRecord, result.centroid)
+
         measRecord[self.orientationKey] = result.orientation
-        measRecord[self.separationKey] = np.sqrt((result.posCentroidX - result.negCentroidX)**2.
-                                                 + (result.posCentroidY - result.negCentroidY)**2.)
-        measRecord[self.centroidKey.getX()] = result.centroidX
-        measRecord[self.centroidKey.getY()] = result.centroidY
+        measRecord[self.separationKey] = math.sqrt((result.posCentroid.x - result.negCentroid.x)**2
+                                                   + (result.posCentroid.y - result.negCentroid.y)**2)
 
         measRecord[self.signalToNoiseKey] = result.signalToNoise
         measRecord[self.chi2dofKey] = result.redChi2
