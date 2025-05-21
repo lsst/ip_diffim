@@ -119,7 +119,8 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
     doForcedMeasurement = pexConfig.Field(
         dtype=bool,
         default=True,
-        doc="Force photometer diaSource locations on PVI?")
+        doc="Force photometer diaSource locations on PVI?"
+    )
     doAddMetrics = pexConfig.Field(
         dtype=bool,
         default=False,
@@ -361,8 +362,9 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
         self.schema.addField("refMatchId", "L", "unique id of reference catalog match")
         self.schema.addField("srcMatchId", "L", "unique id of source match")
-        if self.config.doSkySources:
-            self.makeSubtask("skySources", schema=self.schema)
+        # Create the sky source task for use by metrics,
+        # even if sky sources are not added to the diaSource catalog
+        self.makeSubtask("skySources", schema=self.schema)
         if self.config.doMaskStreaks:
             self.makeSubtask("maskStreaks")
             self.makeSubtask("streakDetection")
@@ -597,7 +599,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         if self.config.doForcedMeasurement:
             self.measureForcedSources(diaSources, science, difference.getWcs())
 
-        self.calculateMetrics(difference)
+        self.calculateMetrics(science, difference, diaSources)
 
         measurementResults = pipeBase.Struct(
             subtractedMeasuredExposure=difference,
@@ -787,7 +789,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         for diaSource, forcedSource in zip(diaSources, forcedSources):
             diaSource.assign(forcedSource, mapper)
 
-    def calculateMetrics(self, difference):
+    def calculateMetrics(self, science, difference, diaSources):
         """Add difference image QA metrics to the Task metadata.
 
         This may be used to produce corresponding metrics (see
@@ -795,8 +797,12 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
         Parameters
         ----------
+        science :  `lsst.afw.image.ExposureF`
+            Science exposure that was subtracted.
         difference : `lsst.afw.image.Exposure`
             The target difference image to calculate metrics for.
+        diaSources : `lsst.afw.table.SourceCatalog`
+            The catalog of detected sources.
         """
         mask = difference.mask
         badPix = (mask.array & mask.getPlaneBitMask(self.config.detection.excludeMaskPlanes)) > 0
@@ -818,6 +824,76 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             except InvalidParameterError:
                 self.metadata["%s_mask_fraction"%maskPlane.lower()] = -1
                 self.log.info("Unable to calculate metrics for mask plane %s: not in image"%maskPlane)
+
+        residualInfo = self._computeDifferenceResidual(science, difference, diaSources)
+        self.metadata["residualFootprintRatioMean"] = residualInfo.ratio
+        self.metadata["residualFootprintRatioStdev"] = residualInfo.ratio_std
+        self.log.info("Mean, stdev of ratio of difference to science "
+                      "pixels in star footprints: %5.4f, %5.4f",
+                      residualInfo.ratio, residualInfo.ratio_std)
+
+    def _computeDifferenceResidual(self, science, difference, diaSources):
+        """Compute quality metrics (saved to the task metadata) on the
+        difference image, at the locations of detected stars on the science
+        image (determined by the DETECTED mask plane). This restricts the metric
+        to locations that should be well-subtracted.
+
+        Parameters
+        ----------
+        science : `lsst.afw.image.ExposureF`
+            Science exposure that was subtracted.
+        difference : `lsst.afw.image.ExposureF`
+            Result of subtracting template and science.
+        diaSources : `lsst.afw.table.SourceCatalog`
+            The catalog of detected sources.
+
+        Returns
+        -------
+        results: `lsst.pipe.base.Struct`
+            ``ratio`` : `np.ndarray`
+                Mean of the ratio of the absolute value of the difference image
+                (with the mean absolute value of the sky regions on the
+                difference image removed) to the science image, computed in the
+                footprints of stars detected on the science image.
+            ``ratio_std`` : `np.ndarray`
+                Standard Deviation across footprints of the above ratio.
+        """
+        good = science.mask.array & science.mask.getPlaneBitMask('DETECTED') > 0
+        badPix = (difference.mask.array
+                  & difference.mask.getPlaneBitMask(self.config.detection.excludeMaskPlanes)) > 0
+        good &= ~badPix
+        if not self.config.doSkySources:
+            # Place sky sources to sample the background
+            skySourceFootprints = self.skySources.run(mask=science.mask, seed=difference.info.id,
+                                                      catalog=afwTable.SourceCatalog(self.schema))
+        else:
+            skySourceFootprints = [sky.getFootprint() for sky in diaSources[diaSources["sky_source"]]]
+        n = len(skySourceFootprints)
+        sky_science = np.zeros(n)
+        sky_difference = np.zeros(n)
+        for i, footprint in enumerate(skySourceFootprints):
+            heavy = lsst.afw.detection.makeHeavyFootprint(footprint, science.maskedImage)
+            heavy_diff = lsst.afw.detection.makeHeavyFootprint(footprint, difference.maskedImage)
+            sky_science[i] = abs(heavy.getImageArray()).mean()
+            sky_difference[i] = abs(heavy_diff.getImageArray()).mean()
+
+        # Calculate the difference between the absolute value of the science
+        # image within detected footprints and the sky sources.
+        # Then do the same for the difference image
+        if np.sum(good) > 1:
+            science_mean = np.abs(np.mean(abs(science.image.array[good])) - sky_science.mean())
+            science_std = np.std(abs(science.image.array[good]))
+            difference_mean = np.abs(np.mean(abs(difference.image.array[good])) - sky_difference.mean())
+            difference_std = np.std(abs(difference.image.array[good]))
+            # Calculate stddev of the science and difference image values and
+            # propagate to the stddev of the quotient.
+            # This avoids potential divide by zero errors.
+            ratio = difference_mean/science_mean
+            ratio_std = ratio*np.sqrt((difference_std/difference_mean)**2 + (science_std/science_mean)**2)
+        else:
+            ratio = np.nan
+            ratio_std = np.nan
+        return pipeBase.Struct(ratio=ratio, ratio_std=ratio_std)
 
     def _runStreakMasking(self, difference):
         """Do streak masking and optionally save the resulting streak
