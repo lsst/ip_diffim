@@ -528,13 +528,21 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             return science_footprints, difference_footprints, ratio
 
         sky = stars["sky_source"]
-        sky_science, sky_difference, sky_ratio = footprint_mean(stars[sky])
-        science_footprints, difference_footprints, ratio = footprint_mean(stars[~sky], sky_difference.mean())
+        if np.count_nonzero(sky) > 0:
+            sky_science, sky_difference, sky_ratio = footprint_mean(stars[sky])
+            sky_mean = sky_ratio.mean()
+            sky_std = sky_ratio.std()
+            sky_difference = sky_difference.mean()
+        else:
+            sky_mean = np.nan
+            sky_std = np.nan
+            sky_difference = 0
+        science_footprints, difference_footprints, ratio = footprint_mean(stars[~sky], sky_difference)
 
         self.metadata["differenceFootprintRatioMean"] = ratio.mean()
         self.metadata["differenceFootprintRatioStdev"] = ratio.std()
-        self.metadata["differenceFootprintSkyRatioMean"] = sky_ratio.mean()
-        self.metadata["differenceFootprintSkyRatioStdev"] = sky_ratio.std()
+        self.metadata["differenceFootprintSkyRatioMean"] = sky_mean
+        self.metadata["differenceFootprintSkyRatioStdev"] = sky_std
         self.log.info("Mean, stdev of ratio of difference to science "
                       "pixels in star footprints: %5.4f, %5.4f",
                       self.metadata["differenceFootprintRatioMean"],
