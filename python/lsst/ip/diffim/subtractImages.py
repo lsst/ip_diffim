@@ -581,9 +581,13 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         try:
             kernelSources = self.makeKernel.selectKernelSources(template, science,
                                                                 candidateList=selectSources,
-                                                                preconvolved=False)
+                                                                preconvolved=False,
+                                                                templateFwhmPix=self.templatePsfSize,
+                                                                scienceFwhmPix=self.sciencePsfSize)
             kernelResult = self.makeKernel.run(template, science, kernelSources,
-                                               preconvolved=False)
+                                               preconvolved=False,
+                                               templateFwhmPix=self.templatePsfSize,
+                                               scienceFwhmPix=self.sciencePsfSize)
         except Exception as e:
             if self.config.allowKernelSourceDetection:
                 self.log.warning("Error encountered trying to construct the matching kernel"
@@ -596,9 +600,13 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                                                                   sigma=self.sciencePsfSize/sigmaToFwhm)
                 kernelSources = self.makeKernel.selectKernelSources(template, science,
                                                                     candidateList=candidateList,
-                                                                    preconvolved=False)
+                                                                    preconvolved=False,
+                                                                    templateFwhmPix=self.templatePsfSize,
+                                                                    scienceFwhmPix=self.sciencePsfSize)
                 kernelResult = self.makeKernel.run(template, science, kernelSources,
-                                                   preconvolved=False)
+                                                   preconvolved=False,
+                                                   templateFwhmPix=self.templatePsfSize,
+                                                   scienceFwhmPix=self.sciencePsfSize)
             else:
                 raise e
 
@@ -654,9 +662,13 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         bbox = science.getBBox()
         kernelSources = self.makeKernel.selectKernelSources(science, template,
                                                             candidateList=selectSources,
-                                                            preconvolved=False)
+                                                            preconvolved=False,
+                                                            templateFwhmPix=self.templatePsfSize,
+                                                            scienceFwhmPix=self.sciencePsfSize)
         kernelResult = self.makeKernel.run(science, template, kernelSources,
-                                           preconvolved=False)
+                                           preconvolved=False,
+                                           templateFwhmPix=self.templatePsfSize,
+                                           scienceFwhmPix=self.sciencePsfSize)
         modelParams = kernelResult.backgroundModel.getParameters()
         # We must invert the background model if the matching kernel is solved for the science image.
         kernelResult.backgroundModel.setParameters([-p for p in modelParams])
@@ -1200,9 +1212,13 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
 
         kernelSources = self.makeKernel.selectKernelSources(template[innerBBox], matchedScience[innerBBox],
                                                             candidateList=selectSources,
-                                                            preconvolved=True)
+                                                            preconvolved=True,
+                                                            templateFwhmPix=self.templatePsfSize,
+                                                            scienceFwhmPix=self.sciencePsfSize)
         kernelResult = self.makeKernel.run(template[innerBBox], matchedScience[innerBBox], kernelSources,
-                                           preconvolved=True)
+                                           preconvolved=True,
+                                           templateFwhmPix=self.templatePsfSize,
+                                           scienceFwhmPix=self.sciencePsfSize)
 
         matchedTemplate = self._convolveExposure(template, kernelResult.psfMatchingKernel,
                                                  self.convolutionControl,
