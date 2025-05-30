@@ -589,10 +589,6 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         # difference[~inds] = subtractResults.difference.image.array[~inds]
         subtractResults.matchedTemplate.image.array = matchedTemplate
         subtractResults.difference.image.array = difference
-        
-        subtractResults.difference = self.finalize(template, science, subtractResults.difference,
-                                                   subtractResults.psfMatchingKernel,
-                                                   templateMatched=True)
         # subtractResults.psfMatchingKernel = CoaddPsf(spatialCellSet)
         return subtractResults
 
@@ -741,7 +737,11 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         difference = _subtractImages(science, matchedTemplate,
                                      backgroundModel=backgroundModel)
 
-        return lsst.pipe.base.Struct(difference=difference,
+        correctedExposure = self.finalize(template, science, difference,
+                                          kernelResult.psfMatchingKernel,
+                                          templateMatched=True)
+
+        return lsst.pipe.base.Struct(difference=correctedExposure,
                                      matchedTemplate=matchedTemplate,
                                      matchedScience=science,
                                      backgroundModel=backgroundModel,
@@ -813,7 +813,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                                           kernelResult.psfMatchingKernel,
                                           templateMatched=False)
 
-        return lsst.pipe.base.Struct(difference=difference,
+        return lsst.pipe.base.Struct(difference=correctedExposure,
                                      matchedTemplate=matchedTemplate,
                                      matchedScience=matchedScience,
                                      backgroundModel=backgroundModel,
