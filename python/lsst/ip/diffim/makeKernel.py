@@ -105,7 +105,8 @@ class MakeKernelTask(PsfMatchTask):
         self.makeSubtask("selectDetection", schema=self.selectSchema)
         self.makeSubtask("selectMeasurement", schema=self.selectSchema, algMetadata=self.selectAlgMetadata)
 
-    def run(self, template, science, kernelSources, preconvolved=False):
+    def run(self, template, science, kernelSources, preconvolved=False,
+            templateFwhmPix=None, scienceFwhmPix=None):
         """Solve for the kernel and background model that best match two
         Exposures evaluated at the given source locations.
 
@@ -131,27 +132,28 @@ class MakeKernelTask(PsfMatchTask):
                 Spatially varying background-matching function.
         """
         kernelCellSet = self._buildCellSet(template.maskedImage, science.maskedImage, kernelSources)
-        # Calling getPsfFwhm on template.psf fails on some rare occasions when
-        # the template has no input exposures at the average position of the
-        # stars. So we try getPsfFwhm first on template, and if that fails we
-        # evaluate the PSF on a grid specified by fwhmExposure* fields.
-        # To keep consistent definitions for PSF size on the template and
-        # science images, we use the same method for both.
-        try:
-            templateFwhmPix = getPsfFwhm(template.psf)
-            scienceFwhmPix = getPsfFwhm(science.psf)
-        except (InvalidParameterError, RangeError):
-            self.log.debug("Unable to evaluate PSF at the average position. "
-                           "Evaluting PSF on a grid of points."
-                           )
-            templateFwhmPix = evaluateMeanPsfFwhm(template,
-                                                  fwhmExposureBuffer=self.config.fwhmExposureBuffer,
-                                                  fwhmExposureGrid=self.config.fwhmExposureGrid
-                                                  )
-            scienceFwhmPix = evaluateMeanPsfFwhm(science,
-                                                 fwhmExposureBuffer=self.config.fwhmExposureBuffer,
-                                                 fwhmExposureGrid=self.config.fwhmExposureGrid
-                                                 )
+        if (scienceFwhmPix is None) or (templateFwhmPix is None):
+            # Calling getPsfFwhm on template.psf fails on some rare occasions when
+            # the template has no input exposures at the average position of the
+            # stars. So we try getPsfFwhm first on template, and if that fails we
+            # evaluate the PSF on a grid specified by fwhmExposure* fields.
+            # To keep consistent definitions for PSF size on the template and
+            # science images, we use the same method for both.
+            try:
+                templateFwhmPix = getPsfFwhm(template.psf)
+                scienceFwhmPix = getPsfFwhm(science.psf)
+            except (InvalidParameterError, RangeError):
+                self.log.debug("Unable to evaluate PSF at the average position. "
+                               "Evaluting PSF on a grid of points."
+                               )
+                templateFwhmPix = evaluateMeanPsfFwhm(template,
+                                                      fwhmExposureBuffer=self.config.fwhmExposureBuffer,
+                                                      fwhmExposureGrid=self.config.fwhmExposureGrid
+                                                      )
+                scienceFwhmPix = evaluateMeanPsfFwhm(science,
+                                                     fwhmExposureBuffer=self.config.fwhmExposureBuffer,
+                                                     fwhmExposureGrid=self.config.fwhmExposureGrid
+                                                     )
 
         if preconvolved:
             scienceFwhmPix *= np.sqrt(2)
@@ -163,7 +165,8 @@ class MakeKernelTask(PsfMatchTask):
             backgroundModel=backgroundModel,
         )
 
-    def selectKernelSources(self, template, science, candidateList=None, preconvolved=False):
+    def selectKernelSources(self, template, science, candidateList=None, preconvolved=False,
+                            templateFwhmPix=None, scienceFwhmPix=None):
         """Select sources from a list of candidates, and extract footprints.
 
         Parameters
@@ -182,27 +185,28 @@ class MakeKernelTask(PsfMatchTask):
         kernelSources : `lsst.afw.table.SourceCatalog`
             Kernel candidates with appropriate sized footprints.
         """
-        # Calling getPsfFwhm on template.psf fails on some rare occasions when
-        # the template has no input exposures at the average position of the
-        # stars. So we try getPsfFwhm first on template, and if that fails we
-        # evaluate the PSF on a grid specified by fwhmExposure* fields.
-        # To keep consistent definitions for PSF size on the template and
-        # science images, we use the same method for both.
-        try:
-            templateFwhmPix = getPsfFwhm(template.psf)
-            scienceFwhmPix = getPsfFwhm(science.psf)
-        except (InvalidParameterError, RangeError):
-            self.log.debug("Unable to evaluate PSF at the average position. "
-                           "Evaluting PSF on a grid of points."
-                           )
-            templateFwhmPix = evaluateMeanPsfFwhm(template,
-                                                  fwhmExposureBuffer=self.config.fwhmExposureBuffer,
-                                                  fwhmExposureGrid=self.config.fwhmExposureGrid
-                                                  )
-            scienceFwhmPix = evaluateMeanPsfFwhm(science,
-                                                 fwhmExposureBuffer=self.config.fwhmExposureBuffer,
-                                                 fwhmExposureGrid=self.config.fwhmExposureGrid
-                                                 )
+        if (scienceFwhmPix is None) or (templateFwhmPix is None):
+            # Calling getPsfFwhm on template.psf fails on some rare occasions when
+            # the template has no input exposures at the average position of the
+            # stars. So we try getPsfFwhm first on template, and if that fails we
+            # evaluate the PSF on a grid specified by fwhmExposure* fields.
+            # To keep consistent definitions for PSF size on the template and
+            # science images, we use the same method for both.
+            try:
+                templateFwhmPix = getPsfFwhm(template.psf)
+                scienceFwhmPix = getPsfFwhm(science.psf)
+            except (InvalidParameterError, RangeError):
+                self.log.debug("Unable to evaluate PSF at the average position. "
+                               "Evaluting PSF on a grid of points."
+                               )
+                templateFwhmPix = evaluateMeanPsfFwhm(template,
+                                                      fwhmExposureBuffer=self.config.fwhmExposureBuffer,
+                                                      fwhmExposureGrid=self.config.fwhmExposureGrid
+                                                      )
+                scienceFwhmPix = evaluateMeanPsfFwhm(science,
+                                                     fwhmExposureBuffer=self.config.fwhmExposureBuffer,
+                                                     fwhmExposureGrid=self.config.fwhmExposureGrid
+                                                     )
         if preconvolved:
             scienceFwhmPix *= np.sqrt(2)
         kernelSize = self.makeKernelBasisList(templateFwhmPix, scienceFwhmPix)[0].getWidth()

@@ -411,6 +411,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
 
         #  Calculate estimated image depths, i.e., limiting magnitudes
         maglim_science = self._calculateMagLim(science, fallbackPsfSize=self.sciencePsfSize)
+        if np.isnan(maglim_science):
+            self.log.warning("Limiting magnitude of the science image is NaN!")
         fluxlim_science = (maglim_science*u.ABmag).to_value(u.nJy)
         maglim_template = self._calculateMagLim(template, fallbackPsfSize=self.templatePsfSize)
         if np.isnan(maglim_template):
@@ -579,9 +581,13 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         try:
             kernelSources = self.makeKernel.selectKernelSources(template, science,
                                                                 candidateList=selectSources,
-                                                                preconvolved=False)
+                                                                preconvolved=False,
+                                                                templateFwhmPix=self.templatePsfSize,
+                                                                scienceFwhmPix=self.sciencePsfSize)
             kernelResult = self.makeKernel.run(template, science, kernelSources,
-                                               preconvolved=False)
+                                               preconvolved=False,
+                                               templateFwhmPix=self.templatePsfSize,
+                                               scienceFwhmPix=self.sciencePsfSize)
         except Exception as e:
             if self.config.allowKernelSourceDetection:
                 self.log.warning("Error encountered trying to construct the matching kernel"
@@ -594,9 +600,13 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                                                                   sigma=self.sciencePsfSize/sigmaToFwhm)
                 kernelSources = self.makeKernel.selectKernelSources(template, science,
                                                                     candidateList=candidateList,
-                                                                    preconvolved=False)
+                                                                    preconvolved=False,
+                                                                    templateFwhmPix=self.templatePsfSize,
+                                                                    scienceFwhmPix=self.sciencePsfSize)
                 kernelResult = self.makeKernel.run(template, science, kernelSources,
-                                                   preconvolved=False)
+                                                   preconvolved=False,
+                                                   templateFwhmPix=self.templatePsfSize,
+                                                   scienceFwhmPix=self.sciencePsfSize)
             else:
                 raise e
 
@@ -652,9 +662,13 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         bbox = science.getBBox()
         kernelSources = self.makeKernel.selectKernelSources(science, template,
                                                             candidateList=selectSources,
-                                                            preconvolved=False)
+                                                            preconvolved=False,
+                                                            templateFwhmPix=self.templatePsfSize,
+                                                            scienceFwhmPix=self.sciencePsfSize)
         kernelResult = self.makeKernel.run(science, template, kernelSources,
-                                           preconvolved=False)
+                                           preconvolved=False,
+                                           templateFwhmPix=self.templatePsfSize,
+                                           scienceFwhmPix=self.sciencePsfSize)
         modelParams = kernelResult.backgroundModel.getParameters()
         # We must invert the background model if the matching kernel is solved for the science image.
         kernelResult.backgroundModel.setParameters([-p for p in modelParams])
@@ -756,6 +770,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         maglim : `astropy.units.Quantity`
             The limiting magnitude of the exposure, or np.nan.
         """
+        if exposure.photoCalib is None:
+            return np.nan
         try:
             psf = exposure.getPsf()
             psf_shape = psf.computeShape(psf.getAveragePosition())
@@ -763,7 +779,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             if fallbackPsfSize is not None:
                 self.log.info("Unable to evaluate PSF, using fallback FWHM %f", fallbackPsfSize)
                 psf_area = np.pi*(fallbackPsfSize/2)**2
-                zeropoint = exposure.getPhotoCalib().instFluxToMagnitude(1)
+                zeropoint = exposure.photoCalib.instFluxToMagnitude(1)
                 maglim = zeropoint - 2.5*np.log10(nsigma*np.sqrt(psf_area))
             else:
                 self.log.info("Unable to evaluate PSF, setting maglim to nan")
@@ -771,7 +787,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         else:
             # Get a more accurate area than `psf_shape.getArea()` via moments
             psf_area = np.pi*np.sqrt(psf_shape.getIxx()*psf_shape.getIyy())
-            zeropoint = exposure.getPhotoCalib().instFluxToMagnitude(1)
+            zeropoint = exposure.photoCalib.instFluxToMagnitude(1)
             maglim = zeropoint - 2.5*np.log10(nsigma*np.sqrt(psf_area))
         finally:
             return maglim
@@ -1196,9 +1212,13 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
 
         kernelSources = self.makeKernel.selectKernelSources(template[innerBBox], matchedScience[innerBBox],
                                                             candidateList=selectSources,
-                                                            preconvolved=True)
+                                                            preconvolved=True,
+                                                            templateFwhmPix=self.templatePsfSize,
+                                                            scienceFwhmPix=self.sciencePsfSize)
         kernelResult = self.makeKernel.run(template[innerBBox], matchedScience[innerBBox], kernelSources,
-                                           preconvolved=True)
+                                           preconvolved=True,
+                                           templateFwhmPix=self.templatePsfSize,
+                                           scienceFwhmPix=self.sciencePsfSize)
 
         matchedTemplate = self._convolveExposure(template, kernelResult.psfMatchingKernel,
                                                  self.convolutionControl,
