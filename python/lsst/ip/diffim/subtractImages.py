@@ -515,10 +515,13 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             patchOuterCorners = patch.wcs.pixelToSky(lsst.geom.Box2D(patch.getOuterBBox()).getCorners())
             patchOuterPolygon = afwGeom.Polygon(template.wcs.skyToPixel(patchOuterCorners))
             patchBBox = lsst.geom.Box2I(patchOuterPolygon.getBBox())
-            templatePsfSize = getPsfFwhm(template[warpedPatchBox].psf, position=patchBBox.getCenter())
-            sciencePsfSize = getPsfFwhm(science[warpedPatchBox].psf, position=patchBBox.getCenter())
-            self.log.info(f"Science image PSF size in patch: {sciencePsfSize}")
-            self.log.info(f"Template image PSF size in patch: {templatePsfSize}")
+            try:
+                templatePsfSize = getPsfFwhm(template[warpedPatchBox].psf, position=patchBBox.getCenter())
+                sciencePsfSize = getPsfFwhm(science[warpedPatchBox].psf, position=patchBBox.getCenter())
+                self.log.info(f"Science image PSF size in patch: {sciencePsfSize}")
+                self.log.info(f"Template image PSF size in patch: {templatePsfSize}")
+            except (lsst.pex.exceptions.Exception):
+                self.log.info(f"Could not compute PSF size in patch {patch}. ")
             boxS = science.getBBox()
             boxT = boxS.clippedTo(patchBBox)
             boxT.grow(templateBorderSize)
