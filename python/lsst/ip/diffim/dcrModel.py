@@ -403,6 +403,8 @@ class DcrModel:
             raise ValueError("Either exposure or visitInfo must be set.")
         if bbox is None:
             bbox = self.bbox
+        else:
+            bbox = bbox.clippedTo(self.bbox)
         dcrShift = calculateDcr(visitInfo, self.wcs, self.effectiveWavelength, self.bandwidth, len(self),
                                 splitSubfilters=splitSubfilters, bbox=bbox)
         templateImage = afwImage.ImageF(bbox)
