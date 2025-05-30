@@ -45,6 +45,7 @@ class AlardLuptonSubtractTestBase:
         config = RingsSkyMap.ConfigClass()
         config.numRings = 3
         config.tractBuilder = "cells"
+        config.pixelScale = 0.16
 
         self.skymap = RingsSkyMap(config=config)
 
