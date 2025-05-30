@@ -150,10 +150,6 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
         target=MakeKernelTask,
         doc="Task to construct a matching kernel for convolution.",
     )
-    makePatchKernel = lsst.pex.config.ConfigurableField(
-        target=MakeKernelTask,
-        doc="Task to construct a matching kernel for convolution within a patch.",
-    )
     doDecorrelation = lsst.pex.config.Field(
         dtype=bool,
         default=True,
@@ -267,7 +263,6 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
         self.makeKernel.kernel.active.fitForBackground = True
         self.makeKernel.kernel.active.spatialKernelOrder = 1
         self.makeKernel.kernel.active.spatialBgOrder = 2
-        self.makePatchKernel.kernel = self.makeKernel.kernel
         self.sourceSelector.doUnresolved = True  # apply star-galaxy separation
         self.sourceSelector.doIsolated = True  # apply isolated star selection
         self.sourceSelector.doRequirePrimary = True  # apply primary flag selection
@@ -300,7 +295,6 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         super().__init__(**kwargs)
         self.makeSubtask("decorrelate")
         self.makeSubtask("makeKernel")
-        self.makeSubtask("makePatchKernel")
         self.makeSubtask("sourceSelector")
         if self.config.doScaleVariance:
             self.makeSubtask("scaleVariance")
@@ -699,28 +693,27 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                 Kernel used to PSF-match the template to the science image.
         """
         self.metadata["convolvedExposure"] = "Template"
-        kernelTask = self.makePatchKernel if usePatch else self.makeKernel
         try:
-            kernelSources = kernelTask.selectKernelSources(template, science,
-                                                           candidateList=selectSources,
-                                                           preconvolved=False)
-            kernelResult = kernelTask.run(template, science, kernelSources,
-                                          preconvolved=False)
+            kernelSources = self.makeKernel.selectKernelSources(template, science,
+                                                                candidateList=selectSources,
+                                                                preconvolved=False)
+            kernelResult = self.makeKernel.run(template, science, kernelSources,
+                                               preconvolved=False)
         except Exception as e:
             if self.config.allowKernelSourceDetection:
                 self.log.warning("Error encountered trying to construct the matching kernel"
                                  f" Running source detection and retrying. {e}")
-                kernelSize = kernelTask.makeKernelBasisList(
+                kernelSize = self.makeKernel.makeKernelBasisList(
                     self.templatePsfSize, self.sciencePsfSize)[0].getWidth()
                 sigmaToFwhm = 2*np.log(2*np.sqrt(2))
-                candidateList = kernelTask.makeCandidateList(template, science, kernelSize,
-                                                             candidateList=None,
-                                                             sigma=self.sciencePsfSize/sigmaToFwhm)
-                kernelSources = kernelTask.selectKernelSources(template, science,
-                                                               candidateList=candidateList,
-                                                               preconvolved=False)
-                kernelResult = kernelTask.run(template, science, kernelSources,
-                                              preconvolved=False)
+                candidateList = self.makeKernel.makeCandidateList(template, science, kernelSize,
+                                                                  candidateList=None,
+                                                                  sigma=self.sciencePsfSize/sigmaToFwhm)
+                kernelSources = self.makeKernel.selectKernelSources(template, science,
+                                                                    candidateList=candidateList,
+                                                                    preconvolved=False)
+                kernelResult = self.makeKernel.run(template, science, kernelSources,
+                                                   preconvolved=False)
             else:
                 raise e
 
@@ -778,13 +771,12 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                Kernel used to PSF-match the science image to the template.
         """
         self.metadata["convolvedExposure"] = "Science"
-        kernelTask = self.makePatchKernel if usePatch else self.makeKernel
         bbox = science.getBBox()
-        kernelSources = kernelTask.selectKernelSources(science, template,
-                                                       candidateList=selectSources,
-                                                       preconvolved=False)
-        kernelResult = kernelTask.run(science, template, kernelSources,
-                                      preconvolved=False)
+        kernelSources = self.makeKernel.selectKernelSources(science, template,
+                                                            candidateList=selectSources,
+                                                            preconvolved=False)
+        kernelResult = self.makeKernel.run(science, template, kernelSources,
+                                           preconvolved=False)
         modelParams = kernelResult.backgroundModel.getParameters()
         # We must invert the background model if the matching kernel is solved for the science image.
         kernelResult.backgroundModel.setParameters([-p for p in modelParams])
