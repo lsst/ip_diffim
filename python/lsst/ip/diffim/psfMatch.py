@@ -794,7 +794,7 @@ class PsfMatchTask(pipeBase.Task, abc.ABC):
         return
 
     @timeMethod
-    def _solve(self, kernelCellSet, basisList, returnOnExcept=False):
+    def _solve(self, kernelCellSet, basisList):
         """Solve for the PSF matching kernel
 
         Parameters
@@ -805,8 +805,6 @@ class PsfMatchTask(pipeBase.Task, abc.ABC):
         basisList : `list` of `lsst.afw.math.kernel.FixedKernel`
             list of Kernels to be used in the decomposition of the spatially varying kernel
             (typically as provided by makeKernelBasisList)
-        returnOnExcept : `bool`, optional
-            if True then return (None, None) if an error occurs, else raise the exception
 
         Returns
         -------
