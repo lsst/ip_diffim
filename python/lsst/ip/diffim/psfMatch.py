@@ -38,6 +38,14 @@ from . import utils as diutils
 from . import diffimLib
 
 
+class NoKernelCandidatesError(pipeBase.AlgorithmError):
+    """Raised if there are too few candidates to compute the PSF matching
+    kernel.
+    """
+    def metadata(self) -> dict:
+        return {}
+
+
 class PsfMatchConfig(pexConfig.Config):
     """Base configuration for Psf-matching
 
@@ -786,7 +794,7 @@ class PsfMatchTask(pipeBase.Task, abc.ABC):
         return
 
     @timeMethod
-    def _solve(self, kernelCellSet, basisList, returnOnExcept=False):
+    def _solve(self, kernelCellSet, basisList):
         """Solve for the PSF matching kernel
 
         Parameters
@@ -797,8 +805,6 @@ class PsfMatchTask(pipeBase.Task, abc.ABC):
         basisList : `list` of `lsst.afw.math.kernel.FixedKernel`
             list of Kernels to be used in the decomposition of the spatially varying kernel
             (typically as provided by makeKernelBasisList)
-        returnOnExcept : `bool`, optional
-            if True then return (None, None) if an error occurs, else raise the exception
 
         Returns
         -------
@@ -809,8 +815,8 @@ class PsfMatchTask(pipeBase.Task, abc.ABC):
 
         Raises
         ------
-        RuntimeError :
-            If unable to determine PSF matching kernel and ``returnOnExcept==False``.
+        NoKernelCandidatesError :
+            If there are no useable kernel candidates.
         """
 
         import lsstDebug
@@ -917,7 +923,7 @@ class PsfMatchTask(pipeBase.Task, abc.ABC):
 
             # If only nGoodSpatial == 0, might be other candidates in the cells
             if nGoodSpatial == 0 and nRejectedSpatial == 0:
-                raise RuntimeError("No kernel candidates for spatial fit")
+                raise NoKernelCandidatesError("No kernel candidates for spatial fit")
 
             if nRejectedSpatial == 0:
                 # Nothing rejected, finished with spatial fit
@@ -937,6 +943,10 @@ class PsfMatchTask(pipeBase.Task, abc.ABC):
             spatialkv.solveLinearEquation()
             trace_loggers[2].debug("Spatial kernel built with %d candidates", spatialkv.getNCandidates())
             spatialKernel, spatialBackground = spatialkv.getSolutionPair()
+
+        # Run after the final fit to use the updated kernel visitor `spatialkv`
+        if spatialkv.getNCandidates() < 1:
+            raise NoKernelCandidatesError("No kernel candidates remain after max iterations")
 
         spatialSolution = spatialkv.getKernelSolution()
 
