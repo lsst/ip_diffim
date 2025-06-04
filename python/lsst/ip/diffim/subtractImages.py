@@ -374,43 +374,10 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         """
         self._prepareInputs(template, science, visitSummary=visitSummary)
 
-        # In the event that getPsfFwhm fails, evaluate the PSF on a grid.
-        fwhmExposureBuffer = self.config.makeKernel.fwhmExposureBuffer
-        fwhmExposureGrid = self.config.makeKernel.fwhmExposureGrid
-
-        # Calling getPsfFwhm on template.psf fails on some rare occasions when
-        # the template has no input exposures at the average position of the
-        # stars. So we try getPsfFwhm first on template, and if that fails we
-        # evaluate the PSF on a grid specified by fwhmExposure* fields.
-        # To keep consistent definitions for PSF size on the template and
-        # science images, we use the same method for both.
-        # In the try block below, we catch two exceptions:
-        # 1. InvalidParameterError, in case the point where we are evaluating
-        #    the PSF lands in a gap in the template.
-        # 2. RangeError, in case the template coverage is so poor that we end
-        #    up near a region with no data.
-        try:
-            self.templatePsfSize = getPsfFwhm(template.psf)
-            self.sciencePsfSize = getPsfFwhm(science.psf)
-        except (lsst.pex.exceptions.InvalidParameterError, lsst.pex.exceptions.RangeError):
-            self.log.info("Unable to evaluate PSF at the average position. "
-                          "Evaluting PSF on a grid of points."
-                          )
-            self.templatePsfSize = evaluateMeanPsfFwhm(template,
-                                                       fwhmExposureBuffer=fwhmExposureBuffer,
-                                                       fwhmExposureGrid=fwhmExposureGrid
-                                                       )
-            self.sciencePsfSize = evaluateMeanPsfFwhm(science,
-                                                      fwhmExposureBuffer=fwhmExposureBuffer,
-                                                      fwhmExposureGrid=fwhmExposureGrid
-                                                      )
-        self.log.info("Science PSF FWHM: %f pixels", self.sciencePsfSize)
-        self.log.info("Template PSF FWHM: %f pixels", self.templatePsfSize)
-        self.metadata["sciencePsfSize"] = self.sciencePsfSize
-        self.metadata["templatePsfSize"] = self.templatePsfSize
-
         #  Calculate estimated image depths, i.e., limiting magnitudes
         maglim_science = self._calculateMagLim(science, fallbackPsfSize=self.sciencePsfSize)
+        if np.isnan(maglim_science):
+            self.log.warning("Limiting magnitude of the science image is NaN!")
         fluxlim_science = (maglim_science*u.ABmag).to_value(u.nJy)
         maglim_template = self._calculateMagLim(template, fallbackPsfSize=self.templatePsfSize)
         if np.isnan(maglim_template):
@@ -426,8 +393,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         if self.config.mode == "auto":
             convolveTemplate = _shapeTest(template,
                                           science,
-                                          fwhmExposureBuffer=fwhmExposureBuffer,
-                                          fwhmExposureGrid=fwhmExposureGrid)
+                                          fwhmExposureBuffer=self.config.makeKernel.fwhmExposureBuffer,
+                                          fwhmExposureGrid=self.config.makeKernel.fwhmExposureGrid)
             if convolveTemplate:
                 if self.sciencePsfSize < self.templatePsfSize:
                     self.log.info("Average template PSF size is greater, "
@@ -579,9 +546,13 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         try:
             kernelSources = self.makeKernel.selectKernelSources(template, science,
                                                                 candidateList=selectSources,
-                                                                preconvolved=False)
+                                                                preconvolved=False,
+                                                                templateFwhmPix=self.templatePsfSize,
+                                                                scienceFwhmPix=self.sciencePsfSize)
             kernelResult = self.makeKernel.run(template, science, kernelSources,
-                                               preconvolved=False)
+                                               preconvolved=False,
+                                               templateFwhmPix=self.templatePsfSize,
+                                               scienceFwhmPix=self.sciencePsfSize)
         except Exception as e:
             if self.config.allowKernelSourceDetection:
                 self.log.warning("Error encountered trying to construct the matching kernel"
@@ -594,9 +565,13 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                                                                   sigma=self.sciencePsfSize/sigmaToFwhm)
                 kernelSources = self.makeKernel.selectKernelSources(template, science,
                                                                     candidateList=candidateList,
-                                                                    preconvolved=False)
+                                                                    preconvolved=False,
+                                                                    templateFwhmPix=self.templatePsfSize,
+                                                                    scienceFwhmPix=self.sciencePsfSize)
                 kernelResult = self.makeKernel.run(template, science, kernelSources,
-                                                   preconvolved=False)
+                                                   preconvolved=False,
+                                                   templateFwhmPix=self.templatePsfSize,
+                                                   scienceFwhmPix=self.sciencePsfSize)
             else:
                 raise e
 
@@ -652,9 +627,13 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         bbox = science.getBBox()
         kernelSources = self.makeKernel.selectKernelSources(science, template,
                                                             candidateList=selectSources,
-                                                            preconvolved=False)
+                                                            preconvolved=False,
+                                                            templateFwhmPix=self.templatePsfSize,
+                                                            scienceFwhmPix=self.sciencePsfSize)
         kernelResult = self.makeKernel.run(science, template, kernelSources,
-                                           preconvolved=False)
+                                           preconvolved=False,
+                                           templateFwhmPix=self.templatePsfSize,
+                                           scienceFwhmPix=self.sciencePsfSize)
         modelParams = kernelResult.backgroundModel.getParameters()
         # We must invert the background model if the matching kernel is solved for the science image.
         kernelResult.backgroundModel.setParameters([-p for p in modelParams])
@@ -756,6 +735,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         maglim : `astropy.units.Quantity`
             The limiting magnitude of the exposure, or np.nan.
         """
+        if exposure.photoCalib is None:
+            return np.nan
         try:
             psf = exposure.getPsf()
             psf_shape = psf.computeShape(psf.getAveragePosition())
@@ -763,7 +744,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             if fallbackPsfSize is not None:
                 self.log.info("Unable to evaluate PSF, using fallback FWHM %f", fallbackPsfSize)
                 psf_area = np.pi*(fallbackPsfSize/2)**2
-                zeropoint = exposure.getPhotoCalib().instFluxToMagnitude(1)
+                zeropoint = exposure.photoCalib.instFluxToMagnitude(1)
                 maglim = zeropoint - 2.5*np.log10(nsigma*np.sqrt(psf_area))
             else:
                 self.log.info("Unable to evaluate PSF, setting maglim to nan")
@@ -771,7 +752,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         else:
             # Get a more accurate area than `psf_shape.getArea()` via moments
             psf_area = np.pi*np.sqrt(psf_shape.getIxx()*psf_shape.getIyy())
-            zeropoint = exposure.getPhotoCalib().instFluxToMagnitude(1)
+            zeropoint = exposure.photoCalib.instFluxToMagnitude(1)
             maglim = zeropoint - 2.5*np.log10(nsigma*np.sqrt(psf_area))
         finally:
             return maglim
@@ -987,6 +968,39 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         #  We don't want the detection mask from the science image
         self.updateMasks(template, science)
 
+        # Calling getPsfFwhm on template.psf fails on some rare occasions when
+        # the template has no input exposures at the average position of the
+        # stars. So we try getPsfFwhm first on template, and if that fails we
+        # evaluate the PSF on a grid specified by fwhmExposure* fields.
+        # To keep consistent definitions for PSF size on the template and
+        # science images, we use the same method for both.
+        # In the try block below, we catch two exceptions:
+        # 1. InvalidParameterError, in case the point where we are evaluating
+        #    the PSF lands in a gap in the template.
+        # 2. RangeError, in case the template coverage is so poor that we end
+        #    up near a region with no data.
+        try:
+            self.templatePsfSize = getPsfFwhm(template.psf)
+            self.sciencePsfSize = getPsfFwhm(science.psf)
+        except (lsst.pex.exceptions.InvalidParameterError, lsst.pex.exceptions.RangeError):
+            self.log.info("Unable to evaluate PSF at the average position. "
+                          "Evaluting PSF on a grid of points."
+                          )
+            self.templatePsfSize = evaluateMeanPsfFwhm(
+                template,
+                fwhmExposureBuffer=self.config.makeKernel.fwhmExposureBuffer,
+                fwhmExposureGrid=self.config.makeKernel.fwhmExposureGrid
+            )
+            self.sciencePsfSize = evaluateMeanPsfFwhm(
+                science,
+                fwhmExposureBuffer=self.config.makeKernel.fwhmExposureBuffer,
+                fwhmExposureGrid=self.config.makeKernel.fwhmExposureGrid
+            )
+        self.log.info("Science PSF FWHM: %f pixels", self.sciencePsfSize)
+        self.log.info("Template PSF FWHM: %f pixels", self.templatePsfSize)
+        self.metadata["sciencePsfSize"] = self.sciencePsfSize
+        self.metadata["templatePsfSize"] = self.templatePsfSize
+
     def updateMasks(self, template, science):
         """Update the science and template mask planes before differencing.
 
@@ -1196,9 +1210,13 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
 
         kernelSources = self.makeKernel.selectKernelSources(template[innerBBox], matchedScience[innerBBox],
                                                             candidateList=selectSources,
-                                                            preconvolved=True)
+                                                            preconvolved=True,
+                                                            templateFwhmPix=self.templatePsfSize,
+                                                            scienceFwhmPix=self.sciencePsfSize)
         kernelResult = self.makeKernel.run(template[innerBBox], matchedScience[innerBBox], kernelSources,
-                                           preconvolved=True)
+                                           preconvolved=True,
+                                           templateFwhmPix=self.templatePsfSize,
+                                           scienceFwhmPix=self.sciencePsfSize)
 
         matchedTemplate = self._convolveExposure(template, kernelResult.psfMatchingKernel,
                                                  self.convolutionControl,
