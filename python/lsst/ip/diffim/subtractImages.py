@@ -374,41 +374,6 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         """
         self._prepareInputs(template, science, visitSummary=visitSummary)
 
-        # In the event that getPsfFwhm fails, evaluate the PSF on a grid.
-        fwhmExposureBuffer = self.config.makeKernel.fwhmExposureBuffer
-        fwhmExposureGrid = self.config.makeKernel.fwhmExposureGrid
-
-        # Calling getPsfFwhm on template.psf fails on some rare occasions when
-        # the template has no input exposures at the average position of the
-        # stars. So we try getPsfFwhm first on template, and if that fails we
-        # evaluate the PSF on a grid specified by fwhmExposure* fields.
-        # To keep consistent definitions for PSF size on the template and
-        # science images, we use the same method for both.
-        # In the try block below, we catch two exceptions:
-        # 1. InvalidParameterError, in case the point where we are evaluating
-        #    the PSF lands in a gap in the template.
-        # 2. RangeError, in case the template coverage is so poor that we end
-        #    up near a region with no data.
-        try:
-            self.templatePsfSize = getPsfFwhm(template.psf)
-            self.sciencePsfSize = getPsfFwhm(science.psf)
-        except (lsst.pex.exceptions.InvalidParameterError, lsst.pex.exceptions.RangeError):
-            self.log.info("Unable to evaluate PSF at the average position. "
-                          "Evaluting PSF on a grid of points."
-                          )
-            self.templatePsfSize = evaluateMeanPsfFwhm(template,
-                                                       fwhmExposureBuffer=fwhmExposureBuffer,
-                                                       fwhmExposureGrid=fwhmExposureGrid
-                                                       )
-            self.sciencePsfSize = evaluateMeanPsfFwhm(science,
-                                                      fwhmExposureBuffer=fwhmExposureBuffer,
-                                                      fwhmExposureGrid=fwhmExposureGrid
-                                                      )
-        self.log.info("Science PSF FWHM: %f pixels", self.sciencePsfSize)
-        self.log.info("Template PSF FWHM: %f pixels", self.templatePsfSize)
-        self.metadata["sciencePsfSize"] = self.sciencePsfSize
-        self.metadata["templatePsfSize"] = self.templatePsfSize
-
         #  Calculate estimated image depths, i.e., limiting magnitudes
         maglim_science = self._calculateMagLim(science, fallbackPsfSize=self.sciencePsfSize)
         if np.isnan(maglim_science):
@@ -428,8 +393,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         if self.config.mode == "auto":
             convolveTemplate = _shapeTest(template,
                                           science,
-                                          fwhmExposureBuffer=fwhmExposureBuffer,
-                                          fwhmExposureGrid=fwhmExposureGrid)
+                                          fwhmExposureBuffer=self.config.makeKernel.fwhmExposureBuffer,
+                                          fwhmExposureGrid=self.config.makeKernel.fwhmExposureGrid)
             if convolveTemplate:
                 if self.sciencePsfSize < self.templatePsfSize:
                     self.log.info("Average template PSF size is greater, "
@@ -1002,6 +967,39 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         # Erase existing detection mask planes.
         #  We don't want the detection mask from the science image
         self.updateMasks(template, science)
+
+        # Calling getPsfFwhm on template.psf fails on some rare occasions when
+        # the template has no input exposures at the average position of the
+        # stars. So we try getPsfFwhm first on template, and if that fails we
+        # evaluate the PSF on a grid specified by fwhmExposure* fields.
+        # To keep consistent definitions for PSF size on the template and
+        # science images, we use the same method for both.
+        # In the try block below, we catch two exceptions:
+        # 1. InvalidParameterError, in case the point where we are evaluating
+        #    the PSF lands in a gap in the template.
+        # 2. RangeError, in case the template coverage is so poor that we end
+        #    up near a region with no data.
+        try:
+            self.templatePsfSize = getPsfFwhm(template.psf)
+            self.sciencePsfSize = getPsfFwhm(science.psf)
+        except (lsst.pex.exceptions.InvalidParameterError, lsst.pex.exceptions.RangeError):
+            self.log.info("Unable to evaluate PSF at the average position. "
+                          "Evaluting PSF on a grid of points."
+                          )
+            self.templatePsfSize = evaluateMeanPsfFwhm(
+                template,
+                fwhmExposureBuffer=self.config.makeKernel.fwhmExposureBuffer,
+                fwhmExposureGrid=self.config.makeKernel.fwhmExposureGrid
+            )
+            self.sciencePsfSize = evaluateMeanPsfFwhm(
+                science,
+                fwhmExposureBuffer=self.config.makeKernel.fwhmExposureBuffer,
+                fwhmExposureGrid=self.config.makeKernel.fwhmExposureGrid
+            )
+        self.log.info("Science PSF FWHM: %f pixels", self.sciencePsfSize)
+        self.log.info("Template PSF FWHM: %f pixels", self.templatePsfSize)
+        self.metadata["sciencePsfSize"] = self.sciencePsfSize
+        self.metadata["templatePsfSize"] = self.templatePsfSize
 
     def updateMasks(self, template, science):
         """Update the science and template mask planes before differencing.
