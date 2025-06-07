@@ -318,17 +318,18 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         # Run detection and check the results
         def _detection_wrapper(positive=True):
             transients, transientSources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=8, **kwargs)
-            difference = science.clone()
-            difference.maskedImage -= matchedTemplate.maskedImage
+            science2 = science.clone()
             if positive:
-                difference.maskedImage += transients.maskedImage
+                science2.maskedImage += transients.maskedImage
             else:
-                difference.maskedImage -= transients.maskedImage
+                science2.maskedImage -= transients.maskedImage
+            difference = science2.clone()
+            difference.maskedImage -= matchedTemplate.maskedImage
             # NOTE: NoiseReplacer (run by forcedMeasurement) can modify the
             # science image if we've e.g. removed parents post-deblending.
             # Pass a clone of the science image, so that it doesn't disrupt
             # later tests.
-            output = detectionTask.run(science.clone(), matchedTemplate, difference)
+            output = detectionTask.run(science2, matchedTemplate, difference)
             refIds = []
             scale = 1. if positive else -1.
             for diaSource in output.diaSources:

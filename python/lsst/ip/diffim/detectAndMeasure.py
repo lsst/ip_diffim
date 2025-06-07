@@ -45,6 +45,26 @@ __all__ = ["DetectAndMeasureConfig", "DetectAndMeasureTask",
            "DetectAndMeasureScoreConfig", "DetectAndMeasureScoreTask"]
 
 
+class BadSubtractionError(pipeBase.AlgorithmError):
+    """Raised when there are no matches between the psf_stars and stars
+    catalogs.
+    """
+    def __init__(self, *, ratio, threshold):
+        msg = ("The ratio of residual power in source footprints on the"
+               " difference image to the power in the footprints on the"
+               f" science image was {ratio}, which exceeds the maximum"
+               f" threshold of {threshold}")
+        super().__init__(msg)
+        self.ratio = ratio
+        self.threshold = threshold
+
+    @property
+    def metadata(self):
+        return {"ratio": self.ratio,
+                "threshold": self.threshold
+                }
+
+
 class DetectAndMeasureConnections(pipeBase.PipelineTaskConnections,
                                   dimensions=("instrument", "visit", "detector"),
                                   defaultTemplates={"coaddName": "deep",
@@ -238,6 +258,20 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         dtype=str,
         doc="Mask planes to clear before running detection.",
         default=("DETECTED", "DETECTED_NEGATIVE", "NOT_DEBLENDED", "STREAK"),
+    )
+    raiseOnBadSubtractionRatio = pexConfig.Field(
+        dtype=bool,
+        default=True,
+        doc="Raise an error if the ratio of power in detected footprints"
+            " on the difference image to the power in footprints on the science"
+            " image exceeds ``badSubtractionRatioThreshold``",
+    )
+    badSubtractionRatioThreshold = pexConfig.Field(
+        dtype=float,
+        default=0.3,
+        doc="Maximum ratio of power footprints on the difference image to"
+            " the science image."
+            "Only used if ``raiseOnBadSubtractionRatio`` is set",
     )
     idGenerator = DetectorVisitIdGeneratorConfig.make_field()
 
@@ -826,9 +860,16 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         residualInfo = self._computeDifferenceResidual(science, difference, diaSources)
         self.metadata["residualFootprintRatioMean"] = residualInfo.ratio
         self.metadata["residualFootprintRatioStdev"] = residualInfo.ratio_std
+        self.metadata["residualFootprintDetectedRatio"] = residualInfo.ratio_detected
         self.log.info("Mean, stdev of ratio of difference to science "
                       "pixels in star footprints: %5.4f, %5.4f",
                       residualInfo.ratio, residualInfo.ratio_std)
+        self.log.info("Ratio of DETECTED pixels in the differece image to the science image: %5.4f",
+                      residualInfo.ratio_detected)
+        if self.config.raiseOnBadSubtractionRatio:
+            if residualInfo.ratio > self.config.badSubtractionRatioThreshold:
+                raise BadSubtractionError(ratio=residualInfo.ratio,
+                                          threshold=self.config.badSubtractionRatioThreshold)
 
     def _computeDifferenceResidual(self, science, difference, diaSources):
         """Compute quality metrics (saved to the task metadata) on the
@@ -856,13 +897,21 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             ``ratio_std`` : `np.ndarray`
                 Standard Deviation across footprints of the above ratio.
         """
-        good = science.mask.array & science.mask.getPlaneBitMask('DETECTED') > 0
-        badPix = (difference.mask.array
-                  & difference.mask.getPlaneBitMask(self.config.detection.excludeMaskPlanes)) > 0
-        good &= ~badPix
+        goodSci = science.mask.array & science.mask.getPlaneBitMask('DETECTED') > 0
+        goodDiff = ((difference.mask.array & difference.mask.getPlaneBitMask('DETECTED') > 0)
+                    | (difference.mask.array & difference.mask.getPlaneBitMask('DETECTED_NEGATIVE') > 0))
+        badMaskPlanes = ['NO_DATA', 'SAT', 'SAT_TEMPLATE', 'BAD', 'EDGE']
+        imgBadMaskPlanes = [
+            maskPlane for maskPlane in badMaskPlanes if maskPlane in difference.mask.getMaskPlaneDict()
+        ]
+        badPix = (difference.mask.array & difference.mask.getPlaneBitMask(imgBadMaskPlanes)) > 0
+        goodSci &= ~badPix
+        goodDiff &= ~badPix
+        good = goodSci & goodDiff
+        detectedRatio = np.sum(goodDiff)/np.sum(goodSci)
         if not self.config.doSkySources:
             # Place sky sources to sample the background
-            skySourceFootprints = self.skySources.run(mask=science.mask, seed=difference.info.id,
+            skySourceFootprints = self.skySources.run(mask=difference.mask, seed=difference.info.id,
                                                       catalog=afwTable.SourceCatalog(self.schema))
         else:
             skySourceFootprints = [sky.getFootprint() for sky in diaSources[diaSources["sky_source"]]]
@@ -880,9 +929,9 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         # Then do the same for the difference image
         if np.sum(good) > 1:
             science_mean = np.abs(np.mean(abs(science.image.array[good])) - sky_science.mean())
-            science_std = np.std(abs(science.image.array[good]))
+            science_std = np.abs(np.std(science.image.array[good]) - sky_science.std())
             difference_mean = np.abs(np.mean(abs(difference.image.array[good])) - sky_difference.mean())
-            difference_std = np.std(abs(difference.image.array[good]))
+            difference_std = np.abs(np.std(difference.image.array[good]) - sky_difference.std())
             # Calculate stddev of the science and difference image values and
             # propagate to the stddev of the quotient.
             # This avoids potential divide by zero errors.
@@ -891,7 +940,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         else:
             ratio = np.nan
             ratio_std = np.nan
-        return pipeBase.Struct(ratio=ratio, ratio_std=ratio_std)
+        return pipeBase.Struct(ratio=ratio, ratio_std=ratio_std, ratio_detected=detectedRatio)
 
     def _runStreakMasking(self, difference):
         """Do streak masking and optionally save the resulting streak
