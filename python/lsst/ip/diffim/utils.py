@@ -23,14 +23,17 @@
 
 
 __all__ = ["evaluateMeanPsfFwhm", "getPsfFwhm", "getKernelCenterDisplacement",
+           "computeDifferenceImageMetrics",
            ]
 
 import itertools
 import numpy as np
 import lsst.geom as geom
+import lsst.afw.detection as afwDetection
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 from lsst.pex.exceptions import InvalidParameterError, RangeError
+import lsst.pipe.base
 from lsst.utils.logging import getLogger
 
 
@@ -331,3 +334,83 @@ def evaluateMaskFraction(mask, maskPlane):
     """
     nMaskSet = np.count_nonzero((mask.array & mask.getPlaneBitMask(maskPlane)))
     return nMaskSet/mask.array.size
+
+
+def computeDifferenceImageMetrics(science, difference, stars, sky_sources=None):
+    r"""Compute quality metrics (saved to the task metadata) on the
+    difference image, at the locations of detected stars on the science
+    image. This restricts the metric to locations that should be
+    well-subtracted.
+
+    Parameters
+    ----------
+    science : `lsst.afw.image.ExposureF`
+        Science exposure that was subtracted.
+    difference : `lsst.afw.image.ExposureF`
+        Result of subtracting template and science.
+    stars : `lsst.afw.table.SourceCatalog`
+        Good calibration sources detected on science image; these
+        footprints are what the metrics are computed on.
+
+    Returns
+    -------
+    metrics : `lsst.pipe.base.Struct`
+
+        ``differenceFootprintRatioMean`` : `float`
+            Mean of the ratio of the absolute value of the difference image
+            (with the mean absolute value of the sky regions on the difference
+            image removed) to the science image, computed in the footprints
+            of stars detected on the science image (the sums below are of the
+            pixels in each star or sky footprint):
+            :math:`\mathrm{mean}_{footprints}((\sum |difference| -
+            \mathrm{mean}(\sum |difference_{sky}|)) / \sum science)`
+        ``differenceFootprintRatioStdev`` : `float`
+            Standard Deviation across footprints of the above ratio.
+        ``differenceFootprintSkyRatioMean`` : `float`
+            Mean of the ratio of the absolute value of sky source regions on
+            the difference image to the science image (the sum below is of the
+            pixels in each sky source footprint):
+            :math:`\mathrm{mean}_{footprints}(\sum |difference_{sky}| / \sum science_{sky})`
+        ``differenceFootprintSkyRatioStdev`` : `float`
+            Standard Deivation across footprints of the above sky ratio.
+    """
+    def footprint_mean(sources, sky=0):
+        """Compute ratio of the absolute value of the diffim to the science
+        image, within each source footprint, subtracting the sky from the
+        diffim values if provided.
+        """
+        n = len(sources)
+        science_footprints = np.zeros(n)
+        difference_footprints = np.zeros(n)
+        ratio = np.zeros(n)
+        for i, record in enumerate(sources):
+            footprint = record.getFootprint()
+            heavy = afwDetection.makeHeavyFootprint(footprint, science.maskedImage)
+            heavy_diff = afwDetection.makeHeavyFootprint(footprint, difference.maskedImage)
+            science_footprints[i] = abs(heavy.getImageArray()).mean()
+            difference_footprints[i] = abs(heavy_diff.getImageArray()).mean()
+            ratio[i] = abs((difference_footprints[i] - sky)/science_footprints[i])
+        return science_footprints, difference_footprints, ratio
+
+    if "sky_source" in stars.schema:
+        sky = stars["sky_source"]
+        selectStars = stars[~sky]
+        if sky_sources is None:
+            sky_sources = stars[sky]
+    else:
+        selectStars = stars
+    if sky_sources is not None:
+        sky_science, sky_difference, sky_ratio = footprint_mean(sky_sources)
+        sky_mean = sky_ratio.mean()
+        sky_std = sky_ratio.std()
+        sky_difference = sky_difference.mean()
+    else:
+        sky_mean = np.nan
+        sky_std = np.nan
+        sky_difference = 0
+    science_footprints, difference_footprints, ratio = footprint_mean(selectStars, sky_difference)
+    return lsst.pipe.base.Struct(differenceFootprintRatioMean=ratio.mean(),
+                                 differenceFootprintRatioStdev=ratio.std(),
+                                 differenceFootprintSkyRatioMean=sky_mean,
+                                 differenceFootprintSkyRatioStdev=sky_std,
+                                 )
