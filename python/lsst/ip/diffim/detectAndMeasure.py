@@ -252,7 +252,7 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         self.subtractInitialBackground.doFilterSuperPixels = True
         # Use a larger binsize for the final background subtraction, to reduce
         #  over-subtraction of bright objects.
-        self.subtractFinalBackground.binSize = 32
+        self.subtractFinalBackground.binSize = 40
         self.subtractFinalBackground.useApprox = False
         self.subtractFinalBackground.statisticsProperty = "MEDIAN"
         self.subtractFinalBackground.doFilterSuperPixels = True
