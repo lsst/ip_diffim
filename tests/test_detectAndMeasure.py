@@ -101,7 +101,7 @@ class DetectAndMeasureTestBase:
         if maxValue is not None:
             self.assertTrue(np.all(values <= maxValue))
 
-    def _setup_detection(self, doSkySources=False, nSkySources=5, doSubtractBackground=False, **kwargs):
+    def _setup_detection(self, doSkySources=True, nSkySources=5, doSubtractBackground=False, **kwargs):
         """Setup and configure the detection and measurement PipelineTask.
 
         Parameters
@@ -158,7 +158,10 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         difference = science.clone()
 
         # Configure the detection Task
-        detectionTask = self._setup_detection(doDeblend=True)
+        # Set the subtraction residual metric threshold high, since the template
+        # is not actually subtracted from the science image.
+        detectionTask = self._setup_detection(doDeblend=True, badSubtractionRatioThreshold=1.,
+                                              doSkySources=False)
 
         # Run detection and check the results
         output = detectionTask.run(science, matchedTemplate, difference, sources,
@@ -268,6 +271,8 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
                                          nSrc=1, **kwargs)
         matchedTemplate, _ = makeTestImage(seed=staticSeed, noiseLevel=noiseLevel/4, noiseSeed=7,
                                            nSrc=1, **kwargs)
+        transients, transientSources = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=8, nSrc=1, **kwargs)
+        science.maskedImage += transients.maskedImage
         difference = science.clone()
         bbox = difference.getBBox()
         difference.maskedImage -= matchedTemplate.maskedImage
@@ -308,7 +313,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         transientSeed = 6
         fluxLevel = 500
         kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel}
-        science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
+        scienceBase, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
         matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
 
         # Configure the detection Task
@@ -320,17 +325,18 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         # Run detection and check the results
         def _detection_wrapper(positive=True):
             transients, transientSources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=8, **kwargs)
+            science = scienceBase.clone()
+            if positive:
+                science.maskedImage += transients.maskedImage
+            else:
+                science.maskedImage -= transients.maskedImage
             difference = science.clone()
             difference.maskedImage -= matchedTemplate.maskedImage
-            if positive:
-                difference.maskedImage += transients.maskedImage
-            else:
-                difference.maskedImage -= transients.maskedImage
             # NOTE: NoiseReplacer (run by forcedMeasurement) can modify the
             # science image if we've e.g. removed parents post-deblending.
             # Pass a clone of the science image, so that it doesn't disrupt
             # later tests.
-            output = detectionTask.run(science.clone(), matchedTemplate, difference, sources)
+            output = detectionTask.run(science, matchedTemplate, difference, sources)
             refIds = []
             scale = 1. if positive else -1.
             for diaSource in output.diaSources:
@@ -356,8 +362,8 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
 
         bbox2D = lsst.geom.Box2D(lsst.geom.Point2D(x0, y0), lsst.geom.Extent2D(xSize, ySize))
         background_model = afwMath.Chebyshev1Function2D(params, bbox2D)
-        science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6,
-                                         background=background_model, **kwargs)
+        scienceBase, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6,
+                                             background=background_model, **kwargs)
         matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
 
         # Configure the detection Task
@@ -369,17 +375,18 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         # Run detection and check the results
         def _detection_wrapper(positive=True):
             transients, transientSources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=8, **kwargs)
+            science = scienceBase.clone()
+            if positive:
+                science.maskedImage += transients.maskedImage
+            else:
+                science.maskedImage -= transients.maskedImage
             difference = science.clone()
             difference.maskedImage -= matchedTemplate.maskedImage
-            if positive:
-                difference.maskedImage += transients.maskedImage
-            else:
-                difference.maskedImage -= transients.maskedImage
             # NOTE: NoiseReplacer (run by forcedMeasurement) can modify the
             # science image if we've e.g. removed parents post-deblending.
             # Pass a clone of the science image, so that it doesn't disrupt
             # later tests.
-            output = detectionTask.run(science.clone(), matchedTemplate, difference, sources)
+            output = detectionTask.run(science, matchedTemplate, difference, sources)
             refIds = []
             scale = 1. if positive else -1.
             for transient in transientSources:
@@ -400,7 +407,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
 
         difference = science.clone()
         difference.maskedImage -= matchedTemplate.maskedImage
-        detectionTask = self._setup_detection()
+        detectionTask = self._setup_detection(raiseOnBadSubtractionRatio=False)
 
         # Verify that detection runs without errors
         detectionTask.run(science, matchedTemplate, difference, sources)
@@ -434,13 +441,16 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         matchedTemplate.mask.array[...] = np.roll(matchedTemplate.mask.array[...], offset, axis=0)
         difference.maskedImage -= matchedTemplate.maskedImage[science.getBBox()]
 
-        detectionTask = self._setup_detection(doMerge=True)
+        # Need a higher residual metric threshold, since we are purposely
+        # creating poor subtractions.
+        detectionTask = self._setup_detection(doMerge=True, badSubtractionRatioThreshold=0.3)
         output = detectionTask.run(science, matchedTemplate, difference, sources)
-        self.assertEqual(len(output.diaSources), len(sources))
+        diaSources = output.diaSources[~output.diaSources["sky_source"]].copy(deep=True)
+        self.assertEqual(len(diaSources), len(sources))
         # no sources should be flagged as negative
-        self.assertEqual(len(~output.diaSources["is_negative"]), len(output.diaSources))
+        self.assertEqual(len(~diaSources["is_negative"]), len(diaSources))
         refIds = []
-        for diaSource in output.diaSources:
+        for diaSource in diaSources:
             if diaSource[dipoleFlag]:
                 self._check_diaSource(sources, diaSource, refIds=refIds, scale=0,
                                       rtol=0.05, atol=None, usePsfFlux=False)
@@ -613,10 +623,11 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
                                    subtraction.matchedTemplate,
                                    subtraction.difference,
                                    subtraction.kernelSources)
+        diaSources = output.diaSources[~output.diaSources["sky_source"]].copy(deep=True)
 
         sci_refIds = []
         tmpl_refIds = []
-        for diaSrc in output.diaSources:
+        for diaSrc in diaSources:
             if diaSrc['base_PsfFlux_instFlux'] > 0:
                 self._check_diaSource(science_fake_sources, diaSrc, scale=1, refIds=sci_refIds)
                 self.assertTrue(diaSrc['base_PixelFlags_flag_injected'])
@@ -644,7 +655,8 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
 
         # Configure the detection Task
-        detectionTask = self._setup_detection(doMerge=False, doMaskStreaks=True)
+        detectionTask = self._setup_detection(doMerge=False, doMaskStreaks=True,
+                                              raiseOnBadSubtractionRatio=False)
 
         # Test that no streaks are detected
         difference = science.clone()
@@ -712,7 +724,10 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         score = subtractTask._convolveExposure(difference, scienceKernel, subtractTask.convolutionControl)
 
         # Configure the detection Task
-        detectionTask = self._setup_detection(doDeblend=True)
+        # Set the subtraction residual metric threshold high, since the template
+        # is not actually subtracted from the science image.
+        detectionTask = self._setup_detection(doDeblend=True, badSubtractionRatioThreshold=1.,
+                                              doSkySources=False)
 
         # Run detection and check the results
         output = detectionTask.run(science, matchedTemplate, difference, score, sources,
@@ -791,9 +806,9 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         transientSeed = 6
         fluxLevel = 500
         kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel}
-        science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
+        scienceBase, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
         matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
-        scienceKernel = science.psf.getKernel()
+        scienceKernel = scienceBase.psf.getKernel()
         subtractTask = subtractImages.AlardLuptonPreconvolveSubtractTask()
 
         # Configure the detection Task
@@ -813,18 +828,19 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
             """
 
             transients, transientSources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=8, **kwargs)
+            science = scienceBase.clone()
+            if positive:
+                science.maskedImage += transients.maskedImage
+            else:
+                science.maskedImage -= transients.maskedImage
             difference = science.clone()
             difference.maskedImage -= matchedTemplate.maskedImage
-            if positive:
-                difference.maskedImage += transients.maskedImage
-            else:
-                difference.maskedImage -= transients.maskedImage
             score = subtractTask._convolveExposure(difference, scienceKernel, subtractTask.convolutionControl)
             # NOTE: NoiseReplacer (run by forcedMeasurement) can modify the
             # science image if we've e.g. removed parents post-deblending.
             # Pass a clone of the science image, so that it doesn't disrupt
             # later tests.
-            output = detectionTask.run(science.clone(), matchedTemplate, difference, score, sources)
+            output = detectionTask.run(science, matchedTemplate, difference, score, sources)
             refIds = []
             scale = 1. if positive else -1.
             # sources near the edge may have untrustworthy centroids
@@ -867,11 +883,12 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         scienceKernel = science.psf.getKernel()
         score = subtractTask._convolveExposure(difference, scienceKernel, subtractTask.convolutionControl)
 
-        detectionTask = self._setup_detection()
+        detectionTask = self._setup_detection(badSubtractionRatioThreshold=0.3)
         output = detectionTask.run(science, matchedTemplate, difference, score, sources)
-        self.assertEqual(len(output.diaSources), len(sources))
+        diaSources = output.diaSources[~output.diaSources["sky_source"]].copy(deep=True)
+        self.assertEqual(len(diaSources), len(sources))
         refIds = []
-        for diaSource in output.diaSources:
+        for diaSource in diaSources:
             if diaSource[dipoleFlag]:
                 self._check_diaSource(sources, diaSource, refIds=refIds, scale=0,
                                       rtol=0.05, atol=None, usePsfFlux=False)
@@ -1094,6 +1111,7 @@ class TestNegativePeaks(lsst.utils.tests.TestCase):
 
         config = detectAndMeasure.DetectAndMeasureTask.ConfigClass()
         config.doDeblend = True
+        config.raiseOnBadSubtractionRatio = False
         task = detectAndMeasure.DetectAndMeasureTask(config=config)
         result = task.run(science, template, difference, catalog)
 
