@@ -45,6 +45,26 @@ __all__ = ["DetectAndMeasureConfig", "DetectAndMeasureTask",
            "DetectAndMeasureScoreConfig", "DetectAndMeasureScoreTask"]
 
 
+class BadSubtractionError(pipeBase.AlgorithmError):
+    """Raised when the residuals in footprints of stars used to compute the
+    psf-matching kernel exceeds the configured maximum.
+    """
+    def __init__(self, *, ratio, threshold):
+        msg = ("The ratio of residual power in source footprints on the"
+               " difference image to the power in the footprints on the"
+               f" science image was {ratio}, which exceeds the maximum"
+               f" threshold of {threshold}")
+        super().__init__(msg)
+        self.ratio = ratio
+        self.threshold = threshold
+
+    @property
+    def metadata(self):
+        return {"ratio": self.ratio,
+                "threshold": self.threshold
+                }
+
+
 class DetectAndMeasureConnections(pipeBase.PipelineTaskConnections,
                                   dimensions=("instrument", "visit", "detector"),
                                   defaultTemplates={"coaddName": "deep",
@@ -244,6 +264,27 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         dtype=str,
         doc="Mask planes to clear before running detection.",
         default=("DETECTED", "DETECTED_NEGATIVE", "NOT_DEBLENDED", "STREAK"),
+    )
+    raiseOnBadSubtractionRatio = pexConfig.Field(
+        dtype=bool,
+        default=True,
+        doc="Raise an error if the ratio of power in detected footprints"
+            " on the difference image to the power in footprints on the science"
+            " image exceeds ``badSubtractionRatioThreshold``",
+    )
+    badSubtractionRatioThreshold = pexConfig.Field(
+        dtype=float,
+        default=0.2,
+        doc="Maximum ratio of power in footprints on the difference image to"
+            " the same footprints on the science image."
+            "Only used if ``raiseOnBadSubtractionRatio`` is set",
+    )
+    badSubtractionVariationThreshold = pexConfig.Field(
+        dtype=float,
+        default=0.4,
+        doc="Maximum standard deviation of the ratio of power in footprints on"
+            " the difference image to the same footprints on the science image."
+            "Only used if ``raiseOnBadSubtractionRatio`` is set",
     )
     idGenerator = DetectorVisitIdGeneratorConfig.make_field()
 
@@ -607,8 +648,6 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         if self.config.doForcedMeasurement:
             self.measureForcedSources(diaSources, science, difference.getWcs())
 
-        self.calculateMetrics(science, difference, diaSources, kernelSources)
-
         measurementResults = pipeBase.Struct(
             subtractedMeasuredExposure=difference,
         )
@@ -618,6 +657,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
         if self.config.doMaskStreaks and self.config.writeStreakInfo:
             measurementResults.mergeItems(streakInfo, 'maskedStreaks')
+
+        self.calculateMetrics(science, difference, diaSources, kernelSources)
 
         return measurementResults
 
@@ -849,6 +890,13 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                       "pixels in star footprints: %5.4f, %5.4f",
                       self.metadata["residualFootprintRatioMean"],
                       self.metadata["residualFootprintRatioStdev"])
+        if self.config.raiseOnBadSubtractionRatio:
+            if metrics.differenceFootprintRatioMean > self.config.badSubtractionRatioThreshold:
+                raise BadSubtractionError(ratio=metrics.differenceFootprintRatioMean,
+                                          threshold=self.config.badSubtractionRatioThreshold)
+            if metrics.differenceFootprintRatioStdev > self.config.badSubtractionVariationThreshold:
+                raise BadSubtractionError(ratio=metrics.differenceFootprintRatioStdev,
+                                          threshold=self.config.badSubtractionVariationThreshold)
 
     def _runStreakMasking(self, difference):
         """Do streak masking and optionally save the resulting streak
