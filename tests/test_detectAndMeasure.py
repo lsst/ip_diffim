@@ -32,7 +32,7 @@ from lsst.pipe.base import InvalidQuantumError, UpstreamFailureNoWorkFound
 import lsst.utils.tests
 import lsst.meas.base.tests
 
-from utils import makeTestImage
+from utils import makeTestImage, checkMask
 
 
 class DetectAndMeasureTestBase:
@@ -505,7 +505,6 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
         matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
 
-        _checkMask = subtractImages.AlardLuptonSubtractTask._checkMask
         # Configure the detection Task
         detectionTask = self._setup_detection()
         excludeMaskPlanes = detectionTask.config.detection.excludeMaskPlanes
@@ -530,7 +529,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
                     difference[srcBbox].mask.array |= lsst.afw.image.Mask.getPlaneBitMask(badMask)
             output = detectionTask.run(science, matchedTemplate, difference)
             refIds = []
-            goodSrcFlags = _checkMask(difference.mask, transientSources, excludeMaskPlanes)
+            goodSrcFlags = checkMask(difference.mask, transientSources, excludeMaskPlanes)
             if setFlags:
                 self.assertEqual(np.sum(~goodSrcFlags), nBad)
                 self.assertFalse(hasattr(output, "diaSources"))
@@ -965,7 +964,7 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
             score = subtractTask._convolveExposure(difference, scienceKernel, subtractTask.convolutionControl)
             output = detectionTask.run(science, matchedTemplate, difference, score)
             refIds = []
-            goodSrcFlags = subtractTask._checkMask(difference.mask, transientSources, excludeMaskPlanes)
+            goodSrcFlags = checkMask(difference.mask, transientSources, excludeMaskPlanes)
             if setFlags:
                 self.assertEqual(np.sum(~goodSrcFlags), nBad)
                 self.assertFalse(hasattr(output, "diaSources"))
