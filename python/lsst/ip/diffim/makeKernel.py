@@ -335,6 +335,11 @@ class MakeKernelTask(PsfMatchTask):
             if (reference.subset(bbox).mask.array & bitmask).any():
                 good[i] = False
                 continue
+
+            # Reject footprints with any bad mask bits set.
+            if (convolved.subset(bbox).mask.array & bitmask).any():
+                good[i] = False
+                continue
         candidates = candidateList[good].copy(deep=True)
 
         self.log.info("Selected %d / %d sources as kernel candidates.", good.sum(), len(candidateList))
