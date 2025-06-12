@@ -858,7 +858,6 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
 
         selected = self.sourceSelector.selectSources(sources).selected
         nInitialSelected = np.count_nonzero(selected)
-        selected *= self._checkMask(mask, sources, self.config.excludeMaskPlanes)
         nSelected = np.count_nonzero(selected)
         self.log.info("Rejecting %i candidate sources: an excluded template mask plane is set.",
                       nInitialSelected - nSelected)
@@ -884,47 +883,6 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         self.metadata["nPsfSources"] = len(selectSources)
 
         return selectSources
-
-    @staticmethod
-    def _checkMask(mask, sources, excludeMaskPlanes, checkAdjacent=True):
-        """Exclude sources that are located on or adjacent to masked pixels.
-
-        Parameters
-        ----------
-        mask : `lsst.afw.image.Mask`
-            The image mask plane to use to reject sources
-            based on the location of their centroid on the ccd.
-        sources : `lsst.afw.table.SourceCatalog`
-            The source catalog to evaluate.
-        excludeMaskPlanes : `list` of `str`
-            List of the names of the mask planes to exclude.
-
-        Returns
-        -------
-        flags : `numpy.ndarray` of `bool`
-            Array indicating whether each source in the catalog should be
-            kept (True) or rejected (False) based on the value of the
-            mask plane at its location.
-        """
-        setExcludeMaskPlanes = [
-            maskPlane for maskPlane in excludeMaskPlanes if maskPlane in mask.getMaskPlaneDict()
-        ]
-
-        excludePixelMask = mask.getPlaneBitMask(setExcludeMaskPlanes)
-
-        xv = (np.rint(sources.getX() - mask.getX0())).astype(int)
-        yv = (np.rint(sources.getY() - mask.getY0())).astype(int)
-
-        flags = np.ones(len(sources), dtype=bool)
-        if checkAdjacent:
-            pixRange = (0, -1, 1)
-        else:
-            pixRange = (0,)
-        for j in pixRange:
-            for i in pixRange:
-                mv = mask.array[yv + j, xv + i]
-                flags *= np.bitwise_and(mv, excludePixelMask) == 0
-        return flags
 
     def _prepareInputs(self, template, science, visitSummary=None):
         """Perform preparatory calculations common to all Alard&Lupton Tasks.
