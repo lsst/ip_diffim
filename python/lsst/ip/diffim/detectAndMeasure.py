@@ -420,6 +420,28 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             self.schema.addField(
                 "ip_diffim_forced_PsfFlux_flag_edge", "Flag",
                 "Forced PSF flux object was too close to the edge of the image to use the full PSF model.")
+            self.schema.addField(
+                "ip_diffim_forced_template_PsfFlux_instFlux", "D",
+                "Forced PSF flux measured on the template image.",
+                units="count")
+            self.schema.addField(
+                "ip_diffim_forced_template_PsfFlux_instFluxErr", "D",
+                "Forced PSF flux error measured on the template image.",
+                units="count")
+            self.schema.addField(
+                "ip_diffim_forced_template_PsfFlux_area", "F",
+                "Forced template PSF flux effective area of PSF.",
+                units="pixel")
+            self.schema.addField(
+                "ip_diffim_forced_template_PsfFlux_flag", "Flag",
+                "Forced template PSF flux general failure flag.")
+            self.schema.addField(
+                "ip_diffim_forced_template_PsfFlux_flag_noGoodPixels", "Flag",
+                "Forced template PSF flux not enough non-rejected pixels in data to attempt the fit.")
+            self.schema.addField(
+                "ip_diffim_forced_template_PsfFlux_flag_edge", "Flag",
+                """Forced template PSF flux object was too close to the edge of the image """
+                """to use the full PSF model.""")
             self.makeSubtask("forcedMeasurement", refSchema=self.schema)
 
         self.schema.addField("refMatchId", "L", "unique id of reference catalog match")
@@ -694,6 +716,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
         if self.config.doForcedMeasurement:
             self.measureForcedSources(diaSources, science, difference.getWcs())
+            self.measureForcedSources(diaSources, matchedTemplate, difference.getWcs(),
+                                      template=True)
 
         measurementResults.subtractedMeasuredExposure = difference
 
@@ -857,35 +881,42 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                     apCorrMap=apCorrMap,
                 )
 
-    def measureForcedSources(self, diaSources, science, wcs):
-        """Perform forced measurement of the diaSources on the science image.
+    def measureForcedSources(self, diaSources, image, wcs, template=False):
+        """Perform forced measurement of the diaSources on a direct image.
 
         Parameters
         ----------
         diaSources : `lsst.afw.table.SourceCatalog`
             The catalog of detected sources.
-        science : `lsst.afw.image.ExposureF`
-            Science exposure that the template was subtracted from.
+        image: `lsst.afw.image.ExposureF`
+            Exposure that the forced measurement is being performed on
         wcs : `lsst.afw.geom.SkyWcs`
             Coordinate system definition (wcs) for the exposure.
+        template : `bool`
+            Is the forced measurement being performed on the template?
         """
-        # Run forced psf photometry on the PVI at the diaSource locations.
+        # Run forced psf photometry on the image at the diaSource locations.
         # Copy the measured flux and error into the diaSource.
-        forcedSources = self.forcedMeasurement.generateMeasCat(science, diaSources, wcs)
-        self.forcedMeasurement.run(forcedSources, science, diaSources, wcs)
+        forcedSources = self.forcedMeasurement.generateMeasCat(image, diaSources, wcs)
+        self.forcedMeasurement.run(forcedSources, image, diaSources, wcs)
+
+        if template:
+            base_key = 'ip_diffim_forced_template_PsfFlux'
+        else:
+            base_key = 'ip_diffim_forced_PsfFlux'
         mapper = afwTable.SchemaMapper(forcedSources.schema, diaSources.schema)
         mapper.addMapping(forcedSources.schema.find("base_PsfFlux_instFlux")[0],
-                          "ip_diffim_forced_PsfFlux_instFlux", True)
+                          f"{base_key}_instFlux", True)
         mapper.addMapping(forcedSources.schema.find("base_PsfFlux_instFluxErr")[0],
-                          "ip_diffim_forced_PsfFlux_instFluxErr", True)
+                          f"{base_key}_instFluxErr", True)
         mapper.addMapping(forcedSources.schema.find("base_PsfFlux_area")[0],
-                          "ip_diffim_forced_PsfFlux_area", True)
+                          f"{base_key}_area", True)
         mapper.addMapping(forcedSources.schema.find("base_PsfFlux_flag")[0],
-                          "ip_diffim_forced_PsfFlux_flag", True)
+                          f"{base_key}_flag", True)
         mapper.addMapping(forcedSources.schema.find("base_PsfFlux_flag_noGoodPixels")[0],
-                          "ip_diffim_forced_PsfFlux_flag_noGoodPixels", True)
+                          f"{base_key}_flag_noGoodPixels", True)
         mapper.addMapping(forcedSources.schema.find("base_PsfFlux_flag_edge")[0],
-                          "ip_diffim_forced_PsfFlux_flag_edge", True)
+                          f"{base_key}_flag_edge", True)
         for diaSource, forcedSource in zip(diaSources, forcedSources):
             diaSource.assign(forcedSource, mapper)
 
