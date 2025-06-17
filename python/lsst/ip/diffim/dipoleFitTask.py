@@ -862,6 +862,12 @@ class DipoleFitAlgorithm:
 
         # usually around 0.1 -- the minimum flux allowed -- i.e. bad fit.
         if fitResult.params['flux'].value <= 1.:
+            self.log.debug("Fitted flux too small for id=%d; ModelResult.message='%s'",
+                           source["id"], fitResult.message)
+            return None, fitResult
+        if not fitResult.result.errorbars:
+            self.log.debug("Could not estimate error bars for id=%d; ModelResult.message='%s'",
+                           source["id"], fitResult.message)
             return None, fitResult
 
         # TODO: We could include covariances, which could be derived from
