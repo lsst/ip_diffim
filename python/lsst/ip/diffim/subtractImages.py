@@ -426,7 +426,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         except (RuntimeError, lsst.pex.exceptions.Exception) as e:
             self.log.warning("Failed to match template. Checking coverage")
             #  Raise NoWorkFound if template fraction is insufficient
-            checkTemplateIsSufficient(template[science.getBBox()], self.log,
+            checkTemplateIsSufficient(template[science.getBBox()], science, self.log,
                                       self.config.minTemplateFractionForExpectedSuccess,
                                       exceptionMessage="Template coverage lower than expected to succeed."
                                       f" Failure is tolerable: {e}")
@@ -835,7 +835,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         if visitSummary is not None:
             self._applyExternalCalibrations(science, visitSummary=visitSummary)
         templateCoverageFraction = checkTemplateIsSufficient(
-            template[science.getBBox()], self.log,
+            template[science.getBBox()], science, self.log,
             requiredTemplateFraction=self.config.requiredTemplateFraction,
             exceptionMessage="Not attempting subtraction. To force subtraction,"
             " set config requiredTemplateFraction=0"
@@ -1044,7 +1044,7 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
         except (RuntimeError, lsst.pex.exceptions.Exception) as e:
             self.log.warning("Failed to match template. Checking coverage")
             #  Raise NoWorkFound if template fraction is insufficient
-            checkTemplateIsSufficient(template[science.getBBox()], self.log,
+            checkTemplateIsSufficient(template[science.getBBox()], science, self.log,
                                       self.config.minTemplateFractionForExpectedSuccess,
                                       exceptionMessage="Template coverage lower than expected to succeed."
                                       f" Failure is tolerable: {e}")
@@ -1129,7 +1129,7 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
                                      kernelSources=kernelSources)
 
 
-def checkTemplateIsSufficient(templateExposure, logger, requiredTemplateFraction=0.,
+def checkTemplateIsSufficient(templateExposure, scienceExposure, logger, requiredTemplateFraction=0.,
                               exceptionMessage=""):
     """Raise NoWorkFound if template coverage < requiredTemplateFraction
 
@@ -1159,8 +1159,11 @@ def checkTemplateIsSufficient(templateExposure, logger, requiredTemplateFraction
     """
     # Count the number of pixels with the NO_DATA mask bit set
     # counting NaN pixels is insufficient because pixels without data are often intepolated over)
-    pixNoData = np.count_nonzero(templateExposure.mask.array
-                                 & templateExposure.mask.getPlaneBitMask('NO_DATA'))
+    noTemplate = templateExposure.mask.array & templateExposure.mask.getPlaneBitMask('NO_DATA')
+    # Also need to account for missing data in the science image,
+    # because template coverage there doesn't help
+    noScience = scienceExposure.mask.array & scienceExposure.mask.getPlaneBitMask('NO_DATA')
+    pixNoData = np.count_nonzero(noTemplate | noScience)
     pixGood = templateExposure.getBBox().getArea() - pixNoData
     templateCoverageFraction = pixGood/templateExposure.getBBox().getArea()
     logger.info("template has %d good pixels (%.1f%%)", pixGood, 100*templateCoverageFraction)
