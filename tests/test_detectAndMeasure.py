@@ -28,7 +28,7 @@ import lsst.afw.math as afwMath
 import lsst.geom
 from lsst.ip.diffim import detectAndMeasure, subtractImages
 import lsst.meas.algorithms as measAlg
-from lsst.pipe.base import InvalidQuantumError, UpstreamFailureNoWorkFound
+from lsst.pipe.base import InvalidQuantumError, UpstreamFailureNoWorkFound, AlgorithmError
 import lsst.utils.tests
 import lsst.meas.base.tests
 
@@ -407,7 +407,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
 
         difference = science.clone()
         difference.maskedImage -= matchedTemplate.maskedImage
-        detectionTask = self._setup_detection(raiseOnBadSubtractionRatio=False)
+        detectionTask = self._setup_detection(raiseOnBadSubtractionRatio=False, raiseOnNoDiaSources=False)
 
         # Verify that detection runs without errors
         detectionTask.run(science, matchedTemplate, difference, sources)
@@ -541,13 +541,14 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
                     srcBbox = lsst.geom.Box2I(lsst.geom.Point2I(srcX - radius, srcY - radius),
                                               lsst.geom.Extent2I(2*radius + 1, 2*radius + 1))
                     difference[srcBbox].mask.array |= lsst.afw.image.Mask.getPlaneBitMask(badMask)
-            output = detectionTask.run(science, matchedTemplate, difference, sources)
-            refIds = []
-            goodSrcFlags = checkMask(difference.mask, transientSources, excludeMaskPlanes)
             if setFlags:
-                self.assertEqual(np.sum(~goodSrcFlags), nBad)
-                self.assertFalse(hasattr(output, "diaSources"))
+                with self.assertRaises(AlgorithmError):
+                    output = detectionTask.run(science, matchedTemplate, difference, sources)
+                return
             else:
+                output = detectionTask.run(science, matchedTemplate, difference, sources)
+                refIds = []
+                goodSrcFlags = checkMask(difference.mask, transientSources, excludeMaskPlanes)
                 self.assertEqual(np.sum(~goodSrcFlags), 0)
                 for diaSource, goodSrcFlag in zip(output.diaSources, goodSrcFlags):
                     if ~goodSrcFlag:
@@ -656,7 +657,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
 
         # Configure the detection Task
         detectionTask = self._setup_detection(doMerge=False, doMaskStreaks=True,
-                                              raiseOnBadSubtractionRatio=False)
+                                              raiseOnNoDiaSources=False, raiseOnBadSubtractionRatio=False)
 
         # Test that no streaks are detected
         difference = science.clone()
@@ -986,13 +987,14 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
                                               lsst.geom.Extent2I(2*radius + 1, 2*radius + 1))
                     difference[srcBbox].mask.array |= lsst.afw.image.Mask.getPlaneBitMask(badMask)
             score = subtractTask._convolveExposure(difference, scienceKernel, subtractTask.convolutionControl)
-            output = detectionTask.run(science, matchedTemplate, difference, score, sources)
-            refIds = []
-            goodSrcFlags = checkMask(difference.mask, transientSources, excludeMaskPlanes)
             if setFlags:
-                self.assertEqual(np.sum(~goodSrcFlags), nBad)
-                self.assertFalse(hasattr(output, "diaSources"))
+                with self.assertRaises(AlgorithmError):
+                    output = detectionTask.run(science, matchedTemplate, difference, score, sources)
+                return
             else:
+                output = detectionTask.run(science, matchedTemplate, difference, score, sources)
+                refIds = []
+                goodSrcFlags = checkMask(difference.mask, transientSources, excludeMaskPlanes)
                 self.assertEqual(np.sum(~goodSrcFlags), 0)
                 for diaSource, goodSrcFlag in zip(output.diaSources, goodSrcFlags):
                     if ~goodSrcFlag:
@@ -1112,6 +1114,7 @@ class TestNegativePeaks(lsst.utils.tests.TestCase):
         config = detectAndMeasure.DetectAndMeasureTask.ConfigClass()
         config.doDeblend = True
         config.raiseOnBadSubtractionRatio = False
+        config.raiseOnNoDiaSources = False
         task = detectAndMeasure.DetectAndMeasureTask(config=config)
         result = task.run(science, template, difference, catalog)
 

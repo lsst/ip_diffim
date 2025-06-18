@@ -65,6 +65,18 @@ class BadSubtractionError(pipeBase.AlgorithmError):
                 }
 
 
+class NoDiaSourcesError(pipeBase.AlgorithmError):
+    """Raised when there are no diaSources detected on an image difference.
+    """
+    def __init__(self):
+        msg = ("No diaSources detected!")
+        super().__init__(msg)
+
+    @property
+    def metadata(self):
+        return {}
+
+
 class DetectAndMeasureConnections(pipeBase.PipelineTaskConnections,
                                   dimensions=("instrument", "visit", "detector"),
                                   defaultTemplates={"coaddName": "deep",
@@ -285,6 +297,11 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         doc="Maximum standard deviation of the ratio of power in footprints on"
             " the difference image to the same footprints on the science image."
             "Only used if ``raiseOnBadSubtractionRatio`` is set",
+    )
+    raiseOnNoDiaSources = pexConfig.Field(
+        dtype=bool,
+        default=True,
+        doc="Raise an algorithm error if no diaSources are detected.",
     )
     idGenerator = DetectorVisitIdGeneratorConfig.make_field()
 
@@ -659,6 +676,15 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             measurementResults.mergeItems(streakInfo, 'maskedStreaks')
 
         self.calculateMetrics(science, difference, diaSources, kernelSources)
+
+        if np.count_nonzero(~diaSources["sky_source"]) > 0:
+            measurementResults.diaSources = diaSources
+        elif self.config.raiseOnNoDiaSources:
+            raise NoDiaSourcesError()
+        elif len(diaSources) > 0:
+            # This option allows returning sky sources,
+            # even if there are no diaSources
+            measurementResults.diaSources = diaSources
 
         return measurementResults
 
