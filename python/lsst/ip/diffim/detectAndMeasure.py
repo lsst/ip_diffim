@@ -450,12 +450,32 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         inputs = butlerQC.get(inputRefs)
         idGenerator = self.config.idGenerator.apply(butlerQC.quantum.dataId)
         idFactory = idGenerator.make_table_id_factory()
-        outputs = self.run(**inputs, idFactory=idFactory)
-        butlerQC.put(outputs, outputRefs)
+        # Specify the fields that `annotate` needs below, to ensure they
+        # exist, even as None.
+        measurementResults = pipeBase.Struct(
+            subtractedMeasuredExposure=None,
+            diaSources=None,
+            maskedStreaks=None,
+            differenceBackground=None,
+        )
+        try:
+            self.run(**inputs, idFactory=idFactory, measurementResults=measurementResults)
+        except pipeBase.AlgorithmError as e:
+            error = pipeBase.AnnotatedPartialOutputsError.annotate(
+                e,
+                self,
+                measurementResults.subtractedMeasuredExposure,
+                measurementResults.diaSources,
+                measurementResults.maskedStreaks,
+                log=self.log
+            )
+            butlerQC.put(measurementResults, outputRefs)
+            raise error from e
+        butlerQC.put(measurementResults, outputRefs)
 
     @timeMethod
     def run(self, science, matchedTemplate, difference, kernelSources,
-            idFactory=None):
+            idFactory=None, measurementResults=None):
         """Detect and measure sources on a difference image.
 
         The difference image will be convolved with a gaussian approximation of
@@ -481,6 +501,10 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             Generator object used to assign ids to detected sources in the
             difference image. Ids from this generator are not set until after
             deblending and merging positive/negative peaks.
+        measurementResults : `lsst.pipe.base.Struct`, optional
+            Result struct that is modified to allow saving of partial outputs
+            for some failure conditions. If the task completes successfully,
+            this is also returned.
 
         Returns
         -------
@@ -493,6 +517,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             ``differenceBackground`` : `lsst.afw.math.BackgroundList`
                 Background that was subtracted from the difference image.
         """
+        if measurementResults is None:
+            measurementResults = pipeBase.Struct()
         if idFactory is None:
             idFactory = lsst.meas.base.IdGenerator().make_table_id_factory()
 
@@ -532,28 +558,26 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                 doSmooth=True,
                 background=background
             )
+        measurementResults.differenceBackground = background
 
         if self.config.doDeblend:
             sources, positives, negatives = self._deblend(difference,
                                                           results.positive,
                                                           results.negative)
 
-            result = self.processResults(science, matchedTemplate, difference,
-                                         sources, idFactory, kernelSources,
-                                         positives=positives,
-                                         negatives=negatives)
-            result.differenceBackground = background
         else:
             positives = afwTable.SourceCatalog(self.schema)
             results.positive.makeSources(positives)
             negatives = afwTable.SourceCatalog(self.schema)
             results.negative.makeSources(negatives)
-            result = self.processResults(science, matchedTemplate, difference,
-                                         results.sources, idFactory, kernelSources,
-                                         positives=positives,
-                                         negatives=negatives)
-            result.differenceBackground = background
-        return result
+            sources = results.sources
+
+        self.processResults(science, matchedTemplate, difference,
+                            sources, idFactory, kernelSources,
+                            positives=positives,
+                            negatives=negatives,
+                            measurementResults=measurementResults)
+        return measurementResults
 
     def _prepareInputs(self, difference):
         """Ensure that we start with an empty detection and deblended mask.
@@ -581,7 +605,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         mask &= ~mask.getPlaneBitMask(self.config.clearMaskPlanes)
 
     def processResults(self, science, matchedTemplate, difference, sources, idFactory, kernelSources,
-                       positives=None, negatives=None,):
+                       positives=None, negatives=None, measurementResults=None):
         """Measure and process the results of source detection.
 
         Parameters
@@ -604,6 +628,10 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             Positive polarity footprints.
         negatives : `lsst.afw.table.SourceCatalog`, optional
             Negative polarity footprints.
+        measurementResults : `lsst.pipe.base.Struct`, optional
+            Result struct that is modified to allow saving of partial outputs
+            for some failure conditions. If the task completes successfully,
+            this is also returned.
 
         Returns
         -------
@@ -614,6 +642,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             ``diaSources``  : `lsst.afw.table.SourceCatalog`
                 The catalog of detected sources.
         """
+        if measurementResults is None:
+            measurementResults = pipeBase.Struct()
         self.metadata["nUnmergedDiaSources"] = len(sources)
         if self.config.doMerge:
             # preserve peak schema, if there are any footprints
@@ -665,12 +695,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         if self.config.doForcedMeasurement:
             self.measureForcedSources(diaSources, science, difference.getWcs())
 
-        measurementResults = pipeBase.Struct(
-            subtractedMeasuredExposure=difference,
-        )
-
-        if len(diaSources) > 0:
-            measurementResults.diaSources = diaSources
+        measurementResults.subtractedMeasuredExposure = difference
 
         if self.config.doMaskStreaks and self.config.writeStreakInfo:
             measurementResults.mergeItems(streakInfo, 'maskedStreaks')
