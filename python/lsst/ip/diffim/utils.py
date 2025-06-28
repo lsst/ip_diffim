@@ -520,11 +520,11 @@ def divideExposureByPatches(exposure, skymap, overlapThreshold=0.1):
     overlapFractionInds = [(frac, idx) for idx, frac in enumerate(overlapFraction)]
     sortedOverlapFraction = sorted(overlapFractionInds, key=lambda x: x[0], reverse=True)
     patchCandidates = [patchCandidates[idx] for _, idx in sortedOverlapFraction]
-    return patchCandidates
+    return(patchCandidates, sortedOverlapFraction)
 
 
 class MyKernelSpatialCellCandidate(afwMath.SpatialCellCandidate):
-    def __init__(self, region, kernel):
+    def __init__(self, region, kernel, weight):
         """Initialize with position, region, and kernel.
 
         Parameters:
@@ -535,6 +535,7 @@ class MyKernelSpatialCellCandidate(afwMath.SpatialCellCandidate):
         super().__init__()
         self.region = region
         self.kernel = kernel
+        self.weight = weight
 
     def getKernel(self):
         """Return the kernel associated with this candidate."""
@@ -550,4 +551,4 @@ class MyKernelSpatialCellCandidate(afwMath.SpatialCellCandidate):
 
     def getChi2(self):
         """Return a dummy chi-squared value for sorting candidates (if needed)."""
-        return 0.0
+        return self.weight
