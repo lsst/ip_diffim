@@ -871,7 +871,12 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         try:
             self.templatePsfSize = getPsfFwhm(template.psf)
             self.sciencePsfSize = getPsfFwhm(science.psf)
-        except (lsst.pex.exceptions.InvalidParameterError, lsst.pex.exceptions.RangeError):
+        except lsst.pex.exceptions.Exception:
+            # Catch a broad range of exceptions, since some are C++ only
+            # Catching:
+            #  - lsst::geom::SingularTransformException
+            #  - lsst.pex.exceptions.InvalidParameterError
+            #  - lsst.pex.exceptions.RangeError
             self.log.info("Unable to evaluate PSF at the average position. "
                           "Evaluting PSF on a grid of points."
                           )
