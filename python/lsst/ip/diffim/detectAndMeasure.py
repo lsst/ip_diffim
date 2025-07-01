@@ -45,6 +45,38 @@ __all__ = ["DetectAndMeasureConfig", "DetectAndMeasureTask",
            "DetectAndMeasureScoreConfig", "DetectAndMeasureScoreTask"]
 
 
+class BadSubtractionError(pipeBase.AlgorithmError):
+    """Raised when the residuals in footprints of stars used to compute the
+    psf-matching kernel exceeds the configured maximum.
+    """
+    def __init__(self, *, ratio, threshold):
+        msg = ("The ratio of residual power in source footprints on the"
+               " difference image to the power in the footprints on the"
+               f" science image was {ratio}, which exceeds the maximum"
+               f" threshold of {threshold}")
+        super().__init__(msg)
+        self.ratio = ratio
+        self.threshold = threshold
+
+    @property
+    def metadata(self):
+        return {"ratio": self.ratio,
+                "threshold": self.threshold
+                }
+
+
+class NoDiaSourcesError(pipeBase.AlgorithmError):
+    """Raised when there are no diaSources detected on an image difference.
+    """
+    def __init__(self):
+        msg = ("No diaSources detected!")
+        super().__init__(msg)
+
+    @property
+    def metadata(self):
+        return {}
+
+
 class DetectAndMeasureConnections(pipeBase.PipelineTaskConnections,
                                   dimensions=("instrument", "visit", "detector"),
                                   defaultTemplates={"coaddName": "deep",
@@ -245,6 +277,32 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         doc="Mask planes to clear before running detection.",
         default=("DETECTED", "DETECTED_NEGATIVE", "NOT_DEBLENDED", "STREAK"),
     )
+    raiseOnBadSubtractionRatio = pexConfig.Field(
+        dtype=bool,
+        default=True,
+        doc="Raise an error if the ratio of power in detected footprints"
+            " on the difference image to the power in footprints on the science"
+            " image exceeds ``badSubtractionRatioThreshold``",
+    )
+    badSubtractionRatioThreshold = pexConfig.Field(
+        dtype=float,
+        default=0.2,
+        doc="Maximum ratio of power in footprints on the difference image to"
+            " the same footprints on the science image."
+            "Only used if ``raiseOnBadSubtractionRatio`` is set",
+    )
+    badSubtractionVariationThreshold = pexConfig.Field(
+        dtype=float,
+        default=0.4,
+        doc="Maximum standard deviation of the ratio of power in footprints on"
+            " the difference image to the same footprints on the science image."
+            "Only used if ``raiseOnBadSubtractionRatio`` is set",
+    )
+    raiseOnNoDiaSources = pexConfig.Field(
+        dtype=bool,
+        default=True,
+        doc="Raise an algorithm error if no diaSources are detected.",
+    )
     idGenerator = DetectorVisitIdGeneratorConfig.make_field()
 
     def setDefaults(self):
@@ -392,12 +450,32 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         inputs = butlerQC.get(inputRefs)
         idGenerator = self.config.idGenerator.apply(butlerQC.quantum.dataId)
         idFactory = idGenerator.make_table_id_factory()
-        outputs = self.run(**inputs, idFactory=idFactory)
-        butlerQC.put(outputs, outputRefs)
+        # Specify the fields that `annotate` needs below, to ensure they
+        # exist, even as None.
+        measurementResults = pipeBase.Struct(
+            subtractedMeasuredExposure=None,
+            diaSources=None,
+            maskedStreaks=None,
+            differenceBackground=None,
+        )
+        try:
+            self.run(**inputs, idFactory=idFactory, measurementResults=measurementResults)
+        except pipeBase.AlgorithmError as e:
+            error = pipeBase.AnnotatedPartialOutputsError.annotate(
+                e,
+                self,
+                measurementResults.subtractedMeasuredExposure,
+                measurementResults.diaSources,
+                measurementResults.maskedStreaks,
+                log=self.log
+            )
+            butlerQC.put(measurementResults, outputRefs)
+            raise error from e
+        butlerQC.put(measurementResults, outputRefs)
 
     @timeMethod
     def run(self, science, matchedTemplate, difference, kernelSources,
-            idFactory=None):
+            idFactory=None, measurementResults=None):
         """Detect and measure sources on a difference image.
 
         The difference image will be convolved with a gaussian approximation of
@@ -423,6 +501,10 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             Generator object used to assign ids to detected sources in the
             difference image. Ids from this generator are not set until after
             deblending and merging positive/negative peaks.
+        measurementResults : `lsst.pipe.base.Struct`, optional
+            Result struct that is modified to allow saving of partial outputs
+            for some failure conditions. If the task completes successfully,
+            this is also returned.
 
         Returns
         -------
@@ -435,6 +517,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             ``differenceBackground`` : `lsst.afw.math.BackgroundList`
                 Background that was subtracted from the difference image.
         """
+        if measurementResults is None:
+            measurementResults = pipeBase.Struct()
         if idFactory is None:
             idFactory = lsst.meas.base.IdGenerator().make_table_id_factory()
 
@@ -474,28 +558,26 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                 doSmooth=True,
                 background=background
             )
+        measurementResults.differenceBackground = background
 
         if self.config.doDeblend:
             sources, positives, negatives = self._deblend(difference,
                                                           results.positive,
                                                           results.negative)
 
-            result = self.processResults(science, matchedTemplate, difference,
-                                         sources, idFactory, kernelSources,
-                                         positives=positives,
-                                         negatives=negatives)
-            result.differenceBackground = background
         else:
             positives = afwTable.SourceCatalog(self.schema)
             results.positive.makeSources(positives)
             negatives = afwTable.SourceCatalog(self.schema)
             results.negative.makeSources(negatives)
-            result = self.processResults(science, matchedTemplate, difference,
-                                         results.sources, idFactory, kernelSources,
-                                         positives=positives,
-                                         negatives=negatives)
-            result.differenceBackground = background
-        return result
+            sources = results.sources
+
+        self.processResults(science, matchedTemplate, difference,
+                            sources, idFactory, kernelSources,
+                            positives=positives,
+                            negatives=negatives,
+                            measurementResults=measurementResults)
+        return measurementResults
 
     def _prepareInputs(self, difference):
         """Ensure that we start with an empty detection and deblended mask.
@@ -523,7 +605,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         mask &= ~mask.getPlaneBitMask(self.config.clearMaskPlanes)
 
     def processResults(self, science, matchedTemplate, difference, sources, idFactory, kernelSources,
-                       positives=None, negatives=None,):
+                       positives=None, negatives=None, measurementResults=None):
         """Measure and process the results of source detection.
 
         Parameters
@@ -546,6 +628,10 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             Positive polarity footprints.
         negatives : `lsst.afw.table.SourceCatalog`, optional
             Negative polarity footprints.
+        measurementResults : `lsst.pipe.base.Struct`, optional
+            Result struct that is modified to allow saving of partial outputs
+            for some failure conditions. If the task completes successfully,
+            this is also returned.
 
         Returns
         -------
@@ -556,6 +642,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             ``diaSources``  : `lsst.afw.table.SourceCatalog`
                 The catalog of detected sources.
         """
+        if measurementResults is None:
+            measurementResults = pipeBase.Struct()
         self.metadata["nUnmergedDiaSources"] = len(sources)
         if self.config.doMerge:
             # preserve peak schema, if there are any footprints
@@ -607,17 +695,21 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         if self.config.doForcedMeasurement:
             self.measureForcedSources(diaSources, science, difference.getWcs())
 
-        self.calculateMetrics(science, difference, diaSources, kernelSources)
-
-        measurementResults = pipeBase.Struct(
-            subtractedMeasuredExposure=difference,
-        )
-
-        if len(diaSources) > 0:
-            measurementResults.diaSources = diaSources
+        measurementResults.subtractedMeasuredExposure = difference
 
         if self.config.doMaskStreaks and self.config.writeStreakInfo:
             measurementResults.mergeItems(streakInfo, 'maskedStreaks')
+
+        self.calculateMetrics(science, difference, diaSources, kernelSources)
+
+        if np.count_nonzero(~diaSources["sky_source"]) > 0:
+            measurementResults.diaSources = diaSources
+        elif self.config.raiseOnNoDiaSources:
+            raise NoDiaSourcesError()
+        elif len(diaSources) > 0:
+            # This option allows returning sky sources,
+            # even if there are no diaSources
+            measurementResults.diaSources = diaSources
 
         return measurementResults
 
@@ -849,6 +941,13 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                       "pixels in star footprints: %5.4f, %5.4f",
                       self.metadata["residualFootprintRatioMean"],
                       self.metadata["residualFootprintRatioStdev"])
+        if self.config.raiseOnBadSubtractionRatio:
+            if metrics.differenceFootprintRatioMean > self.config.badSubtractionRatioThreshold:
+                raise BadSubtractionError(ratio=metrics.differenceFootprintRatioMean,
+                                          threshold=self.config.badSubtractionRatioThreshold)
+            if metrics.differenceFootprintRatioStdev > self.config.badSubtractionVariationThreshold:
+                raise BadSubtractionError(ratio=metrics.differenceFootprintRatioStdev,
+                                          threshold=self.config.badSubtractionVariationThreshold)
 
     def _runStreakMasking(self, difference):
         """Do streak masking and optionally save the resulting streak

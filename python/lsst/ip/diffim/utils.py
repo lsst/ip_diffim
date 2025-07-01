@@ -399,7 +399,8 @@ def computeDifferenceImageMetrics(science, difference, stars, sky_sources=None):
             sky_sources = stars[sky]
     else:
         selectStars = stars
-    if sky_sources is not None:
+    # Note that the len() below is only evaluated if sky_sources is not None
+    if sky_sources is not None and len(sky_sources) > 0:
         sky_science, sky_difference, sky_ratio = footprint_mean(sky_sources)
         sky_mean = sky_ratio.mean()
         sky_std = sky_ratio.std()
