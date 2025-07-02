@@ -668,10 +668,14 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         """
         if exposure.photoCalib is None:
             return np.nan
+        # Set maglim to nan upfront in case on an unexpected RuntimeError
+        maglim = np.nan
         try:
             psf = exposure.getPsf()
             psf_shape = psf.computeShape(psf.getAveragePosition())
-        except (lsst.pex.exceptions.InvalidParameterError, afwDetection.InvalidPsfError):
+        except (lsst.pex.exceptions.InvalidParameterError,
+                afwDetection.InvalidPsfError,
+                lsst.pex.exceptions.RangeError):
             if fallbackPsfSize is not None:
                 self.log.info("Unable to evaluate PSF, using fallback FWHM %f", fallbackPsfSize)
                 psf_area = np.pi*(fallbackPsfSize/2)**2
