@@ -717,8 +717,9 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         self.measureDiaSources(initialDiaSources, science, difference, matchedTemplate)
         diaSources = self._removeBadSources(initialDiaSources)
 
-        diaSources = self.filterSatellites(diaSources, science)
-        # Do I want science or difference for the wcs?
+        if self.config.doSattle:
+            diaSources = self.filterSatellites(diaSources, science)
+            # Do I want science or difference for the wcs?
 
         if self.config.doForcedMeasurement:
             self.measureForcedSources(diaSources, science, difference.getWcs())
