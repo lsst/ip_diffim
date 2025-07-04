@@ -858,7 +858,20 @@ class PsfMatchTask(pipeBase.Task, abc.ABC):
             ksv.resetKernelSum()
             ksv.setMode(diffimLib.KernelSumVisitorF.AGGREGATE)
             kernelCellSet.visitCandidates(ksv, nStarPerCell, ignoreExceptions=True)
-            ksv.processKsumDistribution()
+
+            allCellsEmpty = True
+            for cell in kernelCellSet.getCellList():
+                if not cell.empty():
+                    allCellsEmpty = False
+                    break
+            if allCellsEmpty:
+                raise NoKernelCandidatesError("All spatial cells are emtpy of candidates")
+
+            try:
+                ksv.processKsumDistribution()
+            except RuntimeError as e:
+                raise NoKernelCandidatesError("Unable to calculate the kernel sum") from e
+
             ksv.setMode(diffimLib.KernelSumVisitorF.REJECT)
             kernelCellSet.visitCandidates(ksv, nStarPerCell, ignoreExceptions=True)
 
