@@ -47,7 +47,7 @@ namespace {
  */
 template <typename PixelT>
 void declareAssessSpatialKernelVisitor(lsst::cpputils::python::WrapperCollection &wrappers, std::string const& suffix) {
-    using PyClass = py::class_<AssessSpatialKernelVisitor<PixelT>, lsst::afw::math::CandidateVisitor>;
+    using PyClass = py::classh<AssessSpatialKernelVisitor<PixelT>, lsst::afw::math::CandidateVisitor>;
 
     std::string name = "AssessSpatialKernelVisitor" + suffix;
 

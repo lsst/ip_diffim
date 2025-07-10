@@ -55,7 +55,7 @@ void declareKernelCandidate(lsst::cpputils::python::WrapperCollection &wrappers,
     using PyCandidateSwitch = py::enum_<CandidateSwitch>;
 
     std::string name = "KernelCandidate" + suffix;
-    using PyKernelCandidate = py::class_<KernelCandidate<PixelT>, afw::math::SpatialCellImageCandidate>;
+    using PyKernelCandidate = py::classh<KernelCandidate<PixelT>, afw::math::SpatialCellImageCandidate>;
 
     auto clsDef = wrappers.wrapType(PyKernelCandidate(wrappers.module, name.c_str()), [](auto &mod, auto &cls) {
         cls.def(py::init<float const, float const, std::shared_ptr<afw::image::MaskedImage<PixelT>> const &,
