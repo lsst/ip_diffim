@@ -817,6 +817,34 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         with self.assertRaises(pexConfig.FieldValidationError):
             self._setup_detection(run_sattle=True)
 
+    def test_trailed_glints(self):
+        """Test that the glint_trail column works, and that
+        the trailed_glints output contains the expected information.
+        """
+        noiseLevel = 1.
+        staticSeed = 1
+        diffim, diaSources = makeTestImage(seed=staticSeed, noiseLevel=noiseLevel, noiseSeed=6)
+        self._check_values(diaSources['glint_trail'])
+
+        # Run detection and return the output Struct so we can check it
+        def _detection_wrapper(diffim, diaSources):
+            detectionTask = self._setup_detection()
+            scienceBase, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6)
+            matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7)
+            science = scienceBase.clone()
+            science.maskedImage -= diffim.maskedImage
+            difference = science.clone()
+            difference.maskedImage -= matchedTemplate.maskedImage
+            output = detectionTask.run(science, matchedTemplate, difference, sources)
+            return output
+
+        output = _detection_wrapper(diffim, diaSources)
+        self.assertTrue('slopes' in output.glintTrailInfo)
+        self.assertTrue('intercepts' in output.glintTrailInfo)
+        self.assertTrue('stderrs' in output.glintTrailInfo)
+        self.assertTrue('lengths' in output.glintTrailInfo)
+        self.assertTrue('angles' in output.glintTrailInfo)
+
 
 class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
     detectionTask = detectAndMeasure.DetectAndMeasureScoreTask
