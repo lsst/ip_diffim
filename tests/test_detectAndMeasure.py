@@ -705,6 +705,16 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         # Check that the entire image was not masked STREAK
         self.assertFalse(np.all(streakMaskSet))
 
+    def test_trailed_glints(self):
+        """Test that the trailed_glint column works.
+        """
+        # Set up a simulated image
+        noiseLevel = 1.
+        staticSeed = 1
+        _, diaSources = makeTestImage(seed=staticSeed, noiseLevel=noiseLevel, noiseSeed=6,
+                                      nSrc=10)
+        self._check_values(diaSources['trailed_glint'])
+
 
 class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
     detectionTask = detectAndMeasure.DetectAndMeasureScoreTask
