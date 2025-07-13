@@ -1026,9 +1026,9 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                     visit_date = Time(
                         science.getInfo().getVisitInfo().getDate().toPython()).jd
 
-                    exposure_time_jd = science.getInfo().getVisitInfo().getExposureTime() / 86400.0
-                    exposure_end_jd = visit_date + exposure_time_jd / 2.0
-                    exposure_start_jd = visit_date - exposure_time_jd / 2.0
+                    exposure_time_days = science.getInfo().getVisitInfo().getExposureTime() / 86400.0
+                    exposure_end_jd = visit_date + exposure_time_days / 2.0
+                    exposure_start_jd = visit_date - exposure_time_days / 2.0
 
                     boresight_ra = science.getInfo().getVisitInfo().boresightRaDec[0].asDegrees()
                     boresight_dec = science.getInfo().getVisitInfo().boresightRaDec[1].asDegrees()
