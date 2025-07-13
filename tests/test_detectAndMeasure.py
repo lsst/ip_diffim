@@ -861,6 +861,32 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
             detectionTask.run(science, matchedTemplate, difference, sources,
                               idFactory=IdFactory.makeSimple())
 
+    def test_fail_on_sattle_misconfiguration(self):
+        noiseLevel = 1.
+        staticSeed = 1
+        fluxLevel = 500
+        kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel,
+                  "x0": 12345, "y0": 67890}
+        science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6,
+                                         **kwargs)
+        science.getInfo().setVisitInfo(makeVisitInfo(id=4))
+        detector = DetectorWrapper(numAmps=1).detector
+        science.setDetector(detector)
+        matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel / 4,
+                                           noiseSeed=7, **kwargs)
+        difference = science.clone()
+
+        detectionTask = self._setup_detection(doDeblend=True,
+                                              badSubtractionRatioThreshold=1.,
+                                              doSkySources=False, doSattle=True)
+
+        detectionTask.config.sattle_host = None
+        detectionTask.config.sattle_port = None
+
+        with self.assertRaises(RuntimeError):
+            detectionTask.run(science, matchedTemplate, difference, sources,
+                              idFactory=IdFactory.makeSimple())
+
 
 class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
     detectionTask = detectAndMeasure.DetectAndMeasureScoreTask

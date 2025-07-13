@@ -722,8 +722,6 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
         if self.config.doSattle:
             if not self.config.sattle_host or not self.config.sattle_port:
-                self.log.error("Sattle filtering is on but service endpoints"
-                               "not set.")
                 raise RuntimeError("Sattle filtering is on but service endpoints not set.")
             diaSources = self.filterSatellites(diaSources, science)
 
