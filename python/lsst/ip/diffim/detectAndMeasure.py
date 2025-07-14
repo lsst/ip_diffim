@@ -307,7 +307,7 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         default=True,
         doc="Raise an algorithm error if no diaSources are detected.",
     )
-    doSattle = pexConfig.Field(
+    run_sattle = pexConfig.Field(
         dtype=bool,
         default=False,
         doc="If true, dia source bounding boxes will be sent for verification"
@@ -720,7 +720,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         self.measureDiaSources(initialDiaSources, science, difference, matchedTemplate)
         diaSources = self._removeBadSources(initialDiaSources)
 
-        if self.config.doSattle:
+        if self.config.run_sattle:
             if not self.config.sattle_host or not self.config.sattle_port:
                 raise RuntimeError("Sattle filtering is on but service endpoints not set.")
             diaSources = self.filterSatellites(diaSources, science)

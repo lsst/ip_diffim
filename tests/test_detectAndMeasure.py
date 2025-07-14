@@ -109,7 +109,7 @@ class DetectAndMeasureTestBase:
             self.assertTrue(np.all(values <= maxValue))
 
     def _setup_detection(self, doSkySources=True, nSkySources=5,
-                         doSubtractBackground=False, doSattle=False, **kwargs):
+                         doSubtractBackground=False, run_sattle=False, **kwargs):
         """Setup and configure the detection and measurement PipelineTask.
 
         Parameters
@@ -132,8 +132,8 @@ class DetectAndMeasureTestBase:
             config.skySources.nSources = nSkySources
         config.update(**kwargs)
 
-        if doSattle:
-            config.doSattle = doSattle
+        if run_sattle:
+            config.run_sattle = run_sattle
             config.sattle_port = 9999
             config.sattle_host = 'fake_host'
 
@@ -776,7 +776,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         difference = science.clone()
         detectionTask = self._setup_detection(doDeblend=True,
                                               badSubtractionRatioThreshold=1.,
-                                              doSkySources=False, doSattle=True)
+                                              doSkySources=False, run_sattle=True)
 
         # Nothing in the visit cache raises
         with self.assertRaises(RuntimeError):
@@ -800,7 +800,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         difference = science.clone()
         detectionTask = self._setup_detection(doDeblend=True,
                                               badSubtractionRatioThreshold=1.,
-                                              doSkySources=False, doSattle=True)
+                                              doSkySources=False, run_sattle=True)
 
         # Run detection and check the results
         output = detectionTask.run(science, matchedTemplate, difference,
@@ -825,7 +825,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         difference = science.clone()
 
         detectionTask = self._setup_detection(doDeblend=True, badSubtractionRatioThreshold=1.,
-                                              doSkySources=False, doSattle=True)
+                                              doSkySources=False, run_sattle=True)
 
         # Run detection and check the results
         output = detectionTask.run(science, matchedTemplate, difference, sources,
@@ -854,7 +854,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
 
         detectionTask = self._setup_detection(doDeblend=True,
                                               badSubtractionRatioThreshold=1.,
-                                              doSkySources=False, doSattle=True)
+                                              doSkySources=False, run_sattle=True)
 
         # Run detection and confirm it raises for no diasources
         with self.assertRaises(detectAndMeasure.NoDiaSourcesError):
@@ -878,7 +878,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
 
         detectionTask = self._setup_detection(doDeblend=True,
                                               badSubtractionRatioThreshold=1.,
-                                              doSkySources=False, doSattle=True)
+                                              doSkySources=False, run_sattle=True)
 
         detectionTask.config.sattle_host = None
         detectionTask.config.sattle_port = None
