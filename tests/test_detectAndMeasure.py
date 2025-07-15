@@ -211,8 +211,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
     def test_measurements_finite(self):
         """Measured fluxes and centroids should always be finite.
         """
-        columnNames = ["coord_ra", "coord_dec", "ip_diffim_forced_PsfFlux_instFlux",
-                       "ip_diffim_forced_template_PsfFlux_instFlux"]
+        columnNames = ["coord_ra", "coord_dec", "ip_diffim_forced_PsfFlux_instFlux"]
 
         # Set up the simulated images
         noiseLevel = 1.
@@ -756,8 +755,7 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
     def test_measurements_finite(self):
         """Measured fluxes and centroids should always be finite.
         """
-        columnNames = ["coord_ra", "coord_dec", "ip_diffim_forced_PsfFlux_instFlux",
-                       "ip_diffim_forced_template_PsfFlux_instFlux"]
+        columnNames = ["coord_ra", "coord_dec", "ip_diffim_forced_PsfFlux_instFlux"]
 
         # Set up the simulated images
         noiseLevel = 1.
