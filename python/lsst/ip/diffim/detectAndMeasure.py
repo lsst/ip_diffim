@@ -320,7 +320,7 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         optional=True
     )
     sattle_port = pexConfig.Field(
-        dtype=int,
+        dtype=str,
         default=os.getenv("SATTLE_PORT"),
         doc="Port to connect to sattle.",
         optional=True
@@ -1021,12 +1021,12 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
                     visit_id = science.getInfo().getVisitInfo().id
 
-                    visit_date = Time(
-                        science.getInfo().getVisitInfo().getDate().toPython()).jd
+                    visit_mjd = Time(
+                        science.getInfo().getVisitInfo().getDate().toPython()).mjd
 
                     exposure_time_days = science.getInfo().getVisitInfo().getExposureTime() / 86400.0
-                    exposure_end_jd = visit_date + exposure_time_days / 2.0
-                    exposure_start_jd = visit_date - exposure_time_days / 2.0
+                    exposure_end_mjd = visit_mjd + exposure_time_days / 2.0
+                    exposure_start_mjd = visit_mjd - exposure_time_days / 2.0
 
                     boresight_ra = science.getInfo().getVisitInfo().boresightRaDec[0].asDegrees()
                     boresight_dec = science.getInfo().getVisitInfo().boresightRaDec[1].asDegrees()
@@ -1034,8 +1034,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                     r = requests.put(
                         f'{self.config.sattle_host}:{self.config.sattle_port}/visit_cache',
                         json={"visit_id": visit_id,
-                              "exposure_start_mjd": exposure_start_jd,
-                              "exposure_end_mjd": exposure_end_jd,
+                              "exposure_start_mjd": exposure_start_mjd,
+                              "exposure_end_mjd": exposure_end_mjd,
                               "boresight_ra": boresight_ra,
                               "boresight_dec": boresight_dec,
                               "historical": self.config.sattle_historical})
