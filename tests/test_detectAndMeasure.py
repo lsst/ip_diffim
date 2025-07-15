@@ -134,7 +134,7 @@ class DetectAndMeasureTestBase:
 
         if run_sattle:
             config.run_sattle = run_sattle
-            config.sattle_port = 9999
+            config.sattle_port = '9999'
             config.sattle_host = 'fake_host'
 
         # Make a realistic id generator so that output catalog ids are useful.
