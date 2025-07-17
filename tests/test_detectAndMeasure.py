@@ -19,10 +19,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import json as json_package
 import numpy as np
+import os
 import unittest
 from unittest import mock
-import json as json_package
 
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
@@ -134,8 +135,7 @@ class DetectAndMeasureTestBase:
 
         if run_sattle:
             config.run_sattle = run_sattle
-            config.sattle_port = '9999'
-            config.sattle_host = 'fake_host'
+            self.addCleanup(unittest.mock.patch.dict(os.environ, {"SATTLE_URI": "fake_host"}))
 
         # Make a realistic id generator so that output catalog ids are useful.
         dataId = lsst.daf.butler.DataCoordinate.standardize(
@@ -749,9 +749,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
                                 f"Provided visit {data['visit_id']} not present in cache!")
         # All sources are allowed
         elif data['visit_id'] == 3:
-            return MockResponse({"allow_list": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
-                                                18, 19, 20]},
-                                200, "test 3")
+            return MockResponse({"allow_list": list(range(1, 21))}, 200, "test 3")
         # ALl sources are filtered, bad things happen
         elif data['visit_id'] == 4:
             return MockResponse({"allow_list": []}, 200, "Test 4")
@@ -781,7 +779,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         # Nothing in the visit cache raises
         with self.assertRaises(RuntimeError):
             detectionTask.run(science, matchedTemplate, difference, sources,
-                              idFactory=IdFactory.makeSimple())
+                              idFactory=self.idGenerator.makeSimple())
 
     @mock.patch('lsst.ip.diffim.detectAndMeasure.requests.put', side_effect=_mocked_requests_put)
     def test_filter_satellites_some_allowed(self, mock_put):
@@ -805,7 +803,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         # Run detection and check the results
         output = detectionTask.run(science, matchedTemplate, difference,
                                    sources,
-                                   idFactory=IdFactory.makeSimple())
+                                   idFactory=self.idGenerator.makeSimple())
 
         self.assertEqual(len(output.diaSources), 2)
 
@@ -880,8 +878,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
                                               badSubtractionRatioThreshold=1.,
                                               doSkySources=False, run_sattle=True)
 
-        detectionTask.config.sattle_host = None
-        detectionTask.config.sattle_port = None
+        detectionTask.config.sattle_uri = None
 
         with self.assertRaises(RuntimeError):
             detectionTask.run(science, matchedTemplate, difference, sources,
