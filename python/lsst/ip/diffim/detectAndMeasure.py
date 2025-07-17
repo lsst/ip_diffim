@@ -20,6 +20,10 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
+import requests
+import json
+import os
+from astropy.time import Time
 
 import lsst.afw.detection as afwDetection
 import lsst.afw.image as afwImage
@@ -27,7 +31,7 @@ import lsst.afw.math as afwMath
 import lsst.afw.table as afwTable
 import lsst.daf.base as dafBase
 import lsst.geom
-from lsst.ip.diffim.utils import evaluateMaskFraction, computeDifferenceImageMetrics
+from lsst.ip.diffim.utils import evaluateMaskFraction, computeDifferenceImageMetrics, populate_sattle_visit_cache
 from lsst.meas.algorithms import SkyObjectsTask, SourceDetectionTask, SetPrimaryFlagsTask, MaskStreaksTask
 from lsst.meas.base import ForcedMeasurementTask, ApplyApCorrTask, DetectorVisitIdGeneratorConfig
 import lsst.meas.deblender
@@ -303,6 +307,18 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         default=True,
         doc="Raise an algorithm error if no diaSources are detected.",
     )
+    run_sattle = pexConfig.Field(
+        dtype=bool,
+        default=False,
+        doc="If true, dia source bounding boxes will be sent for verification"
+            "to the sattle service."
+    )
+    sattle_historical = pexConfig.Field(
+        dtype=bool,
+        default=False,
+        doc="If set to true, sattle service checks against historical "
+            "catalogs."
+    )
     idGenerator = DetectorVisitIdGeneratorConfig.make_field()
 
     def setDefaults(self):
@@ -374,6 +390,15 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         self.measurement.plugins["base_PixelFlags"].masksFpCenter = [
             "STREAK", "INJECTED", "INJECTED_TEMPLATE"]
         self.skySources.avoidMask = ["DETECTED", "DETECTED_NEGATIVE", "BAD", "NO_DATA", "EDGE"]
+
+    def validate(self):
+        super().validate()
+
+        if self.run_sattle:
+            self.sattle_uri = os.getenv("SATTLE_URI")
+            if not self.sattle_uri:
+                raise ValueError("Sattle uri environment variable not set.")
+
 
 
 class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
@@ -692,6 +717,9 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         self.measureDiaSources(initialDiaSources, science, difference, matchedTemplate)
         diaSources = self._removeBadSources(initialDiaSources)
 
+        if self.config.run_sattle:
+            diaSources = self.filterSatellites(diaSources, science)
+
         if self.config.doForcedMeasurement:
             self.measureForcedSources(diaSources, science, difference.getWcs())
 
@@ -949,6 +977,75 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                 raise BadSubtractionError(ratio=metrics.differenceFootprintRatioStdev,
                                           threshold=self.config.badSubtractionVariationThreshold)
 
+    def prepareSattleDiaSourcePayload(self, diaSources, science):
+        """Generate JSON payload to send to the sattle allowlist endpoint.
+
+        Parameters
+        ----------
+        diaSources : `lsst.afw.table.SourceCatalog`
+            The catalog of detected sources.
+        science : `lsst.afw.image.ExposureF`
+            Science exposure that was subtracted.
+        """
+
+        wcs = science.getWcs()
+        visit_info = science.getInfo().getVisitInfo()
+        visit_id = visit_info.getId()
+
+        dia_sources_json = []
+        for source in diaSources:
+            source_bbox = source.getFootprint().getBBox()
+            corners = [wcs.pixelToSky(Point2D(c)) for c in source_bbox.getCorners()]
+            bbox_radec = [[pt.getRa().asDegrees(), pt.getDec().asDegrees()] for pt in corners]
+            dia_sources_json.append({"diasource_id": source["id"], "bbox": bbox_radec})
+
+        return {"visit_id": visit_id, "detector_id": detector_id, "diasources": dia_sources_json, 
+                "historical":self.config.sattle_historical}
+
+    def filterSatellites(self, diaSources, science):
+        """Remove diaSources overlapping predicted satellite positions.
+
+        Parameters
+        ----------
+        diaSources : `lsst.afw.table.SourceCatalog`
+            The catalog of detected sources.
+        science : `lsst.afw.image.ExposureF`
+            Science exposure that was subtracted.
+        """
+
+        payload = self.prepareSattleDiaSourcePayload(diaSources, science)
+
+        sattle_output = requests.put(f'{self.sattle_uri}/diasource_allow_list',
+                                     json=payload)
+
+        # retry once if unsuccessful
+        if sattle_output.status_code != 200:
+            if sattle_output.status_code != 404:
+                # Unknown sattle error: halt processing.
+                sattle_output.raise_for_status()
+            else:
+                # The cache is missing the visit; populate it and retry once
+                visit_info = science.getInfo().getVisitInfo()
+                self.log.warning(f'Visit {visit_info.getId()} not found in sattle cache, re-sending')
+
+                populate_sattle_visit_cache(visit_info,
+                                            historical=self.config.sattle_historical)
+                sattle_output = requests.put(f'{self.sattle_uri}/diasource_allow_list',
+                                             json=payload)
+                sattle_output.raise_for_status()
+
+        sattle_output_array = sattle_output.json()
+
+        if sattle_output_array['allow_list'] == []:
+            self.log.warning('Sattle output array is empty, all sources removed')
+            diaSources = diaSources[0:0].copy(deep=True)
+        else:
+            allow_set = set(sattle_output_array['allow_list']) 
+            allowed_ids = [source['id'] in allow_set for source in diaSources]
+            diaSources = diaSources[np.array(allowed_ids)].copy(deep=True)
+
+        return diaSources
+
     def _runStreakMasking(self, difference):
         """Do streak masking and optionally save the resulting streak
         fit parameters in a catalog.
@@ -1118,3 +1215,4 @@ class DetectAndMeasureScoreTask(DetectAndMeasureTask):
                                        results.sources, idFactory, kernelSources,
                                        positives=positives,
                                        negatives=negatives)
+

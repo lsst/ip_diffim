@@ -415,3 +415,34 @@ def computeDifferenceImageMetrics(science, difference, stars, sky_sources=None):
                                  differenceFootprintSkyRatioMean=sky_mean,
                                  differenceFootprintSkyRatioStdev=sky_std,
                                  )
+
+def populate_sattle_visit_cache(visit_info, historical=False):
+    """Populate a cache of predicted satellite positions in the sattle service.
+
+    Parameters
+    ----------
+    visit_info: `lsst.afw.table.ExposureRecord.visitInfo`
+        Visit info for the science exposure being processed.
+    historical: `bool`
+        Set to True if observations are older than the current day.
+    """
+
+    visit_mjd = visit_info.getDate().toAstropy().mjd
+
+    exposure_time_days = visit_info.getExposureTime() / 86400.0
+    exposure_end_mjd = visit_mjd + exposure_time_days / 2.0
+    exposure_start_mjd = visit_mjd - exposure_time_days / 2.0
+
+    boresight_ra = visit_info.getRa().asDegrees()
+    boresight_dec = visit_info.getDec().asDegrees()
+
+    r = requests.put(
+        f'{self.sattle_uri}/visit_cache',
+        json={"visit_id": visit_id,
+              "exposure_start_mjd": exposure_start_mjd,
+              "exposure_end_mjd": exposure_end_mjd,
+              "boresight_ra": boresight_ra,
+              "boresight_dec": boresight_dec,
+              "historical": historical})
+
+    r.raise_for_status()
