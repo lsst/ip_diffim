@@ -29,6 +29,7 @@ import lsst.daf.base as dafBase
 import lsst.geom
 from lsst.ip.diffim.utils import evaluateMaskFraction, computeDifferenceImageMetrics
 from lsst.meas.algorithms import SkyObjectsTask, SourceDetectionTask, SetPrimaryFlagsTask, MaskStreaksTask
+from lsst.meas.algorithms import FindGlintTrailsTask
 from lsst.meas.base import ForcedMeasurementTask, ApplyApCorrTask, DetectorVisitIdGeneratorConfig
 import lsst.meas.deblender
 import lsst.meas.extensions.trailedSources  # noqa: F401
@@ -135,6 +136,12 @@ class DetectAndMeasureConnections(pipeBase.PipelineTaskConnections,
         dimensions=("instrument", "visit", "detector"),
         name="{fakesType}{coaddName}Diff_streaks",
     )
+    trailedGlintInfo = pipeBase.connectionTypes.Output(
+        doc='Dict of fit parameters for trailed glints in the catalog.',
+        storageClass="ArrowNumpyDict",
+        dimensions=("instrument", "visit", "detector"),
+        name="trailed_glints",
+    )
 
     def __init__(self, *, config):
         super().__init__(config=config)
@@ -142,6 +149,8 @@ class DetectAndMeasureConnections(pipeBase.PipelineTaskConnections,
             self.outputs.remove("maskedStreaks")
         if not (self.config.doSubtractBackground and self.config.doWriteBackground):
             self.outputs.remove("differenceBackground")
+        if not (self.config.writeGlintInfo):
+            self.outputs.remove("trailedGlintInfo")
 
 
 class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
@@ -256,6 +265,15 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         default=False,
         doc="Record the parameters of any detected streaks. For LSST, this should be turned off except for "
             "development work."
+    )
+    findGlints = pexConfig.ConfigurableField(
+        target=FindGlintTrailsTask,
+        doc="Subtask for finding trailed glints, usually caused by satellites or debris."
+    )
+    writeGlintInfo = pexConfig.Field(
+        dtype=bool,
+        default=True,
+        doc="Record the parameters of any detected trailed glints."
     )
     setPrimaryFlags = pexConfig.ConfigurableField(
         target=SetPrimaryFlagsTask,
@@ -430,6 +448,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         if self.config.doMaskStreaks:
             self.makeSubtask("maskStreaks")
             self.makeSubtask("streakDetection")
+        self.makeSubtask("findGlints")
+        self.schema.addField("trailed_glint", "Flag", "DiaSource is part of a glint trail.")
 
         # To get the "merge_*" fields in the schema; have to re-initialize
         # this later, once we have a peak schema post-detection.
@@ -467,6 +487,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                 measurementResults.subtractedMeasuredExposure,
                 measurementResults.diaSources,
                 measurementResults.maskedStreaks,
+                measurementResults.trailedGlintInfo,
                 log=self.log
             )
             butlerQC.put(measurementResults, outputRefs)
@@ -690,6 +711,13 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             initialDiaSources = initialDiaSources.copy(deep=True)
 
         self.measureDiaSources(initialDiaSources, science, difference, matchedTemplate)
+
+        # Add a column for trailed glint diaSources, but do not remove them
+        initialDiaSources, trail_parameters = self._find_trailed_glints(initialDiaSources)
+        if self.config.writeGlintInfo:
+            measurementResults.mergeItems(trail_parameters, 'trailedGlintInfo')
+
+        # Remove unphysical diaSources per config.badSourceFlags
         diaSources = self._removeBadSources(initialDiaSources)
 
         if self.config.doForcedMeasurement:
@@ -806,6 +834,39 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         self.metadata["nRemovedBadFlaggedSources"] = nBadTotal
         self.log.info("Removed %d unphysical sources.", nBadTotal)
         return diaSources[selector].copy(deep=True)
+
+    def _find_trailed_glints(self, diaSources):
+        """Define a new flag column for diaSources that are in a glint trail.
+
+        Parameters
+        ----------
+        diaSources : `lsst.afw.table.SourceCatalog`
+            The catalog of detected sources.
+
+        Returns
+        -------
+        diaSources : `lsst.afw.table.SourceCatalog`
+            The updated catalog of detected sources, with a new bool column
+            called 'trailed_glint' added.
+
+        trail_parameters : `dict`
+            Parameters of all the trails that were found.
+        """
+        trailed_glints = self.findGlints.run(diaSources)
+        glint_mask = [True if id in trailed_glints.trailed_ids else False for id in diaSources['id']]
+        diaSources['trailed_glint'] = np.array(glint_mask)
+
+        slopes = np.array([trail.slope for trail in trailed_glints.parameters])
+        intercepts = np.array([trail.intercept for trail in trailed_glints.parameters])
+        stderrs = np.array([trail.stderr for trail in trailed_glints.parameters])
+        lengths = np.array([trail.length for trail in trailed_glints.parameters])
+        angles = np.array([trail.angle for trail in trailed_glints.parameters])
+        parameters = {'slopes': slopes, 'intercepts': intercepts, 'stderrs': stderrs, 'lengths': lengths,
+                      'angles': angles}
+
+        trail_parameters = pipeBase.Struct(trailedGlintInfo=parameters)
+
+        return diaSources, trail_parameters
 
     def addSkySources(self, diaSources, mask, seed,
                       subtask=None):
