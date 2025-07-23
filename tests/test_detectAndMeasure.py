@@ -20,17 +20,26 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
+import os
 import unittest
+from unittest import mock
+import requests
 
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.geom
 from lsst.ip.diffim import detectAndMeasure, subtractImages
+from lsst.afw.table import IdFactory
+from lsst.afw.cameraGeom.testUtils import DetectorWrapper
 import lsst.meas.algorithms as measAlg
 from lsst.pipe.base import InvalidQuantumError, UpstreamFailureNoWorkFound, AlgorithmError
 import lsst.utils.tests
 import lsst.meas.base.tests
+import lsst.daf.base as dafBase
+from lsst.afw.coord import Observatory, Weather
+import lsst.geom as geom
+import lsst.pex.config as pexConfig
 
 from utils import makeTestImage, checkMask
 
@@ -101,7 +110,8 @@ class DetectAndMeasureTestBase:
         if maxValue is not None:
             self.assertTrue(np.all(values <= maxValue))
 
-    def _setup_detection(self, doSkySources=True, nSkySources=5, doSubtractBackground=False, **kwargs):
+    def _setup_detection(self, doSkySources=True, nSkySources=5,
+                         doSubtractBackground=False, run_sattle=False, **kwargs):
         """Setup and configure the detection and measurement PipelineTask.
 
         Parameters
@@ -123,6 +133,8 @@ class DetectAndMeasureTestBase:
         if doSkySources:
             config.skySources.nSources = nSkySources
         config.update(**kwargs)
+
+        config.run_sattle = run_sattle
 
         # Make a realistic id generator so that output catalog ids are useful.
         dataId = lsst.daf.butler.DataCoordinate.standardize(
@@ -154,6 +166,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         fluxLevel = 500
         kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel, "x0": 12345, "y0": 67890}
         science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
+        science.getInfo().setVisitInfo(makeVisitInfo())
         matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
         difference = science.clone()
 
@@ -223,6 +236,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
                   "xSize": xSize, "ySize": ySize}
         science, sources = makeTestImage(seed=staticSeed, noiseLevel=noiseLevel, noiseSeed=6,
                                          nSrc=1, **kwargs)
+        science.getInfo().setVisitInfo(makeVisitInfo())
         matchedTemplate, _ = makeTestImage(seed=staticSeed, noiseLevel=noiseLevel/4, noiseSeed=7,
                                            nSrc=1, **kwargs)
         rng = np.random.RandomState(3)
@@ -269,6 +283,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         kwargs = {"psfSize": 2.4, "xSize": xSize, "ySize": ySize}
         science, sources = makeTestImage(seed=staticSeed, noiseLevel=noiseLevel, noiseSeed=6,
                                          nSrc=1, **kwargs)
+        science.getInfo().setVisitInfo(makeVisitInfo())
         matchedTemplate, _ = makeTestImage(seed=staticSeed, noiseLevel=noiseLevel/4, noiseSeed=7,
                                            nSrc=1, **kwargs)
         transients, transientSources = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=8, nSrc=1, **kwargs)
@@ -403,6 +418,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         kwargs = {"psfSize": 2.4, "fluxLevel": fluxLevel, "addMaskPlanes": []}
         # Use different seeds for the science and template so every source is a diaSource
         science, sources = makeTestImage(seed=5, noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
+        science.getInfo().setVisitInfo(makeVisitInfo())
         matchedTemplate, _ = makeTestImage(seed=6, noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
 
         difference = science.clone()
@@ -434,6 +450,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
                   "xSize": xSize, "ySize": ySize}
         dipoleFlag = "ip_diffim_DipoleFit_classification"
         science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
+        science.getInfo().setVisitInfo(makeVisitInfo())
         matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
         difference = science.clone()
         matchedTemplate.image.array[...] = np.roll(matchedTemplate.image.array[...], offset, axis=0)
@@ -473,6 +490,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         fluxLevel = 500
         kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel}
         science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
+        science.getInfo().setVisitInfo(makeVisitInfo())
         matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
         transients, transientSources = makeTestImage(seed=transientSeed, psfSize=2.4,
                                                      nSrc=10, fluxLevel=transientFluxLevel,
@@ -517,6 +535,9 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         radius = 2
         kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel}
         science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
+        science.getInfo().setVisitInfo(makeVisitInfo())
+        detector = DetectorWrapper(numAmps=1).detector
+        science.setDetector(detector)
         matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
 
         # Configure the detection Task
@@ -704,6 +725,97 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         self.assertTrue(np.all(streakMaskSet[streak_check]))
         # Check that the entire image was not masked STREAK
         self.assertFalse(np.all(streakMaskSet))
+
+    def _setup_sattle_tests(self):
+        noiseLevel = 1.
+        staticSeed = 1
+        fluxLevel = 500
+        shared_kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel,
+                         "x0": 12345, "y0": 67890}
+        science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6,
+                                         **shared_kwargs)
+        science.getInfo().setVisitInfo(makeVisitInfo(id=2))
+        detector = DetectorWrapper(numAmps=1).detector
+        science.setDetector(detector)
+        matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel / 4,
+                                           noiseSeed=7, **shared_kwargs)
+        difference = science.clone()
+
+        detectionTask = self._setup_detection(doDeblend=True,
+                                              badSubtractionRatioThreshold=1.,
+                                              doSkySources=False, run_sattle=True)
+
+        return science, matchedTemplate, difference, sources, detectionTask
+
+    @mock.patch.dict(os.environ, {"SATTLE_URI_BASE": "fake_host:1234"})
+    def test_sattle_not_available(self):
+        science, matchedTemplate, difference, sources, detectionTask = self._setup_sattle_tests()
+
+        response = MockResponse({"allow_list": []}, 500, "sattle internal error")
+        with mock.patch('requests.put', return_value=response):
+            with self.assertRaises(requests.exceptions.HTTPError):
+                detectionTask.run(science, matchedTemplate, difference, sources,
+                                  idFactory=IdFactory.makeSimple())
+
+    @mock.patch.dict(os.environ, {"SATTLE_URI_BASE": "fake_host:1234"})
+    def test_visit_id_not_in_sattle(self):
+        science, matchedTemplate, difference, sources, detectionTask = self._setup_sattle_tests()
+
+        response = MockResponse({"allow_list": []}, 404, "missing visit cache")
+        # visit id not in sattle raises
+        with self.assertRaises(requests.exceptions.HTTPError):
+            with mock.patch('lsst.ip.diffim.detectAndMeasure.requests.put',
+                            return_value=response):
+                with mock.patch('lsst.ip.diffim.utils.populate_sattle_visit_cache'):
+                    detectionTask.run(science, matchedTemplate, difference, sources,
+                                      idFactory=IdFactory.makeSimple())
+
+    @mock.patch.dict(os.environ, {"SATTLE_URI_BASE": "fake_host:1234"})
+    def test_filter_satellites_some_allowed(self):
+        science, matchedTemplate, difference, sources, detectionTask = self._setup_sattle_tests()
+
+        allowed_ids = [1, 5]
+        response = MockResponse({"allow_list": allowed_ids}, 200, "some allowed")
+        with mock.patch('requests.put', return_value=response):
+            output = detectionTask.run(science, matchedTemplate, difference, sources,
+                                       idFactory=IdFactory.makeSimple())
+
+        self.assertEqual(len(output.diaSources), 2)
+
+        # Output should be sources 1 and 5 allowed out of 20
+        self.assertEqual(set(output.diaSources['id']), set(allowed_ids))
+
+    @mock.patch.dict(os.environ, {"SATTLE_URI_BASE": "fake_host:1234"})
+    def test_filter_satellites_all_allowed(self):
+        science, matchedTemplate, difference, sources, detectionTask = self._setup_sattle_tests()
+
+        allowed_ids = list(range(1, 21))
+        response = MockResponse({"allow_list": allowed_ids}, 200, "all allowed")
+        # Run detection and check the results
+        with mock.patch('requests.put', return_value=response):
+            output = detectionTask.run(science, matchedTemplate, difference, sources,
+                                       idFactory=IdFactory.makeSimple())
+
+        ## Output should be all sources that went in. 20 go in, 20 should come out
+        self.assertEqual(len(output.diaSources), 20)
+
+        self.assertEqual(set(output.diaSources['id']), set(allowed_ids))
+
+    @mock.patch.dict(os.environ, {"SATTLE_URI_BASE": "fake_host:1234"})
+    def test_filter_satellites_none_allowed(self):
+        science, matchedTemplate, difference, sources, detectionTask = self._setup_sattle_tests()
+
+        response = MockResponse({"allow_list": []}, 200, "none allowed")
+        # Run detection and confirm it raises for no diasources
+        with self.assertRaises(detectAndMeasure.NoDiaSourcesError):
+            with mock.patch('requests.put', return_value=response):
+                detectionTask.run(science, matchedTemplate, difference, sources,
+                                  idFactory=IdFactory.makeSimple())
+
+    @mock.patch.dict(os.environ, {"SATTLE_URI_BASE": ""})
+    def test_fail_on_sattle_misconfiguration(self):
+        with self.assertRaises(pexConfig.FieldValidationError):
+            self._setup_detection(run_sattle=True)
 
 
 class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
@@ -960,6 +1072,7 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         radius = 2
         kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel}
         science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
+        science.getInfo().setVisitInfo(makeVisitInfo())
         matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
 
         subtractTask = subtractImages.AlardLuptonPreconvolveSubtractTask()
@@ -1150,6 +1263,40 @@ class TestNegativePeaks(lsst.utils.tests.TestCase):
         # set, independent of how deblending/merging of negative sources is
         # handled.
         self.assertEqual((~result.diaSources["is_negative"]).sum(), 3)
+
+
+def makeVisitInfo(id=1):
+    """Return a non-NaN visitInfo."""
+    return afwImage.VisitInfo(id=id,
+                              exposureTime=10.01,
+                              darkTime=11.02,
+                              date=dafBase.DateTime(65321.1, dafBase.DateTime.MJD, dafBase.DateTime.TAI),
+                              ut1=12345.1,
+                              era=45.1*geom.degrees,
+                              boresightRaDec=geom.SpherePoint(23.1, 73.2, geom.degrees),
+                              boresightAzAlt=geom.SpherePoint(134.5, 33.3, geom.degrees),
+                              boresightAirmass=1.73,
+                              boresightRotAngle=73.2*geom.degrees,
+                              rotType=afwImage.RotType.SKY,
+                              observatory=Observatory(
+                                  11.1*geom.degrees, 22.2*geom.degrees, 0.333),
+                              weather=Weather(1.1, 2.2, 34.5),
+                              )
+
+
+class MockResponse:
+    """Provide a mock for requests.put calls"""
+    def __init__(self, json_data, status_code, text):
+        self.json_data = json_data
+        self.status_code = status_code
+        self.text = text
+
+    def json(self):
+        return self.json_data
+
+    def raise_for_status(self):
+        if self.status_code != 200:
+            raise requests.exceptions.HTTPError
 
 
 def setup_module(module):

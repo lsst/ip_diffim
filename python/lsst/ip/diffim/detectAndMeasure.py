@@ -20,6 +20,8 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
+import requests
+import os
 
 import lsst.afw.detection as afwDetection
 import lsst.afw.image as afwImage
@@ -27,7 +29,8 @@ import lsst.afw.math as afwMath
 import lsst.afw.table as afwTable
 import lsst.daf.base as dafBase
 import lsst.geom
-from lsst.ip.diffim.utils import evaluateMaskFraction, computeDifferenceImageMetrics
+from lsst.ip.diffim.utils import (evaluateMaskFraction, computeDifferenceImageMetrics,
+                                  populate_sattle_visit_cache)
 from lsst.meas.algorithms import SkyObjectsTask, SourceDetectionTask, SetPrimaryFlagsTask, MaskStreaksTask
 from lsst.meas.base import ForcedMeasurementTask, ApplyApCorrTask, DetectorVisitIdGeneratorConfig
 import lsst.meas.deblender
@@ -303,6 +306,19 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         default=True,
         doc="Raise an algorithm error if no diaSources are detected.",
     )
+    run_sattle = pexConfig.Field(
+        dtype=bool,
+        default=False,
+        doc="If true, dia source bounding boxes will be sent for verification"
+            "to the sattle service."
+    )
+    sattle_historical = pexConfig.Field(
+        dtype=bool,
+        default=False,
+        doc="If re-running a pipeline that requires sattle, this should be set "
+            "to True. This will populate sattle's cache with the historic data "
+            "closest in time to the exposure."
+    )
     idGenerator = DetectorVisitIdGeneratorConfig.make_field()
 
     def setDefaults(self):
@@ -374,6 +390,15 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         self.measurement.plugins["base_PixelFlags"].masksFpCenter = [
             "STREAK", "INJECTED", "INJECTED_TEMPLATE"]
         self.skySources.avoidMask = ["DETECTED", "DETECTED_NEGATIVE", "BAD", "NO_DATA", "EDGE"]
+
+    def validate(self):
+        super().validate()
+
+        if self.run_sattle:
+            if not os.getenv("SATTLE_URI_BASE"):
+                raise pexConfig.FieldValidationError(DetectAndMeasureConfig.run_sattle, self,
+                                                     "Sattle requested but SATTLE_URI_BASE "
+                                                     "environment variable not set.")
 
 
 class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
@@ -692,6 +717,9 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         self.measureDiaSources(initialDiaSources, science, difference, matchedTemplate)
         diaSources = self._removeBadSources(initialDiaSources)
 
+        if self.config.run_sattle:
+            diaSources = self.filterSatellites(diaSources, science)
+
         if self.config.doForcedMeasurement:
             self.measureForcedSources(diaSources, science, difference.getWcs())
 
@@ -948,6 +976,81 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             if metrics.differenceFootprintRatioStdev > self.config.badSubtractionVariationThreshold:
                 raise BadSubtractionError(ratio=metrics.differenceFootprintRatioStdev,
                                           threshold=self.config.badSubtractionVariationThreshold)
+
+    def getSattleDiaSourceAllowlist(self, diaSources, science):
+        """Query the sattle service and determine which diaSources are allowed.
+
+        Parameters
+        ----------
+        diaSources : `lsst.afw.table.SourceCatalog`
+            The catalog of detected sources.
+        science : `lsst.afw.image.ExposureF`
+            Science exposure that was subtracted.
+
+        Returns
+        ----------
+        allow_list : `list` of `int`
+            diaSourceIds of diaSources that can be made public.
+
+        Raises
+        ------
+        requests.HTTPError
+            Raised if sattle call does not return success.
+        """
+        wcs = science.getWcs()
+        visit_info = science.getInfo().getVisitInfo()
+        visit_id = visit_info.getId()
+        sattle_uri_base = os.getenv('SATTLE_URI_BASE')
+
+        dia_sources_json = []
+        for source in diaSources:
+            source_bbox = source.getFootprint().getBBox()
+            corners = wcs.pixelToSky([lsst.geom.Point2D(c) for c in source_bbox.getCorners()])
+            bbox_radec = [[pt.getRa().asDegrees(), pt.getDec().asDegrees()] for pt in corners]
+            dia_sources_json.append({"diasource_id": source["id"], "bbox": bbox_radec})
+
+        payload = {"visit_id": visit_id, "detector_id": science.getDetector(), "diasources": dia_sources_json,
+                   "historical": self.config.sattle_historical}
+
+        sattle_output = requests.put(f'{sattle_uri_base}/diasource_allow_list',
+                                     json=payload)
+
+        # retry once if visit cache is not populated
+        if sattle_output.status_code == 404:
+            self.log.warning(f'Visit {visit_id} not found in sattle cache, re-sending')
+            populate_sattle_visit_cache(visit_info, historical=self.config.sattle_historical)
+            sattle_output = requests.put(f'{sattle_uri_base}/diasource_allow_list', json=payload)
+
+        sattle_output.raise_for_status()
+
+        return sattle_output.json()['allow_list']
+
+    def filterSatellites(self, diaSources, science):
+        """Remove diaSources overlapping predicted satellite positions.
+
+        Parameters
+        ----------
+        diaSources : `lsst.afw.table.SourceCatalog`
+            The catalog of detected sources.
+        science : `lsst.afw.image.ExposureF`
+            Science exposure that was subtracted.
+
+        Returns
+        ----------
+        filterdDiaSources : `lsst.afw.table.SourceCatalog`
+            Filtered catalog of diaSources
+        """
+
+        allow_list = self.getSattleDiaSourceAllowlist(diaSources, science)
+
+        if allow_list:
+            allow_set = set(allow_list)
+            allowed_ids = [source['id'] in allow_set for source in diaSources]
+            diaSources = diaSources[np.array(allowed_ids)].copy(deep=True)
+        else:
+            self.log.warning('Sattle allowlist is empty, all diaSources removed')
+            diaSources = diaSources[0:0].copy(deep=True)
+        return diaSources
 
     def _runStreakMasking(self, difference):
         """Do streak masking and optionally save the resulting streak
