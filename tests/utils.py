@@ -1075,6 +1075,7 @@ def _makeTruthSchema():
     schema.getAliasMap().set("slot_CalibFlux", "truth")
     schema.getAliasMap().set("slot_ApFlux", "truth")
     schema.getAliasMap().set("slot_PsfFlux", "truth")
+    schema.addField("glint_trail", "Flag", "testing flag.")
     return keys, schema
 
 
