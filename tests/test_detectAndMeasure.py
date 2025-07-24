@@ -796,7 +796,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
             output = detectionTask.run(science, matchedTemplate, difference, sources,
                                        idFactory=IdFactory.makeSimple())
 
-        ## Output should be all sources that went in. 20 go in, 20 should come out
+        # Output should be all sources that went in. 20 go in, 20 should come out
         self.assertEqual(len(output.diaSources), 20)
 
         self.assertEqual(set(output.diaSources['id']), set(allowed_ids))
