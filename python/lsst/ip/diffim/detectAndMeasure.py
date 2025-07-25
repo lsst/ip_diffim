@@ -1070,8 +1070,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             bbox_radec = [[pt.getRa().asDegrees(), pt.getDec().asDegrees()] for pt in corners]
             dia_sources_json.append({"diasource_id": source["id"], "bbox": bbox_radec})
 
-        payload = {"visit_id": visit_id, "detector_id": science.getDetector(), "diasources": dia_sources_json,
-                   "historical": self.config.sattle_historical}
+        payload = {"visit_id": visit_id, "detector_id": science.getDetector().getId(),
+                   "diasources": dia_sources_json, "historical": self.config.sattle_historical}
 
         sattle_output = requests.put(f'{sattle_uri_base}/diasource_allow_list',
                                      json=payload)
