@@ -885,12 +885,12 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                           "Evaluting PSF on a grid of points."
                           )
             self.templatePsfSize = evaluateMeanPsfFwhm(
-                template,
+                template.psf, template.getBBox(),
                 fwhmExposureBuffer=self.config.makeKernel.fwhmExposureBuffer,
                 fwhmExposureGrid=self.config.makeKernel.fwhmExposureGrid
             )
             self.sciencePsfSize = evaluateMeanPsfFwhm(
-                science,
+                science.psf, science.getBBox(),
                 fwhmExposureBuffer=self.config.makeKernel.fwhmExposureBuffer,
                 fwhmExposureGrid=self.config.makeKernel.fwhmExposureGrid
             )
@@ -1235,11 +1235,11 @@ def _shapeTest(exp1, exp2, fwhmExposureBuffer, fwhmExposureGrid):
         shape1 = getPsfFwhm(exp1.psf, average=False)
         shape2 = getPsfFwhm(exp2.psf, average=False)
     except (lsst.pex.exceptions.InvalidParameterError, lsst.pex.exceptions.RangeError):
-        shape1 = evaluateMeanPsfFwhm(exp1,
+        shape1 = evaluateMeanPsfFwhm(exp1.psf, exp1.getBBox(),
                                      fwhmExposureBuffer=fwhmExposureBuffer,
                                      fwhmExposureGrid=fwhmExposureGrid
                                      )
-        shape2 = evaluateMeanPsfFwhm(exp2,
+        shape2 = evaluateMeanPsfFwhm(exp2.psf, exp2.getBBox(),
                                      fwhmExposureBuffer=fwhmExposureBuffer,
                                      fwhmExposureGrid=fwhmExposureGrid
                                      )

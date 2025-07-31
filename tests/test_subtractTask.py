@@ -264,17 +264,18 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
             getPsfFwhm(template.psf, False)
 
         # Test that evaluateMeanPsfFwhm runs successfully on the template.
-        evaluateMeanPsfFwhm(template, fwhmExposureBuffer=0.05, fwhmExposureGrid=10)
+        evaluateMeanPsfFwhm(template.psf, template.getBBox(), fwhmExposureBuffer=0.05, fwhmExposureGrid=10)
 
         # Since the PSF is spatially invariant, the FWHM should be the same at
         # all points in the science image.
         fwhm1 = getPsfFwhm(science.psf, False)
-        fwhm2 = evaluateMeanPsfFwhm(science, fwhmExposureBuffer=0.05, fwhmExposureGrid=10)
+        fwhm2 = evaluateMeanPsfFwhm(science.psf, science.getBBox(),
+                                    fwhmExposureBuffer=0.05, fwhmExposureGrid=10)
         self.assertAlmostEqual(fwhm1[0], fwhm2, places=13)
         self.assertAlmostEqual(fwhm1[1], fwhm2, places=13)
 
-        self.assertAlmostEqual(evaluateMeanPsfFwhm(science, fwhmExposureBuffer=0.05,
-                                                   fwhmExposureGrid=10),
+        self.assertAlmostEqual(evaluateMeanPsfFwhm(science.psf, science.getBBox(),
+                                                   fwhmExposureBuffer=0.05, fwhmExposureGrid=10),
                                getPsfFwhm(science.psf, True), places=7
                                )
 

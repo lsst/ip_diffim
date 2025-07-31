@@ -146,11 +146,11 @@ class MakeKernelTask(PsfMatchTask):
                 self.log.debug("Unable to evaluate PSF at the average position. "
                                "Evaluting PSF on a grid of points."
                                )
-                templateFwhmPix = evaluateMeanPsfFwhm(template,
+                templateFwhmPix = evaluateMeanPsfFwhm(template.psf, template.getBBox(),
                                                       fwhmExposureBuffer=self.config.fwhmExposureBuffer,
                                                       fwhmExposureGrid=self.config.fwhmExposureGrid
                                                       )
-                scienceFwhmPix = evaluateMeanPsfFwhm(science,
+                scienceFwhmPix = evaluateMeanPsfFwhm(science.psf, science.getBBox(),
                                                      fwhmExposureBuffer=self.config.fwhmExposureBuffer,
                                                      fwhmExposureGrid=self.config.fwhmExposureGrid
                                                      )
@@ -199,11 +199,11 @@ class MakeKernelTask(PsfMatchTask):
                 self.log.debug("Unable to evaluate PSF at the average position. "
                                "Evaluting PSF on a grid of points."
                                )
-                templateFwhmPix = evaluateMeanPsfFwhm(template,
+                templateFwhmPix = evaluateMeanPsfFwhm(template.psf, template.getBBox(),
                                                       fwhmExposureBuffer=self.config.fwhmExposureBuffer,
                                                       fwhmExposureGrid=self.config.fwhmExposureGrid
                                                       )
-                scienceFwhmPix = evaluateMeanPsfFwhm(science,
+                scienceFwhmPix = evaluateMeanPsfFwhm(science.psf, science.getBBox(),
                                                      fwhmExposureBuffer=self.config.fwhmExposureBuffer,
                                                      fwhmExposureGrid=self.config.fwhmExposureGrid
                                                      )

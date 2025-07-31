@@ -137,15 +137,16 @@ def getPsfFwhm(psf, average=True, position=None):
         return [sigmaToFwhm*np.sqrt(shape.getIxx()), sigmaToFwhm*np.sqrt(shape.getIyy())]
 
 
-def evaluateMeanPsfFwhm(exposure: afwImage.Exposure,
+def evaluateMeanPsfFwhm(psf: lsst.afw.detection.Psf, bbox: lsst.geom.Box2I,
                         fwhmExposureBuffer: float, fwhmExposureGrid: int) -> float:
     """Get the mean PSF FWHM by evaluating it on a grid within an exposure.
 
     Parameters
     ----------
-    exposure : `~lsst.afw.image.Exposure`
-        The exposure for which the mean FWHM of the PSF is to be computed.
-        The exposure must contain a `psf` attribute.
+    psf : `lsst.afw.detection.Psf`
+        The PSF of the exposure to evaluate.
+    bbox : `lsst.geom.Box2I`
+        The bounding box of the exposure.
     fwhmExposureBuffer : `float`
         Fractional buffer margin to be left out of all sides of the image
         during the construction of the grid to compute mean PSF FWHM in an
@@ -168,10 +169,6 @@ def evaluateMeanPsfFwhm(exposure: afwImage.Exposure,
     `getPsfFwhm`
     `computeAveragePsf`
     """
-
-    psf = exposure.psf
-
-    bbox = exposure.getBBox()
     xmax, ymax = bbox.getMax()
     xmin, ymin = bbox.getMin()
 
