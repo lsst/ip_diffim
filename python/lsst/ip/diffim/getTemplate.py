@@ -30,10 +30,12 @@ import lsst.afw.table as afwTable
 from lsst.afw.math._warper import computeWarpedBBox
 import lsst.afw.math as afwMath
 import lsst.pex.config as pexConfig
+import lsst.pex.exceptions
 import lsst.pipe.base as pipeBase
 
 from lsst.skymap import BaseSkyMap
 from lsst.ip.diffim.dcrModel import DcrModel
+from lsst.ip.diffim.utils import evaluateMeanPsfFwhm, getPsfFwhm
 from lsst.meas.algorithms import CoaddPsf, CoaddPsfConfig
 from lsst.utils.timer import timeMethod
 
@@ -94,6 +96,17 @@ class GetTemplateConfig(
         dtype=int,
         default=20,
         doc="Number of pixels to grow the requested template image to account for warping",
+    )
+    doFilterWarpsByPsfSize = pexConfig.Field(
+        dtype=bool,
+        default=True,
+        doc="Filter the input warps by PSF size to increase uniformity?",
+    )
+    maxPsfSizeDifferenceFraction = pexConfig.RangeField(
+        dtype=float,
+        default=0.2,
+        min=0.,
+        doc="Maximum fractional difference in PSF size allowed between included warps.",
     )
     warp = pexConfig.ConfigField(
         dtype=afwMath.Warper.ConfigClass,
@@ -221,6 +234,8 @@ class GetTemplateTask(pipeBase.PipelineTask):
             raise pipeBase.NoWorkFound(
                 "WCS is None; cannot find overlapping exposures."
             )
+        if self.config.doFilterWarpsByPsfSize:
+            coaddExposureHandles = self.selectInputWarps(bbox, wcs, skymap, coaddExposureHandles)
 
         # Exposure's validPolygon would be more accurate
         detectorPolygon = geom.Box2D(bbox)
@@ -404,6 +419,60 @@ class GetTemplateTask(pipeBase.PipelineTask):
             raise RuntimeError(msg)
         photoCalib = photoCalibs[0]
         return band, photoCalib
+
+    def selectInputWarps(self, bbox, wcs, skymap, coaddExposureHandles):
+        detectorPolygon = geom.Box2D(bbox)
+        weightList = np.zeros(len(coaddExposureHandles))
+        psfSizeList = np.zeros(len(coaddExposureHandles))
+
+        for i, coaddRef in enumerate(coaddExposureHandles):
+            dataId = coaddRef.dataId
+            psf = coaddRef.get(component="psf")
+            warpBBox = coaddRef.get(component="bbox")
+            try:
+                psfSize = getPsfFwhm(psf)
+            except lsst.pex.exceptions.Exception:
+                psfSize = evaluateMeanPsfFwhm(
+                    psf, warpBBox,
+                    fwhmExposureBuffer=self.fwhmExposureBuffer,
+                    fwhmExposureGrid=self.fwhmExposureGrid
+                )
+            psfSizeList[i] = psfSize
+            patchWcs = skymap[dataId["tract"]].getWcs()
+            patchBBox = skymap[dataId["tract"]][dataId["patch"]].getOuterBBox()
+            patchCorners = patchWcs.pixelToSky(geom.Box2D(patchBBox).getCorners())
+            patchPolygon = afwGeom.Polygon(wcs.skyToPixel(patchCorners))
+            if patchPolygon.intersection(detectorPolygon):
+                overlappingArea = patchPolygon.intersectionSingle(detectorPolygon).calculateArea()
+            else:
+                overlappingArea = 0
+            weightList[i] = overlappingArea/psfSize
+        overlappingWarps = weightList > 0
+        if not np.any(overlappingWarps):
+            raise pipeBase.NoWorkFound("No patches found to overlap science exposure.")
+        # Drop any warps that don't actually overlap the science image
+        psfSizeList = psfSizeList[overlappingWarps]
+        weightList = weightList[overlappingWarps]
+
+        validCoaddExposureHandles = [coaddRef for useRef, coaddRef
+                                     in zip(overlappingWarps, coaddExposureHandles)
+                                     if useRef]
+        maxWeight = 0
+        for minPsfCandidate in psfSizeList:
+            maxPsfCandidate = minPsfCandidate*(1 + self.config.maxPsfSizeDifferenceFraction)
+            candidates = (minPsfCandidate <= psfSizeList) & (psfSizeList <= maxPsfCandidate)
+            candidateWeight = np.sum(weightList[candidates])
+            if candidateWeight > maxWeight:
+                minPsfSize = minPsfCandidate
+                maxPsfSize = maxPsfCandidate
+                maxWeight = candidateWeight
+        candidates = (minPsfSize <= psfSizeList) & (psfSizeList <= maxPsfSize)
+        plateScale = wcs.getPixelScale().asArcseconds()
+        minPsf = minPsfSize*plateScale
+        maxPsf = max(psfSizeList[candidates])*plateScale
+        self.log.info(f"Using {np.sum(candidates)} out of {len(validCoaddExposureHandles)} input warps,"
+                      f" with a PSF size range of {minPsf} to {maxPsf} arcseconds.")
+        return [coaddRef for useRef, coaddRef in zip(candidates, validCoaddExposureHandles) if useRef]
 
     def _makeExposureCatalog(self, exposureRefs, dataIds):
         """Make an exposure catalog for one tract.
