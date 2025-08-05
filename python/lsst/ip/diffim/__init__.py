@@ -33,6 +33,7 @@ from .makeKernel import *
 from .makeKernelBasisList import *
 from .dipoleMeasurement import *
 from .getTemplate import *
+from .desTemplateTask import *
 from .dipoleFitTask import *
 from .detectAndMeasure import *
 from .imageDecorrelation import *
