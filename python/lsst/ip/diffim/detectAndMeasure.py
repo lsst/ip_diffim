@@ -752,6 +752,12 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         if self.config.doForcedMeasurement:
             self.measureForcedSources(diaSources, science, difference.getWcs())
 
+        # Clear the image plane for regions with NO_DATA.
+        # These regions are most often caused by insufficient template coverage.
+        # Do this for the final difference image after detection and measurement
+        # since the subtasks should all be configured to handle NO_DATA properly
+        difference.image.array[difference.mask.array & difference.mask.getPlaneBitMask('NO_DATA') > 0] = 0
+
         measurementResults.subtractedMeasuredExposure = difference
 
         if self.config.doMaskStreaks and self.config.writeStreakInfo:
