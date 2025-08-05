@@ -348,12 +348,24 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         self.subtractInitialBackground.useApprox = False
         self.subtractInitialBackground.statisticsProperty = "MEDIAN"
         self.subtractInitialBackground.doFilterSuperPixels = True
+        self.subtractInitialBackground.ignoredPixelMask = ["BAD",
+                                                           "EDGE",
+                                                           "DETECTED",
+                                                           "DETECTED_NEGATIVE",
+                                                           "NO_DATA",
+                                                           ]
         # Use a larger binsize for the final background subtraction, to reduce
         #  over-subtraction of bright objects.
         self.subtractFinalBackground.binSize = 40
         self.subtractFinalBackground.useApprox = False
         self.subtractFinalBackground.statisticsProperty = "MEDIAN"
         self.subtractFinalBackground.doFilterSuperPixels = True
+        self.subtractFinalBackground.ignoredPixelMask = ["BAD",
+                                                         "EDGE",
+                                                         "DETECTED",
+                                                         "DETECTED_NEGATIVE",
+                                                         "NO_DATA",
+                                                         ]
         # DiaSource Detection
         self.detection.thresholdPolarity = "both"
         self.detection.thresholdValue = 5.0
