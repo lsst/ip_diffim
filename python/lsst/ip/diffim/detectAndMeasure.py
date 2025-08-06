@@ -348,12 +348,24 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         self.subtractInitialBackground.useApprox = False
         self.subtractInitialBackground.statisticsProperty = "MEDIAN"
         self.subtractInitialBackground.doFilterSuperPixels = True
+        self.subtractInitialBackground.ignoredPixelMask = ["BAD",
+                                                           "EDGE",
+                                                           "DETECTED",
+                                                           "DETECTED_NEGATIVE",
+                                                           "NO_DATA",
+                                                           ]
         # Use a larger binsize for the final background subtraction, to reduce
         #  over-subtraction of bright objects.
         self.subtractFinalBackground.binSize = 40
         self.subtractFinalBackground.useApprox = False
         self.subtractFinalBackground.statisticsProperty = "MEDIAN"
         self.subtractFinalBackground.doFilterSuperPixels = True
+        self.subtractFinalBackground.ignoredPixelMask = ["BAD",
+                                                         "EDGE",
+                                                         "DETECTED",
+                                                         "DETECTED_NEGATIVE",
+                                                         "NO_DATA",
+                                                         ]
         # DiaSource Detection
         self.detection.thresholdPolarity = "both"
         self.detection.thresholdValue = 5.0
@@ -751,6 +763,12 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
         if self.config.doForcedMeasurement:
             self.measureForcedSources(diaSources, science, difference.getWcs())
+
+        # Clear the image plane for regions with NO_DATA.
+        # These regions are most often caused by insufficient template coverage.
+        # Do this for the final difference image after detection and measurement
+        # since the subtasks should all be configured to handle NO_DATA properly
+        difference.image.array[difference.mask.array & difference.mask.getPlaneBitMask('NO_DATA') > 0] = 0
 
         measurementResults.subtractedMeasuredExposure = difference
 
