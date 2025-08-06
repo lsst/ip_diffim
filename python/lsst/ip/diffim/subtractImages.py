@@ -374,27 +374,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         """
         self._prepareInputs(template, science, visitSummary=visitSummary)
 
-        if self.config.mode == "auto":
-            convolveTemplate = _shapeTest(template,
-                                          science,
-                                          fwhmExposureBuffer=self.config.makeKernel.fwhmExposureBuffer,
-                                          fwhmExposureGrid=self.config.makeKernel.fwhmExposureGrid)
-            if convolveTemplate:
-                if self.sciencePsfSize < self.templatePsfSize:
-                    self.log.info("Average template PSF size is greater, "
-                                  "but science PSF greater in one dimension: convolving template image.")
-                else:
-                    self.log.info("Science PSF size is greater: convolving template image.")
-            else:
-                self.log.info("Template PSF size is greater: convolving science image.")
-        elif self.config.mode == "convolveTemplate":
-            self.log.info("`convolveTemplate` is set: convolving template image.")
-            convolveTemplate = True
-        elif self.config.mode == "convolveScience":
-            self.log.info("`convolveScience` is set: convolving science image.")
-            convolveTemplate = False
-        else:
-            raise RuntimeError("Cannot handle AlardLuptonSubtract mode: %s", self.config.mode)
+        convolveTemplate = self.chooseConvolutionMethod(template, science)
 
         try:
             sourceMask = science.mask.clone()
@@ -429,6 +409,50 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                       self.metadata["differenceFootprintRatioStdev"])
 
         return subtractResults
+
+    def chooseConvolutionMethod(self, template, science):
+        """Determine whether the template should be convolved with the PSF
+        matching kernel.
+
+        Parameters
+        ----------
+        template : `lsst.afw.image.ExposureF`
+            Template exposure, warped to match the science exposure.
+        science : `lsst.afw.image.ExposureF`
+            Science exposure to subtract from the template.
+
+        Returns
+        -------
+        convolveTemplate : `bool`
+            Convolve the template to match the two images?
+
+        Raises
+        ------
+        RuntimeError
+            If an unsupported convolution mode is supplied.
+        """
+        if self.config.mode == "auto":
+            convolveTemplate = _shapeTest(template,
+                                          science,
+                                          fwhmExposureBuffer=self.config.makeKernel.fwhmExposureBuffer,
+                                          fwhmExposureGrid=self.config.makeKernel.fwhmExposureGrid)
+            if convolveTemplate:
+                if self.sciencePsfSize < self.templatePsfSize:
+                    self.log.info("Average template PSF size is greater, "
+                                  "but science PSF greater in one dimension: convolving template image.")
+                else:
+                    self.log.info("Science PSF size is greater: convolving template image.")
+            else:
+                self.log.info("Template PSF size is greater: convolving science image.")
+        elif self.config.mode == "convolveTemplate":
+            self.log.info("`convolveTemplate` is set: convolving template image.")
+            convolveTemplate = True
+        elif self.config.mode == "convolveScience":
+            self.log.info("`convolveScience` is set: convolving science image.")
+            convolveTemplate = False
+        else:
+            raise RuntimeError("Cannot handle AlardLuptonSubtract mode: %s", self.config.mode)
+        return convolveTemplate
 
     def runConvolveTemplate(self, template, science, selectSources):
         """Convolve the template image with a PSF-matching kernel and subtract
