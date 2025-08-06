@@ -30,7 +30,7 @@ import lsst.afw.table as afwTable
 import lsst.daf.base as dafBase
 import lsst.geom
 from lsst.ip.diffim.utils import (evaluateMaskFraction, computeDifferenceImageMetrics,
-                                  populate_sattle_visit_cache)
+                                  populate_sattle_visit_cache, compute_exposure_times)
 from lsst.meas.algorithms import SkyObjectsTask, SourceDetectionTask, SetPrimaryFlagsTask, MaskStreaksTask
 from lsst.meas.algorithms import FindGlintTrailsTask
 from lsst.meas.base import ForcedMeasurementTask, ApplyApCorrTask, DetectorVisitIdGeneratorConfig
@@ -1082,6 +1082,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         visit_id = visit_info.getId()
         sattle_uri_base = os.getenv('SATTLE_URI_BASE')
 
+        exposure_start_mjd, exposure_end_mjd = compute_exposure_times(visit_info)
+
         dia_sources_json = []
         for source in diaSources:
             source_bbox = source.getFootprint().getBBox()
@@ -1089,7 +1091,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             bbox_radec = [[pt.getRa().asDegrees(), pt.getDec().asDegrees()] for pt in corners]
             dia_sources_json.append({"diasource_id": source["id"], "bbox": bbox_radec})
 
-        payload = {"visit_id": visit_id, "detector_id": science.getDetector().getId(),
+        payload = {"visit_id": visit_id, "exposure_start_mjd": exposure_start_mjd,
+                   "detector_id": science.getDetector().getId(),
                    "diasources": dia_sources_json, "historical": self.config.sattle_historical}
 
         sattle_output = requests.put(f'{sattle_uri_base}/diasource_allow_list',

@@ -419,6 +419,16 @@ def computeDifferenceImageMetrics(science, difference, stars, sky_sources=None):
                                  )
 
 
+def compute_exposure_times(visit_info):
+    visit_mjd = visit_info.getDate().toAstropy().mjd
+
+    exposure_time_days = visit_info.getExposureTime() / 86400.0
+    exposure_end_mjd = visit_mjd + exposure_time_days / 2.0
+    exposure_start_mjd = visit_mjd - exposure_time_days / 2.0
+
+    return exposure_start_mjd, exposure_end_mjd
+
+
 def populate_sattle_visit_cache(visit_info, historical=False):
     """Populate a cache of predicted satellite positions in the sattle service.
 
@@ -435,11 +445,7 @@ def populate_sattle_visit_cache(visit_info, historical=False):
         Raised if sattle call does not return success.
     """
 
-    visit_mjd = visit_info.getDate().toAstropy().mjd
-
-    exposure_time_days = visit_info.getExposureTime() / 86400.0
-    exposure_end_mjd = visit_mjd + exposure_time_days / 2.0
-    exposure_start_mjd = visit_mjd - exposure_time_days / 2.0
+    exposure_start_mjd, exposure_end_mjd = compute_exposure_times(visit_info)
 
     boresight_ra = visit_info.boresightRaDec.getRa().asDegrees()
     boresight_dec = visit_info.boresightRaDec.getDec().asDegrees()
