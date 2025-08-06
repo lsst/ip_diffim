@@ -374,22 +374,6 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         """
         self._prepareInputs(template, science, visitSummary=visitSummary)
 
-        #  Calculate estimated image depths, i.e., limiting magnitudes
-        maglim_science = self._calculateMagLim(science, fallbackPsfSize=self.sciencePsfSize)
-        if np.isnan(maglim_science):
-            self.log.warning("Limiting magnitude of the science image is NaN!")
-        fluxlim_science = (maglim_science*u.ABmag).to_value(u.nJy)
-        maglim_template = self._calculateMagLim(template, fallbackPsfSize=self.templatePsfSize)
-        if np.isnan(maglim_template):
-            self.log.info("Cannot evaluate template limiting mag; adopting science limiting mag for diffim")
-            maglim_diffim = maglim_science
-        else:
-            fluxlim_template = (maglim_template*u.ABmag).to_value(u.nJy)
-            maglim_diffim = (np.sqrt(fluxlim_science**2 + fluxlim_template**2)*u.nJy).to(u.ABmag).value
-        self.metadata["scienceLimitingMagnitude"] = maglim_science
-        self.metadata["templateLimitingMagnitude"] = maglim_template
-        self.metadata["diffimLimitingMagnitude"] = maglim_diffim
-
         if self.config.mode == "auto":
             convolveTemplate = _shapeTest(template,
                                           science,
@@ -898,6 +882,22 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         self.log.info("Template PSF FWHM: %f pixels", self.templatePsfSize)
         self.metadata["sciencePsfSize"] = self.sciencePsfSize
         self.metadata["templatePsfSize"] = self.templatePsfSize
+
+        #  Calculate estimated image depths, i.e., limiting magnitudes
+        maglim_science = self._calculateMagLim(science, fallbackPsfSize=self.sciencePsfSize)
+        if np.isnan(maglim_science):
+            self.log.warning("Limiting magnitude of the science image is NaN!")
+        fluxlim_science = (maglim_science*u.ABmag).to_value(u.nJy)
+        maglim_template = self._calculateMagLim(template, fallbackPsfSize=self.templatePsfSize)
+        if np.isnan(maglim_template):
+            self.log.info("Cannot evaluate template limiting mag; adopting science limiting mag for diffim")
+            maglim_diffim = maglim_science
+        else:
+            fluxlim_template = (maglim_template*u.ABmag).to_value(u.nJy)
+            maglim_diffim = (np.sqrt(fluxlim_science**2 + fluxlim_template**2)*u.nJy).to(u.ABmag).value
+        self.metadata["scienceLimitingMagnitude"] = maglim_science
+        self.metadata["templateLimitingMagnitude"] = maglim_template
+        self.metadata["diffimLimitingMagnitude"] = maglim_diffim
 
     def updateMasks(self, template, science):
         """Update the science and template mask planes before differencing.
