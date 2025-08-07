@@ -36,10 +36,29 @@ from . import MakeKernelTask, DecorrelateALKernelTask
 from lsst.utils.timer import timeMethod
 
 __all__ = ["AlardLuptonSubtractConfig", "AlardLuptonSubtractTask",
-           "AlardLuptonPreconvolveSubtractConfig", "AlardLuptonPreconvolveSubtractTask"]
+           "AlardLuptonPreconvolveSubtractConfig", "AlardLuptonPreconvolveSubtractTask",
+           "InsufficientKernelSourcesError"]
 
 _dimensions = ("instrument", "visit", "detector")
 _defaultTemplates = {"coaddName": "deep", "fakesType": ""}
+
+
+class InsufficientKernelSourcesError(lsst.pipe.base.AlgorithmError):
+    """Raised when there are too few sources to calculate the PSF matching
+    kernel.
+    """
+    def __init__(self, *, nSources, nRequired):
+        msg = (f"Only {nSources} sources were selected for PSF matching,"
+               f" but {nRequired} are required.")
+        super().__init__(msg)
+        self.nSources = nSources
+        self.nRequired = nRequired
+
+    @property
+    def metadata(self):
+        return {"nSources": self.nSources,
+                "nRequired": self.nRequired
+                }
 
 
 class SubtractInputConnections(lsst.pipe.base.PipelineTaskConnections,
@@ -834,7 +853,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                            "%i selected but %i needed for the calculation.",
                            len(selectSources), self.config.minKernelSources)
             if not self.config.allowKernelSourceDetection:
-                raise RuntimeError("Cannot compute PSF matching kernel: too few sources selected.")
+                raise InsufficientKernelSourcesError(nSources=len(selectSources),
+                                                     nRequired=self.config.minKernelSources)
         self.metadata["nPsfSources"] = len(selectSources)
 
         return selectSources
