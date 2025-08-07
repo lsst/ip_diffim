@@ -27,7 +27,7 @@ import lsst.afw.math as afwMath
 import lsst.afw.table as afwTable
 import lsst.geom
 import lsst.meas.algorithms as measAlg
-from lsst.ip.diffim import subtractImages
+from lsst.ip.diffim import subtractImages, InsufficientKernelSourcesError
 from lsst.pex.config import FieldValidationError
 from lsst.pipe.base import NoWorkFound
 import lsst.utils.tests
@@ -436,8 +436,7 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
         template, _ = makeTestImage(psfSize=2.0, nSrc=10, xSize=xSize, ySize=ySize, doApplyCalibration=True)
         task = self._setup_subtraction()
         sources = sources[0:1]
-        with self.assertRaisesRegex(RuntimeError,
-                                    "Cannot compute PSF matching kernel: too few sources selected."):
+        with self.assertRaises(InsufficientKernelSourcesError):
             task.run(template, science, sources)
 
     def test_kernel_source_selector(self):
@@ -1159,8 +1158,7 @@ class AlardLuptonPreconvolveSubtractTest(AlardLuptonSubtractTestBase, lsst.utils
         template, _ = makeTestImage(psfSize=2.0, nSrc=10, xSize=xSize, ySize=ySize, doApplyCalibration=True)
         task = self._setup_subtraction()
         sources = sources[0:1]
-        with self.assertRaisesRegex(RuntimeError,
-                                    "Cannot compute PSF matching kernel: too few sources selected."):
+        with self.assertRaises(InsufficientKernelSourcesError):
             task.run(template, science, sources)
 
     def test_background_subtraction(self):
