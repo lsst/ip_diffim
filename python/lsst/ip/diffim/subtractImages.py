@@ -193,13 +193,15 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
         dtype=float,
         default=10,
         doc="Minimum signal to noise ratio of detected sources "
-        "to use for calculating the PSF matching kernel."
+        "to use for calculating the PSF matching kernel.",
+        deprecated="No longer used. Will be removed after v30"
     )
     detectionThresholdMax = lsst.pex.config.Field(
         dtype=float,
         default=500,
         doc="Maximum signal to noise ratio of detected sources "
-        "to use for calculating the PSF matching kernel."
+        "to use for calculating the PSF matching kernel.",
+        deprecated="No longer used. Will be removed after v30"
     )
     maxKernelSources = lsst.pex.config.Field(
         dtype=int,
@@ -215,7 +217,8 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
     excludeMaskPlanes = lsst.pex.config.ListField(
         dtype=str,
         default=("NO_DATA", "BAD", "SAT", "EDGE", "FAKE"),
-        doc="Mask planes to exclude when selecting sources for PSF matching."
+        doc="Mask planes to exclude when selecting sources for PSF matching.",
+        deprecated="No longer used. Will be removed after v30"
     )
     badMaskPlanes = lsst.pex.config.ListField(
         dtype=str,
