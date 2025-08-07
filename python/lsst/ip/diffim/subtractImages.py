@@ -173,7 +173,8 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
         doc="Subtask to rescale the variance of the template to the statistically expected level."
     )
     doSubtractBackground = lsst.pex.config.Field(
-        doc="Subtract the background fit when solving the kernel?",
+        doc="Subtract the background fit when solving the kernel? "
+        "It is generally better to instead subtract the background in detectAndMeasure.",
         dtype=bool,
         default=False,
     )
