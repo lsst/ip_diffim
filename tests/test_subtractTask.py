@@ -451,11 +451,13 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
         template, _ = makeTestImage(psfSize=2.0, nSrc=nSourcesSimulated,
                                     xSize=xSize, ySize=ySize, doApplyCalibration=True)
 
-        def _run_and_check_sources(sourcesIn, maxKernelSources=1000, minKernelSources=3):
+        def _run_and_check_sources(sourcesIn, maxKernelSources=1000, minKernelSources=3,
+                                   restrictKernelEdgeSources=False):
             sources = sourcesIn.copy(deep=True)
 
             task = self._setup_subtraction(maxKernelSources=maxKernelSources,
                                            minKernelSources=minKernelSources,
+                                           restrictKernelEdgeSources=restrictKernelEdgeSources,
                                            )
             # Verify that source flags are not set in the input catalog
             # Note that this will use the last flag in the list for the rest of
@@ -465,6 +467,12 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
             nSources = len(sources)
             # Flag a third of the sources
             sources[0:: 3][badSourceFlag] = True
+            if restrictKernelEdgeSources:
+                rejectRadius = 2*task.config.makeKernel.kernel.active.kernelSize
+                bbox = science.getBBox()
+                bbox.grow(-rejectRadius)
+                edgeSources = ~bbox.contains(sources.getX(), sources.getY())
+                sources[edgeSources][badSourceFlag] = True
             nBadSources = np.sum(sources[badSourceFlag])
             if maxKernelSources > 0:
                 nGoodSources = np.minimum(nSources - nBadSources, maxKernelSources)
@@ -474,7 +482,7 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
             signalToNoise = sources.getPsfInstFlux()/sources.getPsfInstFluxErr()
             signalToNoise = signalToNoise[~sources[badSourceFlag]]
             signalToNoise.sort()
-            selectSources = task._sourceSelector(sources, science.mask)
+            selectSources = task._sourceSelector(sources, science.getBBox())
             self.assertEqual(nGoodSources, len(selectSources))
             signalToNoiseOut = selectSources.getPsfInstFlux()/selectSources.getPsfInstFluxErr()
             signalToNoiseOut.sort()
@@ -482,6 +490,8 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
 
         _run_and_check_sources(sources)
         _run_and_check_sources(sources, maxKernelSources=len(sources)//3)
+        _run_and_check_sources(sources, restrictKernelEdgeSources=True)
+        _run_and_check_sources(sources, maxKernelSources=len(sources)//3, restrictKernelEdgeSources=True)
         _run_and_check_sources(sources, maxKernelSources=-1)
         with self.assertRaises(RuntimeError):
             _run_and_check_sources(sources, minKernelSources=1000)
@@ -671,6 +681,7 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
             task = self._setup_subtraction(mode="convolveScience",
                                            doDecorrelation=doDecorrelation,
                                            doScaleVariance=doScaleVariance,
+                                           restrictKernelEdgeSources=False,
                                            )
             output = task.run(template.clone(), science.clone(), sources)
             if doScaleVariance:

@@ -204,6 +204,11 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
         "to use for calculating the PSF matching kernel.",
         deprecated="No longer used. Will be removed after v30"
     )
+    restrictKernelEdgeSources = lsst.pex.config.Field(
+        dtype=bool,
+        default=True,
+        doc="Exclude sources close to the edge from the kernel calculation?"
+    )
     maxKernelSources = lsst.pex.config.Field(
         dtype=int,
         default=1000,
@@ -381,9 +386,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         convolveTemplate = self.chooseConvolutionMethod(template, science)
 
         try:
-            sourceMask = science.mask.clone()
-            sourceMask.array |= template[science.getBBox()].mask.array
-            selectSources = self._sourceSelector(sources, sourceMask)
+            selectSources = self._sourceSelector(sources, science.getBBox())
             if convolveTemplate:
                 self.metadata["convolvedExposure"] = "Template"
                 subtractResults = self.runConvolveTemplate(template, science, selectSources)
@@ -779,16 +782,18 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         else:
             return convolvedExposure[bbox]
 
-    def _sourceSelector(self, sources, mask):
+    def _sourceSelector(self, sources, bbox):
         """Select sources from a catalog that meet the selection criteria.
+        The selection criteria include any configured parameters of the
+        `sourceSelector` subtask, as well as distance from the edge if
+        `restrictKernelEdgeSources` is set.
 
         Parameters
         ----------
         sources : `lsst.afw.table.SourceCatalog`
             Input source catalog to select sources from.
-        mask : `lsst.afw.image.Mask`
-            The image mask plane to use to reject sources
-            based on their location on the ccd.
+        bbox : `lsst.geom.Box2I`
+            Bounding box of the science image.
 
         Returns
         -------
@@ -804,6 +809,13 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         """
 
         selected = self.sourceSelector.selectSources(sources).selected
+        if self.config.restrictKernelEdgeSources:
+            rejectRadius = 2*self.config.makeKernel.kernel.active.kernelSize
+            bbox.grow(-rejectRadius)
+            bboxSelected = bbox.contains(sources.getX(), sources.getY())
+            self.log.info("Rejecting %i candidate sources within %i pixels of the edge.",
+                          np.count_nonzero(~bboxSelected), rejectRadius)
+            selected &= bboxSelected
         selectSources = sources[selected].copy(deep=True)
         # Trim selectSources if they exceed ``maxKernelSources``.
         # Keep the highest signal-to-noise sources of those selected.
@@ -1070,7 +1082,7 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
                                                 interpolateBadMaskPlanes=True)
         self.metadata["convolvedExposure"] = "Preconvolution"
         try:
-            selectSources = self._sourceSelector(sources, matchedScience.mask)
+            selectSources = self._sourceSelector(sources, science.getBBox())
             subtractResults = self.runPreconvolve(template, science, matchedScience,
                                                   selectSources, scienceKernel)
 
