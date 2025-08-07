@@ -803,10 +803,6 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         """
 
         selected = self.sourceSelector.selectSources(sources).selected
-        nInitialSelected = np.count_nonzero(selected)
-        nSelected = np.count_nonzero(selected)
-        self.log.info("Rejecting %i candidate sources: an excluded template mask plane is set.",
-                      nInitialSelected - nSelected)
         selectSources = sources[selected].copy(deep=True)
         # Trim selectSources if they exceed ``maxKernelSources``.
         # Keep the highest signal-to-noise sources of those selected.
