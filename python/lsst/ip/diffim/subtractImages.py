@@ -389,6 +389,9 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                 PSF-matching kernel
             ``psfMatchingKernel`` : `lsst.afw.math.Kernel`
                 Kernel used to PSF-match the convolved image.
+            ``kernelSources` : `lsst.afw.table.SourceCatalog`
+                Sources from the input catalog that were used to construct the
+                PSF-matching kernel.
 
         Raises
         ------
