@@ -407,24 +407,21 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
 
         convolveTemplate = self.chooseConvolutionMethod(template, science)
 
-        try:
-            selectSources = self._sourceSelector(sources, science.getBBox())
-            if convolveTemplate:
-                self.metadata["convolvedExposure"] = "Template"
-                subtractResults = self.runConvolveTemplate(template, science, selectSources)
-            else:
-                self.metadata["convolvedExposure"] = "Science"
-                subtractResults = self.runConvolveScience(template, science, selectSources)
+        selectSources = self._sourceSelector(sources, science.getBBox())
 
-        except (RuntimeError, lsst.pex.exceptions.Exception) as e:
-            self.log.warning("Failed to match template. Checking coverage")
-            #  Raise NoWorkFound if template fraction is insufficient
-            checkTemplateIsSufficient(template[science.getBBox()], science, self.log,
-                                      self.config.minTemplateFractionForExpectedSuccess,
-                                      exceptionMessage="Template coverage lower than expected to succeed."
-                                      f" Failure is tolerable: {e}")
-            #  checkTemplateIsSufficient did not raise NoWorkFound, so raise original exception
-            raise e
+        kernelResult = self.runMakeKernel(template, science, selectSources,
+                                          convolveTemplate=convolveTemplate)
+        if self.config.doSubtractBackground:
+            backgroundModel = kernelResult.backgroundModel
+        else:
+            backgroundModel = None
+        if convolveTemplate:
+            subtractResults = self.runConvolveTemplate(template, science, kernelResult.psfMatchingKernel,
+                                                       backgroundModel=backgroundModel)
+        else:
+            subtractResults = self.runConvolveScience(template, science, kernelResult.psfMatchingKernel,
+                                                      backgroundModel=backgroundModel)
+        subtractResults.kernelSources = kernelResult.kernelSources
 
         metrics = computeDifferenceImageMetrics(science, subtractResults.difference, sources)
 
@@ -483,7 +480,98 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             raise RuntimeError("Cannot handle AlardLuptonSubtract mode: %s", self.config.mode)
         return convolveTemplate
 
-    def runConvolveTemplate(self, template, science, selectSources):
+    def runMakeKernel(self, template, science, sources, convolveTemplate=True):
+        """Construct the PSF-matching kernel.
+
+        Parameters
+        ----------
+        template : `lsst.afw.image.ExposureF`
+            Template exposure, warped to match the science exposure.
+        science : `lsst.afw.image.ExposureF`
+            Science exposure to subtract from the template.
+        sources : `lsst.afw.table.SourceCatalog`
+            Identified sources on the science exposure. This catalog is used to
+            select sources in order to perform the AL PSF matching on stamp
+            images around them.
+        convolveTemplate : `bool`, optional
+            Construct the matching kernel to convolve the template?
+
+        Returns
+        -------
+        results : `lsst.pipe.base.Struct`
+            ``backgroundModel`` : `lsst.afw.math.Function2D`
+                Background model that was fit while solving for the
+                PSF-matching kernel
+            ``psfMatchingKernel`` : `lsst.afw.math.Kernel`
+                Kernel used to PSF-match the convolved image.
+            ``kernelSources` : `lsst.afw.table.SourceCatalog`
+                Sources from the input catalog that were used to construct the
+                PSF-matching kernel.
+        """
+        if convolveTemplate:
+            reference = template
+            target = science
+            referenceFwhmPix = self.templatePsfSize
+            targetFwhmPix = self.sciencePsfSize
+        else:
+            reference = science
+            target = template
+            referenceFwhmPix = self.sciencePsfSize
+            targetFwhmPix = self.templatePsfSize
+        try:
+            # The outer try..except block catches any error, and raises
+            # NoWorkFound if the template coverage is insufficient. Otherwise,
+            # the original error is raised.
+            try:
+                # The inner try..except block catches errors related to the
+                # input source catalog. If the catalog is not sufficient to
+                # constrain the kernel fit and `allowKernelSourceDetection=True`
+                # then source detection and measurement are re-run to make a new
+                # catalog. Otherwise, the original error is raised.
+                kernelSources = self.makeKernel.selectKernelSources(reference, target,
+                                                                    candidateList=sources,
+                                                                    preconvolved=False,
+                                                                    templateFwhmPix=referenceFwhmPix,
+                                                                    scienceFwhmPix=targetFwhmPix)
+                kernelResult = self.makeKernel.run(reference, target, kernelSources,
+                                                   preconvolved=False,
+                                                   templateFwhmPix=referenceFwhmPix,
+                                                   scienceFwhmPix=targetFwhmPix)
+            except Exception as e:
+                if self.config.allowKernelSourceDetection and convolveTemplate:
+                    self.log.warning("Error encountered trying to construct the matching kernel"
+                                     f" Running source detection and retrying. {e}")
+                    kernelSize = self.makeKernel.makeKernelBasisList(
+                        referenceFwhmPix, targetFwhmPix)[0].getWidth()
+                    sigmaToFwhm = 2*np.log(2*np.sqrt(2))
+                    candidateList = self.makeKernel.makeCandidateList(reference, target, kernelSize,
+                                                                      candidateList=None,
+                                                                      sigma=targetFwhmPix/sigmaToFwhm)
+                    kernelSources = self.makeKernel.selectKernelSources(reference, target,
+                                                                        candidateList=candidateList,
+                                                                        preconvolved=False,
+                                                                        templateFwhmPix=referenceFwhmPix,
+                                                                        scienceFwhmPix=targetFwhmPix)
+                    kernelResult = self.makeKernel.run(reference, target, kernelSources,
+                                                       preconvolved=False,
+                                                       templateFwhmPix=referenceFwhmPix,
+                                                       scienceFwhmPix=targetFwhmPix)
+                else:
+                    raise e
+        except (RuntimeError, lsst.pex.exceptions.Exception) as e:
+            self.log.warning("Failed to match template. Checking coverage")
+            #  Raise NoWorkFound if template fraction is insufficient
+            checkTemplateIsSufficient(template[science.getBBox()], science, self.log,
+                                      self.config.minTemplateFractionForExpectedSuccess,
+                                      exceptionMessage="Template coverage lower than expected to succeed."
+                                      f" Failure is tolerable: {e}")
+            #  checkTemplateIsSufficient did not raise NoWorkFound, so raise original exception
+            raise e
+        return lsst.pipe.base.Struct(backgroundModel=kernelResult.backgroundModel,
+                                     psfMatchingKernel=kernelResult.psfMatchingKernel,
+                                     kernelSources=kernelSources)
+
+    def runConvolveTemplate(self, template, science, psfMatchingKernel, backgroundModel=None):
         """Convolve the template image with a PSF-matching kernel and subtract
         from the science image.
 
@@ -511,59 +599,26 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             ``psfMatchingKernel`` : `lsst.afw.math.Kernel`
                 Kernel used to PSF-match the template to the science image.
         """
-        try:
-            kernelSources = self.makeKernel.selectKernelSources(template, science,
-                                                                candidateList=selectSources,
-                                                                preconvolved=False,
-                                                                templateFwhmPix=self.templatePsfSize,
-                                                                scienceFwhmPix=self.sciencePsfSize)
-            kernelResult = self.makeKernel.run(template, science, kernelSources,
-                                               preconvolved=False,
-                                               templateFwhmPix=self.templatePsfSize,
-                                               scienceFwhmPix=self.sciencePsfSize)
-        except Exception as e:
-            if self.config.allowKernelSourceDetection:
-                self.log.warning("Error encountered trying to construct the matching kernel"
-                                 f" Running source detection and retrying. {e}")
-                kernelSize = self.makeKernel.makeKernelBasisList(
-                    self.templatePsfSize, self.sciencePsfSize)[0].getWidth()
-                sigmaToFwhm = 2*np.log(2*np.sqrt(2))
-                candidateList = self.makeKernel.makeCandidateList(template, science, kernelSize,
-                                                                  candidateList=None,
-                                                                  sigma=self.sciencePsfSize/sigmaToFwhm)
-                kernelSources = self.makeKernel.selectKernelSources(template, science,
-                                                                    candidateList=candidateList,
-                                                                    preconvolved=False,
-                                                                    templateFwhmPix=self.templatePsfSize,
-                                                                    scienceFwhmPix=self.sciencePsfSize)
-                kernelResult = self.makeKernel.run(template, science, kernelSources,
-                                                   preconvolved=False,
-                                                   templateFwhmPix=self.templatePsfSize,
-                                                   scienceFwhmPix=self.sciencePsfSize)
-            else:
-                raise e
+        self.metadata["convolvedExposure"] = "Template"
 
-        matchedTemplate = self._convolveExposure(template, kernelResult.psfMatchingKernel,
+        matchedTemplate = self._convolveExposure(template, psfMatchingKernel,
                                                  self.convolutionControl,
                                                  bbox=science.getBBox(),
                                                  psf=science.psf,
                                                  photoCalib=science.photoCalib)
 
-        difference = _subtractImages(science, matchedTemplate,
-                                     backgroundModel=(kernelResult.backgroundModel
-                                                      if self.config.doSubtractBackground else None))
+        difference = _subtractImages(science, matchedTemplate, backgroundModel=backgroundModel)
         correctedExposure = self.finalize(template, science, difference,
-                                          kernelResult.psfMatchingKernel,
+                                          psfMatchingKernel,
                                           templateMatched=True)
 
         return lsst.pipe.base.Struct(difference=correctedExposure,
                                      matchedTemplate=matchedTemplate,
                                      matchedScience=science,
-                                     backgroundModel=kernelResult.backgroundModel,
-                                     psfMatchingKernel=kernelResult.psfMatchingKernel,
-                                     kernelSources=kernelSources)
+                                     backgroundModel=backgroundModel,
+                                     psfMatchingKernel=psfMatchingKernel)
 
-    def runConvolveScience(self, template, science, selectSources):
+    def runConvolveScience(self, template, science, psfMatchingKernel, backgroundModel=None):
         """Convolve the science image with a PSF-matching kernel and subtract
         the template image.
 
@@ -592,24 +647,13 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             ``psfMatchingKernel`` : `lsst.afw.math.Kernel`
                Kernel used to PSF-match the science image to the template.
         """
+        self.metadata["convolvedExposure"] = "Science"
         bbox = science.getBBox()
-        kernelSources = self.makeKernel.selectKernelSources(science, template,
-                                                            candidateList=selectSources,
-                                                            preconvolved=False,
-                                                            templateFwhmPix=self.templatePsfSize,
-                                                            scienceFwhmPix=self.sciencePsfSize)
-        kernelResult = self.makeKernel.run(science, template, kernelSources,
-                                           preconvolved=False,
-                                           templateFwhmPix=self.templatePsfSize,
-                                           scienceFwhmPix=self.sciencePsfSize)
-        modelParams = kernelResult.backgroundModel.getParameters()
-        # We must invert the background model if the matching kernel is solved for the science image.
-        kernelResult.backgroundModel.setParameters([-p for p in modelParams])
 
-        kernelImage = lsst.afw.image.ImageD(kernelResult.psfMatchingKernel.getDimensions())
-        norm = kernelResult.psfMatchingKernel.computeImage(kernelImage, doNormalize=False)
+        kernelImage = lsst.afw.image.ImageD(psfMatchingKernel.getDimensions())
+        norm = psfMatchingKernel.computeImage(kernelImage, doNormalize=False)
 
-        matchedScience = self._convolveExposure(science, kernelResult.psfMatchingKernel,
+        matchedScience = self._convolveExposure(science, psfMatchingKernel,
                                                 self.convolutionControl,
                                                 psf=template.psf)
 
@@ -619,20 +663,22 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         matchedTemplate.maskedImage /= norm
         matchedTemplate.setPhotoCalib(science.photoCalib)
 
-        difference = _subtractImages(matchedScience, matchedTemplate,
-                                     backgroundModel=(kernelResult.backgroundModel
-                                                      if self.config.doSubtractBackground else None))
+        if backgroundModel is not None:
+            modelParams = backgroundModel.getParameters()
+            # We must invert the background model if the matching kernel is solved for the science image.
+            backgroundModel.setParameters([-p for p in modelParams])
+
+        difference = _subtractImages(matchedScience, matchedTemplate, backgroundModel=backgroundModel)
 
         correctedExposure = self.finalize(template, science, difference,
-                                          kernelResult.psfMatchingKernel,
+                                          psfMatchingKernel,
                                           templateMatched=False)
 
         return lsst.pipe.base.Struct(difference=correctedExposure,
                                      matchedTemplate=matchedTemplate,
                                      matchedScience=matchedScience,
-                                     backgroundModel=kernelResult.backgroundModel,
-                                     psfMatchingKernel=kernelResult.psfMatchingKernel,
-                                     kernelSources=kernelSources)
+                                     backgroundModel=backgroundModel,
+                                     psfMatchingKernel=psfMatchingKernel)
 
     def finalize(self, template, science, difference, kernel,
                  templateMatched=True,
