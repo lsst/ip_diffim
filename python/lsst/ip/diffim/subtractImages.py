@@ -276,12 +276,15 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
         self.makeKernel.kernel.active.spatialKernelOrder = 1
         self.makeKernel.kernel.active.spatialBgOrder = 2
         self.sourceSelector.doUnresolved = True  # apply star-galaxy separation
-        self.sourceSelector.doIsolated = True  # apply isolated star selection
-        self.sourceSelector.doRequirePrimary = True  # apply primary flag selection
         self.sourceSelector.doSkySources = False  # Do not include sky sources
         self.sourceSelector.doSignalToNoise = True  # apply signal to noise filter
         self.sourceSelector.signalToNoise.minimum = 10
         self.sourceSelector.signalToNoise.maximum = 500
+        # The following two configs should not be necessary to be turned on for
+        # PSF-matching, and the fallback kernel source selection will fail if
+        # they are set since it does not run deblending.
+        self.sourceSelector.doIsolated = False  # Do not apply isolated star selection
+        self.sourceSelector.doRequirePrimary = False  # Do not apply primary flag selection
 
 
 class AlardLuptonSubtractConfig(AlardLuptonSubtractBaseConfig, lsst.pipe.base.PipelineTaskConfig,

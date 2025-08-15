@@ -58,8 +58,6 @@ class AlardLuptonSubtractTestBase:
         config.sourceSelector.signalToNoise.fluxField = "truth_instFlux"
         config.sourceSelector.signalToNoise.errField = "truth_instFluxErr"
         config.sourceSelector.doUnresolved = True
-        config.sourceSelector.doIsolated = True
-        config.sourceSelector.doRequirePrimary = True
         config.sourceSelector.doFlags = True
         config.sourceSelector.doSignalToNoise = True
         config.sourceSelector.flags.bad = ["base_PsfFlux_flag", ]
