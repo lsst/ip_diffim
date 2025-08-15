@@ -37,6 +37,7 @@ from lsst.utils.timer import timeMethod
 
 __all__ = ["AlardLuptonSubtractConfig", "AlardLuptonSubtractTask",
            "AlardLuptonPreconvolveSubtractConfig", "AlardLuptonPreconvolveSubtractTask",
+           "SimplifiedSubtractConfig", "SimplifiedSubtractTask",
            "InsufficientKernelSourcesError"]
 
 _dimensions = ("instrument", "visit", "detector")
@@ -152,6 +153,24 @@ class SubtractScoreOutputConnections(lsst.pipe.base.PipelineTaskConnections,
 
 class AlardLuptonSubtractConnections(SubtractInputConnections, SubtractImageOutputConnections):
     pass
+
+
+class SimplifiedSubtractConnections(SubtractInputConnections, SubtractImageOutputConnections):
+    inputPsfMatchingKernel = connectionTypes.Input(
+        doc="Kernel used to PSF match the science and template images.",
+        dimensions=("instrument", "visit", "detector"),
+        storageClass="MatchingKernel",
+        name="{fakesType}{coaddName}Diff_psfMatchKernel",
+    )
+
+    def __init__(self, *, config=None):
+        super().__init__(config=config)
+        del self.sources
+        if config.useExistingKernel:
+            del self.psfMatchingKernel
+            del self.kernelSources
+        else:
+            del self.inputPsfMatchingKernel
 
 
 class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
@@ -1375,6 +1394,159 @@ def _shapeTest(exp1, exp2, fwhmExposureBuffer, fwhmExposureGrid):
     xTest = shape1[0] <= shape2[0]
     yTest = shape1[1] <= shape2[1]
     return xTest | yTest
+
+
+class SimplifiedSubtractConfig(AlardLuptonSubtractBaseConfig, lsst.pipe.base.PipelineTaskConfig,
+                               pipelineConnections=SimplifiedSubtractConnections):
+    mode = lsst.pex.config.ChoiceField(
+        dtype=str,
+        default="convolveTemplate",
+        allowed={"auto": "Choose which image to convolve at runtime.",
+                 "convolveScience": "Only convolve the science image.",
+                 "convolveTemplate": "Only convolve the template image."},
+        doc="Choose which image to convolve at runtime, or require that a specific image is convolved."
+    )
+    useExistingKernel = lsst.pex.config.Field(
+        dtype=bool,
+        default=True,
+        doc="Use a pre-existing PSF matching kernel?"
+        "If False, source detection and measurement will be run."
+    )
+
+
+class SimplifiedSubtractTask(AlardLuptonSubtractTask):
+    """Compute the image difference of a science and template image using
+    the Alard & Lupton (1998) algorithm.
+    """
+    ConfigClass = SimplifiedSubtractConfig
+    _DefaultName = "simplifiedSubtract"
+
+    @timeMethod
+    def run(self, template, science, visitSummary=None, inputPsfMatchingKernel=None):
+        """PSF match, subtract, and decorrelate two images.
+
+        Parameters
+        ----------
+        template : `lsst.afw.image.ExposureF`
+            Template exposure, warped to match the science exposure.
+        science : `lsst.afw.image.ExposureF`
+            Science exposure to subtract from the template.
+        visitSummary : `lsst.afw.table.ExposureCatalog`, optional
+            Exposure catalog with external calibrations to be applied. Catalog
+            uses the detector id for the catalog id, sorted on id for fast
+            lookup.
+
+        Returns
+        -------
+        results : `lsst.pipe.base.Struct`
+            ``difference`` : `lsst.afw.image.ExposureF`
+                Result of subtracting template and science.
+            ``matchedTemplate`` : `lsst.afw.image.ExposureF`
+                Warped and PSF-matched template exposure.
+            ``backgroundModel`` : `lsst.afw.math.Function2D`
+                Background model that was fit while solving for the
+                PSF-matching kernel
+            ``psfMatchingKernel`` : `lsst.afw.math.Kernel`
+                Kernel used to PSF-match the convolved image.
+            ``kernelSources` : `lsst.afw.table.SourceCatalog`
+                Sources detected on the science image that were used to
+                construct the PSF-matching kernel.
+
+        Raises
+        ------
+        RuntimeError
+            If an unsupported convolution mode is supplied.
+        RuntimeError
+            If there are too few sources to calculate the PSF matching kernel.
+        lsst.pipe.base.NoWorkFound
+            Raised if fraction of good pixels, defined as not having NO_DATA
+            set, is less then the configured requiredTemplateFraction
+        """
+        self._prepareInputs(template, science, visitSummary=visitSummary)
+
+        convolveTemplate = self.chooseConvolutionMethod(template, science)
+
+        if self.config.useExistingKernel:
+            psfMatchingKernel = inputPsfMatchingKernel
+            backgroundModel = None
+            kernelSources = None
+        else:
+            kernelResult = self.runMakeKernel(template, science, convolveTemplate=convolveTemplate)
+            psfMatchingKernel = kernelResult.psfMatchingKernel
+            kernelSources = kernelResult.kernelSources
+            if self.config.doSubtractBackground:
+                backgroundModel = kernelResult.backgroundModel
+            else:
+                backgroundModel = None
+        if convolveTemplate:
+            subtractResults = self.runConvolveTemplate(template, science, psfMatchingKernel,
+                                                       backgroundModel=backgroundModel)
+        else:
+            subtractResults = self.runConvolveScience(template, science, psfMatchingKernel,
+                                                      backgroundModel=backgroundModel)
+        if kernelSources is not None:
+            subtractResults.kernelSources = kernelSources
+        return subtractResults
+
+    def runMakeKernel(self, template, science, convolveTemplate=True):
+        """Construct the PSF-matching kernel.
+
+        Parameters
+        ----------
+        template : `lsst.afw.image.ExposureF`
+            Template exposure, warped to match the science exposure.
+        science : `lsst.afw.image.ExposureF`
+            Science exposure to subtract from the template.
+        sources : `lsst.afw.table.SourceCatalog`
+            Identified sources on the science exposure. This catalog is used to
+            select sources in order to perform the AL PSF matching on stamp
+            images around them.
+        convolveTemplate : `bool`, optional
+            Construct the matching kernel to convolve the template?
+
+        Returns
+        -------
+        results : `lsst.pipe.base.Struct`
+            ``backgroundModel`` : `lsst.afw.math.Function2D`
+                Background model that was fit while solving for the
+                PSF-matching kernel
+            ``psfMatchingKernel`` : `lsst.afw.math.Kernel`
+                Kernel used to PSF-match the convolved image.
+            ``kernelSources` : `lsst.afw.table.SourceCatalog`
+                Sources from the input catalog that were used to construct the
+                PSF-matching kernel.
+        """
+        if convolveTemplate:
+            reference = template
+            target = science
+            referenceFwhmPix = self.templatePsfSize
+            targetFwhmPix = self.sciencePsfSize
+        else:
+            reference = science
+            target = template
+            referenceFwhmPix = self.sciencePsfSize
+            targetFwhmPix = self.templatePsfSize
+        try:
+            # The try..except block catches any error, and raises
+            # NoWorkFound if the template coverage is insufficient. Otherwise,
+            # the original error is raised.
+            kernelSources = self.runKernelSourceDetection(template, science)
+            kernelResult = self.makeKernel.run(reference, target, kernelSources,
+                                               preconvolved=False,
+                                               templateFwhmPix=referenceFwhmPix,
+                                               scienceFwhmPix=targetFwhmPix)
+        except (RuntimeError, lsst.pex.exceptions.Exception) as e:
+            self.log.warning("Failed to match template. Checking coverage")
+            #  Raise NoWorkFound if template fraction is insufficient
+            checkTemplateIsSufficient(template[science.getBBox()], science, self.log,
+                                      self.config.minTemplateFractionForExpectedSuccess,
+                                      exceptionMessage="Template coverage lower than expected to succeed."
+                                      f" Failure is tolerable: {e}")
+            #  checkTemplateIsSufficient did not raise NoWorkFound, so raise original exception
+            raise e
+        return lsst.pipe.base.Struct(backgroundModel=kernelResult.backgroundModel,
+                                     psfMatchingKernel=kernelResult.psfMatchingKernel,
+                                     kernelSources=kernelSources)
 
 
 def _interpolateImage(maskedImage, badMaskPlanes, fallbackValue=None):

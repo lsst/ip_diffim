@@ -40,11 +40,15 @@ from utils import makeStats, makeTestImage, CustomCoaddPsf
 
 
 class AlardLuptonSubtractTestBase:
-    def _setup_subtraction(self, **kwargs):
+    def _setup_subtraction(self, fluxField="truth_instFlux", errField="truth_instFluxErr", **kwargs):
         """Setup and configure the image subtraction PipelineTask.
 
         Parameters
         ----------
+        fluxField : `str`, optional
+            Name of the flux field in the source catalog.
+        errField : `str`, optional
+            Name of the flux error field in the source catalog.
         **kwargs
             Any additional config parameters to set.
 
@@ -55,8 +59,8 @@ class AlardLuptonSubtractTestBase:
         """
         config = self.subtractTask.ConfigClass()
         config.doSubtractBackground = False
-        config.sourceSelector.signalToNoise.fluxField = "truth_instFlux"
-        config.sourceSelector.signalToNoise.errField = "truth_instFluxErr"
+        config.sourceSelector.signalToNoise.fluxField = fluxField
+        config.sourceSelector.signalToNoise.errField = errField
         config.sourceSelector.doUnresolved = True
         config.sourceSelector.doIsolated = True
         config.sourceSelector.doRequirePrimary = True
@@ -1329,6 +1333,55 @@ class AlardLuptonPreconvolveSubtractTest(AlardLuptonSubtractTestBase, lsst.utils
             self.assertEqual(science.photoCalib, output.scoreExposure.photoCalib)
         _run_and_check_images(doDecorrelation=True)
         _run_and_check_images(doDecorrelation=False)
+
+
+class SimplifiedSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.TestCase):
+    subtractTask = subtractImages.SimplifiedSubtractTask
+
+    def test_runSimplifiedTaskWithExistingKernel(self):
+        """Test that the simplified task produces the same output as
+        `AlardLuptonSubtractTask` if it uses the AL kernel.
+        """
+        noiseLevel = 1.
+        science, sources = makeTestImage(psfSize=3.0, noiseLevel=noiseLevel, noiseSeed=6)
+        template, _ = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=7,
+                                    templateBorderSize=20, doApplyCalibration=True)
+        alTask = AlardLuptonSubtractTest._setup_subtraction(AlardLuptonSubtractTest())
+        task = self._setup_subtraction(useExistingKernel=True)
+
+        alResults = alTask.run(template.clone(), science.clone(), sources)
+        results = task.run(template.clone(), science.clone(),
+                           inputPsfMatchingKernel=alResults.psfMatchingKernel)
+
+        self.assertMaskedImagesEqual(alResults.difference, results.difference)
+
+    def test_runSimplifiedTaskWithSourceDetection(self):
+        """Test that the simplified task with source detection produces
+        reasonable output.
+        """
+        noiseLevel = 1.
+        science, sources = makeTestImage(psfSize=3.0, noiseLevel=noiseLevel, noiseSeed=6)
+        template, _ = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=7,
+                                    templateBorderSize=20, doApplyCalibration=True)
+        task = self._setup_subtraction(useExistingKernel=False,
+                                       fluxField="base_PsfFlux_instFlux",
+                                       errField="base_PsfFlux_instFluxErr",
+                                       )
+
+        output = task.run(template, science)
+
+        # There shoud be no NaN values in the difference image
+        self.assertTrue(np.all(np.isfinite(output.difference.image.array)))
+        # Mean of difference image should be close to zero.
+        meanError = noiseLevel/np.sqrt(output.difference.image.array.size)
+        # Make sure to include pixels with the DETECTED mask bit set.
+        statsCtrl = makeStats(badMaskPlanes=("EDGE", "BAD", "NO_DATA", "DETECTED", "DETECTED_NEGATIVE"))
+        differenceMean = computeRobustStatistics(output.difference.image, output.difference.mask, statsCtrl)
+        self.assertFloatsAlmostEqual(differenceMean, 0, atol=5*meanError)
+        # stddev of difference image should be close to expected value.
+        differenceStd = computeRobustStatistics(output.difference.image, output.difference.mask,
+                                                makeStats(), statistic=afwMath.STDEV)
+        self.assertFloatsAlmostEqual(differenceStd, np.sqrt(2)*noiseLevel, rtol=0.1)
 
 
 def setup_module(module):
