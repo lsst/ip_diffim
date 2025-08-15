@@ -541,17 +541,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                 if self.config.allowKernelSourceDetection and convolveTemplate:
                     self.log.warning("Error encountered trying to construct the matching kernel"
                                      f" Running source detection and retrying. {e}")
-                    kernelSize = self.makeKernel.makeKernelBasisList(
-                        referenceFwhmPix, targetFwhmPix)[0].getWidth()
-                    sigmaToFwhm = 2*np.log(2*np.sqrt(2))
-                    candidateList = self.makeKernel.makeCandidateList(reference, target, kernelSize,
-                                                                      candidateList=None,
-                                                                      sigma=targetFwhmPix/sigmaToFwhm)
-                    kernelSources = self.makeKernel.selectKernelSources(reference, target,
-                                                                        candidateList=candidateList,
-                                                                        preconvolved=False,
-                                                                        templateFwhmPix=referenceFwhmPix,
-                                                                        scienceFwhmPix=targetFwhmPix)
+                    kernelSources = self.runKernelSourceDetection(template, science)
                     kernelResult = self.makeKernel.run(reference, target, kernelSources,
                                                        preconvolved=False,
                                                        templateFwhmPix=referenceFwhmPix,
@@ -570,6 +560,38 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         return lsst.pipe.base.Struct(backgroundModel=kernelResult.backgroundModel,
                                      psfMatchingKernel=kernelResult.psfMatchingKernel,
                                      kernelSources=kernelSources)
+
+    def runKernelSourceDetection(self, template, science):
+        """Run detection on the science image and use the template mask plane
+        to reject candidate sources.
+
+        Parameters
+        ----------
+        template : `lsst.afw.image.ExposureF`
+            Template exposure, warped to match the science exposure.
+        science : `lsst.afw.image.ExposureF`
+            Science exposure to subtract from the template.
+
+        Returns
+        -------
+        kernelSources : `lsst.afw.table.SourceCatalog`
+                Sources from the input catalog to use to construct the
+                PSF-matching kernel.
+        """
+        kernelSize = self.makeKernel.makeKernelBasisList(
+            self.templatePsfSize, self.sciencePsfSize)[0].getWidth()
+        sigmaToFwhm = 2*np.log(2*np.sqrt(2))
+        candidateList = self.makeKernel.makeCandidateList(template, science, kernelSize,
+                                                          candidateList=None,
+                                                          sigma=self.sciencePsfSize/sigmaToFwhm)
+        sources = self.makeKernel.selectKernelSources(template, science,
+                                                      candidateList=candidateList,
+                                                      preconvolved=False,
+                                                      templateFwhmPix=self.templatePsfSize,
+                                                      scienceFwhmPix=self.sciencePsfSize)
+
+        # return sources
+        return self._sourceSelector(sources, science.getBBox())
 
     def runConvolveTemplate(self, template, science, psfMatchingKernel, backgroundModel=None):
         """Convolve the template image with a PSF-matching kernel and subtract
@@ -875,7 +897,6 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             If there are too few sources to compute the PSF matching kernel
             remaining after source selection.
         """
-
         selected = self.sourceSelector.selectSources(sources).selected
         if self.config.restrictKernelEdgeSources:
             rejectRadius = 2*self.config.makeKernel.kernel.active.kernelSize
