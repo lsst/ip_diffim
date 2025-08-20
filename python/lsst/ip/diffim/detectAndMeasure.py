@@ -750,16 +750,16 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
         self.measureDiaSources(initialDiaSources, science, difference, matchedTemplate)
 
-        # Add a column for glint trail diaSources, but do not remove them
-        initialDiaSources, trail_parameters = self._find_glint_trails(initialDiaSources)
-        if self.config.writeGlintInfo:
-            measurementResults.mergeItems(trail_parameters, 'glintTrailInfo')
-
         # Remove unphysical diaSources per config.badSourceFlags
         diaSources = self._removeBadSources(initialDiaSources)
 
         if self.config.run_sattle:
             diaSources = self.filterSatellites(diaSources, science)
+
+        # Flag diaSources in glint trails, but do not remove them
+        diaSources, trail_parameters = self._find_glint_trails(diaSources)
+        if self.config.writeGlintInfo:
+            measurementResults.mergeItems(trail_parameters, 'glintTrailInfo')
 
         if self.config.doForcedMeasurement:
             self.measureForcedSources(diaSources, science, difference.getWcs())
