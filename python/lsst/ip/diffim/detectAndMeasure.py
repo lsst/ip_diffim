@@ -906,7 +906,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             candidateDiaSources = diaSources
         trailed_glints = self.findGlints.run(candidateDiaSources)
         glint_mask = [True if id in trailed_glints.trailed_ids else False for id in diaSources['id']]
-        diaSources['glint_trail'] = np.array(glint_mask)
+        if np.any(glint_mask):
+            diaSources['glint_trail'] = np.array(glint_mask)
 
         slopes = np.array([trail.slope for trail in trailed_glints.parameters])
         intercepts = np.array([trail.intercept for trail in trailed_glints.parameters])
