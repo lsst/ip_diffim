@@ -899,7 +899,12 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         trail_parameters : `dict`
             Parameters of all the trails that were found.
         """
-        trailed_glints = self.findGlints.run(diaSources)
+        if self.config.doSkySources:
+            # Do not include sky sources in glint detection
+            candidateDiaSources = diaSources[~diaSources["sky_source"]].copy(deep=True)
+        else:
+            candidateDiaSources = diaSources
+        trailed_glints = self.findGlints.run(candidateDiaSources)
         glint_mask = [True if id in trailed_glints.trailed_ids else False for id in diaSources['id']]
         diaSources['glint_trail'] = np.array(glint_mask)
 
