@@ -750,16 +750,16 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
         self.measureDiaSources(initialDiaSources, science, difference, matchedTemplate)
 
-        # Add a column for glint trail diaSources, but do not remove them
-        initialDiaSources, trail_parameters = self._find_glint_trails(initialDiaSources)
-        if self.config.writeGlintInfo:
-            measurementResults.mergeItems(trail_parameters, 'glintTrailInfo')
-
         # Remove unphysical diaSources per config.badSourceFlags
         diaSources = self._removeBadSources(initialDiaSources)
 
         if self.config.run_sattle:
             diaSources = self.filterSatellites(diaSources, science)
+
+        # Flag diaSources in glint trails, but do not remove them
+        diaSources, trail_parameters = self._find_glint_trails(diaSources)
+        if self.config.writeGlintInfo:
+            measurementResults.mergeItems(trail_parameters, 'glintTrailInfo')
 
         if self.config.doForcedMeasurement:
             self.measureForcedSources(diaSources, science, difference.getWcs())
@@ -899,9 +899,15 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         trail_parameters : `dict`
             Parameters of all the trails that were found.
         """
-        trailed_glints = self.findGlints.run(diaSources)
+        if self.config.doSkySources:
+            # Do not include sky sources in glint detection
+            candidateDiaSources = diaSources[~diaSources["sky_source"]].copy(deep=True)
+        else:
+            candidateDiaSources = diaSources
+        trailed_glints = self.findGlints.run(candidateDiaSources)
         glint_mask = [True if id in trailed_glints.trailed_ids else False for id in diaSources['id']]
-        diaSources['glint_trail'] = np.array(glint_mask)
+        if np.any(glint_mask):
+            diaSources['glint_trail'] = np.array(glint_mask)
 
         slopes = np.array([trail.slope for trail in trailed_glints.parameters])
         intercepts = np.array([trail.intercept for trail in trailed_glints.parameters])
