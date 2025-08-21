@@ -525,7 +525,6 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                 measurementResults.subtractedMeasuredExposure,
                 measurementResults.diaSources,
                 measurementResults.maskedStreaks,
-                measurementResults.glintTrailInfo,
                 log=self.log
             )
             butlerQC.put(measurementResults, outputRefs)
