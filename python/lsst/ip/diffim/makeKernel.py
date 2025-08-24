@@ -80,7 +80,8 @@ class MakeKernelConfig(PsfMatchConfig):
         # Minimal set of measurments for star selection
         self.selectMeasurement.algorithms.names.clear()
         self.selectMeasurement.algorithms.names = ('base_SdssCentroid', 'base_PsfFlux', 'base_PixelFlags',
-                                                   'base_SdssShape', 'base_GaussianFlux', 'base_SkyCoord')
+                                                   'base_SdssShape', 'base_GaussianFlux', 'base_SkyCoord',
+                                                   'base_ClassificationSizeExtendedness')
         self.selectMeasurement.slots.modelFlux = None
         self.selectMeasurement.slots.apFlux = None
         self.selectMeasurement.slots.calibFlux = None
