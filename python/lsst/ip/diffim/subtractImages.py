@@ -228,6 +228,14 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
         target=ScienceSourceSelectorTask,
         doc="Task to select sources to be used for PSF matching.",
     )
+    fallbackSourceSelector = lsst.pex.config.ConfigurableField(
+        target=ScienceSourceSelectorTask,
+        doc="Task to select sources to be used for PSF matching."
+        "Used only if the kernel calculation fails and"
+        "`allowKernelSourceDetection` is set. The fallback source detection"
+        " will not include all of the same plugins as the original source "
+        " detection, so not all of the same flags can be used.",
+    )
     detectionThreshold = lsst.pex.config.Field(
         dtype=float,
         default=10,
@@ -301,6 +309,14 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
         self.sourceSelector.doSignalToNoise = True  # apply signal to noise filter
         self.sourceSelector.signalToNoise.minimum = 10
         self.sourceSelector.signalToNoise.maximum = 500
+        self.fallbackSourceSelector.doSkySources = False  # Do not include sky sources
+        self.fallbackSourceSelector.doSignalToNoise = True  # apply signal to noise filter
+        self.fallbackSourceSelector.signalToNoise.minimum = 10
+        # The following two configs should not be necessary to be turned on for
+        # PSF-matching, and the fallback kernel source selection will fail if
+        # they are set since it does not run deblending.
+        self.fallbackSourceSelector.doIsolated = False  # Do not apply isolated star selection
+        self.fallbackSourceSelector.doRequirePrimary = False  # Do not apply primary flag selection
 
 
 class AlardLuptonSubtractConfig(AlardLuptonSubtractBaseConfig, lsst.pipe.base.PipelineTaskConfig,
@@ -327,6 +343,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         self.makeSubtask("decorrelate")
         self.makeSubtask("makeKernel")
         self.makeSubtask("sourceSelector")
+        self.makeSubtask("fallbackSourceSelector")
         if self.config.doScaleVariance:
             self.makeSubtask("scaleVariance")
 
@@ -610,7 +627,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                                                       scienceFwhmPix=self.sciencePsfSize)
 
         # return sources
-        return self._sourceSelector(sources, science.getBBox())
+        return self._sourceSelector(sources, science.getBBox(), fallback=True)
 
     def runConvolveTemplate(self, template, science, psfMatchingKernel, backgroundModel=None):
         """Convolve the template image with a PSF-matching kernel and subtract
@@ -891,7 +908,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         else:
             return convolvedExposure[bbox]
 
-    def _sourceSelector(self, sources, bbox):
+    def _sourceSelector(self, sources, bbox, fallback=False):
         """Select sources from a catalog that meet the selection criteria.
         The selection criteria include any configured parameters of the
         `sourceSelector` subtask, as well as distance from the edge if
@@ -916,7 +933,10 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             If there are too few sources to compute the PSF matching kernel
             remaining after source selection.
         """
-        selected = self.sourceSelector.selectSources(sources).selected
+        if fallback:
+            selected = self.fallbackSourceSelector.selectSources(sources).selected
+        else:
+            selected = self.sourceSelector.selectSources(sources).selected
         if self.config.restrictKernelEdgeSources:
             rejectRadius = 2*self.config.makeKernel.kernel.active.kernelSize
             bbox.grow(-rejectRadius)
