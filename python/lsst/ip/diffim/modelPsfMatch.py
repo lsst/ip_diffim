@@ -54,6 +54,7 @@ class WarpedPsfTransformTooBigError(pipeBase.AlgorithmError):
     """Raised when the transform of a WarpedPsf is too large to compute
     the FWHM of the PSF at a given position.
     """
+    @property
     def metadata(self) -> dict:
         return {}
 
@@ -64,6 +65,7 @@ class PsfComputeShapeError(pipeBase.AlgorithmError):
         super().__init__(message)
         self.position = position
 
+    @property
     def metadata(self) -> dict:
         return {
             "position": self.position,
