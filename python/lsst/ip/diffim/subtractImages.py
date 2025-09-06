@@ -921,6 +921,11 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             Bounding box of the science image.
         mask : `lsst.afw.image.Mask`
             The mask plane of the template to use to reject kernel candidates.
+        fallback : `bool`, optional
+            Switch indicating the source selector is being called after
+            running the fallback source detection subtask, which does not run a
+            full set of measurement plugins and can't use the same settings for
+            the source selector.
 
         Returns
         -------
@@ -930,6 +935,9 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
 
         Raises
         ------
+        InsufficientKernelSourcesError
+            An AlgorithmError that is raised if there are not enough PSF
+            candidates to construct the PSF matching kernel.
         RuntimeError
             If there are too few sources to compute the PSF matching kernel
             remaining after source selection.
