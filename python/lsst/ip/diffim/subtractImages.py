@@ -26,7 +26,7 @@ import lsst.afw.detection as afwDetection
 import lsst.afw.image
 import lsst.afw.math
 import lsst.geom
-from lsst.ip.diffim.utils import evaluateMeanPsfFwhm, getPsfFwhm, computeDifferenceImageMetrics
+from lsst.ip.diffim.utils import evaluateMeanPsfFwhm, getPsfFwhm, computeDifferenceImageMetrics, checkMask
 from lsst.meas.algorithms import ScaleVarianceTask, ScienceSourceSelectorTask
 import lsst.pex.config
 import lsst.pipe.base
@@ -270,7 +270,6 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
         dtype=str,
         default=("NO_DATA", "BAD", "SAT", "EDGE", "FAKE"),
         doc="Mask planes to exclude when selecting sources for PSF matching.",
-        deprecated="No longer used. Will be removed after v30"
     )
     badMaskPlanes = lsst.pex.config.ListField(
         dtype=str,
@@ -443,7 +442,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
 
         convolveTemplate = self.chooseConvolutionMethod(template, science)
 
-        selectSources = self._sourceSelector(sources, science.getBBox())
+        selectSources = self._sourceSelector(sources, science.getBBox(), template.mask)
 
         kernelResult = self.runMakeKernel(template, science, selectSources,
                                           convolveTemplate=convolveTemplate)
@@ -627,7 +626,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                                                       scienceFwhmPix=self.sciencePsfSize)
 
         # return sources
-        return self._sourceSelector(sources, science.getBBox(), fallback=True)
+        return self._sourceSelector(sources, science.getBBox(), template.mask, fallback=True)
 
     def runConvolveTemplate(self, template, science, psfMatchingKernel, backgroundModel=None):
         """Convolve the template image with a PSF-matching kernel and subtract
@@ -908,7 +907,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         else:
             return convolvedExposure[bbox]
 
-    def _sourceSelector(self, sources, bbox, fallback=False):
+    def _sourceSelector(self, sources, bbox, mask, fallback=False):
         """Select sources from a catalog that meet the selection criteria.
         The selection criteria include any configured parameters of the
         `sourceSelector` subtask, as well as distance from the edge if
@@ -920,6 +919,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             Input source catalog to select sources from.
         bbox : `lsst.geom.Box2I`
             Bounding box of the science image.
+        mask : `lsst.afw.image.Mask`
+            The mask plane of the template to use to reject kernel candidates.
 
         Returns
         -------
@@ -945,6 +946,9 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                           np.count_nonzero(~bboxSelected), rejectRadius)
             selected &= bboxSelected
         selectSources = sources[selected].copy(deep=True)
+        # Optionally remove sources that land on masked pixels
+        maskSelected = checkMask(mask, selectSources, self.config.excludeMaskPlanes, checkAdjacent=True)
+        selectSources = selectSources[maskSelected].copy(deep=True)
         # Trim selectSources if they exceed ``maxKernelSources``.
         # Keep the highest signal-to-noise sources of those selected.
         if (len(selectSources) > self.config.maxKernelSources) & (self.config.maxKernelSources > 0):
@@ -1211,7 +1215,7 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
                                                 interpolateBadMaskPlanes=True)
         self.metadata["convolvedExposure"] = "Preconvolution"
         try:
-            selectSources = self._sourceSelector(sources, science.getBBox())
+            selectSources = self._sourceSelector(sources, science.getBBox(), template.mask)
             subtractResults = self.runPreconvolve(template, science, matchedScience,
                                                   selectSources, scienceKernel)
 
