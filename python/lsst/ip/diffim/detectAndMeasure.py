@@ -808,7 +808,10 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             # This option allows returning sky sources,
             # even if there are no diaSources
             measurementResults.diaSources = diaSources
-
+        self.log.info("Measured %d diaSources and %d sky sources",
+                      np.count_nonzero(~diaSources["sky_source"]),
+                      np.count_nonzero(diaSources["sky_source"])
+                      )
         return measurementResults
 
     def _deblend(self, difference, positiveFootprints, negativeFootprints):
