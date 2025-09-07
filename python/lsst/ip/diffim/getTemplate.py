@@ -34,7 +34,7 @@ import lsst.pipe.base as pipeBase
 
 from lsst.skymap import BaseSkyMap
 from lsst.ip.diffim.dcrModel import DcrModel
-from lsst.meas.algorithms import CoaddPsf, CoaddPsfConfig
+from lsst.meas.algorithms import CoaddPsf, CoaddPsfConfig, SubtractBackgroundTask
 from lsst.utils.timer import timeMethod
 
 __all__ = [
@@ -103,6 +103,17 @@ class GetTemplateConfig(
         doc="Configuration for CoaddPsf",
         dtype=CoaddPsfConfig,
     )
+    varianceBackground = pexConfig.ConfigurableField(
+        target=SubtractBackgroundTask,
+        doc="Task to estimate the background variance.",
+    )
+    highVarianceThreshold = pexConfig.RangeField(
+        dtype=float,
+        default=4,
+        min=1,
+        doc="Set the HIGH_VARIANCE mask plane for regions with variance"
+        " greater than the median by this factor.",
+    )
 
     def setDefaults(self):
         # Use a smaller cache: per SeparableKernel.computeCache, this should
@@ -114,6 +125,19 @@ class GetTemplateConfig(
         self.warp.interpLength = 100
         self.warp.warpingKernelName = "lanczos3"
         self.coaddPsf.warpingKernelName = self.warp.warpingKernelName
+
+        # Background subtraction of the variance plane
+        self.varianceBackground.algorithm = "LINEAR"
+        self.varianceBackground.binSize = 32
+        self.varianceBackground.useApprox = False
+        self.varianceBackground.statisticsProperty = "MEDIAN"
+        self.varianceBackground.doFilterSuperPixels = True
+        self.varianceBackground.ignoredPixelMask = ["BAD",
+                                                    "EDGE",
+                                                    "DETECTED",
+                                                    "DETECTED_NEGATIVE",
+                                                    "NO_DATA",
+                                                    ]
 
 
 class GetTemplateTask(pipeBase.PipelineTask):
@@ -137,6 +161,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
             type=float,
             doc="Weight for each exposure, used to make the CoaddPsf; should always be 1.",
         )
+        self.makeSubtask("varianceBackground")
 
     def runQuantum(self, butlerQC, inputRefs, outputRefs):
         inputs = butlerQC.get(inputRefs)
@@ -357,10 +382,29 @@ class GetTemplateTask(pipeBase.PipelineTask):
         for c in catalogs:
             catalog.extend(c)
 
+        # Set a mask plane for any regions with exceptionally high variance.
+        self.checkHighVariance(template)
         template.setPsf(self._makePsf(template, catalog, wcs))
         template.setFilter(afwImage.FilterLabel(band, physical_filter))
         template.setPhotoCalib(photoCalib)
         return pipeBase.Struct(template=template)
+
+    def checkHighVariance(self, template):
+        """Set a mask plane for regions with unusually high variance.
+
+        Parameters
+        ----------
+        template : `lsst.afw.image.Exposure`
+            The warped template exposure, which will be modified in place.
+        """
+        highVarianceMaskPlaneBit = template.mask.addMaskPlane("HIGH_VARIANCE")
+        template.mask.getPlaneBitMask("HIGH_VARIANCE")
+        varianceExposure = template.clone()
+        varianceExposure.image.array = varianceExposure.variance.array
+        varianceBackground = self.varianceBackground.run(varianceExposure).background.getImage().array
+        threshold = self.config.highVarianceThreshold*np.nanmedian(varianceBackground)
+        highVariancePix = varianceBackground > threshold
+        template.mask.array[highVariancePix] |= 2**highVarianceMaskPlaneBit
 
     @staticmethod
     def _checkInputs(dataIds, coaddExposures):

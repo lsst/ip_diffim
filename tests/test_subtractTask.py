@@ -117,9 +117,9 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
         border = 20
         xSize = 400
         ySize = 400
-        science, sources = makeTestImage(psfSize=3.0, noiseLevel=noiseLevel, noiseSeed=6, nSrc=50,
+        science, sources = makeTestImage(psfSize=3.0, noiseLevel=noiseLevel, noiseSeed=6, nSrc=100,
                                          xSize=xSize, ySize=ySize)
-        template, _ = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=7, nSrc=50,
+        template, _ = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=7, nSrc=100,
                                     templateBorderSize=border, doApplyCalibration=True,
                                     xSize=xSize, ySize=ySize)
 
@@ -485,7 +485,7 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
             signalToNoise = sources.getPsfInstFlux()/sources.getPsfInstFluxErr()
             signalToNoise = signalToNoise[~sources[badSourceFlag]]
             signalToNoise.sort()
-            selectSources = task._sourceSelector(sources, science.getBBox())
+            selectSources = task._sourceSelector(sources, science.getBBox(), template.mask)
             self.assertEqual(nGoodSources, len(selectSources))
             signalToNoiseOut = selectSources.getPsfInstFlux()/selectSources.getPsfInstFluxErr()
             signalToNoiseOut.sort()

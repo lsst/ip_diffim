@@ -416,9 +416,9 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
 
         # Keep track of which footprints contain streaks
         self.measurement.plugins["base_PixelFlags"].masksFpAnywhere = [
-            "STREAK", "INJECTED", "INJECTED_TEMPLATE"]
+            "STREAK", "INJECTED", "INJECTED_TEMPLATE", "HIGH_VARIANCE"]
         self.measurement.plugins["base_PixelFlags"].masksFpCenter = [
-            "STREAK", "INJECTED", "INJECTED_TEMPLATE"]
+            "STREAK", "INJECTED", "INJECTED_TEMPLATE", "HIGH_VARIANCE"]
         self.skySources.avoidMask = ["DETECTED", "DETECTED_NEGATIVE", "BAD", "NO_DATA", "EDGE"]
 
     def validate(self):
@@ -808,7 +808,10 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             # This option allows returning sky sources,
             # even if there are no diaSources
             measurementResults.diaSources = diaSources
-
+        self.log.info("Measured %d diaSources and %d sky sources",
+                      np.count_nonzero(~diaSources["sky_source"]),
+                      np.count_nonzero(diaSources["sky_source"])
+                      )
         return measurementResults
 
     def _deblend(self, difference, positiveFootprints, negativeFootprints):
