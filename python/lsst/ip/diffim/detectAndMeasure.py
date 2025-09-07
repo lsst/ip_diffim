@@ -286,6 +286,7 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         dtype=str,
         doc="Sources with any of these flags set are removed before writing the output catalog.",
         default=("base_PixelFlags_flag_offimage",
+                 "base_PixelFlags_flag_edge",
                  "base_PixelFlags_flag_interpolatedCenterAll",
                  "base_PixelFlags_flag_badCenterAll",
                  "base_PixelFlags_flag_edgeCenterAll",
@@ -372,8 +373,7 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         self.detection.thresholdValue = 5.0
         self.detection.reEstimateBackground = False
         self.detection.thresholdType = "pixel_stdev"
-        self.detection.excludeMaskPlanes = ["EDGE",
-                                            "BAD",
+        self.detection.excludeMaskPlanes = ["BAD",
                                             ]
 
         # Copy configs for binned streak detection from the base detection task
