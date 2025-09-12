@@ -963,6 +963,9 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         """
         if subtask is None:
             subtask = self.skySources
+        if subtask.config.nSources <= 0:
+            self.metadata[f"n_{subtask.getName()}"] = 0
+            return
         skySourceFootprints = subtask.run(mask=mask, seed=seed, catalog=diaSources)
         self.metadata[f"n_{subtask.getName()}"] = len(skySourceFootprints)
 
