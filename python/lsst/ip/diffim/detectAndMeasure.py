@@ -286,11 +286,13 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         dtype=str,
         doc="Sources with any of these flags set are removed before writing the output catalog.",
         default=("base_PixelFlags_flag_offimage",
+                 "base_PixelFlags_flag_edge",
                  "base_PixelFlags_flag_interpolatedCenterAll",
                  "base_PixelFlags_flag_badCenterAll",
                  "base_PixelFlags_flag_edgeCenterAll",
                  "base_PixelFlags_flag_nodataCenterAll",
                  "base_PixelFlags_flag_saturatedCenterAll",
+                 "base_PixelFlags_flag_saturated_templateCenterAll",
                  ),
     )
     clearMaskPlanes = lsst.pex.config.ListField(
@@ -371,9 +373,7 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         self.detection.thresholdValue = 5.0
         self.detection.reEstimateBackground = False
         self.detection.thresholdType = "pixel_stdev"
-        self.detection.excludeMaskPlanes = ["EDGE",
-                                            "BAD",
-                                            ]
+        self.detection.excludeMaskPlanes = []
 
         # Copy configs for binned streak detection from the base detection task
         self.streakDetection.thresholdType = self.detection.thresholdType
@@ -416,9 +416,9 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
 
         # Keep track of which footprints contain streaks
         self.measurement.plugins["base_PixelFlags"].masksFpAnywhere = [
-            "STREAK", "INJECTED", "INJECTED_TEMPLATE", "HIGH_VARIANCE"]
+            "STREAK", "INJECTED", "INJECTED_TEMPLATE", "HIGH_VARIANCE", "SATURATED_TEMPLATE"]
         self.measurement.plugins["base_PixelFlags"].masksFpCenter = [
-            "STREAK", "INJECTED", "INJECTED_TEMPLATE", "HIGH_VARIANCE"]
+            "STREAK", "INJECTED", "INJECTED_TEMPLATE", "HIGH_VARIANCE", "SATURATED_TEMPLATE"]
         self.skySources.avoidMask = ["DETECTED", "DETECTED_NEGATIVE", "BAD", "NO_DATA", "EDGE"]
 
     def validate(self):
@@ -963,6 +963,9 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         """
         if subtask is None:
             subtask = self.skySources
+        if subtask.config.nSources <= 0:
+            self.metadata[f"n_{subtask.getName()}"] = 0
+            return
         skySourceFootprints = subtask.run(mask=mask, seed=seed, catalog=diaSources)
         self.metadata[f"n_{subtask.getName()}"] = len(skySourceFootprints)
 

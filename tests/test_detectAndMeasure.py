@@ -111,7 +111,8 @@ class DetectAndMeasureTestBase:
             self.assertTrue(np.all(values <= maxValue))
 
     def _setup_detection(self, doSkySources=True, nSkySources=5,
-                         doSubtractBackground=False, run_sattle=False, **kwargs):
+                         doSubtractBackground=False, run_sattle=False,
+                         badSourceFlags=None, **kwargs):
         """Setup and configure the detection and measurement PipelineTask.
 
         Parameters
@@ -143,12 +144,15 @@ class DetectAndMeasureTestBase:
             detector=12,
             universe=lsst.daf.butler.DimensionUniverse(),
         )
+        if badSourceFlags is None:
+            badSourceFlags = ["base_PixelFlags_flag_offimage", ]
         config.idGenerator.packer.name = "observation"
         config.idGenerator.packer["observation"].n_observations = 10000
         config.idGenerator.packer["observation"].n_detectors = 99
         config.idGenerator.n_releases = 8
         config.idGenerator.release_id = 2
         config.doSubtractBackground = doSubtractBackground
+        config.badSourceFlags = badSourceFlags
         self.idGenerator = config.idGenerator.apply(dataId)
 
         return self.detectionTask(config=config)
@@ -542,8 +546,12 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
 
         # Configure the detection Task
-        detectionTask = self._setup_detection()
-        excludeMaskPlanes = detectionTask.config.detection.excludeMaskPlanes
+        badSourceFlags = ["base_PixelFlags_flag_offimage",
+                          "base_PixelFlags_flag_edgeCenterAll",
+                          "base_PixelFlags_flag_badCenterAll",
+                          "base_PixelFlags_flag_saturatedCenterAll", ]
+        detectionTask = self._setup_detection(nSkySources=0, badSourceFlags=badSourceFlags)
+        excludeMaskPlanes = ["EDGE", "BAD", "SAT"]
         nBad = len(excludeMaskPlanes)
         self.assertGreater(nBad, 0)
         kwargs["seed"] = transientSeed
@@ -563,10 +571,8 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
                     srcBbox = lsst.geom.Box2I(lsst.geom.Point2I(srcX - radius, srcY - radius),
                                               lsst.geom.Extent2I(2*radius + 1, 2*radius + 1))
                     difference[srcBbox].mask.array |= lsst.afw.image.Mask.getPlaneBitMask(badMask)
-            if setFlags:
                 with self.assertRaises(AlgorithmError):
                     output = detectionTask.run(science, matchedTemplate, difference, sources)
-                return
             else:
                 output = detectionTask.run(science, matchedTemplate, difference, sources)
                 refIds = []
@@ -881,9 +887,7 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
 
         self.assertImagesEqual(subtractedMeasuredExposure.image, difference.image)
 
-        # Not all of the sources will be detected: preconvolution results in
-        # a larger edge mask, so we miss an edge source.
-        self.assertEqual(len(output.diaSources), len(sources)-1)
+        self.assertEqual(len(output.diaSources), len(sources))
         # no sources should be flagged as negative
         self.assertEqual(len(~output.diaSources["is_negative"]), len(output.diaSources))
         # TODO DM-41496: restore this block once we handle detections on edge
@@ -1103,13 +1107,19 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel}
         science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
         science.getInfo().setVisitInfo(makeVisitInfo())
+        detector = DetectorWrapper(numAmps=1).detector
+        science.setDetector(detector)
         matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
 
         subtractTask = subtractImages.AlardLuptonPreconvolveSubtractTask()
         scienceKernel = science.psf.getKernel()
         # Configure the detection Task
-        detectionTask = self._setup_detection()
-        excludeMaskPlanes = detectionTask.config.detection.excludeMaskPlanes
+        badSourceFlags = ["base_PixelFlags_flag_offimage",
+                          "base_PixelFlags_flag_edgeCenterAll",
+                          "base_PixelFlags_flag_badCenterAll",
+                          "base_PixelFlags_flag_saturatedCenterAll", ]
+        detectionTask = self._setup_detection(nSkySources=0, badSourceFlags=badSourceFlags)
+        excludeMaskPlanes = ["EDGE", "BAD", "SAT"]
         nBad = len(excludeMaskPlanes)
         self.assertGreater(nBad, 0)
         kwargs["seed"] = transientSeed
@@ -1133,7 +1143,6 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
             if setFlags:
                 with self.assertRaises(AlgorithmError):
                     output = detectionTask.run(science, matchedTemplate, difference, score, sources)
-                return
             else:
                 output = detectionTask.run(science, matchedTemplate, difference, score, sources)
                 refIds = []

@@ -410,7 +410,7 @@ def computeDifferenceImageMetrics(science, difference, stars, sky_sources=None):
     else:
         sky_mean = np.nan
         sky_std = np.nan
-        sky_difference = 0
+        sky_difference = np.nanmedian(np.abs(difference.image.array))
     science_footprints, difference_footprints, ratio = footprint_mean(selectStars, sky_difference)
     return lsst.pipe.base.Struct(differenceFootprintRatioMean=ratio.mean(),
                                  differenceFootprintRatioStdev=ratio.std(),
