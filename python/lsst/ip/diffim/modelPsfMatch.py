@@ -61,14 +61,16 @@ class WarpedPsfTransformTooBigError(pipeBase.AlgorithmError):
 
 class PsfComputeShapeError(pipeBase.AlgorithmError):
     def __init__(self, position):
-        message = f"Unable to compute the FWHM of the science Psf at {position}"
+        message = f"Unable to evaluate Psf at ({float(position.getX()):.4f}, {float(position.getY()):.4f})"
         super().__init__(message)
         self.position = position
 
     @property
     def metadata(self) -> dict:
         return {
-            "position": self.position,
+            # must have values `str`, `int`, `float`, `bool`or nested-dict
+            "position": {"x": float(self.position.getX()),
+                         "y": float(self.position.getY())}
         }
 
 
@@ -175,13 +177,13 @@ class ModelPsfMatchTask(PsfMatchTask):
         modelAvgPos = referencePsfModel.getAveragePosition()
         try:
             fwhmScience = exposure.getPsf().computeShape(sciAvgPos).getDeterminantRadius()*sigma2fwhm
-        except pexExceptions.RangeError:
+        except pexExceptions.RangeError as err:
             raise WarpedPsfTransformTooBigError(
                 f"Unable to compute the FWHM of the science Psf at {sciAvgPos}"
                 "due to an unexpectedly large transform."
-            )
-        except pexExceptions.Exception:
-            raise PsfComputeShapeError(sciAvgPos)
+            ) from err
+        except pexExceptions.Exception as err:
+            raise PsfComputeShapeError(sciAvgPos) from err
         fwhmModel = referencePsfModel.computeShape(modelAvgPos).getDeterminantRadius()*sigma2fwhm
 
         basisList = makeKernelBasisList(self.kConfig, fwhmScience, fwhmModel, metadata=self.metadata)
@@ -281,7 +283,10 @@ class ModelPsfMatchTask(PsfMatchTask):
             posY = sizeCellY*row + sizeCellY//2 + scienceY0
             for col in range(nCellX):
                 posX = sizeCellX*col + sizeCellX//2 + scienceX0
-                widthS, heightS = sciencePsfModel.computeBBox(geom.Point2D(posX, posY)).getDimensions()
+                try:
+                    widthS, heightS = sciencePsfModel.computeBBox(geom.Point2D(posX, posY)).getDimensions()
+                except pexExceptions.InvalidParameterError as err:
+                    raise PsfComputeShapeError(geom.Point2D(posX, posY)) from err
                 widthList.append(widthS)
                 heightList.append(heightS)
 
