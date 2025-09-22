@@ -114,6 +114,12 @@ class GetTemplateConfig(
         doc="Set the HIGH_VARIANCE mask plane for regions with variance"
         " greater than the median by this factor.",
     )
+    highVarianceMaskFraction = pexConfig.Field(
+        dtype=float,
+        default=0.1,
+        doc="Minimum fraction of unmasked pixels needed to set the"
+        " HIGH_VARIANCE mask plane.",
+    )
 
     def setDefaults(self):
         # Use a smaller cache: per SeparableKernel.computeCache, this should
@@ -398,13 +404,20 @@ class GetTemplateTask(pipeBase.PipelineTask):
             The warped template exposure, which will be modified in place.
         """
         highVarianceMaskPlaneBit = template.mask.addMaskPlane("HIGH_VARIANCE")
-        template.mask.getPlaneBitMask("HIGH_VARIANCE")
-        varianceExposure = template.clone()
-        varianceExposure.image.array = varianceExposure.variance.array
-        varianceBackground = self.varianceBackground.run(varianceExposure).background.getImage().array
-        threshold = self.config.highVarianceThreshold*np.nanmedian(varianceBackground)
-        highVariancePix = varianceBackground > threshold
-        template.mask.array[highVariancePix] |= 2**highVarianceMaskPlaneBit
+        ignoredPixelBits = template.mask.getPlaneBitMask(self.varianceBackground.config.ignoredPixelMask)
+        goodMask = (template.mask.array & ignoredPixelBits) == 0
+        goodFraction = np.count_nonzero(goodMask)/template.mask.array.size
+        if goodFraction < self.config.highVarianceMaskFraction:
+            self.log.info("Not setting HIGH_VARIANCE mask plane, only %2.1f%% of"
+                          " pixels were unmasked for background estimation, but"
+                          " %2.1f%% are required", 100*goodFraction, 100*self.config.highVarianceMaskFraction)
+        else:
+            varianceExposure = template.clone()
+            varianceExposure.image.array = varianceExposure.variance.array
+            varianceBackground = self.varianceBackground.run(varianceExposure).background.getImage().array
+            threshold = self.config.highVarianceThreshold*np.nanmedian(varianceBackground)
+            highVariancePix = varianceBackground > threshold
+            template.mask.array[highVariancePix] |= 2**highVarianceMaskPlaneBit
 
     @staticmethod
     def _checkInputs(dataIds, coaddExposures):
