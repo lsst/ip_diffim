@@ -45,6 +45,55 @@ __all__ = (
 sigma2fwhm = 2.*np.sqrt(2.*np.log(2.))
 
 
+def _safeEstimateRoughShape(psf, position, jitter=2.0, maxTries=5, log=None):
+
+    """
+    Try to compute the shape of `psf` at `position`.
+
+    If it fails, perturb the position until success or maxTries.
+
+    Parameters
+    ----------
+    psf : `lsst.afw.detection.Psf`
+        The PSF object.
+    position : `lsst.geom.Point2D`
+        The nominal position at which to evaluate the PSF shape.
+    jitter : `float`
+        Size of random offset in pixels to try when retrying.
+    maxTries : `int`
+        Maximum number of attempts (including the original).
+    log : `lsst.utils.logging.LsstLogAdapter` optional
+        logger to use for logging retries.
+
+    Returns
+    -------
+    shape : lsst.afw.geom.ellipses.Quadrupole
+        The shape of the PSF at the (possibly perturbed) position.
+    """
+    try:
+        return psf.computeShape(position)
+    except pexExceptions.Exception as err:
+        if log:
+            log.info(f"safeEstimateRoughShape: initial evaluation of PSF failed with message: {str(err)}."
+                     " Retrying nearby")
+        firstErr = err
+
+    # random offsets must be deterministic
+    offsets = np.random.default_rng(seed=40).uniform(-jitter, jitter, size=(maxTries - 1, 2))
+    candidates = [position + geom.Extent2D(dx, dy) for dx, dy in offsets]
+    for i, candidate in enumerate(candidates):
+        try:
+            shape = psf.computeShape(candidate)
+            if log:
+                log.info(f"safeEstimateRoughShape succeeded on try {i + 2} at position {candidate}")
+            return shape
+        except pexExceptions.Exception:
+            continue
+
+    # If nothing worked, raise AlgorithmError from original position
+    raise PsfComputeShapeError(position) from firstErr
+
+
 def nextOddInteger(x):
     nextInt = int(np.ceil(x))
     return nextInt + 1 if nextInt%2 == 0 else nextInt
@@ -61,14 +110,16 @@ class WarpedPsfTransformTooBigError(pipeBase.AlgorithmError):
 
 class PsfComputeShapeError(pipeBase.AlgorithmError):
     def __init__(self, position):
-        message = f"Unable to compute the FWHM of the science Psf at {position}"
+        message = f"Unable to evaluate Psf at ({float(position.getX()):.4f}, {float(position.getY()):.4f})"
         super().__init__(message)
         self.position = position
 
     @property
     def metadata(self) -> dict:
         return {
-            "position": self.position,
+            # must have values `str`, `int`, `float`, `bool`or nested-dict
+            "position": {"x": float(self.position.getX()),
+                         "y": float(self.position.getY())}
         }
 
 
@@ -173,15 +224,12 @@ class ModelPsfMatchTask(PsfMatchTask):
         # exposure's bounding box in DM-32756.
         sciAvgPos = exposure.getPsf().getAveragePosition()
         modelAvgPos = referencePsfModel.getAveragePosition()
-        try:
-            fwhmScience = exposure.getPsf().computeShape(sciAvgPos).getDeterminantRadius()*sigma2fwhm
-        except pexExceptions.RangeError:
-            raise WarpedPsfTransformTooBigError(
-                f"Unable to compute the FWHM of the science Psf at {sciAvgPos}"
-                "due to an unexpectedly large transform."
-            )
-        except pexExceptions.Exception:
-            raise PsfComputeShapeError(sciAvgPos)
+
+        # TODO If DM-52537 eliminates the need for _safeEstimateRoughShape,
+        # the remove it, and replace next line with a direct call to
+        # computeShape in a try/except block.
+        fwhmScience = _safeEstimateRoughShape(exposure.getPsf(), sciAvgPos,
+                                              log=self.log).getDeterminantRadius()*sigma2fwhm
         fwhmModel = referencePsfModel.computeShape(modelAvgPos).getDeterminantRadius()*sigma2fwhm
 
         basisList = makeKernelBasisList(self.kConfig, fwhmScience, fwhmModel, metadata=self.metadata)
@@ -281,7 +329,10 @@ class ModelPsfMatchTask(PsfMatchTask):
             posY = sizeCellY*row + sizeCellY//2 + scienceY0
             for col in range(nCellX):
                 posX = sizeCellX*col + sizeCellX//2 + scienceX0
-                widthS, heightS = sciencePsfModel.computeBBox(geom.Point2D(posX, posY)).getDimensions()
+                try:
+                    widthS, heightS = sciencePsfModel.computeBBox(geom.Point2D(posX, posY)).getDimensions()
+                except pexExceptions.InvalidParameterError as err:
+                    raise PsfComputeShapeError(geom.Point2D(posX, posY)) from err
                 widthList.append(widthS)
                 heightList.append(heightS)
 
