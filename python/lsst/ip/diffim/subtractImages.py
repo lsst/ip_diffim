@@ -301,21 +301,29 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
         self.makeKernel.kernel.active.fitForBackground = True
         self.makeKernel.kernel.active.spatialKernelOrder = 1
         self.makeKernel.kernel.active.spatialBgOrder = 2
-        self.sourceSelector.doUnresolved = True  # apply star-galaxy separation
+        # Shared source selector settings
+        doSkySources = False  # Do not include sky sources
+        doSignalToNoise = True  # apply signal to noise filter
+        doUnresolved = True  # apply star-galaxy separation
+        signalToNoiseMinimum = 10
+        signalToNoiseMaximum = 500
         self.sourceSelector.doIsolated = True  # apply isolated star selection
         self.sourceSelector.doRequirePrimary = True  # apply primary flag selection
-        self.sourceSelector.doSkySources = False  # Do not include sky sources
-        self.sourceSelector.doSignalToNoise = True  # apply signal to noise filter
-        self.sourceSelector.signalToNoise.minimum = 10
-        self.sourceSelector.signalToNoise.maximum = 500
-        self.fallbackSourceSelector.doSkySources = False  # Do not include sky sources
-        self.fallbackSourceSelector.doSignalToNoise = True  # apply signal to noise filter
-        self.fallbackSourceSelector.signalToNoise.minimum = 10
+        self.sourceSelector.doUnresolved = doUnresolved
+        self.sourceSelector.doSkySources = doSkySources
+        self.sourceSelector.doSignalToNoise = doSignalToNoise
+        self.sourceSelector.signalToNoise.minimum = signalToNoiseMinimum
+        self.sourceSelector.signalToNoise.maximum = signalToNoiseMaximum
         # The following two configs should not be necessary to be turned on for
         # PSF-matching, and the fallback kernel source selection will fail if
         # they are set since it does not run deblending.
         self.fallbackSourceSelector.doIsolated = False  # Do not apply isolated star selection
         self.fallbackSourceSelector.doRequirePrimary = False  # Do not apply primary flag selection
+        self.fallbackSourceSelector.doUnresolved = doUnresolved
+        self.fallbackSourceSelector.doSkySources = doSkySources
+        self.fallbackSourceSelector.doSignalToNoise = doSignalToNoise
+        self.fallbackSourceSelector.signalToNoise.minimum = signalToNoiseMinimum
+        self.fallbackSourceSelector.signalToNoise.maximum = signalToNoiseMaximum
 
 
 class AlardLuptonSubtractConfig(AlardLuptonSubtractBaseConfig, lsst.pipe.base.PipelineTaskConfig,
