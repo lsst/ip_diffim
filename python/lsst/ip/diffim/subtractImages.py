@@ -26,7 +26,8 @@ import lsst.afw.detection as afwDetection
 import lsst.afw.image
 import lsst.afw.math
 import lsst.geom
-from lsst.ip.diffim.utils import evaluateMeanPsfFwhm, getPsfFwhm, computeDifferenceImageMetrics, checkMask
+from lsst.ip.diffim.utils import (evaluateMeanPsfFwhm, getPsfFwhm, computeDifferenceImageMetrics,
+                                  checkMask, setSourceFootprints)
 from lsst.meas.algorithms import ScaleVarianceTask, ScienceSourceSelectorTask
 import lsst.pex.config
 import lsst.pipe.base
@@ -435,25 +436,15 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             ``kernelSources` : `lsst.afw.table.SourceCatalog`
                 Sources from the input catalog that were used to construct the
                 PSF-matching kernel.
-
-        Raises
-        ------
-        RuntimeError
-            If an unsupported convolution mode is supplied.
-        RuntimeError
-            If there are too few sources to calculate the PSF matching kernel.
-        lsst.pipe.base.NoWorkFound
-            Raised if fraction of good pixels, defined as not having NO_DATA
-            set, is less then the configured requiredTemplateFraction
         """
         self._prepareInputs(template, science, visitSummary=visitSummary)
 
         convolveTemplate = self.chooseConvolutionMethod(template, science)
 
-        selectSources = self._sourceSelector(sources, science.getBBox(), template.mask)
+        kernelResult = self.runMakeKernel(template, science, sources=sources,
+                                          convolveTemplate=convolveTemplate,
+                                          runSourceDetection=False)
 
-        kernelResult = self.runMakeKernel(template, science, selectSources,
-                                          convolveTemplate=convolveTemplate)
         if self.config.doSubtractBackground:
             backgroundModel = kernelResult.backgroundModel
         else:
@@ -523,7 +514,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             raise RuntimeError("Cannot handle AlardLuptonSubtract mode: %s", self.config.mode)
         return convolveTemplate
 
-    def runMakeKernel(self, template, science, sources, convolveTemplate=True):
+    def runMakeKernel(self, template, science, sources=None, convolveTemplate=True, runSourceDetection=False):
         """Construct the PSF-matching kernel.
 
         Parameters
@@ -536,8 +527,13 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             Identified sources on the science exposure. This catalog is used to
             select sources in order to perform the AL PSF matching on stamp
             images around them.
+            Not used if ``runSourceDetection`` is set.
         convolveTemplate : `bool`, optional
             Construct the matching kernel to convolve the template?
+        runSourceDetection : `bool`, optional
+            Run a minimal version of source detection to determine kernel
+            candidates? If False, a source list to select kernel candidates
+            from must be supplied.
 
         Returns
         -------
@@ -551,6 +547,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                 Sources from the input catalog that were used to construct the
                 PSF-matching kernel.
         """
+
         if convolveTemplate:
             reference = template
             target = science
@@ -562,35 +559,14 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             referenceFwhmPix = self.sciencePsfSize
             targetFwhmPix = self.templatePsfSize
         try:
-            # The outer try..except block catches any error, and raises
-            # NoWorkFound if the template coverage is insufficient. Otherwise,
-            # the original error is raised.
-            try:
-                # The inner try..except block catches errors related to the
-                # input source catalog. If the catalog is not sufficient to
-                # constrain the kernel fit and `allowKernelSourceDetection=True`
-                # then source detection and measurement are re-run to make a new
-                # catalog. Otherwise, the original error is raised.
-                kernelSources = self.makeKernel.selectKernelSources(reference, target,
-                                                                    candidateList=sources,
-                                                                    preconvolved=False,
-                                                                    templateFwhmPix=referenceFwhmPix,
-                                                                    scienceFwhmPix=targetFwhmPix)
-                kernelResult = self.makeKernel.run(reference, target, kernelSources,
-                                                   preconvolved=False,
-                                                   templateFwhmPix=referenceFwhmPix,
-                                                   scienceFwhmPix=targetFwhmPix)
-            except Exception as e:
-                if self.config.allowKernelSourceDetection and convolveTemplate:
-                    self.log.warning("Error encountered trying to construct the matching kernel"
-                                     f" Running source detection and retrying. {e}")
-                    kernelSources = self.runKernelSourceDetection(template, science)
-                    kernelResult = self.makeKernel.run(reference, target, kernelSources,
-                                                       preconvolved=False,
-                                                       templateFwhmPix=referenceFwhmPix,
-                                                       scienceFwhmPix=targetFwhmPix)
-                else:
-                    raise e
+            if runSourceDetection:
+                kernelSources = self.runKernelSourceDetection(template, science)
+            else:
+                kernelSources = self._sourceSelector(template, science, sources)
+            kernelResult = self.makeKernel.run(reference, target, kernelSources,
+                                               preconvolved=False,
+                                               templateFwhmPix=referenceFwhmPix,
+                                               scienceFwhmPix=targetFwhmPix)
         except (RuntimeError, lsst.pex.exceptions.Exception) as e:
             self.log.warning("Failed to match template. Checking coverage")
             #  Raise NoWorkFound if template fraction is insufficient
@@ -600,6 +576,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                                       f" Failure is tolerable: {e}")
             #  checkTemplateIsSufficient did not raise NoWorkFound, so raise original exception
             raise e
+
         return lsst.pipe.base.Struct(backgroundModel=kernelResult.backgroundModel,
                                      psfMatchingKernel=kernelResult.psfMatchingKernel,
                                      kernelSources=kernelSources)
@@ -634,7 +611,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                                                       scienceFwhmPix=self.sciencePsfSize)
 
         # return sources
-        return self._sourceSelector(sources, science.getBBox(), template.mask, fallback=True)
+        return self._sourceSelector(template, science, sources, fallback=True)
 
     def runConvolveTemplate(self, template, science, psfMatchingKernel, backgroundModel=None):
         """Convolve the template image with a PSF-matching kernel and subtract
@@ -920,78 +897,88 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         else:
             return convolvedExposure[bbox]
 
-    def _sourceSelector(self, sources, bbox, mask, fallback=False):
+    def _sourceSelector(self, template, science, sources, fallback=False, preconvolved=False):
         """Select sources from a catalog that meet the selection criteria.
         The selection criteria include any configured parameters of the
-        `sourceSelector` subtask, as well as distance from the edge if
-        `restrictKernelEdgeSources` is set.
+        `sourceSelector` subtask, as well as checking the science and template
+        mask planes.
 
         Parameters
         ----------
+        template : `lsst.afw.image.ExposureF`
+            Template exposure, warped to match the science exposure.
+        science : `lsst.afw.image.ExposureF`
+            Science exposure to subtract from the template.
         sources : `lsst.afw.table.SourceCatalog`
             Input source catalog to select sources from.
-        bbox : `lsst.geom.Box2I`
-            Bounding box of the science image.
-        mask : `lsst.afw.image.Mask`
-            The mask plane of the template to use to reject kernel candidates.
         fallback : `bool`, optional
             Switch indicating the source selector is being called after
             running the fallback source detection subtask, which does not run a
             full set of measurement plugins and can't use the same settings for
             the source selector.
+        preconvolved : `bool`, optional
+            If set, exclude a wider buffer around the edge of the image to
+            account for an extra convolution.
 
         Returns
         -------
-        selectSources : `lsst.afw.table.SourceCatalog`
+        kernelSources : `lsst.afw.table.SourceCatalog`
             The input source catalog, with flagged and low signal-to-noise
-            sources removed.
+            sources removed and footprints added.
 
         Raises
         ------
         InsufficientKernelSourcesError
             An AlgorithmError that is raised if there are not enough PSF
             candidates to construct the PSF matching kernel.
-        RuntimeError
-            If there are too few sources to compute the PSF matching kernel
-            remaining after source selection.
         """
         if fallback:
             selected = self.fallbackSourceSelector.selectSources(sources).selected
         else:
             selected = self.sourceSelector.selectSources(sources).selected
-        if self.config.restrictKernelEdgeSources:
-            rejectRadius = 2*self.config.makeKernel.kernel.active.kernelSize
-            bbox.grow(-rejectRadius)
-            bboxSelected = bbox.contains(sources.getX(), sources.getY())
-            self.log.info("Rejecting %i candidate sources within %i pixels of the edge.",
-                          np.count_nonzero(~bboxSelected), rejectRadius)
-            selected &= bboxSelected
+        sciencePsfSize = self.sciencePsfSize*np.sqrt(2) if preconvolved else self.sciencePsfSize
+        kSize = self.makeKernel.makeKernelBasisList(self.templatePsfSize, sciencePsfSize)[0].getWidth()
         selectSources = sources[selected].copy(deep=True)
-        # Optionally remove sources that land on masked pixels
-        maskSelected = checkMask(mask, selectSources, self.config.excludeMaskPlanes, checkAdjacent=True)
-        selectSources = selectSources[maskSelected].copy(deep=True)
-        # Trim selectSources if they exceed ``maxKernelSources``.
+        # Set the footprints, to be used in `makeKernel` and `checkMask`.
+        kernelSources = setSourceFootprints(selectSources, kernelSize=kSize)
+        bbox = science.getBBox()
+        if preconvolved:
+            bbox.grow(-kSize)
+        if self.config.restrictKernelEdgeSources:
+            bbox.grow(-kSize)
+        # Remove sources that land on masked pixels
+        scienceSelected = checkMask(science.mask[bbox], kernelSources, self.config.excludeMaskPlanes)
+        templateSelected = checkMask(template.mask[bbox], kernelSources, self.config.excludeMaskPlanes)
+        maskSelected = scienceSelected & templateSelected
+        kernelSources = kernelSources[maskSelected].copy(deep=True)
+        # Trim kernelSources if they exceed ``maxKernelSources``.
         # Keep the highest signal-to-noise sources of those selected.
-        if (len(selectSources) > self.config.maxKernelSources) & (self.config.maxKernelSources > 0):
-            signalToNoise = selectSources.getPsfInstFlux()/selectSources.getPsfInstFluxErr()
+        if (len(kernelSources) > self.config.maxKernelSources) & (self.config.maxKernelSources > 0):
+            signalToNoise = kernelSources.getPsfInstFlux()/kernelSources.getPsfInstFluxErr()
             indices = np.argsort(signalToNoise)
             indices = indices[-self.config.maxKernelSources:]
-            selected = np.zeros(len(selectSources), dtype=bool)
+            selected = np.zeros(len(kernelSources), dtype=bool)
             selected[indices] = True
-            selectSources = selectSources[selected].copy(deep=True)
+            kernelSources = kernelSources[selected].copy(deep=True)
 
         self.log.info("%i/%i=%.1f%% of sources selected for PSF matching from the input catalog",
-                      len(selectSources), len(sources), 100*len(selectSources)/len(sources))
-        if len(selectSources) < self.config.minKernelSources:
+                      len(kernelSources), len(sources), 100*len(kernelSources)/len(sources))
+        if len(kernelSources) < self.config.minKernelSources:
             self.log.error("Too few sources to calculate the PSF matching kernel: "
                            "%i selected but %i needed for the calculation.",
-                           len(selectSources), self.config.minKernelSources)
-            if not self.config.allowKernelSourceDetection:
-                raise InsufficientKernelSourcesError(nSources=len(selectSources),
+                           len(kernelSources), self.config.minKernelSources)
+            if self.config.allowKernelSourceDetection and not fallback:
+                # The fallback source detection pipeline calls this method, so
+                # allowing source detection in that case would create an endless
+                # loop
+                kernelSources = self.runKernelSourceDetection(template, science)
+            else:
+                raise InsufficientKernelSourcesError(nSources=len(kernelSources),
                                                      nRequired=self.config.minKernelSources)
-        self.metadata["nPsfSources"] = len(selectSources)
 
-        return selectSources
+        self.metadata["nPsfSources"] = len(kernelSources)
+
+        return kernelSources
 
     def _prepareInputs(self, template, science, visitSummary=None):
         """Perform preparatory calculations common to all Alard&Lupton Tasks.
@@ -1236,9 +1223,9 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
                                                 interpolateBadMaskPlanes=True)
         self.metadata["convolvedExposure"] = "Preconvolution"
         try:
-            selectSources = self._sourceSelector(sources, science.getBBox(), template.mask)
+            kernelSources = self._sourceSelector(template, matchedScience, sources, preconvolved=True)
             subtractResults = self.runPreconvolve(template, science, matchedScience,
-                                                  selectSources, scienceKernel)
+                                                  kernelSources, scienceKernel)
 
         except (RuntimeError, lsst.pex.exceptions.Exception) as e:
             self.log.warning("Failed to match template. Checking coverage")
@@ -1252,7 +1239,7 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
 
         return subtractResults
 
-    def runPreconvolve(self, template, science, matchedScience, selectSources, preConvKernel):
+    def runPreconvolve(self, template, science, matchedScience, kernelSources, preConvKernel):
         """Convolve the science image with its own PSF, then convolve the
         template with a matching kernel and subtract to form the Score
         exposure.
@@ -1265,7 +1252,7 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
             Science exposure to subtract from the template.
         matchedScience : `lsst.afw.image.ExposureF`
             The science exposure, convolved with the reflection of its own PSF.
-        selectSources : `lsst.afw.table.SourceCatalog`
+        kernelSources : `lsst.afw.table.SourceCatalog`
             Identified sources on the science exposure. This catalog is used to
             select sources in order to perform the AL PSF matching on stamp
             images around them.
@@ -1296,11 +1283,6 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
         bbox = science.getBBox()
         innerBBox = preConvKernel.shrinkBBox(bbox)
 
-        kernelSources = self.makeKernel.selectKernelSources(template[innerBBox], matchedScience[innerBBox],
-                                                            candidateList=selectSources,
-                                                            preconvolved=True,
-                                                            templateFwhmPix=self.templatePsfSize,
-                                                            scienceFwhmPix=self.sciencePsfSize)
         kernelResult = self.makeKernel.run(template[innerBBox], matchedScience[innerBBox], kernelSources,
                                            preconvolved=True,
                                            templateFwhmPix=self.templatePsfSize,
@@ -1502,10 +1484,6 @@ class SimplifiedSubtractTask(AlardLuptonSubtractTask):
 
         Raises
         ------
-        RuntimeError
-            If an unsupported convolution mode is supplied.
-        RuntimeError
-            If there are too few sources to calculate the PSF matching kernel.
         lsst.pipe.base.NoWorkFound
             Raised if fraction of good pixels, defined as not having NO_DATA
             set, is less then the configured requiredTemplateFraction
@@ -1519,7 +1497,8 @@ class SimplifiedSubtractTask(AlardLuptonSubtractTask):
             backgroundModel = None
             kernelSources = None
         else:
-            kernelResult = self.runMakeKernel(template, science, convolveTemplate=convolveTemplate)
+            kernelResult = self.runMakeKernel(template, science, convolveTemplate=convolveTemplate,
+                                              runSourceDetection=True)
             psfMatchingKernel = kernelResult.psfMatchingKernel
             kernelSources = kernelResult.kernelSources
             if self.config.doSubtractBackground:
@@ -1535,66 +1514,6 @@ class SimplifiedSubtractTask(AlardLuptonSubtractTask):
         if kernelSources is not None:
             subtractResults.kernelSources = kernelSources
         return subtractResults
-
-    def runMakeKernel(self, template, science, convolveTemplate=True):
-        """Construct the PSF-matching kernel.
-
-        Parameters
-        ----------
-        template : `lsst.afw.image.ExposureF`
-            Template exposure, warped to match the science exposure.
-        science : `lsst.afw.image.ExposureF`
-            Science exposure to subtract from the template.
-        sources : `lsst.afw.table.SourceCatalog`
-            Identified sources on the science exposure. This catalog is used to
-            select sources in order to perform the AL PSF matching on stamp
-            images around them.
-        convolveTemplate : `bool`, optional
-            Construct the matching kernel to convolve the template?
-
-        Returns
-        -------
-        results : `lsst.pipe.base.Struct`
-            ``backgroundModel`` : `lsst.afw.math.Function2D`
-                Background model that was fit while solving for the
-                PSF-matching kernel
-            ``psfMatchingKernel`` : `lsst.afw.math.Kernel`
-                Kernel used to PSF-match the convolved image.
-            ``kernelSources` : `lsst.afw.table.SourceCatalog`
-                Sources from the input catalog that were used to construct the
-                PSF-matching kernel.
-        """
-        if convolveTemplate:
-            reference = template
-            target = science
-            referenceFwhmPix = self.templatePsfSize
-            targetFwhmPix = self.sciencePsfSize
-        else:
-            reference = science
-            target = template
-            referenceFwhmPix = self.sciencePsfSize
-            targetFwhmPix = self.templatePsfSize
-        try:
-            # The try..except block catches any error, and raises
-            # NoWorkFound if the template coverage is insufficient. Otherwise,
-            # the original error is raised.
-            kernelSources = self.runKernelSourceDetection(template, science)
-            kernelResult = self.makeKernel.run(reference, target, kernelSources,
-                                               preconvolved=False,
-                                               templateFwhmPix=referenceFwhmPix,
-                                               scienceFwhmPix=targetFwhmPix)
-        except (RuntimeError, lsst.pex.exceptions.Exception) as e:
-            self.log.warning("Failed to match template. Checking coverage")
-            #  Raise NoWorkFound if template fraction is insufficient
-            checkTemplateIsSufficient(template[science.getBBox()], science, self.log,
-                                      self.config.minTemplateFractionForExpectedSuccess,
-                                      exceptionMessage="Template coverage lower than expected to succeed."
-                                      f" Failure is tolerable: {e}")
-            #  checkTemplateIsSufficient did not raise NoWorkFound, so raise original exception
-            raise e
-        return lsst.pipe.base.Struct(backgroundModel=kernelResult.backgroundModel,
-                                     psfMatchingKernel=kernelResult.psfMatchingKernel,
-                                     kernelSources=kernelSources)
 
 
 def _interpolateImage(maskedImage, badMaskPlanes, fallbackValue=None):
