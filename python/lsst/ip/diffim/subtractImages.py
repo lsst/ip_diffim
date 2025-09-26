@@ -638,10 +638,11 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             Template exposure, warped to match the science exposure.
         science : `lsst.afw.image.ExposureF`
             Science exposure to subtract from the template.
-        selectSources : `lsst.afw.table.SourceCatalog`
-            Identified sources on the science exposure. This catalog is used to
-            select sources in order to perform the AL PSF matching on stamp
-            images around them.
+        psfMatchingKernel : `lsst.afw.math.Kernel`
+            Kernel to be used to PSF-match the science image to the template.
+        backgroundModel : `lsst.afw.math.Function2D`, optional
+            Background model that was fit while solving for the PSF-matching
+            kernel.
 
         Returns
         -------
@@ -685,10 +686,11 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             Template exposure, warped to match the science exposure.
         science : `lsst.afw.image.ExposureF`
             Science exposure to subtract from the template.
-        selectSources : `lsst.afw.table.SourceCatalog`
-            Identified sources on the science exposure. This catalog is used to
-            select sources in order to perform the AL PSF matching on stamp
-            images around them.
+        psfMatchingKernel : `lsst.afw.math.Kernel`
+            Kernel to be used to PSF-match the science image to the template.
+        backgroundModel : `lsst.afw.math.Function2D`, optional
+            Background model that was fit while solving for the PSF-matching
+            kernel.
 
         Returns
         -------
@@ -884,6 +886,9 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             Point spread function (PSF) to set for the convolved exposure.
         photoCalib : `lsst.afw.image.PhotoCalib`, optional
             Photometric calibration of the convolved exposure.
+        interpolateBadMaskPlanes : `bool`, optional
+            If set, interpolate over mask planes specified in
+            ``config.badMaskPlanes`` before convolving the image.
 
         Returns
         -------
@@ -1467,6 +1472,9 @@ class SimplifiedSubtractTask(AlardLuptonSubtractTask):
             Exposure catalog with external calibrations to be applied. Catalog
             uses the detector id for the catalog id, sorted on id for fast
             lookup.
+        inputPsfMatchingKernel : `lsst.afw.math.Kernel`, optional
+            Pre-existing PSF matching kernel to use for convolution.
+            Required, and only used, if ``config.useExistingKernel`` is set.
 
         Returns
         -------
