@@ -148,6 +148,8 @@ class DetectAndMeasureConnections(pipeBase.PipelineTaskConnections,
 
     def __init__(self, *, config):
         super().__init__(config=config)
+        if not (self.config.doCalculateResidualMetics):
+            self.inputs.remove("kernelSources")
         if not (self.config.writeStreakInfo and self.config.doMaskStreaks):
             self.outputs.remove("maskedStreaks")
         if not (self.config.doSubtractBackground and self.config.doWriteBackground):
@@ -185,6 +187,12 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         dtype=bool,
         doc="Persist the fitted background model?",
         default=False,
+    )
+    doCalculateResidualMetics = pexConfig.Field(
+        dtype=bool,
+        doc="Calculate metrics to assess image subtraction quality for the task"
+        "metadata?",
+        default=True,
     )
     subtractInitialBackground = pexConfig.ConfigurableField(
         target=lsst.meas.algorithms.SubtractBackgroundTask,
@@ -554,7 +562,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         butlerQC.put(measurementResults, outputRefs)
 
     @timeMethod
-    def run(self, science, matchedTemplate, difference, kernelSources,
+    def run(self, science, matchedTemplate, difference, kernelSources=None,
             idFactory=None, measurementResults=None):
         """Detect and measure sources on a difference image.
 
@@ -575,7 +583,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             difference image.
         difference : `lsst.afw.image.ExposureF`
             Result of subtracting template from the science image.
-        kernelSources : `lsst.afw.table.SourceCatalog`
+        kernelSources : `lsst.afw.table.SourceCatalog`, optional
             Final selection of sources that was used for psf matching.
         idFactory : `lsst.afw.table.IdFactory`, optional
             Generator object used to assign ids to detected sources in the
@@ -684,8 +692,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                 mask.addMaskPlane(mp)
         mask &= ~mask.getPlaneBitMask(self.config.clearMaskPlanes)
 
-    def processResults(self, science, matchedTemplate, difference, sources, idFactory, kernelSources,
-                       positives=None, negatives=None, measurementResults=None):
+    def processResults(self, science, matchedTemplate, difference, sources, idFactory,
+                       kernelSources=None, positives=None, negatives=None, measurementResults=None):
         """Measure and process the results of source detection.
 
         Parameters
@@ -702,7 +710,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         idFactory : `lsst.afw.table.IdFactory`
             Generator object used to assign ids to detected sources in the
             difference image.
-        kernelSources : `lsst.afw.table.SourceCatalog`
+        kernelSources : `lsst.afw.table.SourceCatalog`, optional
             Final selection of sources that was used for psf matching.
         positives : `lsst.afw.table.SourceCatalog`, optional
             Positive polarity footprints.
@@ -798,7 +806,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         if self.config.doMaskStreaks and self.config.writeStreakInfo:
             measurementResults.mergeItems(streakInfo, 'maskedStreaks')
 
-        self.calculateMetrics(science, difference, diaSources, kernelSources)
+        if kernelSources is not None:
+            self.calculateMetrics(science, difference, diaSources, kernelSources)
 
         if np.count_nonzero(~diaSources["sky_source"]) > 0:
             measurementResults.diaSources = diaSources
