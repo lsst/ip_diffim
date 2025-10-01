@@ -47,7 +47,7 @@ __all__ = [
 
 class GetTemplateConnections(
     pipeBase.PipelineTaskConnections,
-    dimensions=("instrument", "visit", "detector", "skymap"),
+    dimensions=("instrument", "visit", "detector"),
     defaultTemplates={"coaddName": "goodSeeing", "warpTypeSuffix": "", "fakesType": ""},
 ):
     bbox = pipeBase.connectionTypes.Input(
@@ -619,7 +619,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
 
 class GetDcrTemplateConnections(
     GetTemplateConnections,
-    dimensions=("instrument", "visit", "detector", "skymap"),
+    dimensions=("instrument", "visit", "detector"),
     defaultTemplates={"coaddName": "dcr", "warpTypeSuffix": "", "fakesType": ""},
 ):
     visitInfo = pipeBase.connectionTypes.Input(
