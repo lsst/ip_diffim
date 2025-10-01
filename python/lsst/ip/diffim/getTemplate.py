@@ -21,7 +21,6 @@
 import collections
 
 import numpy as np
-from deprecated.sphinx import deprecated
 
 import lsst.afw.image as afwImage
 import lsst.geom as geom
