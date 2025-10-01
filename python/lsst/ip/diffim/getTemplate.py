@@ -687,21 +687,6 @@ class GetDcrTemplateTask(GetTemplateTask):
         )
         butlerQC.put(outputs, outputRefs)
 
-    @deprecated(
-        reason="Replaced by getExposures, which uses explicit arguments instead of a kwargs dict. "
-        "This method will be removed after v29.",
-        version="v29.0",
-        category=FutureWarning,
-    )
-    def getOverlappingExposures(self, inputs):
-        return self.getExposures(
-            inputs["dcrCoadds"],
-            inputs["bbox"],
-            inputs["skyMap"],
-            inputs["wcs"],
-            inputs["visitInfo"],
-        )
-
     def getExposures(self, dcrCoaddExposureHandles, bbox, skymap, wcs, visitInfo):
         """Return lists of coadds and their corresponding dataIds that overlap
         the detector.
