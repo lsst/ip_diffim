@@ -23,7 +23,7 @@
 
 
 __all__ = ["evaluateMeanPsfFwhm", "getPsfFwhm", "getKernelCenterDisplacement",
-           "computeDifferenceImageMetrics", "checkMask"
+           "computeDifferenceImageMetrics", "checkMask", "setSourceFootprints",
            ]
 
 import itertools
@@ -456,8 +456,8 @@ def populate_sattle_visit_cache(visit_info, historical=False):
     r.raise_for_status()
 
 
-def checkMask(mask, sources, excludeMaskPlanes, checkAdjacent=True):
-    """Exclude sources that are located on or adjacent to masked pixels.
+def checkMask(mask, sources, excludeMaskPlanes):
+    """Exclude sources that have masked pixels in their footprints.
 
     Parameters
     ----------
@@ -471,7 +471,7 @@ def checkMask(mask, sources, excludeMaskPlanes, checkAdjacent=True):
 
     Returns
     -------
-    flags : `numpy.ndarray` of `bool`
+    good : `numpy.ndarray` of `bool`
         Array indicating whether each source in the catalog should be
         kept (True) or rejected (False) based on the value of the
         mask plane at its location.
@@ -482,16 +482,41 @@ def checkMask(mask, sources, excludeMaskPlanes, checkAdjacent=True):
 
     excludePixelMask = mask.getPlaneBitMask(setExcludeMaskPlanes)
 
-    xv = (np.rint(sources.getX() - mask.getX0())).astype(int)
-    yv = (np.rint(sources.getY() - mask.getY0())).astype(int)
+    good = np.ones(len(sources), dtype=bool)
+    for i, source in enumerate(sources):
+        bbox = source.getFootprint().getBBox()
+        if not mask.getBBox().contains(bbox):
+            good[i] = False
+            continue
 
-    flags = np.ones(len(sources), dtype=bool)
-    if checkAdjacent:
-        pixRange = (0, -1, 1)
-    else:
-        pixRange = (0,)
-    for j in pixRange:
-        for i in pixRange:
-            mv = mask.array[yv + j, xv + i]
-            flags *= np.bitwise_and(mv, excludePixelMask) == 0
-    return flags
+        # Reject footprints with any bad mask bits set.
+        if (mask.subset(bbox).array & excludePixelMask).any():
+            good[i] = False
+            continue
+    return good
+
+
+def setSourceFootprints(sources, kernelSize):
+    """Add footprints of fixed size to a source catalog
+
+    Parameters
+    ----------
+    sources : `lsst.afw.table.SourceCatalog`
+        The source catalog to add footprints to.
+    kernelSize : `int`
+        The "radius" of the footprint, i.e half the size of the bounding box.
+
+    Returns
+    -------
+    sources : `lsst.afw.table.SourceCatalog`
+        The modified source catalog
+    """
+    size = 2*kernelSize + 1
+    for source in sources:
+        bbox = lsst.geom.Box2I.makeCenteredBox(source.getCentroid(),
+                                               lsst.geom.Extent2I(size, size))
+        peak = source.getFootprint().getPeaks()[0]
+        boxFootprint = lsst.afw.detection.Footprint(lsst.afw.geom.SpanSet(bbox))
+        boxFootprint.addPeak(peak.getFx(), peak.getFy(), peak.getPeakValue())
+        source.setFootprint(boxFootprint)
+    return sources
