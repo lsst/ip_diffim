@@ -78,6 +78,15 @@ class GetTemplateConnections(
         deferLoad=True,
         deferGraphConstraint=True,
     )
+    dcrCorrectionCatalog = pipeBase.connectionTypes.Input(
+        doc="Catalog of sub-band fluxes and footprints for moderately bright sources.",
+        storageClass="SourceCatalog",
+        dimensions=("tract", "patch", "skymap", "band"),
+        name="{fakesType}dcr_correction_catalog",
+        multiple=True,
+        deferLoad=True,
+        deferGraphConstraint=True,
+    )
 
     template = pipeBase.connectionTypes.Output(
         doc="Warped template, pixel matched to the bounding box and WCS.",
@@ -85,6 +94,12 @@ class GetTemplateConnections(
         storageClass="ExposureF",
         name="{fakesType}{coaddName}Diff_templateExp{warpTypeSuffix}",
     )
+
+    def __init__(self, *, config=None):
+        super().__init__(config=config)
+
+        if not config.useDcrCorrection:
+            self.outputs.remove("dcrCorrectionCatalog")
 
 
 class GetTemplateConfig(
@@ -119,6 +134,11 @@ class GetTemplateConfig(
         default=0.1,
         doc="Minimum fraction of unmasked pixels needed to set the"
         " HIGH_VARIANCE mask plane.",
+    )
+    useDcrCorrection = pexConfig.Field(
+        dtype=bool,
+        default=False,
+        doc="Use the DCR catalog to correct the shape of included sources",
     )
 
     def setDefaults(self):
@@ -175,11 +195,15 @@ class GetTemplateTask(pipeBase.PipelineTask):
         wcs = inputs.pop("wcs")
         coaddExposures = inputs.pop("coaddExposures")
         skymap = inputs.pop("skyMap")
+        if self.config.useDcrCorrection:
+            dcrCorrectionCatalog = inputs.pop("dcrCorrectionCatalog")
+        else:
+            dcrCorrectionCatalog = None
 
         # This should not happen with a properly configured execution context.
         assert not inputs, "runQuantum got more inputs than expected"
 
-        results = self.getExposures(coaddExposures, bbox, skymap, wcs)
+        results = self.getExposures(coaddExposures, bbox, skymap, wcs, dcrCorrectionCatalog)
         physical_filter = butlerQC.quantum.dataId["physical_filter"]
         outputs = self.run(
             coaddExposureHandles=results.coaddExposures,
@@ -188,10 +212,12 @@ class GetTemplateTask(pipeBase.PipelineTask):
             dataIds=results.dataIds,
             physical_filter=physical_filter,
             visit=outputRefs.template.dataId["visit"],
+            dcrCorrectionCatalog=results.dcrCorrectionCatalog,
         )
         butlerQC.put(outputs, outputRefs)
 
     def getExposures(self, coaddExposureHandles, bbox, skymap, wcs):
+
         """Return a data structure containing the coadds that overlap the
         specified bbox projected onto the sky, and a corresponding data
         structure of their dataIds.
@@ -249,7 +275,16 @@ class GetTemplateTask(pipeBase.PipelineTask):
         overlappingArea = 0
         coaddExposures = collections.defaultdict(list)
         dataIds = collections.defaultdict(list)
-
+        if self.config.useDcrCorrection:
+            # Create a temporary lookup table of the DCR catalogs, so that the list
+            # per tract will have the same order as the coadds and dataIds
+            dcrCorrectionCatalogs = collections.defaultdict(list)
+            dcrCorrectionTempRefs = collections.defaultdict(dict)
+            for dcrRef in dcrCorrectionCatalogHandles:
+                dataId = dcrRef.dataId
+                dcrCorrectionTempRefs[dataId["tract"]][dataId["patch"]] = dcrRef
+        else:
+            dcrCorrectionCatalogs = None
         for coaddRef in coaddExposureHandles:
             dataId = coaddRef.dataId
             patchWcs = skymap[dataId["tract"]].getWcs()
@@ -272,13 +307,20 @@ class GetTemplateTask(pipeBase.PipelineTask):
                 coaddExposures[dataId["tract"]].append(coaddRef)
                 dataIds[dataId["tract"]].append(dataId)
 
+                if self.config.useDcrCorrection:
+                    dcrCorrectionCatalogs[dataId["tract"]].append(
+                        dcrCorrectionTempRefs[dataId["tract"]][dataId["patch"]]
+                    )
+
         if not overlappingArea:
             raise pipeBase.NoWorkFound("No patches overlap detector")
 
-        return pipeBase.Struct(coaddExposures=coaddExposures, dataIds=dataIds)
+        return pipeBase.Struct(coaddExposures=coaddExposures, dataIds=dataIds,
+                               dcrCorrectionCatalogs=dcrCorrectionCatalogs)
 
     @timeMethod
-    def run(self, *, coaddExposureHandles, bbox, wcs, dataIds, physical_filter, visit=None):
+    def run(self, *, coaddExposureHandles, bbox, wcs, dataIds, physical_filter, visit=None,
+            dcrCorrectionHandles=None):
         """Warp coadds from multiple tracts and patches to form a template to
         subtract from a science image.
 
@@ -332,8 +374,9 @@ class GetTemplateTask(pipeBase.PipelineTask):
         warped = {}
         catalogs = []
         for tract in coaddExposureHandles:
+            dcrCorrectionHandlesTract = dcrCorrectionHandles[tract] if self.config.useDcrCorrection else None
             maskedImages, catalog, totalBox = self._makeExposureCatalog(
-                coaddExposureHandles[tract], dataIds[tract]
+                coaddExposureHandles[tract], dataIds[tract], dcrCorrectionHandlesTract,
             )
             warpedBox = computeWarpedBBox(catalog[0].wcs, bbox, wcs)
             warpedBox.grow(5)  # to ensure we catch all relevant input pixels
@@ -467,9 +510,9 @@ class GetTemplateTask(pipeBase.PipelineTask):
         photoCalib = photoCalibs[0]
         return band, photoCalib
 
-    def _makeExposureCatalog(self, exposureRefs, dataIds):
+    def _makeExposureCatalog(self, exposureRefs, dataIds, dcrCorrectionRefs=None):
         """Make an exposure catalog for one tract.
-
+        
         Parameters
         ----------
         exposureRefs : `list` of [`lsst.daf.butler.DeferredDatasetHandle` of \
@@ -478,7 +521,10 @@ class GetTemplateTask(pipeBase.PipelineTask):
         dataIds : `list` [`lsst.daf.butler.DataCoordinate`]
             Data ids of each of the included exposures; must have "tract" and
             "patch" entries.
-
+        dcrCorrectionRefs : `list` of [`lsst.daf.butler.DeferredDatasetHandle` of \
+                        `lsst.afw.table.SourceCatalog`], optional
+            Catalogs with heavy footprints of DCR models for sources in each patch.
+        
         Returns
         -------
         images : `dict` [`lsst.afw.image.MaskedImage`]
@@ -491,11 +537,18 @@ class GetTemplateTask(pipeBase.PipelineTask):
         catalog = afwTable.ExposureCatalog(self.schema)
         catalog.reserve(len(exposureRefs))
         exposures = (exposureRef.get() for exposureRef in exposureRefs)
+        if self.config.useDcrCorrection:
+            dcrCatalogs = (dcrCorrectionRef.get() for dcrCorrectionRef in dcrCorrectionRefs)
+        else:
+            dcrCatalogs = [None, ]*len(exposureRefs)
         images = {}
         totalBox = geom.Box2I()
 
-        for coadd, dataId in zip(exposures, dataIds):
-            images[dataId] = coadd.maskedImage
+        for coadd, dataId, dcrCatalog in zip(exposures, dataIds, dcrCatalogs):
+            if self.config.useDcrCorrection:
+                images[dataId] = applyDcr(coadd.maskedImage, dcrCatalog)
+            else:
+                images[dataId] = coadd.maskedImage
             bbox = coadd.getBBox()
             totalBox = totalBox.expandedTo(bbox)
             record = catalog.addNew()
@@ -847,6 +900,30 @@ class GetDcrTemplateTask(GetTemplateTask):
                 )
                 coaddExposures[tract].append(dcrModel.buildMatchedExposureHandle(visitInfo=visitInfo))
         return coaddExposures
+
+
+def applyDcr(exposure, dcrCatalog):
+    """Summary
+    
+    Parameters
+    ----------
+    exposure : TYPE
+        Description
+    dcrCatalog : TYPE
+        Description
+    """
+    nSubfilters = None
+    for recId in dcrCatalog:
+        dcrShift = calculateDcr(visitInfo, self.wcs, self.effectiveWavelength, self.bandwidth, len(self),
+                                splitSubfilters=splitSubfilters, bbox=bbox)
+        if nSubfilters is None:
+            nSubfilters = dcrCatalog[recId]['numSubfilters']
+        bbox = dcrCatalog[recId].getFootprint().getBBox()
+        flux = dcrCatalog[recId]['modelFlux']
+        model = flux*dcrCatalog[recId].getFootprint().extractImage().array
+        for subfilter in range(nSubfilters):
+            subFlux = dcrCatalog[recId][f'subfilterWeight_{subfilter}']
+        exposure[bbox].image.array -= model
 
 
 def _selectDataRef(coaddRef, tract, patch):
