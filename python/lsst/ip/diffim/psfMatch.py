@@ -42,6 +42,8 @@ class NoKernelCandidatesError(pipeBase.AlgorithmError):
     """Raised if there are too few candidates to compute the PSF matching
     kernel.
     """
+
+    @property
     def metadata(self) -> dict:
         return {}
 
