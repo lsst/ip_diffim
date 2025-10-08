@@ -867,7 +867,7 @@ class PsfMatchTask(pipeBase.Task, abc.ABC):
                     allCellsEmpty = False
                     break
             if allCellsEmpty:
-                raise NoKernelCandidatesError("All spatial cells are emtpy of candidates")
+                raise NoKernelCandidatesError("All spatial cells are empty of candidates")
 
             try:
                 ksv.processKsumDistribution()
