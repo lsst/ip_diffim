@@ -402,6 +402,18 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
 
         return exposure
 
+    def runQuantum(self, butlerQC, inputRefs, outputRefs):
+        inputs = butlerQC.get(inputRefs)
+
+        try:
+            results = self.run(**inputs)
+        except lsst.pipe.base.AlgorithmError as e:
+            error = lsst.pipe.base.AnnotatedPartialOutputsError.annotate(e, self, log=self.log)
+            # No partial outputs for butler to put
+            raise error from e
+
+        butlerQC.put(results, outputRefs)
+
     @timeMethod
     def run(self, template, science, sources, visitSummary=None):
         """PSF match, subtract, and decorrelate two images.

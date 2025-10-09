@@ -42,6 +42,8 @@ class NoKernelCandidatesError(pipeBase.AlgorithmError):
     """Raised if there are too few candidates to compute the PSF matching
     kernel.
     """
+
+    @property
     def metadata(self) -> dict:
         return {}
 
@@ -865,7 +867,7 @@ class PsfMatchTask(pipeBase.Task, abc.ABC):
                     allCellsEmpty = False
                     break
             if allCellsEmpty:
-                raise NoKernelCandidatesError("All spatial cells are emtpy of candidates")
+                raise NoKernelCandidatesError("All spatial cells are empty of candidates")
 
             try:
                 ksv.processKsumDistribution()
