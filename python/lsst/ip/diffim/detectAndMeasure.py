@@ -804,7 +804,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         measurementResults.subtractedMeasuredExposure = difference
 
         if self.config.doMaskStreaks and self.config.writeStreakInfo:
-            measurementResults.mergeItems(streakInfo, 'maskedStreaks')
+            measurementResults.maskedStreaks = streakInfo.maskedStreaks
 
         if kernelSources is not None:
             self.calculateMetrics(science, difference, diaSources, kernelSources)
