@@ -296,11 +296,13 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         default=("base_PixelFlags_flag_offimage",
                  "base_PixelFlags_flag_edge",
                  "base_PixelFlags_flag_interpolatedCenterAll",
-                 "base_PixelFlags_flag_badCenterAll",
-                 "base_PixelFlags_flag_edgeCenterAll",
-                 "base_PixelFlags_flag_nodataCenterAll",
-                 "base_PixelFlags_flag_saturatedCenterAll",
-                 "base_PixelFlags_flag_saturated_templateCenterAll",
+                 "base_PixelFlags_flag_badCenter",
+                 "base_PixelFlags_flag_edgeCenter",
+                 "base_PixelFlags_flag_nodataCenter",
+                 "base_PixelFlags_flag_saturatedCenter",
+                 "base_PixelFlags_flag_saturated_templateCenter",
+                 "base_PixelFlags_flag_spikeCenter",
+                 "base_PixelFlags_flag_spike_templateCenter",
                  ),
     )
     clearMaskPlanes = lsst.pex.config.ListField(
@@ -424,9 +426,11 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
 
         # Keep track of which footprints contain streaks
         self.measurement.plugins["base_PixelFlags"].masksFpAnywhere = [
-            "STREAK", "INJECTED", "INJECTED_TEMPLATE", "HIGH_VARIANCE", "SATURATED_TEMPLATE"]
+            "STREAK", "INJECTED", "INJECTED_TEMPLATE", "HIGH_VARIANCE", "SATURATED_TEMPLATE",
+            "SPIKE", "SPIKE_TEMPLATE"]
         self.measurement.plugins["base_PixelFlags"].masksFpCenter = [
-            "STREAK", "INJECTED", "INJECTED_TEMPLATE", "HIGH_VARIANCE", "SATURATED_TEMPLATE"]
+            "STREAK", "INJECTED", "INJECTED_TEMPLATE", "HIGH_VARIANCE", "SATURATED_TEMPLATE",
+            "SPIKE", "SPIKE_TEMPLATE"]
         self.skySources.avoidMask = ["DETECTED", "DETECTED_NEGATIVE", "BAD", "NO_DATA", "EDGE"]
 
     def validate(self):
