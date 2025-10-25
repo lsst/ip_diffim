@@ -1155,6 +1155,7 @@ def generate_data_id(*,
                      cell_x: int = 4,
                      cell_y: int = 2,
                      band: str = "notR",
+                     subfilter: int = 0
                      ) -> DataCoordinate:
     """Generate a DataCoordinate instance to use as data_id.
 
@@ -1181,10 +1182,6 @@ def generate_data_id(*,
     universe = DimensionUniverse()
 
     instrument = universe["instrument"]
-    instrument_record = instrument.RecordClass(
-        name="DummyCam",
-        class_name="lsst.obs.base.instrument_tests.DummyCam",
-    )
 
     skymap = universe["skymap"]
     skymap_record = skymap.RecordClass(name="test_skymap")
@@ -1195,19 +1192,18 @@ def generate_data_id(*,
     physical_filter = universe["physical_filter"]
     physical_filter_record = physical_filter.RecordClass(name=band, instrument="test", band=band)
 
-    patch_element = universe["patch"]
-    patch_record = patch_element.RecordClass(
-        skymap="test_skymap", tract=tract, patch=patch, cell_x=cell_x, cell_y=cell_y
-    )
+    subfilter_element = universe["subfilter"]
+    subfilter_record = subfilter_element.RecordClass(subfilter=subfilter, band=band)
 
     # A dictionary with all the relevant records.
     record = {
-        "instrument": instrument_record,
-        "patch": patch_record,
-        "tract": 9813,
+        "instrument": instrument,
+        "patch": patch,
+        "tract": tract,
         "band": band_record.name,
         "skymap": skymap_record.name,
         "physical_filter": physical_filter_record,
+        "subfilter": subfilter_record
     }
 
     # A dictionary with all the relevant recordIds.
