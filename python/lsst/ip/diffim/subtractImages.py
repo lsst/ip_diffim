@@ -284,7 +284,7 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
     )
     renameTemplateMask = lsst.pex.config.ListField(
         dtype=str,
-        default=("SAT", "INJECTED", "INJECTED_CORE", "SPIKE"),
+        default=("SAT", "INJECTED", "INJECTED_CORE",),
         doc="Mask planes from the template to propagate to the image difference"
         "with '_TEMPLATE' appended to the name."
     )
