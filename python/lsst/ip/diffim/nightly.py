@@ -77,6 +77,8 @@ __all__ = [
     "AssembleNightlyCoaddTask",
     "FilterDiaSourceNightlyConfig",
     "FilterDiaSourceNightlyTask",
+    "TransformNightlyDiaObjectForcedSourceConfig",
+    "TransformNightlyDiaObjectForcedSourceTask",
     # "DetectCoaddForDiffConfig",
     # "DetectCoaddForDiffTask",
     # "CoaddAlardLuptonSubtractConfig",
@@ -1436,11 +1438,15 @@ class DrpCoaddAssociationPipeTask(DrpAssociationPipeTask):
         # Get the patch bounding box.
         innerPatchBox = geom.Box2D(skyInfo.patchInfo.getInnerBBox())
 
+        # Get the tract inner sky region
+        tractInfo = skyMap[tractId]
+        innerTractSkyRegion = tractInfo.getInnerSkyPolygon()
+
         diaSourceHistory = []
         for catRef in diaSourceTables:
             cat = catRef.get()
 
-            isInTractPatch = self._trimToPatch(cat, innerPatchBox, skyInfo.wcs)
+            isInTractPatch = self._trimToPatch(cat, innerPatchBox, innerTractSkyRegion, skyInfo.wcs)
 
             nDiaSrc = isInTractPatch.sum()
             self.log.info(
@@ -2005,3 +2011,155 @@ class FilterDiaSourceReliabilityNightlyTask(FilterDiaSourceReliabilityTask):
 
     ConfigClass = FilterDiaSourceReliabilityNightlyConfig
     _DefaultName = "filterDiaSourcePostReliabilityNightly"
+
+
+class TransformNightlyDiaObjectForcedSourceConnections(
+    pipeBase.PipelineTaskConnections,
+    dimensions=("tract", "patch", "band", "skymap", "day_obs"),
+):
+    """Connections for TransformNightlyDiaObjectForcedSourceTask with day_obs dimension."""
+    inputCatalogs = pipeBase.connectionTypes.Input(
+        doc="Input catalogs of forced measurements on DiaObjects.",
+        name="nightly_dia_object_forced_source_unstandardized",
+        storageClass="SourceCatalog",
+        dimensions=("tract", "patch", "band", "skymap", "day_obs"),
+        multiple=True,
+        deferLoad=True,
+    )
+    referenceCatalog = pipeBase.connectionTypes.Input(
+        doc="Reference catalog of DiaObjects.",
+        name="nightly_dia_object_full",
+        storageClass="DataFrame",
+        dimensions=("tract", "patch"),
+        deferLoad=True,
+    )
+    outputCatalog = pipeBase.connectionTypes.Output(
+        doc="Output transformed forced photometry catalog.",
+        name="nightly_dia_object_forced_source",
+        storageClass="DataFrame",
+        dimensions=("tract", "patch", "band", "skymap", "day_obs"),
+    )
+
+
+class TransformNightlyDiaObjectForcedSourceConfig(
+    TransformCatalogBaseConfig,
+    pipelineConnections=TransformNightlyDiaObjectForcedSourceConnections,
+):
+    """Configuration for TransformNightlyDiaObjectForcedSourceTask."""
+    referenceColumns = pexConfig.ListField(
+        dtype=str,
+        default=[],
+        doc="Columns from the reference catalog to include in output.",
+    )
+    keyRef = pexConfig.Field(
+        dtype=str,
+        default="diaObjectId",
+        doc="Name of column in reference catalog to use as key for joining.",
+    )
+    key = pexConfig.Field(
+        dtype=str,
+        default="forcedSourceOnDiaObjectId",
+        doc="Name of column in forced source catalog that references the object.",
+    )
+
+    def setDefaults(self):
+        super().setDefaults()
+        # Set default functor file if needed
+        self.functorFile = None
+
+
+class TransformNightlyDiaObjectForcedSourceTask(TransformCatalogBaseTask):
+    """Transform nightly DiaObject forced source catalogs for nightly processing with day_obs dimension.
+
+    This task transforms forced photometry measurements on DiaObject positions
+    into standardized DataFrame format for nightly processing. It inherits from
+    TransformCatalogBaseTask and adds the day_obs dimension to enable nightly
+    processing of forced photometry on DiaObjects.
+
+    The task matches forced source measurements to their corresponding DiaObjects
+    using the configured key columns and optionally includes reference columns
+    from the DiaObject catalog.
+    """
+
+    ConfigClass = TransformNightlyDiaObjectForcedSourceConfig
+    _DefaultName = "transformNightlyDiaObjectForcedSource"
+
+    def runQuantum(self, butlerQC, inputRefs, outputRefs):
+        """Run the task on a quantum.
+
+        Parameters
+        ----------
+        butlerQC : `lsst.pipe.base.QuantumContext`
+            Quantum context for accessing data.
+        inputRefs : `lsst.pipe.base.InputQuantizedConnection`
+            Input references.
+        outputRefs : `lsst.pipe.base.OutputQuantizedConnection`
+            Output references.
+        """
+        inputs = butlerQC.get(inputRefs)
+
+        # Load the forced source catalogs
+        catalogs = [handle.get() for handle in inputs["inputCatalogs"]]
+
+        # Load the reference catalog
+        refCat = inputs["referenceCatalog"].get()
+
+        # Run the transformation
+        outputs = self.run(catalogs, refCat)
+
+        butlerQC.put(outputs, outputRefs)
+
+    def run(self, catalogs, refCat):
+        """Transform forced source catalogs to standardized format.
+
+        Parameters
+        ----------
+        catalogs : `list` of `lsst.afw.table.SourceCatalog`
+            Input forced source catalogs to transform.
+        refCat : `pandas.DataFrame`
+            Reference DiaObject catalog for joining.
+
+        Returns
+        -------
+        result : `lsst.pipe.base.Struct`
+            Struct containing:
+
+            ``outputCatalog``
+                Transformed forced source catalog as DataFrame
+                (`pandas.DataFrame`).
+        """
+        import pandas as pd
+
+        # Convert source catalogs to DataFrames
+        dfs = []
+        for cat in catalogs:
+            df = cat.asAstropy().to_pandas()
+            dfs.append(df)
+
+        # Concatenate all forced source measurements
+        if dfs:
+            forcedDf = pd.concat(dfs, ignore_index=True)
+        else:
+            # Return empty DataFrame with expected schema
+            forcedDf = pd.DataFrame()
+
+        # Apply functors if configured
+        if self.config.functorFile is not None and len(forcedDf) > 0:
+            forcedDf = self.transform(
+                None,  # band - may need to be extracted from dataId
+                forcedDf,
+                self.funcs,
+                dataId=None
+            ).df
+
+        # Join with reference catalog if configured
+        if self.config.referenceColumns and len(forcedDf) > 0 and len(refCat) > 0:
+            # Merge reference columns into forced source DataFrame
+            forcedDf = forcedDf.merge(
+                refCat[self.config.referenceColumns + [self.config.keyRef]],
+                left_on=self.config.key,
+                right_on=self.config.keyRef,
+                how="left"
+            )
+
+        return pipeBase.Struct(outputCatalog=forcedDf)
