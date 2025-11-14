@@ -174,7 +174,7 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         wcs = afwGeom.makeSkyWcs(crpix=crpix, crval=crval, cdMatrix=cdMatrix)
         return wcs
 
-    def makeDummyVisitInfo(self, azimuth, elevation, exposureId=12345, randomizeTime=False):
+    def makeDummyVisitInfo(self, azimuth, elevation, exposureId=12345, randomizeTime=False, rotAngle=0.):
         """Make a self-consistent visitInfo object for testing.
 
         Parameters
@@ -215,7 +215,7 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
                                       datetime_begin=time,
                                       datetime_end=time,
                                       boresight_airmass=airmass,
-                                      boresight_rotation_angle=Angle(0.*u.degree),
+                                      boresight_rotation_angle=Angle(rotAngle*u.degree),
                                       boresight_rotation_coord='sky',
                                       temperature=lsstTemperature,
                                       pressure=lsstPressure,
@@ -261,7 +261,7 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         azimuth = 30.*degrees
         elevation = 65.*degrees
         pixelScale = 0.2*arcseconds
-        visitInfo = self.makeDummyVisitInfo(azimuth, elevation)
+        visitInfo = self.makeDummyVisitInfo(azimuth, elevation, rotAngle=rotAngle.asDegrees())
         wcs = self.makeDummyWcs(rotAngle, pixelScale, crval=visitInfo.getBoresightRaDec())
         dcrShift = calculateDcr(visitInfo, wcs, self.effectiveWavelength,
                                 self.bandwidth, self.dcrNumSubfilters)
@@ -282,15 +282,13 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         amplitude to the altitude, and transform back to pixel coordinates.
         """
         pixelScale = 0.2*arcseconds
-        doFlip = [False, True]
 
         for testIter in range(self.nRandIter):
             rotAngle = 360.*self.rng.rand()*degrees
             azimuth = 360.*self.rng.rand()*degrees
             elevation = (45. + self.rng.rand()*40.)*degrees  # Restrict to 45 < elevation < 85 degrees
-            visitInfo = self.makeDummyVisitInfo(azimuth, elevation)
-            for flip in doFlip:
-                # Repeat the calculation for both WCS orientations
+            visitInfo = self.makeDummyVisitInfo(azimuth, elevation, rotAngle=rotAngle.asDegrees())
+            for flip in [True, False]:
                 wcs = self.makeDummyWcs(rotAngle, pixelScale, crval=visitInfo.getBoresightRaDec(), flipX=flip)
                 dcrShifts = calculateDcr(visitInfo, wcs,
                                          self.effectiveWavelength, self.bandwidth,
@@ -300,7 +298,10 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
                                                 self.dcrNumSubfilters)
                 for refShift, dcrShift in zip(refShifts, dcrShifts):
                     # Use a fairly loose tolerance, since 1% of a pixel is good enough agreement.
-                    self.assertFloatsAlmostEqual(refShift[1], dcrShift[1], rtol=1e-2, atol=1e-2)
+                    if wcs.isFlipped:
+                        self.assertFloatsAlmostEqual(refShift[1], dcrShift[1], rtol=1e-2, atol=1e-2)
+                    else:
+                        self.assertFloatsAlmostEqual(-refShift[1], dcrShift[1], rtol=1e-2, atol=1e-2)
                     self.assertFloatsAlmostEqual(refShift[0], dcrShift[0], rtol=1e-2, atol=1e-2)
 
     def testDcrSubfilterOrder(self):
@@ -311,12 +312,12 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
             rotAngle = 360.*self.rng.rand()*degrees
             azimuth = 360.*self.rng.rand()*degrees
             elevation = (45. + self.rng.rand()*40.)*degrees  # Restrict to 45 < elevation < 85 degrees
-            visitInfo = self.makeDummyVisitInfo(azimuth, elevation)
+            visitInfo = self.makeDummyVisitInfo(azimuth, elevation, rotAngle=rotAngle.asDegrees())
             wcs = self.makeDummyWcs(rotAngle, pixelScale, crval=visitInfo.getBoresightRaDec())
             dcrShift = calculateDcr(visitInfo, wcs, self.effectiveWavelength, self.bandwidth,
                                     self.dcrNumSubfilters)
             # First check that the blue subfilter amplitude is greater than the red subfilter
-            rotation = calculateImageParallacticAngle(visitInfo, wcs).asRadians()
+            rotation = calculateImageParallacticAngle(visitInfo).asRadians()
             ampShift = [dcr[1]*np.sin(rotation) + dcr[0]*np.cos(rotation) for dcr in dcrShift]
             self.assertGreater(ampShift[0], 0.)  # The blue subfilter should be shifted towards zenith
             self.assertLess(ampShift[2], 0.)  # The red subfilter should be shifted away from zenith
@@ -348,13 +349,11 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
 
         The rotation is compared to pre-computed values.
         """
-        cdRotAngle = 0.*degrees
+        rotAngle = 0.*degrees
         azimuth = 130.*degrees
         elevation = 70.*degrees
-        pixelScale = 0.2*arcseconds
-        visitInfo = self.makeDummyVisitInfo(azimuth, elevation)
-        wcs = self.makeDummyWcs(cdRotAngle, pixelScale, crval=visitInfo.getBoresightRaDec())
-        rotAngle = calculateImageParallacticAngle(visitInfo, wcs)
+        visitInfo = self.makeDummyVisitInfo(azimuth, elevation, rotAngle=rotAngle.asDegrees())
+        rotAngle = calculateImageParallacticAngle(visitInfo)
         refAngle = -1.0848032636337364*radians
         self.assertAnglesAlmostEqual(refAngle, rotAngle)
 
@@ -364,38 +363,16 @@ class DcrModelTestTask(lsst.utils.tests.TestCase):
         An observation pointed South and on the meridian should have zenith
         directly to the North, and a parallactic angle of zero.
         """
-        refAngle = 0.*degrees
         azimuth = 180.*degrees  # Telescope is pointed South
-        pixelScale = 0.2*arcseconds
         for testIter in range(self.nRandIter):
             # Any additional arbitrary rotation should fall out of the calculation
-            cdRotAngle = 360*self.rng.rand()*degrees
+            rotAngle = 360*self.rng.rand()*degrees
             elevation = (45. + self.rng.rand()*40.)*degrees  # Restrict to 45 < elevation < 85 degrees
-            visitInfo = self.makeDummyVisitInfo(azimuth, elevation)
-            wcs = self.makeDummyWcs(cdRotAngle, pixelScale, crval=visitInfo.getBoresightRaDec(), flipX=True)
-            rotAngle = calculateImageParallacticAngle(visitInfo, wcs)
-            self.assertAnglesAlmostEqual(refAngle - cdRotAngle, rotAngle, maxDiff=coordinateTolerance)
-
-    def testRotationFlipped(self):
-        """Check the interpretation of rotations in the WCS.
-        """
-        doFlip = [False, True]
-        for testIter in range(self.nRandIter):
-            # Any additional arbitrary rotation should fall out of the calculation
-            cdRotAngle = 360*self.rng.rand()*degrees
-            # Make the telescope be pointed South, so that the parallactic angle is zero.
-            azimuth = 180.*degrees
-            elevation = (45. + self.rng.rand()*40.)*degrees  # Restrict to 45 < elevation < 85 degrees
-            pixelScale = 0.2*arcseconds
-            visitInfo = self.makeDummyVisitInfo(azimuth, elevation)
-            for flip in doFlip:
-                wcs = self.makeDummyWcs(cdRotAngle, pixelScale,
-                                        crval=visitInfo.getBoresightRaDec(),
-                                        flipX=flip)
-                rotAngle = calculateImageParallacticAngle(visitInfo, wcs)
-                if flip:
-                    rotAngle *= -1
-                self.assertAnglesAlmostEqual(cdRotAngle, rotAngle, maxDiff=coordinateTolerance)
+            visitInfo = self.makeDummyVisitInfo(azimuth, elevation, rotAngle=rotAngle.asDegrees())
+            parAngle = calculateImageParallacticAngle(visitInfo)
+            self.assertAnglesAlmostEqual(visitInfo.boresightParAngle, geom.Angle(0.),
+                                         maxDiff=coordinateTolerance)
+            self.assertAnglesAlmostEqual(rotAngle, -parAngle, maxDiff=coordinateTolerance)
 
     def testConditionDcrModelNoChange(self):
         """Conditioning should not change the model if it equals the reference.
