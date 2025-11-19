@@ -804,7 +804,7 @@ def calculateDcr(visitInfo, wcs, effectiveWavelength, bandwidth, dcrNumSubfilter
         The 2D shift due to DCR, in pixels.
         Uses numpy axes ordering (Y, X).
     """
-    rotation = calculateImageParallacticAngle(visitInfo, wcs)
+    rotation = calculateImageParallacticAngle(visitInfo)
     dcrShift = []
     weight = [0.75, 0.25]
     for wl0, wl1 in wavelengthGenerator(effectiveWavelength, bandwidth, dcrNumSubfilters):
@@ -840,15 +840,16 @@ def calculateDcr(visitInfo, wcs, effectiveWavelength, bandwidth, dcrNumSubfilter
     return dcrShift
 
 
-def calculateImageParallacticAngle(visitInfo, wcs):
+def calculateImageParallacticAngle(visitInfo, wcs=None):
     """Calculate the total sky rotation angle of an exposure.
 
     Parameters
     ----------
     visitInfo : `lsst.afw.image.VisitInfo`
         Metadata for the exposure.
-    wcs : `lsst.afw.geom.SkyWcs`
+    wcs : `lsst.afw.geom.SkyWcs`, optional
         Coordinate system definition (wcs) for the exposure.
+        Deprecated, will be removed following v30.
 
     Returns
     -------
@@ -861,14 +862,7 @@ def calculateImageParallacticAngle(visitInfo, wcs):
         A rotation angle of 90 degrees is defined with
         North along the +x axis and East along the -y axis.
     """
-    parAngle = visitInfo.getBoresightParAngle().asRadians()
-    cd = wcs.getCdMatrix()
-    if wcs.isFlipped:
-        cdAngle = (np.arctan2(-cd[0, 1], cd[0, 0]) + np.arctan2(cd[1, 0], cd[1, 1]))/2.
-        rotAngle = (cdAngle + parAngle)*geom.radians
-    else:
-        cdAngle = (np.arctan2(cd[0, 1], -cd[0, 0]) + np.arctan2(cd[1, 0], cd[1, 1]))/2.
-        rotAngle = (cdAngle - parAngle)*geom.radians
+    rotAngle = visitInfo.boresightParAngle - visitInfo.boresightRotAngle
     return rotAngle
 
 
