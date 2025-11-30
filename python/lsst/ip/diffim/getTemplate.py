@@ -682,31 +682,31 @@ class GetTemplateTask(pipeBase.PipelineTask):
         )
         return coaddPsf
 
-    def applyDcr(self, exposure, visitInfo, dcrCatalog):
+    def applyDcr(self, coadd, visitInfo, dcrCatalog):
         """Summary
 
         Parameters
         ----------
-        exposure : TYPE
+        coadd : TYPE
             Description
         dcrCatalog : TYPE
             Description
         """
         nSubfilters = None
         for recId in dcrCatalog:
-            dcrShift = calculateDcr(visitInfo, self.wcs, self.effectiveWavelength, self.bandwidth,
-                                    nSubfilters, bbox=exposure.getBBox())
+            dcrShift = calculateDcr(visitInfo, coadd.wcs, self.effectiveWavelength, self.bandwidth,
+                                    nSubfilters, bbox=coadd.getBBox())
             if nSubfilters is None:
                 nSubfilters = dcrCatalog[recId]['numSubfilters']
             bbox = dcrCatalog[recId].getFootprint().getBBox()
             # flux = dcrCatalog[recId]['modelFlux']
             model = dcrCatalog[recId].getFootprint().extractImage().array
 
-            exposure[bbox].image.array -= model
+            coadd[bbox].image.array -= model
             for subfilter, shift in enumerate(dcrShift):
                 subFlux = dcrCatalog[recId][f'subfilterWeight_{subfilter}']
                 shiftedCutout = ndimage.shift(model, shift)
-                exposure[bbox].image.array += subFlux*shiftedCutout
+                coadd[bbox].image.array += subFlux*shiftedCutout
 
 
 class GetDcrTemplateConnections(
