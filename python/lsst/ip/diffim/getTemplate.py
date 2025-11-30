@@ -693,18 +693,18 @@ class GetTemplateTask(pipeBase.PipelineTask):
             Description
         """
         nSubfilters = None
-        for recId in dcrCatalog:
+        for dcrRecord in dcrCatalog:
             if nSubfilters is None:
-                nSubfilters = dcrCatalog[recId]['numSubfilters']
+                nSubfilters = dcrRecord['numSubfilters']
             dcrShift = calculateDcr(visitInfo, coadd.wcs, self.effectiveWavelength, self.bandwidth,
                                     nSubfilters, bbox=coadd.getBBox())
-            bbox = dcrCatalog[recId].getFootprint().getBBox()
-            # flux = dcrCatalog[recId]['modelFlux']
-            model = dcrCatalog[recId].getFootprint().extractImage().array
+            bbox = dcrRecord.getFootprint().getBBox()
+            # flux = dcrRecord['modelFlux']
+            model = dcrRecord.getFootprint().extractImage().array
 
             coadd[bbox].image.array -= model
             for subfilter, shift in enumerate(dcrShift):
-                subFlux = dcrCatalog[recId][f'subfilterWeight_{subfilter}']
+                subFlux = dcrRecord[f'subfilterWeight_{subfilter}']
                 shiftedCutout = ndimage.shift(model, shift)
                 coadd[bbox].image.array += subFlux*shiftedCutout
 
