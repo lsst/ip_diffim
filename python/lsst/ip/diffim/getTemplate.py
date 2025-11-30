@@ -233,7 +233,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
             dataIds=results.dataIds,
             physical_filter=physical_filter,
             visitInfo=visitInfo,
-            dcrCorrectionCatalogs=results.dcrCorrectionCatalogs,
+            dcrCorrectionHandles=results.dcrCorrectionCatalogs,
         )
         butlerQC.put(outputs, outputRefs)
 
