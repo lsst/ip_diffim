@@ -695,7 +695,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
         nSubfilters = None
         for dcrRecord in dcrCatalog:
             if nSubfilters is None:
-                nSubfilters = dcrRecord['numSubfilters']
+                nSubfilters = int(dcrRecord['numSubfilters'])
             dcrShift = calculateDcr(visitInfo, coadd.wcs, self.effectiveWavelength, self.bandwidth,
                                     nSubfilters, bbox=coadd.getBBox())
             bbox = dcrRecord.getFootprint().getBBox()
