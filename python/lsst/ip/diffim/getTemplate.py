@@ -694,10 +694,10 @@ class GetTemplateTask(pipeBase.PipelineTask):
         """
         nSubfilters = None
         for recId in dcrCatalog:
-            dcrShift = calculateDcr(visitInfo, coadd.wcs, self.effectiveWavelength, self.bandwidth,
-                                    nSubfilters, bbox=coadd.getBBox())
             if nSubfilters is None:
                 nSubfilters = dcrCatalog[recId]['numSubfilters']
+            dcrShift = calculateDcr(visitInfo, coadd.wcs, self.effectiveWavelength, self.bandwidth,
+                                    nSubfilters, bbox=coadd.getBBox())
             bbox = dcrCatalog[recId].getFootprint().getBBox()
             # flux = dcrCatalog[recId]['modelFlux']
             model = dcrCatalog[recId].getFootprint().extractImage().array
