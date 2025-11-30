@@ -707,6 +707,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
                 subFlux = dcrRecord[f'subfilterWeight_{subfilter}']
                 shiftedCutout = ndimage.shift(model, shift)
                 coadd[bbox].image.array += subFlux*shiftedCutout
+        return coadd
 
 
 class GetDcrTemplateConnections(
