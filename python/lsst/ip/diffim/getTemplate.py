@@ -111,8 +111,9 @@ class GetTemplateConnections(
         super().__init__(config=config)
 
         if not config.useDcrCorrection:
-            self.outputs.remove("dcrCorrectionCatalog")
-            self.outputs.remove("throughput")
+            self.inputs.remove("visitInfo")
+            self.inputs.remove("dcrCorrectionCatalog")
+            self.inputs.remove("throughput")
 
 
 class GetTemplateConfig(
@@ -213,10 +214,12 @@ class GetTemplateTask(pipeBase.PipelineTask):
             throughput = fitThroughput(inputs.pop("throughput"))
             self.effectiveWavelength = throughput.effectiveWavelength
             self.bandwidth = throughput.bandwidth
+            visitInfo = inputs.pop("visitInfo")
         else:
             dcrCorrectionCatalogs = None
             self.effectiveWavelength = None
             self.bandwidth = None
+            visitInfo = None
 
         # This should not happen with a properly configured execution context.
         assert not inputs, "runQuantum got more inputs than expected"
@@ -229,6 +232,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
             wcs=wcs,
             dataIds=results.dataIds,
             physical_filter=physical_filter,
+            visitInfo=visitInfo,
             dcrCorrectionCatalogs=results.dcrCorrectionCatalogs,
         )
         butlerQC.put(outputs, outputRefs)
@@ -386,7 +390,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
         for tract in coaddExposureHandles:
             dcrCorrectionHandlesTract = dcrCorrectionHandles[tract] if self.config.useDcrCorrection else None
             maskedImages, catalog, totalBox = self._makeExposureCatalog(
-                coaddExposureHandles[tract], dataIds[tract], dcrCorrectionHandlesTract,
+                coaddExposureHandles[tract], dataIds[tract], visitInfo, dcrCorrectionHandlesTract,
             )
             warpedBox = computeWarpedBBox(catalog[0].wcs, bbox, wcs)
             warpedBox.grow(5)  # to ensure we catch all relevant input pixels
@@ -514,9 +518,9 @@ class GetTemplateTask(pipeBase.PipelineTask):
         photoCalib = photoCalibs[0]
         return band, photoCalib
 
-    def _makeExposureCatalog(self, exposureRefs, dataIds, dcrCorrectionRefs=None):
+    def _makeExposureCatalog(self, exposureRefs, dataIds, visitInfo=None, dcrCorrectionRefs=None):
         """Make an exposure catalog for one tract.
-        
+
         Parameters
         ----------
         exposureRefs : `list` of [`lsst.daf.butler.DeferredDatasetHandle` of \
@@ -528,7 +532,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
         dcrCorrectionRefs : `list` of [`lsst.daf.butler.DeferredDatasetHandle` of \
                         `lsst.afw.table.SourceCatalog`], optional
             Catalogs with heavy footprints of DCR models for sources in each patch.
-        
+
         Returns
         -------
         images : `dict` [`lsst.afw.image.MaskedImage`]
@@ -550,7 +554,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
 
         for coadd, dataId, dcrCatalog in zip(exposures, dataIds, dcrCatalogs):
             if self.config.useDcrCorrection:
-                images[dataId] = self.applyDcr(coadd, dcrCatalog)
+                images[dataId] = self.applyDcr(coadd, visitInfo, dcrCatalog)
             else:
                 images[dataId] = coadd.maskedImage
             bbox = coadd.getBBox()
@@ -678,9 +682,9 @@ class GetTemplateTask(pipeBase.PipelineTask):
         )
         return coaddPsf
 
-    def applyDcr(self, exposure, dcrCatalog):
+    def applyDcr(self, exposure, visitInfo, dcrCatalog):
         """Summary
-        
+
         Parameters
         ----------
         exposure : TYPE
@@ -690,14 +694,14 @@ class GetTemplateTask(pipeBase.PipelineTask):
         """
         nSubfilters = None
         for recId in dcrCatalog:
-            dcrShift = calculateDcr(exposure.visitInfo, self.wcs, self.effectiveWavelength, self.bandwidth,
+            dcrShift = calculateDcr(visitInfo, self.wcs, self.effectiveWavelength, self.bandwidth,
                                     nSubfilters, bbox=exposure.getBBox())
             if nSubfilters is None:
                 nSubfilters = dcrCatalog[recId]['numSubfilters']
             bbox = dcrCatalog[recId].getFootprint().getBBox()
             # flux = dcrCatalog[recId]['modelFlux']
             model = dcrCatalog[recId].getFootprint().extractImage().array
-                
+
             exposure[bbox].image.array -= model
             for subfilter, shift in enumerate(dcrShift):
                 subFlux = dcrCatalog[recId][f'subfilterWeight_{subfilter}']
