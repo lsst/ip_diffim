@@ -27,7 +27,7 @@ import lsst.afw.image as afwImage
 import lsst.geom as geom
 import lsst.pipe.base as pipeBase
 
-__all__ = ["DcrModel", "applyDcr", "calculateDcr", "calculateImageParallacticAngle"]
+__all__ = ["DcrModel", "applyDcr", "calculateDcr", "calculateImageParallacticAngle", "fitThroughput"]
 
 
 class DcrModel:
@@ -888,3 +888,15 @@ def wavelengthGenerator(effectiveWavelength, bandwidth, dcrNumSubfilters):
     wlStep = bandwidth/dcrNumSubfilters
     for wl in np.linspace(lambdaMin, lambdaMax, dcrNumSubfilters, endpoint=False):
         yield (wl, wl + wlStep)
+
+
+def fitThroughput(throughput):
+    wl = np.asarray(throughput["wavelength"])
+    th = np.asarray(throughput["throughput"])
+    effectiveWavelength = np.sum(wl*th)/np.sum(th)
+    inBand = th >= np.max(th)/2
+
+    bandwidth = np.max(wl[inBand]) - np.min(wl[inBand])
+    return pipeBase.Struct(effectiveWavelength=effectiveWavelength,
+                           bandwidth=bandwidth,
+                           )
