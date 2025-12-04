@@ -554,7 +554,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
 
         for coadd, dataId, dcrCatalog in zip(exposures, dataIds, dcrCatalogs):
             if self.config.useDcrCorrection:
-                images[dataId] = self.applyDcr(coadd, visitInfo, dcrCatalog)
+                images[dataId] = self.applyDcr(coadd, visitInfo, dcrCatalog).maskedImage
             else:
                 images[dataId] = coadd.maskedImage
             bbox = coadd.getBBox()
