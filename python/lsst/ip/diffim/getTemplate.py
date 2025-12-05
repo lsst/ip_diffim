@@ -112,7 +112,7 @@ class GetTemplateConnections(
 
         if not config.useDcrCorrection:
             self.inputs.remove("visitInfo")
-            self.inputs.remove("dcrCorrectionCatalog")
+            self.inputs.remove("dcrCorrectionCatalogs")
             self.inputs.remove("throughput")
 
 
