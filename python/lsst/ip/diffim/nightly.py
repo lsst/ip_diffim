@@ -70,29 +70,189 @@ from . import DipoleFitTask
 from . import DetectAndMeasureConfig, DetectAndMeasureTask
 from . import AlardLuptonSubtractConfig, AlardLuptonSubtractTask
 
+# Here are yaml definitions for use of the nightly coadd difference pipeline
+#   makeDirectWarpNight:
+#     class: lsst.drp.tasks.make_direct_warp.MakeDirectWarpTask
+#     config:
+#       connections.calexp_list: preliminary_visit_image
+#       connections.visit_summary: preliminary_visit_summary
+#       connections.warp: direct_warp
+#       connections.masked_fraction_warp: direct_warp_masked_fraction
+#       useVisitSummaryPsf: False
+#       useVisitSummaryWcs: False
+#       useVisitSummaryPhotoCalib: False
+#   assembleNightlyCoadd:
+#     class: lsst.ip.diffim.nightly.AssembleNightlyCoaddTask
+#     config:
+#       doInputMap: false
+#       connections.inputWarps: direct_warp
+#       connections.inputMap: direct_warp_inputMap
+#       connections.coaddExposure: nightly_coadd
+#       connections.nImage: nightly_coadd_nImage
+#       doWriteArtifactMasks: false
+#   detectionNightlyCoadd:
+#     class: lsst.ip.diffim.nightly.DetectCoaddForDiffTask
+#     config:
+#       connections.detectionSchema: nightly_coadd_det_schema
+#       connections.outputSources: nightly_coadd_det
+#       connections.exposure: nightly_coadd
+#       connections.outputExposure: nightly_coadd_post_det
+#       detection.thresholdValue: 50.0
+#   coaddSubtractCalexpImages:
+#     class: lsst.ip.diffim.nightly.CoaddAlardLuptonSubtractTask
+#     config:
+#       allowKernelSourceDetection: true
+#       makeKernel.selectDetection.thresholdValue: 300
+#       connections.science: nightly_coadd_post_det
+#       connections.sources: nightly_coadd_det
+#       connections.difference: nightly_coadd_difference
+#       connections.template: template_coadd
+#       connections.psfMatchingKernel: nightly_difference_kernel
+#       connections.kernelSources: nightly_difference_kernel_sources
+#       connections.matchedTemplate: nightly_template_matched
+#       sourceSelector.doUnresolved: False
+#       sourceSelector.doIsolated: False
+#       sourceSelector.doRequirePrimary: False
+#   detectAndMeasureCoaddDiaSources:
+#     class: lsst.ip.diffim.nightly.DetectAndMeasureCoaddTask
+#     config:
+#         connections.science: nightly_coadd_post_det
+#         connections.matchedTemplate: template_coadd
+#         connections.difference: nightly_coadd_difference # predetection
+#         connections.kernelSources: nightly_difference_kernel_sources
+#         connections.outputSchema: nightly_dia_source_schema
+#         connections.diaSources: nightly_dia_source_unfiltered
+#         connections.subtractedMeasuredExposure: nigthly_difference_image
+#         connections.maskedStreaks: difference_streaks
+#         doSkySources: true
+#         #idGenerator.release_id: parameters.release_ide
+#   filterDiaSourceNightly:
+#     class: lsst.ip.diffim.nightly.FilterDiaSourceNightlyTask
+#     config:
+#       connections.diaSourceCat: nightly_dia_source_unfiltered
+#       connections.filteredDiaSourceCat: nightly_dia_source_unstandardized
+#       connections.rejectedDiaSources: nightly_rejected_dia_source
+#       connections.diffImVisitInfo: nigthly_difference_image.visitInfo
+#       connections.longTrailedSources: nightly_long_trailed_dia_source
+#       doRemoveSkySources: true
+#   computeReliabilityNightly:
+#     class: lsst.ip.diffim.nightly.RBTransiNetNightlyTask
+#     config:
+#       modelPackageStorageMode: butler
+#       connections.science: nightly_coadd_post_det
+#       connections.template: template_coadd
+#       connections.difference: nightly_coadd_difference
+#       connections.diaSources: nightly_dia_source_unstandardized
+#       connections.classifications: nightly_dia_source_rb
+#   filterDiaSourcePostReliabilityNightly:
+#     class: lsst.ip.diffim.nightly.FilterDiaSourceReliabilityNightlyTask
+#     config:
+#       connections.diaSourceCat: nightly_dia_source_unstandardized
+#       connections.reliability: nightly_dia_source_rb
+#       connections.filteredDiaSources: nightly_dia_source_high_reliability
+#       connections.rejectedDiaSources: nightly_dia_source_low_reliability
+#   standardizeNightlyDiaSource:
+#     class: lsst.ip.diffim.nightly.TransformCoaddDiaSourceCatalogTask
+#     config:
+#       connections.diaSourceSchema: nightly_dia_source_schema
+#       connections.diaSourceCat: nightly_dia_source_high_reliability
+#       connections.diffIm: nightly_coadd_difference
+#       connections.diaSourceTable: nightly_dia_source
+#       functorFile: NightlyDiaSource.yaml
+#   associateNightlyDiaSource:
+#     class: lsst.ip.diffim.nightly.DrpCoaddAssociationPipeTask
+#     config:
+#       connections.diaSourceTables: nightly_dia_source
+#       connections.assocDiaSourceTable: nightly_assoc_dia_source
+#       connections.diaObjectTable: nightly_dia_object_pre_calc
+#   calculateNightlyDiaObject:
+#     class: lsst.pipe.tasks.drpDiaCalculationPipe.DrpDiaCalculationPipeTask
+#     config:
+#       connections.assocDiaSourceTable: nightly_assoc_dia_source
+#       connections.diaObjectTable: nightly_dia_object_pre_calc
+#       connections.fullDiaObjectTable: nightly_dia_object_full
+#   consolidateNightlyDiaSource:
+#     class: lsst.pipe.tasks.postprocess.ConsolidateTractTask
+#     config:
+#       connections.inputCatalogs: nightly_assoc_dia_source
+#       connections.outputCatalog: nightly_dia_source_tract
+#   consolidateNightlyDiaObject:
+#     class: lsst.pipe.tasks.postprocess.ConsolidateTractTask
+#     config:
+#       connections.inputCatalogs: nightly_dia_object_full
+#       connections.outputCatalog: nightly_dia_object_tract
+#   forcedPhotNightlyDiaObjectDetector:
+#     class: lsst.ip.diffim.nightly.ForcedPhotCoaddFromDataFrameTask
+#     config:
+#       connections.refCat: nightly_dia_object_full
+#       connections.exposure: nightly_coadd_post_det
+#       connections.measCat: nightly_dia_object_forced_source_unstandardized
+#       idGenerator.packer.n_bands: None
+#   transformNightlyDiaObjectForcedSource:
+#     class: lsst.ip.diffim.nightly.TransformNightlyDiaObjectForcedSourceTask
+#     config:
+#       connections.inputCatalogs: nightly_dia_object_forced_source_unstandardized
+#       connections.referenceCatalog: nightly_dia_object_full
+#       connections.outputCatalog: nightly_dia_object_forced_source
+#
+# Here are subsets to run these versions
+#   nightly:
+#     subset:
+#       - consolidateVisitSummary
+#       - makeDirectWarpNight
+#       - assembleNightlyCoadd
+#       - detectionNightlyCoadd
+#       - coaddSubtractCalexpImages
+#       - detectAndMeasureCoaddDiaSources
+#       - filterDiaSourceNightly
+#       - computeReliabilityNightly
+#       - filterDiaSourcePostReliabilityNightly
+#   nightly_association:
+#     subset:
+#       - standardizeNightlyDiaSource
+#       - associateNightlyDiaSource
+#       - calculateNightlyDiaObject
+#       - consolidateNightlyDiaSource
+#       - consolidateNightlyDiaObject
+#       - forcedPhotNightlyDiaObjectDetector
+#       - transformNightlyDiaObjectForcedSource
+#     description: |
+#       Nightly DiaSource association and DiaObject calculation for tract-level processing.
+
+#       This step runs after the nightly subset which produces standardized DiaSources.
+#       It performs:
+#       - Association of DiaSources into DiaObjects (at patch level)
+#       - Calculation of DiaObject summary statistics
+#       - Consolidation of DiaSources and DiaObjects to tract level
+#       - Forced photometry on DiaObject positions
+#       - Standardization of forced photometry to DataFrame format
+
 __all__ = [
     "SimpleAssociationCoaddConfig",
     "SimpleAssociationCoaddTask",
     "AssembleNightlyCoaddConfig",
     "AssembleNightlyCoaddTask",
+    "DetectCoaddForDiffConfig",
+    "DetectCoaddForDiffTask",
+    "CoaddAlardLuptonSubtractConfig",
+    "CoaddAlardLuptonSubtractTask",
+    "DetectAndMeasureCoaddConfig",
+    "DetectAndMeasureCoaddTask",
+    "TransformCoaddDiaSourceCatalogConfig",
+    "TransformCoaddDiaSourceCatalogTask",
+    "DrpCoaddAssociationPipeConfig",
+    "DrpCoaddAssociationPipeTask",
+    "ForcedPhotCoaddFromDataFrameConfig",
+    "ForcedPhotCoaddFromDataFrameTask",
     "FilterDiaSourceNightlyConfig",
     "FilterDiaSourceNightlyTask",
+    "RBTransiNetNightlyConfig",
+    "RBTransiNetNightlyTask",
+    "FilterDiaSourceReliabilityNightlyConfig",
+    "FilterDiaSourceReliabilityNightlyTask",
     "TransformNightlyDiaObjectForcedSourceConfig",
     "TransformNightlyDiaObjectForcedSourceTask",
-    # "DetectCoaddForDiffConfig",
-    # "DetectCoaddForDiffTask",
-    # "CoaddAlardLuptonSubtractConfig",
-    # "CoaddAlardLuptonSubtractTask",
-    # "DetectAndMeasureCoaddConfig",
-    # "DetectAndMeasureCoaddTask",
-    # "TransformCoaddDiaSourceCatalogConfig",
-    # "TransformCoaddDiaSourceCatalogTask",
-    # "DrpCoaddAssociationPipeConfig",
-    # "DrpCoaddAssociationPipeTask",
-    # "ForcedPhotCoaddFromDataFrameConfig",
-    # "ForcedPhotCoaddFromDataFrameTask",
 ]
-
 
 ##############################################################################################################
 import lsst.pipe.base.connectionTypes as cT
@@ -341,8 +501,10 @@ class SkyMapNightDimensionPacker(SkyMapDimensionPacker):
         date = Time(time_str)
         day_n = (date - self.day_zero).datetime.days
         if day_n >= self._n_nights:
+            last_allowed = (self.day_zero + (self._n_nights - 1) * u.day).value[:10]
             raise ValueError(
-                f"day_obs {dataId['day_obs']} is out of bounds; expected <{self.config.day_zero.value[:10]+self._n_nights}."
+                f"day_obs {dataId['day_obs']} is out of bounds; "
+                f"expected <= {last_allowed}"
             )
 
         packed = dataId["patch"] + self._n_patches * dataId["tract"]
@@ -1755,7 +1917,7 @@ class ForcedPhotCoaddFromDataFrameTask(pipeBase.PipelineTask):
         outputCatalog = lsst.afw.table.SourceCatalog(schema)
         outputCatalog.reserve(len(df))
 
-        for diaObjectId, ra, dec in df[["ra", "dec"]].itertuples():
+        for diaObjectId, ra, dec in df[["diaObjectId", "ra", "dec"]].itertuples(index=False):
             outputRecord = outputCatalog.addNew()
             outputRecord.setId(diaObjectId)
             outputRecord.setCoord(lsst.geom.SpherePoint(ra, dec, lsst.geom.degrees))
@@ -2155,8 +2317,9 @@ class TransformNightlyDiaObjectForcedSourceTask(TransformCatalogBaseTask):
         # Join with reference catalog if configured
         if self.config.referenceColumns and len(forcedDf) > 0 and len(refCat) > 0:
             # Merge reference columns into forced source DataFrame
+            ref_cols = list(self.config.referenceColumns) + [self.config.keyRef]
             forcedDf = forcedDf.merge(
-                refCat[self.config.referenceColumns + [self.config.keyRef]],
+                refCat[ref_cols],
                 left_on=self.config.key,
                 right_on=self.config.keyRef,
                 how="left"
