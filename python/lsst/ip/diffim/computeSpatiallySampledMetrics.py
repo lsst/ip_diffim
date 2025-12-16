@@ -48,12 +48,6 @@ class SpatiallySampledMetricsConnections(pipeBase.PipelineTaskConnections,
         storageClass="ExposureF",
         name="{fakesType}calexp"
     )
-    matchedTemplate = pipeBase.connectionTypes.Input(
-        doc="Warped and PSF-matched template used to create the difference image.",
-        dimensions=("instrument", "visit", "detector"),
-        storageClass="ExposureF",
-        name="{fakesType}{coaddName}Diff_matchedExp",
-    )
     template = pipeBase.connectionTypes.Input(
         doc="Warped and not PSF-matched template used to create the difference image.",
         dimensions=("instrument", "visit", "detector"),
@@ -195,16 +189,13 @@ class SpatiallySampledMetricsTask(lsst.pipe.base.PipelineTask):
             units="radian")
 
     @timeMethod
-    def run(self, science, matchedTemplate, template, difference, diaSources, psfMatchingKernel):
+    def run(self, science, template, difference, diaSources, psfMatchingKernel):
         """Calculate difference image metrics on specific locations across the images
 
         Parameters
         ----------
         science : `lsst.afw.image.ExposureF`
             Science exposure that the template was subtracted from.
-        matchedTemplate : `lsst.afw.image.ExposureF`
-            Warped and PSF-matched template that was used produce the
-            difference image.
         template : `lsst.afw.image.ExposureF`
             Warped and non PSF-matched template that was used produce
             the difference image.
@@ -237,13 +228,13 @@ class SpatiallySampledMetricsTask(lsst.pipe.base.PipelineTask):
                 self.log.info("Unable to calculate metrics for mask plane %s: not in image"%maskPlane)
 
         for src in spatiallySampledMetrics:
-            self._evaluateLocalMetric(src, science, matchedTemplate, template, difference, diaSources,
+            self._evaluateLocalMetric(src, science, template, difference, diaSources,
                                       metricsMaskPlanes=metricsMaskPlanes,
                                       psfMatchingKernel=psfMatchingKernel)
 
         return pipeBase.Struct(spatiallySampledMetrics=spatiallySampledMetrics.asAstropy())
 
-    def _evaluateLocalMetric(self, src, science, matchedTemplate, template, difference, diaSources,
+    def _evaluateLocalMetric(self, src, science, template, difference, diaSources,
                              metricsMaskPlanes, psfMatchingKernel):
         """Calculate image quality metrics at spatially sampled locations.
 
@@ -255,8 +246,6 @@ class SpatiallySampledMetricsTask(lsst.pipe.base.PipelineTask):
             The catalog of detected sources.
         science : `lsst.afw.image.Exposure`
             The science image.
-        matchedTemplate : `lsst.afw.image.Exposure`
-            The reference image, warped and psf-matched to the science image.
         difference : `lsst.afw.image.Exposure`
             Result of subtracting template from the science image.
         metricsMaskPlanes : `list` of `str`
@@ -293,7 +282,7 @@ class SpatiallySampledMetricsTask(lsst.pipe.base.PipelineTask):
             meanDipoleSeparation = np.mean(dipoleSources["ip_diffim_DipoleFit_separation"])
             src.set('dipole_separation', meanDipoleSeparation)
 
-        templateVal = np.median(matchedTemplate[bbox].image.array)
+        templateVal = np.median(template[bbox].image.array)
         scienceVal = np.median(science[bbox].image.array)
         diffimVal = np.median(difference[bbox].image.array)
         src.set('source_density', sourceDensity)
