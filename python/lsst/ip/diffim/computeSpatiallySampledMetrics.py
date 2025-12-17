@@ -63,8 +63,8 @@ class SpatiallySampledMetricsConnections(pipeBase.PipelineTaskConnections,
     diaSources = pipeBase.connectionTypes.Input(
         doc="Filtered diaSources on the difference image.",
         dimensions=("instrument", "visit", "detector"),
-        storageClass="SourceCatalog",
-        name="{fakesType}{coaddName}Diff_candidateDiaSrc",
+        storageClass="ArrowAstropy",
+        name="{fakesType}dia_source_detector",
     )
     psfMatchingKernel = pipeBase.connectionTypes.Input(
         doc="Kernel used to PSF match the science and template images.",
@@ -271,15 +271,15 @@ class SpatiallySampledMetricsTask(lsst.pipe.base.PipelineTask):
         src.set('x', peak['i_x'])
         src.set('y', peak['i_y'])
         src.setCoord(science.wcs.pixelToSky(peak['i_x'], peak['i_y']))
-        selectSources = diaSources[bbox.contains(diaSources.getX(), diaSources.getY())]
+        selectSources = diaSources[bbox.contains(diaSources['x'], diaSources['y'])]
         sourceDensity = len(selectSources)/area
-        dipoleSources = selectSources[selectSources["ip_diffim_DipoleFit_classification"]]
+        dipoleSources = selectSources[selectSources["isDipole"]]
         dipoleDensity = len(dipoleSources)/area
 
         if dipoleSources:
-            meanDipoleOrientation = angleMean(dipoleSources["ip_diffim_DipoleFit_orientation"])
+            meanDipoleOrientation = angleMean(dipoleSources["dipoleAngle"])
             src.set('dipole_direction', meanDipoleOrientation)
-            meanDipoleSeparation = np.mean(dipoleSources["ip_diffim_DipoleFit_separation"])
+            meanDipoleSeparation = np.mean(dipoleSources["dipoleLength"])
             src.set('dipole_separation', meanDipoleSeparation)
 
         templateVal = np.median(template[bbox].image.array)
