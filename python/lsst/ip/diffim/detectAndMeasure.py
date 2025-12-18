@@ -407,7 +407,8 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         # A lower value will detect more features that are less linear.
         self.maskStreaks.absMinimumKernelHeight = 2
 
-        self.measurement.plugins.names |= ["ext_trailedSources_Naive",
+        self.measurement.plugins.names |= ["base_SdssShape",
+                                           "ext_trailedSources_Naive",
                                            "base_LocalPhotoCalib",
                                            "base_LocalWcs",
                                            "ext_shapeHSM_HsmSourceMoments",
