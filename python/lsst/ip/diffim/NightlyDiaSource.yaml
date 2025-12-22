@@ -7,12 +7,6 @@ funcs:
     diaSourceId: # the index of deepCoadd_disSource IS the diaSourceId
         functor: Column
         args: id
-    # visit:
-    #     functor: Column
-    #     args: visit
-    # detector:
-    #     functor: Column
-    #     args: detector
     day_obs:
         functor: Column
         args: day_obs

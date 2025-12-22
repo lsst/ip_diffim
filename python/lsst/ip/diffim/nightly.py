@@ -2227,7 +2227,9 @@ class TransformNightlyDiaObjectForcedSourceConfig(
     def setDefaults(self):
         super().setDefaults()
         # Set default functor file if needed
-        self.functorFile = None
+        self.functorFile = os.path.join("${IP_DIFFIM_DIR}",
+                                        "python", "lsst", "ip", "diffim"
+                                        "NightlyDiaSource.yaml")
 
 
 class TransformNightlyDiaObjectForcedSourceTask(TransformCatalogBaseTask):
