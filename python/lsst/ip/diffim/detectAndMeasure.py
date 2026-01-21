@@ -417,7 +417,7 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         self.measurement.slots.psfShape = "ext_shapeHSM_HsmPsfMoments"
         self.measurement.slots.shape = "ext_shapeHSM_HsmSourceMoments"
         self.measurement.plugins["base_SdssCentroid"].maxDistToPeak = 5.0
-        self.forcedMeasurement.plugins = ["base_TransformedCentroid", "base_PsfFlux"]
+        self.forcedMeasurement.plugins = ["base_TransformedCentroid", "base_PsfFlux", "base_PixelFlags"]
         self.forcedMeasurement.copyColumns = {
             "id": "objectId", "parent": "parentObjectId", "coord_ra": "coord_ra", "coord_dec": "coord_dec"}
         self.forcedMeasurement.slots.centroid = "base_TransformedCentroid"
