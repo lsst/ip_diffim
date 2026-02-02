@@ -243,6 +243,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
 
         # Exposure's validPolygon would be more accurate
         detectorPolygon = geom.Box2D(bbox)
+        detectorCorners = wcs.pixelToSky(detectorPolygon.getCorners())
         overlappingArea = 0
         coaddExposures = collections.defaultdict(list)
         dataIds = collections.defaultdict(list)
@@ -251,11 +252,15 @@ class GetTemplateTask(pipeBase.PipelineTask):
             dataId = coaddRef.dataId
             patchWcs = skymap[dataId["tract"]].getWcs()
             patchBBox = skymap[dataId["tract"]][dataId["patch"]].getOuterBBox()
-            patchCorners = patchWcs.pixelToSky(geom.Box2D(patchBBox).getCorners())
-            patchPolygon = afwGeom.Polygon(wcs.skyToPixel(patchCorners))
-            if patchPolygon.intersection(detectorPolygon):
+            patchPolygon = afwGeom.Polygon(geom.Box2D(patchBBox))
+            # Calculate detector/patch overlap in patch coordinates rather than
+            # detector coordinates because the skymap's inverse mapping
+            # (patchWcs.skyToPixel()) is more stable than the detector's for
+            # arbitrary sky coordinates.
+            detectorInPatchCoordinates = afwGeom.Polygon(patchWcs.skyToPixel(detectorCorners))
+            if patchPolygon.intersection(detectorInPatchCoordinates):
                 overlappingArea += patchPolygon.intersectionSingle(
-                    detectorPolygon
+                    detectorInPatchCoordinates
                 ).calculateArea()
                 self.log.info(
                     "Using template input tract=%s, patch=%s",
