@@ -32,13 +32,13 @@ import lsst.geom
 from lsst.ip.diffim.utils import (evaluateMaskFraction, computeDifferenceImageMetrics,
                                   populate_sattle_visit_cache)
 from lsst.meas.algorithms import SkyObjectsTask, SourceDetectionTask, SetPrimaryFlagsTask, MaskStreaksTask
-from lsst.meas.algorithms import FindGlintTrailsTask
+from lsst.meas.algorithms import FindGlintTrailsTask, FindCosmicRaysConfig, findCosmicRays
 from lsst.meas.base import ForcedMeasurementTask, ApplyApCorrTask, DetectorVisitIdGeneratorConfig
 import lsst.meas.deblender
 import lsst.meas.extensions.trailedSources  # noqa: F401
 import lsst.meas.extensions.shapeHSM
 import lsst.pex.config as pexConfig
-from lsst.pex.exceptions import InvalidParameterError
+from lsst.pex.exceptions import InvalidParameterError, LengthError
 import lsst.pipe.base as pipeBase
 import lsst.utils
 from lsst.utils.timer import timeMethod
@@ -79,6 +79,33 @@ class NoDiaSourcesError(pipeBase.AlgorithmError):
     @property
     def metadata(self):
         return {}
+
+
+class TooManyCosmicRays(pipeBase.AlgorithmError):
+    """Raised if the cosmic ray task fails with too many cosmics.
+
+    Parameters
+    ----------
+    maxCosmicRays : `int`
+        Maximum number of cosmic rays allowed.
+    """
+    def __init__(self, maxCosmicRays, **kwargs):
+        msg = f"Cosmic ray task found more than {maxCosmicRays} cosmics."
+        self.msg = msg
+        self._metadata = kwargs
+        super().__init__(msg, **kwargs)
+        self._metadata["maxCosmicRays"] = maxCosmicRays
+
+    def __str__(self):
+        # Exception doesn't handle **kwargs, so we need a custom str.
+        return f"{self.msg}: {self.metadata}"
+
+    @property
+    def metadata(self):
+        for key, value in self._metadata.items():
+            if not (isinstance(value, int) or isinstance(value, float) or isinstance(value, str)):
+                raise TypeError(f"{key} is of type {type(value)}, but only (int, float, str) are allowed.")
+        return self._metadata
 
 
 class DetectAndMeasureConnections(pipeBase.PipelineTaskConnections,
@@ -201,6 +228,16 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
     subtractFinalBackground = pexConfig.ConfigurableField(
         target=lsst.meas.algorithms.SubtractBackgroundTask,
         doc="Task to perform final background subtraction, after first detection pass.",
+    )
+    doFindCosmicRays = pexConfig.Field(
+        dtype=bool,
+        doc="Detect and mask cosmic rays on the difference image?"
+            "CRs can be interpolated over by setting cosmicray.keepCRs=False",
+        default=True,
+    )
+    cosmicray = pexConfig.ConfigField(
+        dtype=FindCosmicRaysConfig,
+        doc="Options for finding and masking cosmic rays",
     )
     detection = pexConfig.ConfigurableField(
         target=SourceDetectionTask,
@@ -377,6 +414,8 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
                                                          "DETECTED_NEGATIVE",
                                                          "NO_DATA",
                                                          ]
+        # Cosmic ray detection
+        self.cosmicray.keepCRs = True  # do not interpolate over detected CRs
         # DiaSource Detection
         self.detection.thresholdPolarity = "both"
         self.detection.thresholdValue = 5.0
@@ -621,6 +660,11 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
         self._prepareInputs(detectionExposure)
 
+        if self.config.doFindCosmicRays and not self.config.doSubtractBackground:
+            # Detect and interpolate over any remaining cosmic rays
+            # This only needs to run once, right before the final detection.
+            self.findAndMaskCosmicRays(detectionExposure)
+
         # Don't use the idFactory until after deblend+merge, so that we aren't
         # generating ids that just get thrown away (footprint merge doesn't
         # know about past ids).
@@ -638,6 +682,10 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             # First update the mask using the detection image
             difference.setMask(detectionExposure.mask)
             background = self.subtractFinalBackground.run(difference).background
+
+            if self.config.doFindCosmicRays:
+                # Detect and interpolate over any remaining cosmic rays
+                self.findAndMaskCosmicRays(difference)
 
             # Re-run detection to get final footprints
             table = afwTable.SourceTable.make(self.schema)
@@ -1048,6 +1096,39 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                           f"{base_key}_flag_edge", True)
         for diaSource, forcedSource in zip(diaSources, forcedSources):
             diaSource.assign(forcedSource, mapper)
+
+    def findAndMaskCosmicRays(self, difference):
+        """Detect and mask cosmic rays on the difference image.
+
+        Parameters
+        ----------
+        difference : `lsst.afw.image.Exposure`
+            The background-subtracted difference image.
+            The mask plane will be modified in place.
+        """
+        # This is run on a background-subtracted difference image, so the
+        # remaining background should be ~0.
+        medianBg = 0.
+        try:
+            crs = findCosmicRays(
+                difference.maskedImage,
+                difference.psf,
+                medianBg,
+                pexConfig.makePropertySet(self.config.cosmicray),
+                self.config.cosmicray.keepCRs,
+            )
+        except LengthError:
+            raise TooManyCosmicRays(self.config.cosmicray.nCrPixelMax) from None
+        num = 0
+        if crs is not None:
+            mask = difference.maskedImage.mask
+            crBit = mask.getPlaneBitMask("CR")
+            afwDetection.setMaskFromFootprintList(mask, crs, crBit)
+            num = len(crs)
+
+        text = "masked" if self.config.cosmicray.keepCRs else "interpolated over"
+        self.log.info("Identified and %s %s cosmic rays.", text, num)
+        self.metadata["cosmic_ray_count"] = num
 
     def calculateMetrics(self, science, difference, diaSources, kernelSources):
         """Add difference image QA metrics to the Task metadata.
