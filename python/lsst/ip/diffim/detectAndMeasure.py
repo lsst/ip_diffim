@@ -1368,7 +1368,7 @@ class DetectAndMeasureScoreTask(DetectAndMeasureTask):
 
     @timeMethod
     def run(self, science, matchedTemplate, difference, scoreExposure, kernelSources,
-            idFactory=None):
+            idFactory=None, measurementResults=None):
         """Detect and measure sources on a score image.
 
         Parameters
@@ -1388,6 +1388,10 @@ class DetectAndMeasureScoreTask(DetectAndMeasureTask):
             Generator object used to assign ids to detected sources in the
             difference image. Ids from this generator are not set until after
             deblending and merging positive/negative peaks.
+        measurementResults : `lsst.pipe.base.Struct`, optional
+            Result struct that is modified to allow saving of partial outputs
+            for some failure conditions. If the task completes successfully,
+            this is also returned.
 
         Returns
         -------
@@ -1398,6 +1402,8 @@ class DetectAndMeasureScoreTask(DetectAndMeasureTask):
             ``diaSources``  : `lsst.afw.table.SourceCatalog`
                 The catalog of detected sources.
         """
+        if measurementResults is None:
+            measurementResults = pipeBase.Struct()
         if idFactory is None:
             idFactory = lsst.meas.base.IdGenerator().make_table_id_factory()
 
@@ -1420,17 +1426,20 @@ class DetectAndMeasureScoreTask(DetectAndMeasureTask):
                                                           results.positive,
                                                           results.negative)
 
-            return self.processResults(science, matchedTemplate, difference,
-                                       sources, idFactory, kernelSources,
-                                       positives=positives,
-                                       negatives=negatives)
+            self.processResults(science, matchedTemplate, difference,
+                                sources, idFactory, kernelSources,
+                                positives=positives,
+                                negatives=negatives,
+                                measurementResults=measurementResults)
 
         else:
             positives = afwTable.SourceCatalog(self.schema)
             results.positive.makeSources(positives)
             negatives = afwTable.SourceCatalog(self.schema)
             results.negative.makeSources(negatives)
-            return self.processResults(science, matchedTemplate, difference,
-                                       results.sources, idFactory, kernelSources,
-                                       positives=positives,
-                                       negatives=negatives)
+            self.processResults(science, matchedTemplate, difference,
+                                results.sources, idFactory, kernelSources,
+                                positives=positives,
+                                negatives=negatives,
+                                measurementResults=measurementResults)
+        return measurementResults
