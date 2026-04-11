@@ -144,13 +144,25 @@ class SpatiallySampledMetricsTask(lsst.pipe.base.PipelineTask):
             "Median of template at location.",
             units="nJy")
         self.schema.addField(
+            "template_variance", "F",
+            "Median of template variance at location.",
+            units="nJy^2")
+        self.schema.addField(
             "science_value", "F",
             "Median of science at location.",
             units="nJy")
         self.schema.addField(
+            "science_variance", "F",
+            "Median of science variance at location.",
+            units="nJy^2")
+        self.schema.addField(
             "diffim_value", "F",
             "Median of diffim at location.",
             units="nJy")
+        self.schema.addField(
+            "diffim_variance", "F",
+            "Median of diffim variance at location.",
+            units="nJy^2")
         self.schema.addField(
             "science_psfSize", "F",
             "Width of the science image PSF at location.",
@@ -231,8 +243,8 @@ class SpatiallySampledMetricsTask(lsst.pipe.base.PipelineTask):
             self._evaluateLocalMetric(src, science, template, difference, diaSources,
                                       metricsMaskPlanes=metricsMaskPlanes,
                                       psfMatchingKernel=psfMatchingKernel)
-
-        return pipeBase.Struct(spatiallySampledMetrics=spatiallySampledMetrics.asAstropy())
+        spatiallySampledMetrics = spatiallySampledMetrics.copy(deep=True).asAstropy()
+        return pipeBase.Struct(spatiallySampledMetrics=spatiallySampledMetrics)
 
     def _evaluateLocalMetric(self, src, science, template, difference, diaSources,
                              metricsMaskPlanes, psfMatchingKernel):
@@ -283,13 +295,19 @@ class SpatiallySampledMetricsTask(lsst.pipe.base.PipelineTask):
             src.set('dipole_separation', meanDipoleSeparation)
 
         templateVal = np.median(template[bbox].image.array)
+        templateVar = np.median(template[bbox].variance.array)
         scienceVal = np.median(science[bbox].image.array)
+        scienceVar = np.median(science[bbox].variance.array)
         diffimVal = np.median(difference[bbox].image.array)
+        diffimVar = np.median(difference[bbox].variance.array)
         src.set('source_density', sourceDensity)
         src.set('dipole_density', dipoleDensity)
         src.set('template_value', templateVal)
+        src.set('template_variance', templateVar)
         src.set('science_value', scienceVal)
+        src.set('science_variance', scienceVar)
         src.set('diffim_value', diffimVal)
+        src.set('diffim_variance', diffimVar)
         for maskPlane in metricsMaskPlanes:
             src.set("%s_mask_fraction"%maskPlane.lower(),
                     evaluateMaskFraction(difference.mask[bbox], maskPlane)
