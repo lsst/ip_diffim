@@ -155,9 +155,11 @@ class MakeKernelTask(PsfMatchTask):
                                                      fwhmExposureBuffer=self.config.fwhmExposureBuffer,
                                                      fwhmExposureGrid=self.config.fwhmExposureGrid
                                                      )
-
-        if preconvolved:
-            scienceFwhmPix *= np.sqrt(2)
+            # Apply the Gaussian approximation FWHM boost only when
+            # the size was auto-computed. An explicit ``scienceFwhmPix`` is
+            # assumed already to reflect the preconvolved effective width.
+            if preconvolved:
+                scienceFwhmPix *= np.sqrt(2)
         basisList = self.makeKernelBasisList(templateFwhmPix, scienceFwhmPix,
                                              metadata=self.metadata)
         spatialSolution, psfMatchingKernel, backgroundModel = self._solve(kernelCellSet, basisList)
@@ -208,8 +210,8 @@ class MakeKernelTask(PsfMatchTask):
                                                      fwhmExposureBuffer=self.config.fwhmExposureBuffer,
                                                      fwhmExposureGrid=self.config.fwhmExposureGrid
                                                      )
-        if preconvolved:
-            scienceFwhmPix *= np.sqrt(2)
+            if preconvolved:
+                scienceFwhmPix *= np.sqrt(2)
         kernelSize = self.makeKernelBasisList(templateFwhmPix, scienceFwhmPix)[0].getWidth()
         kernelSources = self.makeCandidateList(template, science, kernelSize,
                                                candidateList=candidateList,
