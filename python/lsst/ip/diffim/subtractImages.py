@@ -1277,6 +1277,35 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
         return subtractResults
 
     @staticmethod
+    def _flagScoreEdge(mask, bbox, innerBBox):
+        """Set the ``EDGE`` mask bit on pixels outside ``innerBBox``.
+
+        Parameters
+        ----------
+        mask : `~lsst.afw.image.Mask`
+            Exposure mask that will be modified in place. Must have
+            an ``EDGE`` mask plane.
+        bbox : `~lsst.geom.Box2I`
+            Outer bounding box of the exposure.
+        innerBBox : `~lsst.geom.Box2I`
+            The valid inner region. Pixels
+            outside this bbox will have their ``EDGE`` bit set.
+        """
+        edgeBit = mask.getPlaneBitMask("EDGE")
+        dx0 = innerBBox.getMinX() - bbox.getMinX()
+        dx1 = bbox.getMaxX() - innerBBox.getMaxX()
+        dy0 = innerBBox.getMinY() - bbox.getMinY()
+        dy1 = bbox.getMaxY() - innerBBox.getMaxY()
+        if dy0 > 0:
+            mask.array[:dy0, :] |= edgeBit
+        if dy1 > 0:
+            mask.array[-dy1:, :] |= edgeBit
+        if dx0 > 0:
+            mask.array[:, :dx0] |= edgeBit
+        if dx1 > 0:
+            mask.array[:, -dx1:] |= edgeBit
+
+    @staticmethod
     def _makePreconvolutionKernel(psf):
         """Build a normalized, reflected matched-filter kernel from a PSF.
 
@@ -1382,6 +1411,9 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
                                        kernelResult.psfMatchingKernel,
                                        templateMatched=True, preConvMode=True,
                                        preConvKernel=preConvKernel)
+
+        # Flag the outer ``preConvKernel/2``-wide border as EDGE.
+        self._flagScoreEdge(correctedScore.mask, correctedScore.getBBox(), innerBBox)
 
         return lsst.pipe.base.Struct(scoreExposure=correctedScore,
                                      matchedTemplate=matchedTemplate,
