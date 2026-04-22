@@ -1421,6 +1421,11 @@ class DetectAndMeasureScoreTask(DetectAndMeasureTask):
 
         self._prepareInputs(detectionScoreExposure)
 
+        if self.config.doFindCosmicRays and not self.config.doSubtractBackground:
+            # Detect cosmic rays on the difference image and propagate the mask
+            # to the score image.
+            self.findAndMaskCosmicRays(difference)
+            scoreExposure.mask.array |= difference.mask.array
 
         # Don't use the idFactory until after deblend+merge, so that we aren't
         # generating ids that just get thrown away (footprint merge doesn't
@@ -1440,6 +1445,10 @@ class DetectAndMeasureScoreTask(DetectAndMeasureTask):
             difference.setMask(detectionScoreExposure.mask)
             background = self.subtractFinalBackground.run(difference).background
             scoreExposure.image -= background.getImage()
+
+            if self.config.doFindCosmicRays:
+                self.findAndMaskCosmicRays(difference)
+                scoreExposure.mask.array |= difference.mask.array
 
             table = afwTable.SourceTable.make(self.schema)
             results = self.detection.run(
