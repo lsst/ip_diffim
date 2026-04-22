@@ -1197,6 +1197,69 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         _detection_wrapper(setFlags=False)
         _detection_wrapper(setFlags=True)
 
+    def test_detect_transients_with_background(self):
+        """Background measured on the difference image should be subtracted
+        from the score image so that transients are still detected cleanly.
+        """
+        # Set up the simulated images
+        noiseLevel = 1.
+        staticSeed = 1
+        transientSeed = 6
+        fluxLevel = 500
+        xSize = 512
+        ySize = 512
+        x0 = 123
+        y0 = 456
+        kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel,
+                  "xSize": xSize, "ySize": ySize, "x0": x0, "y0": y0}
+        params = [2.2, 2.1, 2.0, 1.2, 1.1, 1.0]
+
+        bbox2D = lsst.geom.Box2D(lsst.geom.Point2D(x0, y0), lsst.geom.Extent2D(xSize, ySize))
+        background_model = afwMath.Chebyshev1Function2D(params, bbox2D)
+        scienceBase, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6,
+                                             background=background_model, **kwargs)
+        matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
+        subtractTask = subtractImages.AlardLuptonPreconvolveSubtractTask()
+        scienceKernel = scienceBase.psf.getKernel()
+
+        # Configure the detection Task
+        detectionTask = self._setup_detection(doMerge=False, doSubtractBackground=True)
+        kwargs["seed"] = transientSeed
+        kwargs["nSrc"] = 10
+        kwargs["fluxLevel"] = 1000
+
+        def _detection_wrapper(positive=True):
+            transients, transientSources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=8, **kwargs)
+            science = scienceBase.clone()
+            if positive:
+                science.maskedImage += transients.maskedImage
+            else:
+                science.maskedImage -= transients.maskedImage
+            difference = science.clone()
+            difference.maskedImage -= matchedTemplate.maskedImage
+            score = subtractTask._convolveExposure(difference, scienceKernel,
+                                                   subtractTask.convolutionControl)
+            # Keep a copy of the score image before detection so we can verify
+            # that the background was actually subtracted from it.
+            originalScoreMedian = np.median(score.image.array[np.isfinite(score.image.array)])
+            originalDiffimMedian = np.median(difference.image.array[np.isfinite(difference.image.array)])
+            output = detectionTask.run(science, matchedTemplate, difference, score, sources)
+
+            # The background subtraction should leave a non-empty BackgroundList.
+            self.assertGreater(len(output.differenceBackground), 0)
+            # The difference image should have been modified in place by the
+            # background subtraction, so its median should shift noticeably.
+            subtractedScoreMedian = np.median(score.image.array[np.isfinite(score.image.array)])
+            self.assertNotAlmostEqual(originalScoreMedian, subtractedScoreMedian, places=3)
+            subtractedDiffimMedian = np.median(difference.image.array[np.isfinite(difference.image.array)])
+            self.assertNotAlmostEqual(originalDiffimMedian, subtractedDiffimMedian, places=3)
+
+            refIds = []
+            scale = 1. if positive else -1.
+            for transient in transientSources:
+                self._check_diaSource(output.diaSources, transient, refIds=refIds, scale=scale)
+        _detection_wrapper(positive=True)
+        _detection_wrapper(positive=False)
 
 class TestNegativePeaks(lsst.utils.tests.TestCase):
     """Tests of deblending and merging negative peaks, to test fixes for the
