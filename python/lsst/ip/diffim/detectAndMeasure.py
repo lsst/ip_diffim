@@ -1407,7 +1407,20 @@ class DetectAndMeasureScoreTask(DetectAndMeasureTask):
         if idFactory is None:
             idFactory = lsst.meas.base.IdGenerator().make_table_id_factory()
 
-        self._prepareInputs(scoreExposure)
+        if self.config.doSubtractBackground:
+            # Background is measured on the difference image, and then
+            # subtracted from both the difference and score images.
+            # The preconvolution kernel is normalized to 1, so the
+            # same background level applies to both.
+            background = self.subtractInitialBackground.run(difference.clone()).background
+            detectionScoreExposure = scoreExposure.clone()
+            detectionScoreExposure.image -= background.getImage()
+        else:
+            detectionScoreExposure = scoreExposure
+            background = afwMath.BackgroundList()
+
+        self._prepareInputs(detectionScoreExposure)
+
 
         # Don't use the idFactory until after deblend+merge, so that we aren't
         # generating ids that just get thrown away (footprint merge doesn't
@@ -1415,9 +1428,28 @@ class DetectAndMeasureScoreTask(DetectAndMeasureTask):
         table = afwTable.SourceTable.make(self.schema)
         results = self.detection.run(
             table=table,
-            exposure=scoreExposure,
+            exposure=detectionScoreExposure,
             doSmooth=False,
+            background=background,
         )
+
+        if self.config.doSubtractBackground:
+            # Refine the background with detected peaks flagged in the mask.
+            # The refinement is fit on the difference and also applied
+            # to the score image.
+            difference.setMask(detectionScoreExposure.mask)
+            background = self.subtractFinalBackground.run(difference).background
+            scoreExposure.image -= background.getImage()
+
+            table = afwTable.SourceTable.make(self.schema)
+            results = self.detection.run(
+                table=table,
+                exposure=scoreExposure,
+                doSmooth=False,
+                background=background,
+            )
+        measurementResults.differenceBackground = background
+
         # Copy the detection mask from the Score image to the difference image
         difference.mask.assign(scoreExposure.mask, scoreExposure.getBBox())
 
