@@ -1295,10 +1295,25 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
         -------
         kernel : `~lsst.afw.math.FixedKernel`
             The PSF reflected about both axes, normalized to sum to one.
+
+        Raises
+        ------
+        RuntimeError
+            Raised if the PSF kernel has an even size along either axis.
+            The reflection ``[::-1, ::-1]`` only preserves the peak pixel
+            (and therefore the kernel center) for odd-sized kernels; an
+            even-sized kernel would be silently off-center by one pixel
+            after reflection and produce a misaligned matched filter.
         """
         avgPos = psf.getAveragePosition()
         localKernel = psf.getLocalKernel(avgPos)
-        kimg = lsst.afw.image.ImageD(localKernel.getDimensions())
+        dims = localKernel.getDimensions()
+        width, height = dims.getX(), dims.getY()
+        if width % 2 == 0 or height % 2 == 0:
+            raise RuntimeError(
+                f"Preconvolution requires an odd-sized PSF kernel, got {width}x{height}. "
+            )
+        kimg = lsst.afw.image.ImageD(dims)
         localKernel.computeImage(kimg, True)  # normalize to unit sum
         # Reflect about the kernel center. PSF kernels are odd-sized,
         # so ``[::-1, ::-1]`` places the peak at the same pixel.

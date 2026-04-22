@@ -485,7 +485,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         offset = 1
         xSize = 300
         ySize = 300
-        kernelSize = 32
+        kernelSize = 31
         # Avoid placing sources near the edge for this test, so that we can
         # easily check that the correct number of sources are detected.
         templateBorderSize = kernelSize//2
@@ -1050,7 +1050,7 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         offset = 1
         xSize = 300
         ySize = 300
-        kernelSize = 32
+        kernelSize = 31
         # Avoid placing sources near the edge for this test, so that we can
         # easily check that the correct number of sources are detected.
         templateBorderSize = kernelSize//2
