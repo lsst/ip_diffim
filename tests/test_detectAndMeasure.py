@@ -447,12 +447,14 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         # Add CR-like shape and check that CR is detected
         # Pick two locations on top of sources, since that is what is likely to
         # be missed in the first stage of CR rejection.
-        difference.image.array[crX0:crX0+1, crY0:crY0+5] += 1234  # Arbitrary but large flux for the CRs
-        difference.image.array[crX1:crX1+5, crY1:crY1+1] += 1234
+        crMaskSetInput = np.zeros(difference.image.array.shape, bool)
+        crMaskSetInput[crX0:crX0+1, crY0:crY0+5] = True
+        crMaskSetInput[crX1:crX1+5, crY1:crY1+1] = True
+        difference.image.array[crMaskSetInput] += 1234
         output = detectionTask.run(science, matchedTemplate, difference)
         crMaskSet = (output.subtractedMeasuredExposure.mask.array & crMask) > 0
-        self.assertTrue(np.all(crMaskSet[crX0:crX0+1, crY0:crY0+5]))
-        self.assertTrue(np.all(crMaskSet[crX1:crX1+5, crY1:crY1+1]))
+        self.assertFalse(np.any(crMaskSet[~crMaskSetInput]))
+        self.assertTrue(np.all(crMaskSet[crMaskSetInput]))
 
     def test_missing_mask_planes(self):
         """Check that detection runs with missing mask planes.
@@ -1260,6 +1262,55 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
                 self._check_diaSource(output.diaSources, transient, refIds=refIds, scale=scale)
         _detection_wrapper(positive=True)
         _detection_wrapper(positive=False)
+
+    def test_mask_cosmic_rays(self):
+        """Cosmic rays detected on the difference image should propagate
+        to the mask of the returned (measured) exposure. This version creates
+        and uses a Score image for detection.
+        """
+        # Set up the simulated images
+        noiseLevel = 1.
+        staticSeed = 1
+        fluxLevel = 500
+        xSize = 400
+        ySize = 400
+        kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel,
+                  "xSize": xSize, "ySize": ySize}
+        science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
+        matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
+        subtractTask = subtractImages.AlardLuptonPreconvolveSubtractTask()
+        scienceKernel = science.psf.getKernel()
+        crMask = science.mask.getPlaneBitMask("CR")
+
+        # Configure the detection Task
+        detectionTask = self._setup_detection(doMerge=False, doSkySources=True)
+
+        # Test that no CRs are detected when none are present.
+        transients, _ = makeTestImage(noiseLevel=noiseLevel, noiseSeed=8, nSrc=10, **kwargs)
+        science.maskedImage += transients.maskedImage
+        difference = science.clone()
+        difference.maskedImage -= matchedTemplate.maskedImage
+        score = subtractTask._convolveExposure(difference, scienceKernel, subtractTask.convolutionControl)
+        output = detectionTask.run(science, matchedTemplate, difference, score, sources)
+        self.assertFalse(np.any((output.subtractedMeasuredExposure.mask.array & crMask) > 0))
+
+        crX0 = round(sources.getX()[0] - science.getX0())
+        crY0 = round(sources.getY()[0] - science.getY0())
+        crX1 = round(sources.getX()[1] - science.getX0())
+        crY1 = round(sources.getY()[1] - science.getY0())
+        # Inject CR-like shapes into the difference image. CR detection runs
+        # on the difference, and the mask should propagate to the measured
+        # exposure returned by the task.
+        crMaskSetInput = np.zeros(difference.image.array.shape, bool)
+        crMaskSetInput[crX0:crX0+1, crY0:crY0+5] = True
+        crMaskSetInput[crX1:crX1+5, crY1:crY1+1] = True
+        difference.image.array[crMaskSetInput] += 1234
+        score = subtractTask._convolveExposure(difference, scienceKernel, subtractTask.convolutionControl)
+        output = detectionTask.run(science, matchedTemplate, difference, score, sources)
+        crMaskSet = (output.subtractedMeasuredExposure.mask.array & crMask) > 0
+        self.assertFalse(np.any(crMaskSet[~crMaskSetInput]))
+        self.assertTrue(np.all(crMaskSet[crMaskSetInput]))
+
 
 class TestNegativePeaks(lsst.utils.tests.TestCase):
     """Tests of deblending and merging negative peaks, to test fixes for the
