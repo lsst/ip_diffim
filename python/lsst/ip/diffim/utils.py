@@ -27,13 +27,16 @@ __all__ = ["evaluateMeanPsfFwhm", "getPsfFwhm", "getKernelCenterDisplacement",
            ]
 
 import itertools
-import numpy as np
 import os
 import requests
-import lsst.geom as geom
+
+from astropy.stats import gaussian_sigma_to_fwhm
+import numpy as np
+
 import lsst.afw.detection as afwDetection
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
+import lsst.geom as geom
 from lsst.pex.exceptions import InvalidParameterError, RangeError
 import lsst.pipe.base
 from lsst.utils.logging import getLogger
@@ -129,12 +132,12 @@ def getPsfFwhm(psf, average=True, position=None):
     if position is None:
         position = psf.getAveragePosition()
     shape = psf.computeShape(position)
-    sigmaToFwhm = 2*np.log(2*np.sqrt(2))
 
     if average:
-        return sigmaToFwhm*shape.getTraceRadius()
+        return gaussian_sigma_to_fwhm*shape.getTraceRadius()
     else:
-        return [sigmaToFwhm*np.sqrt(shape.getIxx()), sigmaToFwhm*np.sqrt(shape.getIyy())]
+        return [gaussian_sigma_to_fwhm*np.sqrt(shape.getIxx()),
+                gaussian_sigma_to_fwhm*np.sqrt(shape.getIyy())]
 
 
 def evaluateMeanPsfFwhm(exposure: afwImage.Exposure,

@@ -20,6 +20,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from astropy import units as u
+from astropy.stats import gaussian_fwhm_to_sigma
 import numpy as np
 
 import lsst.afw.detection as afwDetection
@@ -612,10 +613,9 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         """
         kernelSize = self.makeKernel.makeKernelBasisList(
             self.templatePsfSize, self.sciencePsfSize)[0].getWidth()
-        sigmaToFwhm = 2*np.log(2*np.sqrt(2))
         candidateList = self.makeKernel.makeCandidateList(template, science, kernelSize,
                                                           candidateList=None,
-                                                          sigma=self.sciencePsfSize/sigmaToFwhm)
+                                                          sigma=gaussian_fwhm_to_sigma*self.sciencePsfSize)
         sources = self.makeKernel.selectKernelSources(template, science,
                                                       candidateList=candidateList,
                                                       preconvolved=False,

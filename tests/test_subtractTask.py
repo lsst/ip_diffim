@@ -980,7 +980,7 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
         self.assertTrue(np.isnan(maglim_template_offimage))
         # Test that given the provided fallbackPsfSize, the diffim limiting
         # magnitude is calculated correctly.
-        maglim_template_offimage = 28.3173123103493
+        maglim_template_offimage = 28.182284789714952
         fluxlim_template_offimage = (maglim_template_offimage*u.ABmag).to_value(u.nJy)
         maglim_offimage = (np.sqrt(fluxlim_science**2 + fluxlim_template_offimage**2)*u.nJy).to(u.ABmag).value
         self.assertEqual(subtractTask_offimage.metadata['diffimLimitingMagnitude'], maglim_offimage)
