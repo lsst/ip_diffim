@@ -19,6 +19,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+from astropy.stats import gaussian_sigma_to_fwhm
 import numpy as np
 
 import lsst.geom
@@ -45,13 +46,12 @@ class UtilsCalculationsTest(lsst.utils.tests.TestCase):
     def test_getPsfFwhm(self):
         """Calculation of FWHM from a realization of the PSF
         """
-        sigmaToFwhm = 2*np.log(2*np.sqrt(2))
 
         def make_and_check_psf(xKsize, yKsize, sigma):
             psf = measAlg.SingleGaussianPsf(xKsize, yKsize, sigma)
             psfSize = getPsfFwhm(psf)
             psfSize2d = getPsfFwhm(psf, average=False)
-            self.assertFloatsAlmostEqual(sigma*sigmaToFwhm, psfSize, rtol=0.01)
+            self.assertFloatsAlmostEqual(gaussian_sigma_to_fwhm*sigma, psfSize, rtol=0.01)
             self.assertFloatsAlmostEqual(psfSize, psfSize2d[0], rtol=0.01)
             self.assertFloatsAlmostEqual(psfSize, psfSize2d[1], rtol=0.01)
 
