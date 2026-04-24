@@ -717,7 +717,6 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         # Place back on native photometric scale
         matchedScience.maskedImage /= norm
         matchedTemplate = template.clone()[bbox]
-        matchedTemplate.maskedImage /= norm
         matchedTemplate.setPhotoCalib(science.photoCalib)
 
         if backgroundModel is not None:
