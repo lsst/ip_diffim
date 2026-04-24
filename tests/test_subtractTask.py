@@ -119,7 +119,7 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
         xSize = 400
         ySize = 400
         nSources = 80
-        science, sources = makeTestImage(psfSize=3.0, noiseLevel=noiseLevel, noiseSeed=6, nSrc=nSources,
+        science, sources = makeTestImage(psfSize=2.4, noiseLevel=noiseLevel, noiseSeed=6, nSrc=nSources,
                                          xSize=xSize, ySize=ySize)
         template, _ = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=7, nSrc=nSources,
                                     templateBorderSize=border, doApplyCalibration=True,
@@ -150,12 +150,12 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
             else:
                 task.run(template_cut, science.clone(), sources.copy(deep=True))
         _run_and_check_coverage(template_coverage=0.09)
-        _run_and_check_coverage(template_coverage=0.19)
+        _run_and_check_coverage(template_coverage=0.15)
         _run_and_check_coverage(template_coverage=0.7)
 
     def test_clear_template_mask(self):
         noiseLevel = 1.
-        science, sources = makeTestImage(psfSize=3.0, noiseLevel=noiseLevel, noiseSeed=6)
+        science, sources = makeTestImage(psfSize=2.4, noiseLevel=noiseLevel, noiseSeed=6)
         template, _ = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=7,
                                     templateBorderSize=20, doApplyCalibration=True)
         diffimEmptyMaskPlanes = ["DETECTED", "DETECTED_NEGATIVE"]
@@ -304,7 +304,7 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
         the template psf is the smaller.
         """
         noiseLevel = 1.
-        science, sources = makeTestImage(psfSize=3.0, noiseLevel=noiseLevel, noiseSeed=6)
+        science, sources = makeTestImage(psfSize=2.4, noiseLevel=noiseLevel, noiseSeed=6)
         template, _ = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=7,
                                     templateBorderSize=20, doApplyCalibration=True)
         task = self._setup_subtraction(mode="convolveTemplate")
@@ -320,7 +320,7 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
         """
         noiseLevel = 1.
         science, sources = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=6)
-        template, _ = makeTestImage(psfSize=3.0, noiseLevel=noiseLevel, noiseSeed=7,
+        template, _ = makeTestImage(psfSize=2.4, noiseLevel=noiseLevel, noiseSeed=7,
                                     templateBorderSize=20, doApplyCalibration=True)
         task = self._setup_subtraction(mode="convolveScience")
         output = task.run(template.clone(), science.clone(), sources)
@@ -338,7 +338,7 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
 
         def _run_and_check_images(statsCtrl, statsCtrlDetect, scienceNoiseLevel, templateNoiseLevel):
             science, sources = makeTestImage(psfSize=2.0, noiseLevel=scienceNoiseLevel, noiseSeed=6)
-            template, _ = makeTestImage(psfSize=3.0, noiseLevel=templateNoiseLevel, noiseSeed=7,
+            template, _ = makeTestImage(psfSize=2.3, noiseLevel=templateNoiseLevel, noiseSeed=7,
                                         templateBorderSize=20, doApplyCalibration=True)
             task = self._setup_subtraction(mode="convolveScience")
             output = task.run(template, science, sources)
@@ -372,7 +372,7 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
         statsCtrlDetect = makeStats(badMaskPlanes=("EDGE", "BAD", "NO_DATA"))
 
         def _run_and_check_images(statsCtrl, statsCtrlDetect, scienceNoiseLevel, templateNoiseLevel):
-            science, sources = makeTestImage(psfSize=3.0, noiseLevel=scienceNoiseLevel, noiseSeed=6)
+            science, sources = makeTestImage(psfSize=2.4, noiseLevel=scienceNoiseLevel, noiseSeed=6)
             template, _ = makeTestImage(psfSize=2.0, noiseLevel=templateNoiseLevel, noiseSeed=7,
                                         templateBorderSize=20, doApplyCalibration=True)
             task = self._setup_subtraction()
@@ -410,7 +410,7 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
         #  comparable when we swap which image is treated as the "science" image.
         science, sources = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel,
                                          noiseSeed=6, templateBorderSize=0, doApplyCalibration=True)
-        template, _ = makeTestImage(psfSize=3.0, noiseLevel=noiseLevel,
+        template, _ = makeTestImage(psfSize=2.4, noiseLevel=noiseLevel,
                                     noiseSeed=7, templateBorderSize=0, doApplyCalibration=True)
         task = self._setup_subtraction(mode='auto')
 
@@ -640,7 +640,7 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
             varMean = computeRobustStatistics(output.difference.variance, output.difference.mask, statsCtrl)
             self.assertFloatsAlmostEqual(varMean, scienceNoise + templateNoise, rtol=0.1)
 
-        science, sources = makeTestImage(psfSize=3.0, noiseLevel=scienceNoiseLevel, noiseSeed=6)
+        science, sources = makeTestImage(psfSize=2.4, noiseLevel=scienceNoiseLevel, noiseSeed=6)
         template, _ = makeTestImage(psfSize=2.0, noiseLevel=templateNoiseLevel, noiseSeed=7,
                                     templateBorderSize=20, doApplyCalibration=True)
         # Verify that the variance plane of the difference image is correct
@@ -710,7 +710,7 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
             self.assertFloatsAlmostEqual(varMean, scienceNoise + templateNoise, rtol=0.1)
 
         science, sources = makeTestImage(psfSize=2.0, noiseLevel=scienceNoiseLevel, noiseSeed=6)
-        template, _ = makeTestImage(psfSize=3.0, noiseLevel=templateNoiseLevel, noiseSeed=7,
+        template, _ = makeTestImage(psfSize=2.4, noiseLevel=templateNoiseLevel, noiseSeed=7,
                                     templateBorderSize=20, doApplyCalibration=True)
         # Verify that the variance plane of the difference image is correct
         #  when the template and science variance planes are correct
@@ -743,7 +743,7 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
         noiseLevel = 1.
         seed = 37
         rng = np.random.RandomState(seed)
-        science, sources = makeTestImage(psfSize=3.0, noiseLevel=noiseLevel, noiseSeed=6)
+        science, sources = makeTestImage(psfSize=2.4, noiseLevel=noiseLevel, noiseSeed=6)
         psf = science.psf
         psfAvgPos = psf.getAveragePosition()
         psfSize = getPsfFwhm(science.psf)
@@ -791,7 +791,7 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
         seed = 37
         rng = np.random.RandomState(seed)
         science, sources = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=6)
-        template, _ = makeTestImage(psfSize=3.0, noiseLevel=noiseLevel, noiseSeed=7,
+        template, _ = makeTestImage(psfSize=2.4, noiseLevel=noiseLevel, noiseSeed=7,
                                     templateBorderSize=20, doApplyCalibration=True)
         psf = template.psf
         psfAvgPos = psf.getAveragePosition()
@@ -1044,7 +1044,7 @@ class AlardLuptonPreconvolveSubtractTest(AlardLuptonSubtractTestBase, lsst.utils
         border = 20
         xSize = 400
         ySize = 400
-        science, sources = makeTestImage(psfSize=3.0, noiseLevel=noiseLevel, noiseSeed=6,
+        science, sources = makeTestImage(psfSize=2.4, noiseLevel=noiseLevel, noiseSeed=6,
                                          xSize=xSize, ySize=ySize)
         template, _ = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=7,
                                     templateBorderSize=border, doApplyCalibration=True,
@@ -1052,12 +1052,17 @@ class AlardLuptonPreconvolveSubtractTest(AlardLuptonSubtractTestBase, lsst.utils
 
         science_height = science.getBBox().getDimensions().getY()
 
-        def _run_and_check_coverage(template_coverage):
+        def _run_and_check_coverage(template_coverage,
+                                    requiredTemplateFraction=0.1,
+                                    minTemplateFractionForExpectedSuccess=0.2):
             template_cut = template.clone()
             template_height = int(science_height*template_coverage + border)
             template_cut.image.array[:, template_height:] = 0
             template_cut.mask.array[:, template_height:] = template_cut.mask.getPlaneBitMask('NO_DATA')
-            task = self._setup_subtraction()
+            task = self._setup_subtraction(
+                requiredTemplateFraction=requiredTemplateFraction,
+                minTemplateFractionForExpectedSuccess=minTemplateFractionForExpectedSuccess
+            )
             if template_coverage < task.config.requiredTemplateFraction:
                 doRaise = True
             elif template_coverage < task.config.minTemplateFractionForExpectedSuccess:
@@ -1070,14 +1075,14 @@ class AlardLuptonPreconvolveSubtractTest(AlardLuptonSubtractTestBase, lsst.utils
             else:
                 task.run(template_cut, science.clone(), sources.copy(deep=True))
         _run_and_check_coverage(template_coverage=0.09)
-        _run_and_check_coverage(template_coverage=0.19)
+        _run_and_check_coverage(template_coverage=0.15)
         _run_and_check_coverage(template_coverage=.7)
 
     def test_clear_template_mask(self):
         noiseLevel = 1.
         xSize = 400
         ySize = 400
-        science, sources = makeTestImage(psfSize=3.0, noiseLevel=noiseLevel, noiseSeed=6,
+        science, sources = makeTestImage(psfSize=2.4, noiseLevel=noiseLevel, noiseSeed=6,
                                          xSize=xSize, ySize=ySize)
         template, _ = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=7,
                                     templateBorderSize=20, doApplyCalibration=True,
@@ -1125,7 +1130,7 @@ class AlardLuptonPreconvolveSubtractTest(AlardLuptonSubtractTestBase, lsst.utils
         science, sources = makeTestImage(psfSize=2.4, noiseLevel=noiseLevel,
                                          noiseSeed=6, templateBorderSize=0,
                                          xSize=xSize, ySize=ySize)
-        template1, _ = makeTestImage(psfSize=3.0, noiseLevel=noiseLevel,
+        template1, _ = makeTestImage(psfSize=2.8, noiseLevel=noiseLevel,
                                      noiseSeed=7, doApplyCalibration=True,
                                      xSize=xSize, ySize=ySize)
         template2, _ = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel,
@@ -1266,7 +1271,7 @@ class AlardLuptonPreconvolveSubtractTest(AlardLuptonSubtractTestBase, lsst.utils
                                               statsCtrl)
             self.assertFloatsAlmostEqual(varMean, scienceNoise + templateNoise, rtol=0.1)
 
-        science, sources = makeTestImage(psfSize=3.0, noiseLevel=scienceNoiseLevel, noiseSeed=6,
+        science, sources = makeTestImage(psfSize=2.4, noiseLevel=scienceNoiseLevel, noiseSeed=6,
                                          xSize=xSize, ySize=ySize)
         template, _ = makeTestImage(psfSize=2.0, noiseLevel=templateNoiseLevel, noiseSeed=7,
                                     templateBorderSize=20, doApplyCalibration=True,
@@ -1302,7 +1307,7 @@ class AlardLuptonPreconvolveSubtractTest(AlardLuptonSubtractTestBase, lsst.utils
         noiseLevel = 1.
         xSize = 400
         ySize = 400
-        science, sources = makeTestImage(psfSize=3.0, noiseLevel=noiseLevel, noiseSeed=6,
+        science, sources = makeTestImage(psfSize=2.4, noiseLevel=noiseLevel, noiseSeed=6,
                                          xSize=xSize, ySize=ySize)
         psf = science.psf
         psfAvgPos = psf.getAveragePosition()
@@ -1344,7 +1349,7 @@ class SimplifiedSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.TestC
         `AlardLuptonSubtractTask` if it uses the AL kernel.
         """
         noiseLevel = 1.
-        science, sources = makeTestImage(psfSize=3.0, noiseLevel=noiseLevel, noiseSeed=6)
+        science, sources = makeTestImage(psfSize=2.4, noiseLevel=noiseLevel, noiseSeed=6)
         template, _ = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=7,
                                     templateBorderSize=20, doApplyCalibration=True)
         alTask = AlardLuptonSubtractTest._setup_subtraction(AlardLuptonSubtractTest())
@@ -1361,7 +1366,7 @@ class SimplifiedSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.TestC
         reasonable output.
         """
         noiseLevel = 1.
-        science, sources = makeTestImage(psfSize=3.0, noiseLevel=noiseLevel, noiseSeed=6)
+        science, sources = makeTestImage(psfSize=2.4, noiseLevel=noiseLevel, noiseSeed=6)
         template, _ = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=7,
                                     templateBorderSize=20, doApplyCalibration=True)
         task = self._setup_subtraction(useExistingKernel=False,
