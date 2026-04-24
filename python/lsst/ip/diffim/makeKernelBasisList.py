@@ -291,11 +291,14 @@ def _calculateBasisSigmas(referenceSigma, targetSigma, basisMinSigma, basisGauss
     if kernelSigma < basisMinSigma:
         kernelSigma = basisMinSigma
 
-    # If more than one gaussian is requested and kernelSigma is more than a
-    #  factor of basisGaussBeta larger than the minimum sigma, use
-    #  kernelSigma/basisGaussBeta as the size of the first gaussian.
-    if ((kernelSigma/basisGaussBeta) > basisMinSigma) & (basisNGauss > 1):
-        basisSigmaGauss = [kernelSigma/basisGaussBeta, ]
+    # The smallest basis Gaussian sigma is kernelSigma/basisGaussBeta to center
+    # the geometric basis spacing around kernelSigma, but bounded below by
+    # basisMinSigma. Using max() here (rather than a kernelSigma-vs-threshold
+    # branch) keeps the basis continuous as kernelSigma crosses
+    # basisMinSigma*basisGaussBeta, avoiding a discontinuous jump in the AL
+    # basis that produced unstable kernels.
+    if basisNGauss > 1:
+        basisSigmaGauss = [max(basisMinSigma, kernelSigma/basisGaussBeta), ]
     else:
         basisSigmaGauss = [kernelSigma, ]
 
