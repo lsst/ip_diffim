@@ -708,7 +708,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         bbox = science.getBBox()
 
         kernelImage = lsst.afw.image.ImageD(psfMatchingKernel.getDimensions())
-        norm = psfMatchingKernel.computeImage(kernelImage, doNormalize=False)
+        xcen, ycen = bbox.getCenter()
+        norm = psfMatchingKernel.computeImage(kernelImage, False, xcen, ycen)
 
         matchedScience = self._convolveExposure(science, psfMatchingKernel,
                                                 self.convolutionControl,

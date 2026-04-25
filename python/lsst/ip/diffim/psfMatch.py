@@ -595,7 +595,12 @@ class PsfMatchTask(pipeBase.Task, abc.ABC):
         """
         # What is the final kernel sum
         kImage = afwImage.ImageD(spatialKernel.getDimensions())
-        kSum = spatialKernel.computeImage(kImage, False)
+        # Evaluate the kernel at the cell-set center, not at the world
+        # origin (the default (0, 0) lies outside the cellset bbox for any
+        # non-origin region and produces a meaningless kernel sum).
+        regionBBox = kernelCellSet.getBBox()
+        xcen, ycen = regionBBox.getCenter()
+        kSum = spatialKernel.computeImage(kImage, False, xcen, ycen)
         self.log.info("Final spatial kernel sum %.3f", kSum)
 
         # Look at how well conditioned the matrix is
