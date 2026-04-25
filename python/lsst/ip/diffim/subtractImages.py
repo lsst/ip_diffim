@@ -809,29 +809,23 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         """
         if exposure.photoCalib is None:
             return np.nan
-        # Set maglim to nan upfront in case on an unexpected RuntimeError
-        maglim = np.nan
         try:
             psf = exposure.getPsf()
             psf_shape = psf.computeShape(psf.getAveragePosition())
         except (lsst.pex.exceptions.InvalidParameterError,
                 afwDetection.InvalidPsfError,
                 lsst.pex.exceptions.RangeError):
-            if fallbackPsfSize is not None:
-                self.log.info("Unable to evaluate PSF, using fallback FWHM %f", fallbackPsfSize)
-                psf_area = np.pi*(fallbackPsfSize/2)**2
-                zeropoint = exposure.photoCalib.instFluxToMagnitude(1)
-                maglim = zeropoint - 2.5*np.log10(nsigma*np.sqrt(psf_area))
-            else:
+            if fallbackPsfSize is None:
                 self.log.info("Unable to evaluate PSF, setting maglim to nan")
-                maglim = np.nan
+                return np.nan
+            self.log.info("Unable to evaluate PSF, using fallback FWHM %f", fallbackPsfSize)
+            psf_area = np.pi*(fallbackPsfSize/2)**2
         else:
             # Get a more accurate area than `psf_shape.getArea()` via moments
             psf_area = np.pi*np.sqrt(psf_shape.getIxx()*psf_shape.getIyy())
-            zeropoint = exposure.photoCalib.instFluxToMagnitude(1)
-            maglim = zeropoint - 2.5*np.log10(nsigma*np.sqrt(psf_area))
-        finally:
-            return maglim
+
+        zeropoint = exposure.photoCalib.instFluxToMagnitude(1)
+        return zeropoint - 2.5*np.log10(nsigma*np.sqrt(psf_area))
 
     @staticmethod
     def _validateExposures(template, science):
