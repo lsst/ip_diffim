@@ -525,7 +525,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             self.log.info("`convolveScience` is set: convolving science image.")
             convolveTemplate = False
         else:
-            raise RuntimeError("Cannot handle AlardLuptonSubtract mode: %s", self.config.mode)
+            raise RuntimeError(f"Cannot handle AlardLuptonSubtract mode: {self.config.mode}")
         return convolveTemplate
 
     def runMakeKernel(self, template, science, sources=None, convolveTemplate=True, runSourceDetection=False):
