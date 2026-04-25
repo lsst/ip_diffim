@@ -721,9 +721,10 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         matchedTemplate.setPhotoCalib(science.photoCalib)
 
         if backgroundModel is not None:
-            modelParams = backgroundModel.getParameters()
             # We must invert the background model if the matching kernel is solved for the science image.
-            backgroundModel.setParameters([-p for p in modelParams])
+            invertedBackground = backgroundModel.clone()
+            invertedBackground.setParameters([-p for p in backgroundModel.getParameters()])
+            backgroundModel = invertedBackground
 
         difference = _subtractImages(matchedScience, matchedTemplate, backgroundModel=backgroundModel)
 
