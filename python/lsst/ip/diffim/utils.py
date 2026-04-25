@@ -22,7 +22,8 @@
 """Support utilities for Measuring sources"""
 
 
-__all__ = ["evaluateMeanPsfFwhm", "getPsfFwhm", "getKernelCenterDisplacement",
+__all__ = ["evaluateMeanPsfFwhm", "getPsfFwhm", "getPreconvolvedPsfFwhm",
+           "getKernelCenterDisplacement",
            "computeDifferenceImageMetrics", "checkMask", "setSourceFootprints",
            ]
 
@@ -138,6 +139,78 @@ def getPsfFwhm(psf, average=True, position=None):
     else:
         return [gaussian_sigma_to_fwhm*np.sqrt(shape.getIxx()),
                 gaussian_sigma_to_fwhm*np.sqrt(shape.getIyy())]
+
+
+def getPreconvolvedPsfFwhm(psf, position=None):
+    """Measure the FWHM of a PSF convolved with itself.
+
+    This is the effective PSF width of a score image produced by
+    preconvolving an exposure with (the reflection of) its own PSF.
+    For a Gaussian PSF this equals ``sqrt(2) * FWHM``; for realistic PSFs
+    with heavier wings it generally differs, so measuring the true
+    half-maximum width on the self-convolved PSF is preferred.
+
+    Parameters
+    ----------
+    psf : `~lsst.afw.detection.Psf`
+        Point spread function to evaluate.
+    position : `~lsst.geom.Point2D`, optional
+        The position at which to evaluate the PSF. If `None`, the
+        PSF's average position is used.
+
+    Returns
+    -------
+    fwhm : `float`
+        The FWHM, in pixels, of the self-convolved PSF at half maximum,
+        averaged over the X and Y axes.
+
+    Raises
+    ------
+    ValueError
+        Raised if the self-convolved PSF has no usable peak above half
+        maximum, or if the PSF image cannot be computed at ``position``.
+
+    See Also
+    --------
+    getPsfFwhm
+    """
+    if position is None:
+        position = psf.getAveragePosition()
+    img = np.asarray(psf.computeKernelImage(position).array, dtype=np.float64)
+    nY, nX = img.shape
+    # Zero-pad to at least 2N to avoid wrap-around in the self-convolution.
+    padY, padX = 2*nY, 2*nX
+    ft = np.fft.rfft2(img, s=(padY, padX))
+    selfConv = np.fft.irfft2(ft*ft, s=(padY, padX))
+    selfConv = np.fft.fftshift(selfConv)
+    peak = float(selfConv.max())
+    if not (peak > 0 and np.isfinite(peak)):
+        raise ValueError("Self-convolved PSF has non-positive or non-finite peak.")
+    halfMax = 0.5*peak
+    cy, cx = np.unravel_index(np.argmax(selfConv), selfConv.shape)
+
+    def _fwhmAlongAxis(profile, center, level):
+        # Right-side half-max crossing: walk while we stay above ``level``.
+        i = center
+        while i + 1 < len(profile) and profile[i + 1] >= level:
+            i += 1
+        if i + 1 < len(profile) and profile[i] != profile[i + 1]:
+            right = i + (level - profile[i])/(profile[i + 1] - profile[i])
+        else:
+            right = float(i)
+        # Left-side half-max crossing.
+        j = center
+        while j - 1 >= 0 and profile[j - 1] >= level:
+            j -= 1
+        if j - 1 >= 0 and profile[j] != profile[j - 1]:
+            left = (j - 1) + (level - profile[j - 1])/(profile[j] - profile[j - 1])
+        else:
+            left = float(j)
+        return right - left
+
+    fwhmX = _fwhmAlongAxis(selfConv[cy, :], cx, halfMax)
+    fwhmY = _fwhmAlongAxis(selfConv[:, cx], cy, halfMax)
+    return 0.5*(fwhmX + fwhmY)
 
 
 def evaluateMeanPsfFwhm(exposure: afwImage.Exposure,
@@ -502,17 +575,23 @@ def checkMask(mask, sources, excludeMaskPlanes):
 def setSourceFootprints(sources, kernelSize):
     """Add footprints of fixed size to a source catalog
 
+    Each source's footprint is replaced by a centered box of side
+    ``2*kernelSize + 1`` pixels (always odd), preserving the brightest peak
+    of the original footprint.
+
     Parameters
     ----------
     sources : `lsst.afw.table.SourceCatalog`
-        The source catalog to add footprints to.
+        The source catalog to add footprints to. Modified in place.
     kernelSize : `int`
-        The "radius" of the footprint, i.e half the size of the bounding box.
+        Width (in pixels) of the PSF-matching kernel. The footprint side is
+        ``2*kernelSize + 1`` so that the kernel can be convolved across the
+        source without falling off the stamp.
 
     Returns
     -------
     sources : `lsst.afw.table.SourceCatalog`
-        The modified source catalog
+        The same (modified) source catalog, returned for convenience.
     """
     size = 2*kernelSize + 1
     for source in sources:

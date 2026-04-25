@@ -910,7 +910,7 @@ def makeFakeWcs():
 
 def makeTestImage(seed=5, nSrc=20, psfSize=2., noiseLevel=5.,
                   noiseSeed=6, fluxLevel=500., fluxRange=2.,
-                  kernelSize=32, templateBorderSize=0,
+                  kernelSize=31, templateBorderSize=0,
                   background=None,
                   xSize=256,
                   ySize=256,
@@ -945,7 +945,7 @@ def makeTestImage(seed=5, nSrc=20, psfSize=2., noiseLevel=5.,
     fluxRange : `float`, optional
         Range in flux amplitude of the simulated sources.
     kernelSize : `int`, optional
-        Size in pixels of the kernel for simulating sources.
+        Size in pixels of the kernel for simulating sources. Must be odd.
     templateBorderSize : `int`, optional
         Size in pixels of the image border used to pad the image.
     background : `lsst.afw.math.Chebyshev1Function2D`, optional
@@ -980,11 +980,14 @@ def makeTestImage(seed=5, nSrc=20, psfSize=2., noiseLevel=5.,
     Raises
     ------
     ValueError
-        If `xloc`, `yloc`, or `flux` are supplied with inconsistant lengths.
+        If `xloc`, `yloc`, or `flux` are supplied with inconsistant lengths,
+        or if ``kernelSize`` is even.
     """
+    if kernelSize % 2 == 0:
+        raise ValueError(f"kernelSize must be odd, got {kernelSize}.")
     # Distance from the inner edge of the bounding box to avoid placing test
     # sources in the model images.
-    bufferSize = kernelSize/2 + templateBorderSize + 1
+    bufferSize = kernelSize//2 + templateBorderSize + 1
 
     bbox = geom.Box2I(geom.Point2I(x0, y0), geom.Extent2I(xSize, ySize))
     if templateBorderSize > 0:

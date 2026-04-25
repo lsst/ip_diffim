@@ -27,7 +27,8 @@ import lsst.afw.detection as afwDetection
 import lsst.afw.image
 import lsst.afw.math
 import lsst.geom
-from lsst.ip.diffim.utils import (evaluateMeanPsfFwhm, getPsfFwhm, computeDifferenceImageMetrics,
+from lsst.ip.diffim.utils import (evaluateMeanPsfFwhm, getPsfFwhm, getPreconvolvedPsfFwhm,
+                                  computeDifferenceImageMetrics,
                                   checkMask, setSourceFootprints)
 from lsst.meas.algorithms import ScaleVarianceTask, ScienceSourceSelectorTask
 import lsst.pex.config
@@ -524,7 +525,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             self.log.info("`convolveScience` is set: convolving science image.")
             convolveTemplate = False
         else:
-            raise RuntimeError("Cannot handle AlardLuptonSubtract mode: %s", self.config.mode)
+            raise RuntimeError(f"Cannot handle AlardLuptonSubtract mode: {self.config.mode}")
         return convolveTemplate
 
     def runMakeKernel(self, template, science, sources=None, convolveTemplate=True, runSourceDetection=False):
@@ -707,7 +708,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         bbox = science.getBBox()
 
         kernelImage = lsst.afw.image.ImageD(psfMatchingKernel.getDimensions())
-        norm = psfMatchingKernel.computeImage(kernelImage, doNormalize=False)
+        xcen, ycen = bbox.getCenter()
+        norm = psfMatchingKernel.computeImage(kernelImage, False, xcen, ycen)
 
         matchedScience = self._convolveExposure(science, psfMatchingKernel,
                                                 self.convolutionControl,
@@ -716,13 +718,13 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         # Place back on native photometric scale
         matchedScience.maskedImage /= norm
         matchedTemplate = template.clone()[bbox]
-        matchedTemplate.maskedImage /= norm
         matchedTemplate.setPhotoCalib(science.photoCalib)
 
         if backgroundModel is not None:
-            modelParams = backgroundModel.getParameters()
             # We must invert the background model if the matching kernel is solved for the science image.
-            backgroundModel.setParameters([-p for p in modelParams])
+            invertedBackground = backgroundModel.clone()
+            invertedBackground.setParameters([-p for p in backgroundModel.getParameters()])
+            backgroundModel = invertedBackground
 
         difference = _subtractImages(matchedScience, matchedTemplate, backgroundModel=backgroundModel)
 
@@ -807,29 +809,23 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         """
         if exposure.photoCalib is None:
             return np.nan
-        # Set maglim to nan upfront in case on an unexpected RuntimeError
-        maglim = np.nan
         try:
             psf = exposure.getPsf()
             psf_shape = psf.computeShape(psf.getAveragePosition())
         except (lsst.pex.exceptions.InvalidParameterError,
                 afwDetection.InvalidPsfError,
                 lsst.pex.exceptions.RangeError):
-            if fallbackPsfSize is not None:
-                self.log.info("Unable to evaluate PSF, using fallback FWHM %f", fallbackPsfSize)
-                psf_area = np.pi*(fallbackPsfSize/2)**2
-                zeropoint = exposure.photoCalib.instFluxToMagnitude(1)
-                maglim = zeropoint - 2.5*np.log10(nsigma*np.sqrt(psf_area))
-            else:
+            if fallbackPsfSize is None:
                 self.log.info("Unable to evaluate PSF, setting maglim to nan")
-                maglim = np.nan
+                return np.nan
+            self.log.info("Unable to evaluate PSF, using fallback FWHM %f", fallbackPsfSize)
+            psf_area = np.pi*(fallbackPsfSize/2)**2
         else:
             # Get a more accurate area than `psf_shape.getArea()` via moments
             psf_area = np.pi*np.sqrt(psf_shape.getIxx()*psf_shape.getIyy())
-            zeropoint = exposure.photoCalib.instFluxToMagnitude(1)
-            maglim = zeropoint - 2.5*np.log10(nsigma*np.sqrt(psf_area))
-        finally:
-            return maglim
+
+        zeropoint = exposure.photoCalib.instFluxToMagnitude(1)
+        return zeropoint - 2.5*np.log10(nsigma*np.sqrt(psf_area))
 
     @staticmethod
     def _validateExposures(template, science):
@@ -909,7 +905,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         else:
             return convolvedExposure[bbox]
 
-    def _sourceSelector(self, template, science, sources, fallback=False, preconvolved=False):
+    def _sourceSelector(self, template, science, sources, fallback=False, preconvolved=False,
+                        scienceFwhmPix=None):
         """Select sources from a catalog that meet the selection criteria.
         The selection criteria include any configured parameters of the
         `sourceSelector` subtask, as well as checking the science and template
@@ -931,6 +928,11 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         preconvolved : `bool`, optional
             If set, exclude a wider buffer around the edge of the image to
             account for an extra convolution.
+        scienceFwhmPix : `float`, optional
+            Effective FWHM of the science image in pixels to use for sizing
+            the kernel basis and source footprints. If `None`, the
+            width is derived from ``self.sciencePsfSize`` (boosted by
+            ``sqrt(2)`` in the ``preconvolved`` case).
 
         Returns
         -------
@@ -948,8 +950,9 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             selected = self.fallbackSourceSelector.selectSources(sources).selected
         else:
             selected = self.sourceSelector.selectSources(sources).selected
-        sciencePsfSize = self.sciencePsfSize*np.sqrt(2) if preconvolved else self.sciencePsfSize
-        kSize = self.makeKernel.makeKernelBasisList(self.templatePsfSize, sciencePsfSize)[0].getWidth()
+        if scienceFwhmPix is None:
+            scienceFwhmPix = self.sciencePsfSize*np.sqrt(2) if preconvolved else self.sciencePsfSize
+        kSize = self.makeKernel.makeKernelBasisList(self.templatePsfSize, scienceFwhmPix)[0].getWidth()
         selectSources = sources[selected].copy(deep=True)
         # Set the footprints, to be used in `makeKernel` and `checkMask`.
         kernelSources = setSourceFootprints(selectSources, kernelSize=kSize)
@@ -1229,15 +1232,32 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
         """
         self._prepareInputs(template, science, visitSummary=visitSummary)
 
-        # TODO: DM-37212 we need to mirror the kernel in order to get correct cross correlation
-        scienceKernel = science.psf.getKernel()
-        matchedScience = self._convolveExposure(science, scienceKernel, self.convolutionControl,
+        # Effective FWHM of the self-convolved science PSF (the PSF of the
+        # score image). For Gaussian PSFs this is exactly sqrt(2)*FWHM; for
+        # realistic PSFs we measure it directly from the self-convolved PSF
+        # image and fall back to the Gaussian approximation on failure.
+        try:
+            self.preconvolvedSciencePsfSize = getPreconvolvedPsfFwhm(science.psf)
+        except (lsst.pex.exceptions.Exception, ValueError) as e:
+            self.preconvolvedSciencePsfSize = self.sciencePsfSize*np.sqrt(2)
+            self.log.info("Falling back to sqrt(2)*FWHM for preconvolved science PSF size: %s", e)
+        self.log.info("Preconvolved science PSF FWHM: %f pixels", self.preconvolvedSciencePsfSize)
+        self.metadata["preconvolvedSciencePsfSize"] = self.preconvolvedSciencePsfSize
+
+        # Reflect the PSF kernel in both axes so the preconvolution implements
+        # a matched-filter correlation rather than a convolution, which
+        # centers the score on the true source location even for asymmetric
+        # PSFs. The same reflected kernel is reused as ``preConvKernel`` in
+        # the decorrelation step so that both stages are self-consistent.
+        convolutionKernel = self._makePreconvolutionKernel(science.psf)
+        matchedScience = self._convolveExposure(science, convolutionKernel, self.convolutionControl,
                                                 interpolateBadMaskPlanes=True)
         self.metadata["convolvedExposure"] = "Preconvolution"
         try:
-            kernelSources = self._sourceSelector(template, matchedScience, sources, preconvolved=True)
+            kernelSources = self._sourceSelector(template, matchedScience, sources, preconvolved=True,
+                                                 scienceFwhmPix=self.preconvolvedSciencePsfSize)
             subtractResults = self.runPreconvolve(template, science, matchedScience,
-                                                  kernelSources, scienceKernel)
+                                                  kernelSources, convolutionKernel)
 
         except (RuntimeError, lsst.pex.exceptions.Exception) as e:
             self.log.warning("Failed to match template. Checking coverage")
@@ -1250,6 +1270,79 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
             raise e
 
         return subtractResults
+
+    @staticmethod
+    def _flagScoreEdge(mask, bbox, innerBBox):
+        """Set the ``EDGE`` mask bit on pixels outside ``innerBBox``.
+
+        Parameters
+        ----------
+        mask : `~lsst.afw.image.Mask`
+            Exposure mask that will be modified in place. Must have
+            an ``EDGE`` mask plane.
+        bbox : `~lsst.geom.Box2I`
+            Outer bounding box of the exposure.
+        innerBBox : `~lsst.geom.Box2I`
+            The valid inner region. Pixels
+            outside this bbox will have their ``EDGE`` bit set.
+        """
+        edgeBit = mask.getPlaneBitMask("EDGE")
+        dx0 = innerBBox.getMinX() - bbox.getMinX()
+        dx1 = bbox.getMaxX() - innerBBox.getMaxX()
+        dy0 = innerBBox.getMinY() - bbox.getMinY()
+        dy1 = bbox.getMaxY() - innerBBox.getMaxY()
+        if dy0 > 0:
+            mask.array[:dy0, :] |= edgeBit
+        if dy1 > 0:
+            mask.array[-dy1:, :] |= edgeBit
+        if dx0 > 0:
+            mask.array[:, :dx0] |= edgeBit
+        if dx1 > 0:
+            mask.array[:, -dx1:] |= edgeBit
+
+    @staticmethod
+    def _makePreconvolutionKernel(psf):
+        """Build a normalized, reflected matched-filter kernel from a PSF.
+
+        Convolving an image with this kernel is equivalent to correlating
+        the image with the PSF, so peaks in the output align with the PSF's
+        centroid — even for asymmetric PSFs. The kernel is evaluated at the
+        PSF's average position and returned as a constant
+        `~lsst.afw.math.FixedKernel`.
+
+        Parameters
+        ----------
+        psf : `~lsst.afw.detection.Psf`
+            The PSF to derive the preconvolution kernel from.
+
+        Returns
+        -------
+        kernel : `~lsst.afw.math.FixedKernel`
+            The PSF reflected about both axes, normalized to sum to one.
+
+        Raises
+        ------
+        RuntimeError
+            Raised if the PSF kernel has an even size along either axis.
+            The reflection ``[::-1, ::-1]`` only preserves the peak pixel
+            (and therefore the kernel center) for odd-sized kernels; an
+            even-sized kernel would be silently off-center by one pixel
+            after reflection and produce a misaligned matched filter.
+        """
+        avgPos = psf.getAveragePosition()
+        localKernel = psf.getLocalKernel(avgPos)
+        dims = localKernel.getDimensions()
+        width, height = dims.getX(), dims.getY()
+        if width % 2 == 0 or height % 2 == 0:
+            raise RuntimeError(
+                f"Preconvolution requires an odd-sized PSF kernel, got {width}x{height}. "
+            )
+        kimg = lsst.afw.image.ImageD(dims)
+        localKernel.computeImage(kimg, True)  # normalize to unit sum
+        # Reflect about the kernel center. PSF kernels are odd-sized,
+        # so ``[::-1, ::-1]`` places the peak at the same pixel.
+        kimg.array[...] = kimg.array[::-1, ::-1]
+        return lsst.afw.math.FixedKernel(kimg)
 
     def runPreconvolve(self, template, science, matchedScience, kernelSources, preConvKernel):
         """Convolve the science image with its own PSF, then convolve the
@@ -1269,8 +1362,8 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
             select sources in order to perform the AL PSF matching on stamp
             images around them.
         preConvKernel : `lsst.afw.math.Kernel`
-            The reflection of the kernel that was used to preconvolve the
-            `science` exposure. Must be normalized to sum to 1.
+            The kernel that was used to preconvolve the ``science``
+            exposure. Must be normalized to sum to 1.
 
         Returns
         -------
@@ -1298,7 +1391,7 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
         kernelResult = self.makeKernel.run(template[innerBBox], matchedScience[innerBBox], kernelSources,
                                            preconvolved=True,
                                            templateFwhmPix=self.templatePsfSize,
-                                           scienceFwhmPix=self.sciencePsfSize)
+                                           scienceFwhmPix=self.preconvolvedSciencePsfSize)
 
         matchedTemplate = self._convolveExposure(template, kernelResult.psfMatchingKernel,
                                                  self.convolutionControl,
@@ -1313,6 +1406,9 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
                                        kernelResult.psfMatchingKernel,
                                        templateMatched=True, preConvMode=True,
                                        preConvKernel=preConvKernel)
+
+        # Flag the outer ``preConvKernel/2``-wide border as EDGE.
+        self._flagScoreEdge(correctedScore.mask, correctedScore.getBBox(), innerBBox)
 
         return lsst.pipe.base.Struct(scoreExposure=correctedScore,
                                      matchedTemplate=matchedTemplate,
