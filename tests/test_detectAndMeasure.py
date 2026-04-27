@@ -903,7 +903,13 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         noiseLevel = 1.
         staticSeed = 1
         fluxLevel = 500
-        kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel, "x0": 12345, "y0": 67890}
+        kernelSize = 31
+        # Buffer source positions away from the score image's EDGE strip.
+        # Preconvolution adds ~kernelSize//2 pixels of EDGE on top of the
+        # EDGE already set by detection smoothing on the science image.
+        templateBorderSize = kernelSize//2
+        kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel, "x0": 12345, "y0": 67890,
+                  "kernelSize": kernelSize, "templateBorderSize": templateBorderSize}
         science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
         matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
         difference = science.clone()
@@ -930,12 +936,9 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         self.assertEqual(len(output.diaSources), len(sources))
         # no sources should be flagged as negative
         self.assertEqual(len(~output.diaSources["is_negative"]), len(output.diaSources))
-        # TODO DM-41496: restore this block once we handle detections on edge
-        # pixels better; at least one of these sources currently has a bad
-        # centroid because most of the source is rejected as EDGE.
-        # refIds = []
-        # for source in sources:
-        #     self._check_diaSource(output.diaSources, source, refIds=refIds)
+        refIds = []
+        for source in sources:
+            self._check_diaSource(output.diaSources, source, refIds=refIds)
 
     def test_measurements_finite(self):
         """Measured fluxes and centroids should always be finite.
@@ -1210,11 +1213,18 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         ySize = 512
         x0 = 123
         y0 = 456
+        kernelSize = 31
+        templateBorderSize = kernelSize//2
         kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel,
-                  "xSize": xSize, "ySize": ySize, "x0": x0, "y0": y0}
+                  "xSize": xSize, "ySize": ySize, "x0": x0, "y0": y0,
+                  "kernelSize": kernelSize, "templateBorderSize": templateBorderSize}
         params = [2.2, 2.1, 2.0, 1.2, 1.1, 1.0]
 
-        bbox2D = lsst.geom.Box2D(lsst.geom.Point2D(x0, y0), lsst.geom.Extent2D(xSize, ySize))
+        # The background model must cover the grown image bbox, otherwise it
+        # would be extrapolated outside its declared domain.
+        bbox2D = lsst.geom.Box2D(
+            lsst.geom.Point2D(x0 - templateBorderSize, y0 - templateBorderSize),
+            lsst.geom.Extent2D(xSize + 2*templateBorderSize, ySize + 2*templateBorderSize))
         background_model = afwMath.Chebyshev1Function2D(params, bbox2D)
         scienceBase, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6,
                                              background=background_model, **kwargs)
