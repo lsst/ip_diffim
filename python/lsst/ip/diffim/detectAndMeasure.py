@@ -1342,6 +1342,12 @@ class DetectAndMeasureScoreConnections(DetectAndMeasureConnections):
         doc="Maximum likelihood image for detection.",
         dimensions=("instrument", "visit", "detector"),
         storageClass="ExposureF",
+        name="{fakesType}{coaddName}Diff_scoreTempExp",
+    )
+    scoreMeasuredExposure = pipeBase.connectionTypes.Output(
+        doc="Maximum likelihood image for detection.",
+        dimensions=("instrument", "visit", "detector"),
+        storageClass="ExposureF",
         name="{fakesType}{coaddName}Diff_scoreExp",
     )
 
@@ -1458,6 +1464,7 @@ class DetectAndMeasureScoreTask(DetectAndMeasureTask):
                 background=background,
             )
         measurementResults.differenceBackground = background
+        measurementResults.scoreMeasuredExposure = scoreExposure
 
         # Copy the detection mask from the Score image to the difference image
         difference.mask.assign(scoreExposure.mask, scoreExposure.getBBox())

@@ -138,7 +138,7 @@ class SubtractScoreOutputConnections(lsst.pipe.base.PipelineTaskConnections,
         doc="The maximum likelihood image, used for the detection of diaSources.",
         dimensions=("instrument", "visit", "detector"),
         storageClass="ExposureF",
-        name="{fakesType}{coaddName}Diff_scoreExp",
+        name="{fakesType}{coaddName}Diff_scoreTempExp",
     )
     psfMatchingKernel = connectionTypes.Output(
         doc="Kernel used to PSF match the science and template images.",
