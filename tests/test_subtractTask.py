@@ -150,7 +150,7 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
             else:
                 task.run(template_cut, science.clone(), sources.copy(deep=True))
         _run_and_check_coverage(template_coverage=0.09)
-        _run_and_check_coverage(template_coverage=0.19)
+        _run_and_check_coverage(template_coverage=0.15)
         _run_and_check_coverage(template_coverage=0.7)
 
     def test_clear_template_mask(self):
@@ -1052,12 +1052,17 @@ class AlardLuptonPreconvolveSubtractTest(AlardLuptonSubtractTestBase, lsst.utils
 
         science_height = science.getBBox().getDimensions().getY()
 
-        def _run_and_check_coverage(template_coverage):
+        def _run_and_check_coverage(template_coverage,
+                                    requiredTemplateFraction=0.1,
+                                    minTemplateFractionForExpectedSuccess=0.2):
             template_cut = template.clone()
             template_height = int(science_height*template_coverage + border)
             template_cut.image.array[:, template_height:] = 0
             template_cut.mask.array[:, template_height:] = template_cut.mask.getPlaneBitMask('NO_DATA')
-            task = self._setup_subtraction()
+            task = self._setup_subtraction(
+                requiredTemplateFraction=requiredTemplateFraction,
+                minTemplateFractionForExpectedSuccess=minTemplateFractionForExpectedSuccess
+            )
             if template_coverage < task.config.requiredTemplateFraction:
                 doRaise = True
             elif template_coverage < task.config.minTemplateFractionForExpectedSuccess:
@@ -1070,7 +1075,7 @@ class AlardLuptonPreconvolveSubtractTest(AlardLuptonSubtractTestBase, lsst.utils
             else:
                 task.run(template_cut, science.clone(), sources.copy(deep=True))
         _run_and_check_coverage(template_coverage=0.09)
-        _run_and_check_coverage(template_coverage=0.19)
+        _run_and_check_coverage(template_coverage=0.15)
         _run_and_check_coverage(template_coverage=.7)
 
     def test_clear_template_mask(self):
