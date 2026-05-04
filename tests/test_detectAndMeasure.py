@@ -1251,7 +1251,7 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
             difference.maskedImage -= matchedTemplate.maskedImage
             score = subtractTask._convolveExposure(difference, scienceKernel,
                                                    subtractTask.convolutionControl)
-            # Keep a copy of the score image before detection so we can verify
+            # Record the score image metric before detection so we can verify
             # that the background was actually subtracted from it.
             originalScoreMedian = np.median(score.image.array[np.isfinite(score.image.array)])
             originalDiffimMedian = np.median(difference.image.array[np.isfinite(difference.image.array)])
@@ -1262,9 +1262,9 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
             # The difference image should have been modified in place by the
             # background subtraction, so its median should shift noticeably.
             subtractedScoreMedian = np.median(score.image.array[np.isfinite(score.image.array)])
-            self.assertNotAlmostEqual(originalScoreMedian, subtractedScoreMedian, places=3)
+            self.assertLess(np.abs(subtractedScoreMedian), np.abs(originalScoreMedian))
             subtractedDiffimMedian = np.median(difference.image.array[np.isfinite(difference.image.array)])
-            self.assertNotAlmostEqual(originalDiffimMedian, subtractedDiffimMedian, places=3)
+            self.assertLess(np.abs(subtractedDiffimMedian), np.abs(originalDiffimMedian))
 
             refIds = []
             scale = 1. if positive else -1.
