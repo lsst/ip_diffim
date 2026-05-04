@@ -1412,7 +1412,7 @@ class DetectAndMeasureScoreConnections(DetectAndMeasureConnections):
         name="{fakesType}{coaddName}Diff_scoreTempExp",
     )
     scoreMeasuredExposure = pipeBase.connectionTypes.Output(
-        doc="Maximum likelihood image for detection.",
+        doc="Score image after backgrond subtraction and detection.",
         dimensions=("instrument", "visit", "detector"),
         storageClass="ExposureF",
         name="{fakesType}{coaddName}Diff_scoreExp",
