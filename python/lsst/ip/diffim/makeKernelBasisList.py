@@ -293,10 +293,8 @@ def _calculateBasisSigmas(referenceSigma, targetSigma, basisMinSigma, basisGauss
 
     # The smallest basis Gaussian sigma is kernelSigma/basisGaussBeta to center
     # the geometric basis spacing around kernelSigma, but bounded below by
-    # basisMinSigma. Using max() here (rather than a kernelSigma-vs-threshold
-    # branch) keeps the basis continuous as kernelSigma crosses
-    # basisMinSigma*basisGaussBeta, avoiding a discontinuous jump in the AL
-    # basis that produced unstable kernels.
+    # basisMinSigma. Keep the larger of the two so that we don't have a
+    # discontinuous jump in the AL basis and unstable kernel solutions.
     if basisNGauss > 1:
         basisSigmaGauss = [max(basisMinSigma, kernelSigma/basisGaussBeta), ]
     else:
