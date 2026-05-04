@@ -613,17 +613,10 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                 PSF-matching kernel.
         """
         kernelSize = self.makeKernel.makeKernelBasisList(
-            self.templatePsfSize, self.sciencePsfSize)[0].getWidth()
-        candidateList = self.makeKernel.makeCandidateList(template, science, kernelSize,
-                                                          candidateList=None,
-                                                          sigma=gaussian_fwhm_to_sigma*self.sciencePsfSize)
-        sources = self.makeKernel.selectKernelSources(template, science,
-                                                      candidateList=candidateList,
-                                                      preconvolved=False,
-                                                      templateFwhmPix=self.templatePsfSize,
-                                                      scienceFwhmPix=self.sciencePsfSize)
-
-        # return sources
+            self.templatePsfSize, self.matchedPsfSize)[0].getWidth()
+        sources = self.makeKernel.makeCandidateList(template, science, kernelSize,
+                                                    candidateList=None,
+                                                    sigma=gaussian_fwhm_to_sigma*self.sciencePsfSize)
         return self._sourceSelector(template, science, sources, fallback=True)
 
     def runConvolveTemplate(self, template, science, psfMatchingKernel, backgroundModel=None):
