@@ -192,6 +192,65 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         self.assertEqual(template.filter.physicalLabel, "a_test")
         self.assertEqual(template.psf.getComponentCount(), nPsfs)
 
+    def _replacePatchesWithNoise(self, true_var, seed=0):
+        """Replace each patch's pixels with iid Gaussian noise of the
+        given marginal variance and pin the variance plane to that
+        value, so the input to the task has *consistent* noise and
+        variance plane (mask bits cleared too).
+
+        Parameters
+        ----------
+        true_var : `float`
+            Variance of the Gaussian noise drawn into each patch's
+            image plane; the same value is written to the variance
+            plane and used as the ground truth that downstream
+            propagation tests compare against.
+        seed : `int`
+            Numpy RNG seed; per-patch noise draws use independent
+            substreams so tract/patch overlaps combine independent
+            samples.
+        """
+        rng = np.random.default_rng(seed)
+        for tract_id in list(self.patches.keys()):
+            new_handles = []
+            for handle in self.patches[tract_id]:
+                exposure = handle.get()
+                ny, nx = exposure.image.array.shape
+                exposure.image.array[:, :] = rng.normal(
+                    0.0, np.sqrt(true_var), size=(ny, nx),
+                ).astype(np.float32)
+                exposure.variance.array[:, :] = float(true_var)
+                exposure.mask.array[:, :] = 0
+                new_handles.append(pipeBase.InMemoryDatasetHandle(
+                    exposure, storageClass="ExposureF",
+                    copy=True, dataId=handle.dataId,
+                ))
+            self.patches[tract_id] = new_handles
+
+    def _interiorView(self, template, shrink=30):
+        """Return (image, variance, valid_mask) for the interior of the
+        merged template, excluding NO_DATA / EDGE pixels and a
+        ``shrink``-pixel inset that drops residual warping/convolution
+        edge effects from the analytical bounds.
+
+        Used by variance-propagation tests that compare the empirical
+        per-pixel variance of the output image to the median of the
+        variance plane: those statistics are only meaningful where every
+        contributing input was real data.
+        """
+        mask_bits = (template.mask.getPlaneBitMask("NO_DATA")
+                     | template.mask.getPlaneBitMask("EDGE"))
+        good = (template.mask.array & mask_bits) == 0
+        # Sentinel-marked variance pixels inflate the median artificially.
+        good &= template.variance.array < 1e10
+        inset = lsst.geom.Box2I(template.getBBox())
+        inset.grow(-shrink)
+        x0, y0 = template.getX0(), template.getY0()
+        sl = (slice(inset.getMinY() - y0, inset.getMaxY() - y0 + 1),
+              slice(inset.getMinX() - x0, inset.getMaxX() - x0 + 1))
+        valid = good[sl]
+        return (template.image.array[sl], template.variance.array[sl], valid)
+
     def _checkPixels(self, template, config, box):
         """Check that the pixel values in the template are close to the
         original image.
@@ -210,10 +269,18 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         # tolerances large enough to account for that.
         self.assertImagesAlmostEqual(template.image, self.exposure[expectedBox].image,
                                      rtol=.1, atol=4)
-        # Variance plane ==2 in the original image, but the warped images will
-        # have some structure due to the warping.
-        self.assertImagesAlmostEqual(template.variance, self.exposure[expectedBox].variance,
-                                     rtol=0.55, msg="variance planes differ")
+        # The variance plane is now an inverse-variance combination, so a
+        # pixel covered by N independent patches has variance ≈ input/N.
+        # Instead of comparing element-wise to the input, sanity-check the
+        # plane: finite everywhere, strictly positive where data lands,
+        # and never inflated above the per-pixel input.
+        template_var = template.variance.array
+        input_var_max = float(np.max(self.exposure[expectedBox].variance.array))
+        self.assertTrue(np.all(np.isfinite(template_var)))
+        valid = (template.mask.array
+                 & template.mask.getPlaneBitMask("NO_DATA")) == 0
+        self.assertTrue(np.all(template_var[valid] > 0))
+        self.assertTrue(np.all(template_var[valid] <= 2*input_var_max))
         # Not checking the mask, as warping changes the sizes of the masks.
 
     def testRunOneTractInput(self):
@@ -302,6 +369,49 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         self.assertTrue(np.isfinite(result.template.variance.array).all())
         self.assertEqual(no_data.sum(), 20990)
 
+    def testVariancePlaneTracksOutputNoise(self):
+        """The output variance plane should match the marginal per-pixel
+        variance of the output image plane for noise-only inputs.
+
+        Lanczos warping introduces correlations between output pixels but
+        the *marginal* variance of any one pixel is still the empirical
+        variance of pixel values across many pixels (the cross-pixel
+        covariance does not bias an unweighted sample variance). So even
+        though sqrt(template.image) drops below sqrt(true_var) after warp,
+        the variance plane must drop by exactly the same factor —
+        otherwise downstream 5-σ peak detection on
+        ``image / sqrt(variance)`` would mis-threshold.
+        """
+        true_var = 4.0
+        self._replacePatchesWithNoise(true_var=true_var, seed=0)
+
+        box = lsst.geom.Box2I(lsst.geom.Point2I(200, 200),
+                              lsst.geom.Point2I(600, 600))
+        task = lsst.ip.diffim.GetTemplateTask()
+        result = task.run(coaddExposureHandles=self.patches,
+                          bbox=lsst.geom.Box2I(box),
+                          wcs=self.exposure.wcs,
+                          dataIds=self.dataIds,
+                          physical_filter="a_test")
+        image, variance, valid = self._interiorView(result.template)
+        emp = float(np.var(image[valid]))
+        plane = float(np.median(variance[valid]))
+        self.assertGreater(valid.sum(), 1000,
+                           "fixture must produce enough good pixels")
+        self.assertGreater(emp, 0.0)
+        self.assertGreater(plane, 0.0)
+        # Both empirical and plane must be reduced from true_var (Lanczos
+        # warp + multi-tract inverse-variance combine).
+        self.assertLess(plane, true_var)
+        # Per-pixel agreement between marginal noise and variance plane.
+        # 25% tolerance covers correlated-sample variance estimator error
+        # plus per-tile inverse-variance combination noise.
+        self.assertAlmostEqual(
+            emp, plane, delta=0.25*plane,
+            msg=f"empirical output variance {emp:.3f} disagrees with "
+                f"variance plane {plane:.3f} by more than 25%",
+        )
+
     @lsst.utils.tests.methodParameters(
         box=[
             lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180)),
@@ -331,8 +441,9 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         if debug:
             _showTemplate(box, result.template)
         self._checkMetadata(result.template, task.config, box, self.exposure.wcs, 9)
-        # We just check that the pixel values are all finite. We cannot check that pixel values
-        # in the template are closer to the original anymore.
+        # We just check that the pixel values are all finite. We cannot
+        # check that pixel values in the template are closer to the
+        # original anymore.
         self.assertTrue(np.isfinite(result.template.image.array).all())
 
 

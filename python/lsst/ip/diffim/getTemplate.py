@@ -39,6 +39,7 @@ from lsst.utils.timer import timeMethod
 __all__ = [
     "GetTemplateTask",
     "GetTemplateConfig",
+    "GetTemplateConnections",
     "GetDcrTemplateTask",
     "GetDcrTemplateConfig",
 ]
@@ -501,9 +502,17 @@ class GetTemplateTask(pipeBase.PipelineTask):
         return images, catalog, totalBox
 
     def _merge(self, maskedImages, bbox, wcs):
-        """Merge the images that came from one tract into one larger image,
-        ignoring NaN pixels and non-finite variance pixels from individual
-        exposures.
+        """Combine the images from one tract into one larger image with
+        inverse-variance weighting, ignoring NaN pixels and non-finite
+        variance pixels from individual exposures.
+
+        At every output pixel, every input whose variance there is finite
+        and positive contributes with weight ``w_k = 1 / var_k``. The
+        merged image is ``Σ w_k · image_k / Σ w_k`` and the merged
+        variance is ``1 / Σ w_k`` — the standard combination for
+        independent measurements. Pixels with no good input get variance
+        0 and are flagged ``NO_DATA``; callers may overwrite that with a
+        sentinel for downstream consumers.
 
         Parameters
         ----------
@@ -521,8 +530,8 @@ class GetTemplateTask(pipeBase.PipelineTask):
             Merged image with all of the inputs at their respective bbox
             positions.
         count : `int`
-            Count of the number of good pixels (those with positive weights)
-            in the merged image.
+            Count of the number of good pixels (those with at least one
+            contributing input) in the merged image.
         included : `list` [`int`]
             List of indexes of patches that were included in the merged
             result, to be used to trim the exposure catalog.
@@ -537,39 +546,33 @@ class GetTemplateTask(pipeBase.PipelineTask):
             if clippedBox.area == 0:
                 self.log.debug("%s does not overlap template region.", dataId)
                 continue  # nothing in this image overlaps the output
-            maskedImage = maskedImage.subset(clippedBox)
-            # Catch both zero-value and NaN variance plane pixels
-            good = (maskedImage.variance.array > 0) & (
-                np.isfinite(maskedImage.variance.array)
+            sub = maskedImage.subset(clippedBox)
+            # Accept pixels with finite-positive variance and finite
+            # image. The image-finiteness check matters because a pixel
+            # can carry good variance and still have a NaN image after
+            # warping.
+            good = (
+                (sub.variance.array > 0)
+                & np.isfinite(sub.variance.array)
+                & np.isfinite(sub.image.array)
             )
-            weight = maskedImage.variance.array[good] ** (-0.5)
-            bad = np.isnan(maskedImage.image.array) | ~good
-            # Note that modifying the patch MaskedImage in place is fine;
-            # we're throwing it away at the end anyway.
-            maskedImage.image.array[bad] = 0.0
-            maskedImage.variance.array[bad] = 0.0
-            # Reset mask, too, since these pixels don't contribute to sum.
-            maskedImage.mask.array[bad] = 0
-            # Cannot use `merged.maskedImage *= weight` because that operator
-            # multiplies the variance by the weight twice; in this case
-            # `weight` are the exact values we want to scale by.
-            maskedImage.image.array[good] *= weight
-            maskedImage.variance.array[good] *= weight
-            weights[clippedBox].array[good] += weight
-            # Free memory before creating new large arrays
-            del weight
-            merged.maskedImage[clippedBox] += maskedImage
+            if good.any():
+                weight = 1.0 / sub.variance.array[good]
+                # Accumulate the image plane (Σ image_k · w_k), the mask
+                # plane (OR of good-pixel mask bits), and the weights
+                # plane (Σ w_k) directly — never touching the input
+                # MaskedImage. The merged variance plane is filled in
+                # once after the loop as 1 / Σ w_k, so we never
+                # accumulate variance here.
+                merged.image[clippedBox].array[good] += sub.image.array[good]*weight
+                merged.mask[clippedBox].array[good] |= sub.mask.array[good]
+                weights[clippedBox].array[good] += weight
+                del weight
             included.append(i)
 
         good = weights.array > 0
-
-        # Cannot use `merged.maskedImage /= weights` because that
-        # operator divides the variance by the weight twice; in this case
-        # `weights` are the exact values we want to scale by.
-        weights = weights.array[good]
-        merged.image.array[good] /= weights
-        merged.variance.array[good] /= weights
-
+        merged.image.array[good] /= weights.array[good]
+        merged.variance.array[good] = 1.0 / weights.array[good]
         merged.mask.array[~good] |= merged.mask.getPlaneBitMask("NO_DATA")
 
         return merged, good.sum(), included
