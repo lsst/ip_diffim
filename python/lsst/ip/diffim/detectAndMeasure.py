@@ -355,8 +355,9 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
     )
     badMaskPlanes = lsst.pex.config.ListField(
         dtype=str,
-        doc="Detections whose footprint peak lies on a pixel with any of these "
-            "mask planes set will be rejected before measurement.",
+        doc="Detections whose footprint peak lies on a pixel with any of these"
+            " mask planes set will be rejected before measurement."
+            " Any missing mask planes will be silently ignored.",
         default=("NO_DATA", "BAD", "SAT", "EDGE"),
     )
     raiseOnBadSubtractionRatio = pexConfig.Field(
@@ -967,7 +968,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         Parameters
         ----------
         initialDiaSources : `lsst.afw.table.SourceCatalog`
-            The catalog of detected sources, before measurement.
+            The catalog of detected peaks.
         mask : `lsst.afw.image.Mask`
             Mask of the image used for detection.
 
@@ -987,8 +988,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             return initialDiaSources
 
         badBitMask = mask.getPlaneBitMask(presentPlanes)
-        x0 = mask.getX0()
-        y0 = mask.getY0()
+        x0, y0 = mask.getXY0()
 
         selector = np.ones(len(initialDiaSources), dtype=bool)
         for i, source in enumerate(initialDiaSources):
@@ -1004,7 +1004,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         if nRejected > 0:
             self.log.info("Rejected %d detections on pixels with bad mask "
                           "planes %s before measurement.",
-                          nRejected, list(presentPlanes))
+                          nRejected, presentPlanes)
         return initialDiaSources[selector].copy(deep=True)
 
     def _removeBadSources(self, diaSources):
