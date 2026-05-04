@@ -475,6 +475,7 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
                                            )
             task.templatePsfSize = templatePsfSize
             task.sciencePsfSize = sciencePsfSize
+            task.matchedPsfSize = sciencePsfSize
             # Verify that source flags are not set in the input catalog
             # Note that this will use the last flag in the list for the rest of
             #  the test.
@@ -516,37 +517,38 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
         noiseLevel = .1
         seed1 = 6
         seed2 = 7
-        science1, sources1 = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=seed1,
-                                           clearEdgeMask=True)
-        template1, _ = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=seed2,
-                                     templateBorderSize=0, doApplyCalibration=True,
-                                     clearEdgeMask=True)
-        task1 = self._setup_subtraction(mode="convolveTemplate")
-        results_convolveTemplate = task1.run(template1, science1, sources1)
+        for psfSize in [self.midPsfSize, self.goodPsfSize, self.badPsfSize]:
+            science1, sources1 = makeTestImage(psfSize=psfSize, noiseLevel=noiseLevel, noiseSeed=seed1,
+                                               clearEdgeMask=True)
+            template1, _ = makeTestImage(psfSize=psfSize, noiseLevel=noiseLevel, noiseSeed=seed2,
+                                         templateBorderSize=0, doApplyCalibration=True,
+                                         clearEdgeMask=True)
+            task1 = self._setup_subtraction(mode="convolveTemplate")
+            results_convolveTemplate = task1.run(template1, science1, sources1)
 
-        science2, sources2 = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=seed1,
-                                           clearEdgeMask=True)
-        template2, _ = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=seed2,
-                                     templateBorderSize=0, doApplyCalibration=True,
-                                     clearEdgeMask=True)
-        task2 = self._setup_subtraction(mode="convolveScience")
-        results_convolveScience = task2.run(template2, science2, sources2)
-        bbox = results_convolveTemplate.difference.getBBox().clippedTo(
-            results_convolveScience.difference.getBBox())
-        diff1 = science1.maskedImage.clone()[bbox]
-        diff1 -= template1.maskedImage[bbox]
-        diff2 = science2.maskedImage.clone()[bbox]
-        diff2 -= template2.maskedImage[bbox]
-        self.assertFloatsAlmostEqual(results_convolveTemplate.difference[bbox].image.array,
-                                     diff1.image.array,
-                                     atol=noiseLevel*5.)
-        self.assertFloatsAlmostEqual(results_convolveScience.difference[bbox].image.array,
-                                     diff2.image.array,
-                                     atol=noiseLevel*5.)
-        diffErr = noiseLevel*2
-        self.assertMaskedImagesAlmostEqual(results_convolveTemplate.difference[bbox].maskedImage,
-                                           results_convolveScience.difference[bbox].maskedImage,
-                                           atol=diffErr*5.)
+            science2, sources2 = makeTestImage(psfSize=psfSize, noiseLevel=noiseLevel, noiseSeed=seed1,
+                                               clearEdgeMask=True)
+            template2, _ = makeTestImage(psfSize=psfSize, noiseLevel=noiseLevel, noiseSeed=seed2,
+                                         templateBorderSize=0, doApplyCalibration=True,
+                                         clearEdgeMask=True)
+            task2 = self._setup_subtraction(mode="convolveScience")
+            results_convolveScience = task2.run(template2, science2, sources2)
+            bbox = results_convolveTemplate.difference.getBBox().clippedTo(
+                results_convolveScience.difference.getBBox())
+            diff1 = science1.maskedImage.clone()[bbox]
+            diff1 -= template1.maskedImage[bbox]
+            diff2 = science2.maskedImage.clone()[bbox]
+            diff2 -= template2.maskedImage[bbox]
+            self.assertFloatsAlmostEqual(results_convolveTemplate.difference[bbox].image.array,
+                                         diff1.image.array,
+                                         atol=noiseLevel*5.)
+            self.assertFloatsAlmostEqual(results_convolveScience.difference[bbox].image.array,
+                                         diff2.image.array,
+                                         atol=noiseLevel*5.)
+            diffErr = noiseLevel*2
+            self.assertMaskedImagesAlmostEqual(results_convolveTemplate.difference[bbox].maskedImage,
+                                               results_convolveScience.difference[bbox].maskedImage,
+                                               atol=diffErr*5.)
 
     def test_background_subtraction(self):
         """Check that we can recover the background,
