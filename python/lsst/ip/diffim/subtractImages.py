@@ -451,9 +451,11 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                 Sources from the input catalog that were used to construct the
                 PSF-matching kernel.
         """
+        self.usePreconvolution = False
         self._prepareInputs(template, science, visitSummary=visitSummary)
 
         convolveTemplate = self.chooseConvolutionMethod(template, science)
+        self.matchedPsfSize = self.sciencePsfSize if convolveTemplate else self.templatePsfSize
 
         kernelResult = self.runMakeKernel(template, science, sources=sources,
                                           convolveTemplate=convolveTemplate,
@@ -505,6 +507,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         RuntimeError
             If an unsupported convolution mode is supplied.
         """
+        if self.usePreconvolution:
+            raise RuntimeError("Choosing a convolution method is incompatible with preconvolution!")
         if self.config.mode == "auto":
             convolveTemplate = _shapeTest(template,
                                           science,
@@ -529,7 +533,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         return convolveTemplate
 
     def runMakeKernel(self, template, science, sources=None, convolveTemplate=True, runSourceDetection=False):
-        """Construct the PSF-matching kernel.
+        """Construct the PSF-matching kernel. Not used for preconvolution.
 
         Parameters
         ----------
@@ -561,7 +565,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                 Sources from the input catalog that were used to construct the
                 PSF-matching kernel.
         """
-
+        if self.usePreconvolution:
+            raise RuntimeError("Incorrect matching kernel calculation configured.")
         if convolveTemplate:
             reference = template
             target = science
@@ -898,8 +903,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         else:
             return convolvedExposure[bbox]
 
-    def _sourceSelector(self, template, science, sources, fallback=False, preconvolved=False,
-                        scienceFwhmPix=None):
+    def _sourceSelector(self, template, science, sources, fallback=False, preconvolved=False):
         """Select sources from a catalog that meet the selection criteria.
         The selection criteria include any configured parameters of the
         `sourceSelector` subtask, as well as checking the science and template
@@ -921,11 +925,6 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         preconvolved : `bool`, optional
             If set, exclude a wider buffer around the edge of the image to
             account for an extra convolution.
-        scienceFwhmPix : `float`, optional
-            Effective FWHM of the science image in pixels to use for sizing
-            the kernel basis and source footprints. If `None`, the
-            width is derived from ``self.sciencePsfSize`` (boosted by
-            ``sqrt(2)`` in the ``preconvolved`` case).
 
         Returns
         -------
@@ -943,9 +942,10 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             selected = self.fallbackSourceSelector.selectSources(sources).selected
         else:
             selected = self.sourceSelector.selectSources(sources).selected
-        if scienceFwhmPix is None:
-            scienceFwhmPix = self.sciencePsfSize*np.sqrt(2) if preconvolved else self.sciencePsfSize
-        kSize = self.makeKernel.makeKernelBasisList(self.templatePsfSize, scienceFwhmPix)[0].getWidth()
+        # It is OK to use just self.matchedPsfSize for the science PSF here,
+        # since we are just using it to calculate the size of the matching
+        # kernel.
+        kSize = self.makeKernel.makeKernelBasisList(self.templatePsfSize, self.matchedPsfSize)[0].getWidth()
         selectSources = sources[selected].copy(deep=True)
         # Set the footprints, to be used in `makeKernel` and `checkMask`.
         kernelSources = setSourceFootprints(selectSources, kernelSize=kSize)
@@ -1223,19 +1223,20 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
                 Final kernel used to PSF-match the template to the science
                 image.
         """
+        self.usePreconvolution = True
         self._prepareInputs(template, science, visitSummary=visitSummary)
+        self.matchedPsfSize = self.sciencePsfSize*np.sqrt(2)
 
         convolutionKernel = self._makePreconvolutionKernel(science.psf)
         matchedScience = self._convolveExposure(science, convolutionKernel, self.convolutionControl,
                                                 interpolateBadMaskPlanes=True)
         self.metadata["convolvedExposure"] = "Preconvolution"
 
-        self.preconvolvedSciencePsfSize = self.sciencePsfSize*np.sqrt(2)
-        self.log.info("Preconvolved science PSF FWHM: %f pixels", self.preconvolvedSciencePsfSize)
-        self.metadata["preconvolvedSciencePsfSize"] = self.preconvolvedSciencePsfSize
+        self.matchedPsfSize = self.sciencePsfSize*np.sqrt(2)
+        self.log.info("Preconvolved science PSF FWHM: %f pixels", self.matchedPsfSize)
+        self.metadata["preconvolvedSciencePsfSize"] = self.matchedPsfSize
         try:
-            kernelSources = self._sourceSelector(template, matchedScience, sources, preconvolved=True,
-                                                 scienceFwhmPix=self.preconvolvedSciencePsfSize)
+            kernelSources = self._sourceSelector(template, matchedScience, sources, preconvolved=True)
             subtractResults = self.runPreconvolve(template, science, matchedScience,
                                                   kernelSources, convolutionKernel)
 
@@ -1367,7 +1368,7 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
         kernelResult = self.makeKernel.run(template[innerBBox], matchedScience[innerBBox], kernelSources,
                                            preconvolved=True,
                                            templateFwhmPix=self.templatePsfSize,
-                                           scienceFwhmPix=self.preconvolvedSciencePsfSize)
+                                           scienceFwhmPix=self.matchedPsfSize)
 
         matchedTemplate = self._convolveExposure(template, kernelResult.psfMatchingKernel,
                                                  self.convolutionControl,
@@ -1572,9 +1573,11 @@ class SimplifiedSubtractTask(AlardLuptonSubtractTask):
             Raised if fraction of good pixels, defined as not having NO_DATA
             set, is less then the configured requiredTemplateFraction
         """
+        self.usePreconvolution = False
         self._prepareInputs(template, science, visitSummary=visitSummary)
 
         convolveTemplate = self.chooseConvolutionMethod(template, science)
+        self.matchedPsfSize = self.sciencePsfSize if convolveTemplate else self.templatePsfSize
 
         if self.config.useExistingKernel:
             psfMatchingKernel = inputPsfMatchingKernel
