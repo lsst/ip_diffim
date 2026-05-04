@@ -776,10 +776,50 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         """
         if self.config.doDecorrelation:
             self.log.info("Decorrelating image difference.")
+            # If the template was already PSF-matched at build time
+            # (e.g. by `GetPsfMatchedTemplateTask`), its noise was
+            # convolved by a Gaussian of sigma `sigma_patch` whose
+            # parameters live in the template metadata. The matched
+            # template's variance plane therefore reports
+            # ``tvar_orig·ΣK_patch²`` per pixel — not ``tvar_orig`` —
+            # and `DecorrelateALKernelTask`'s default
+            # ``computeVarianceMean(templateExposure)`` would feed that
+            # post-convolution number into corrft, under-decorrelating
+            # the diffim. Recover ``tvar_orig`` from the persisted
+            # ΣK_patch² and pass it explicitly so corrft is built with
+            # the variance that the original template noise *actually*
+            # had, before the patch-side matching kernel attenuated
+            # it.
+            #
+            # We don't compose ``K_patch`` into the matching kernel:
+            # the A&L kernel is a basis-fit that often has strong
+            # high-amplitude oscillations, and naïvely convolving it
+            # with a small Gaussian introduces |K_eff_ft|² values that
+            # destabilize corrft. For the typical sigma_patch ≲ 1 px,
+            # |K_patch_ft|² ≈ 1 across the frequency band where the
+            # A&L kernel carries useful weight, so passing the A&L
+            # kernel alone with the recovered tvar gives a diffim
+            # whose per-pixel marginal variance and variance plane
+            # both end up at ≈ svar + tvar_orig·kSum² — self-consistent
+            # for matched-filter detection on ``image/sqrt(variance)``.
+            _, normSq = self._readTemplateKernelMetadata(template)
+            if normSq < 1.0:
+                tvarOverride = self.decorrelate.computeVarianceMean(
+                    template[science.getBBox()]
+                )/normSq
+                self.log.info(
+                    "Template was pre-matched (ΣK_patch²=%.3f); recovered"
+                    " tvar=%.3e for decorrelation.",
+                    normSq, tvarOverride,
+                )
+            else:
+                tvarOverride = None
             # We have cleared the template mask plane, so copy the mask plane of
             # the image difference so that we can calculate correct statistics
             # during decorrelation
-            correctedExposure = self.decorrelate.run(science, template[science.getBBox()], difference, kernel,
+            correctedExposure = self.decorrelate.run(science, template[science.getBBox()], difference,
+                                                     kernel,
+                                                     tvar=tvarOverride,
                                                      templateMatched=templateMatched,
                                                      preConvMode=preConvMode,
                                                      preConvKernel=preConvKernel,
@@ -788,6 +828,24 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             self.log.info("NOT decorrelating image difference.")
             correctedExposure = difference
         return correctedExposure
+
+    @staticmethod
+    def _readTemplateKernelMetadata(template):
+        """Return ``(sigma_patch, ΣK²)`` from the template's metadata,
+        or ``(0.0, 1.0)`` if no pre-existing matching kernel was
+        recorded — which means the template was not PSF-matched at
+        build time and the standard decorrelation path applies
+        unchanged.
+        """
+        md = template.metadata
+        try:
+            sigma = float(md["MATCHING_KERNEL_SIGMA"])
+            normSq = float(md["MATCHING_KERNEL_NORMSQ"])
+        except (KeyError, TypeError, ValueError):
+            return 0.0, 1.0
+        if not (np.isfinite(sigma) and np.isfinite(normSq) and normSq > 0):
+            return 0.0, 1.0
+        return sigma, normSq
 
     def _calculateMagLim(self, exposure, nsigma=5.0, fallbackPsfSize=None):
         """Calculate an exposure's limiting magnitude.

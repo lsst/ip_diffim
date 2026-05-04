@@ -25,10 +25,13 @@ from astropy import units as u
 
 import lsst.afw.math as afwMath
 import lsst.afw.table as afwTable
+from lsst.daf.butler import DataCoordinate, DimensionUniverse
 import lsst.geom
+import lsst.ip.diffim
 import lsst.meas.algorithms as measAlg
 from lsst.ip.diffim import subtractImages, InsufficientKernelSourcesError
 from lsst.pex.config import FieldValidationError
+import lsst.pipe.base as pipeBase
 from lsst.pipe.base import NoWorkFound
 import lsst.utils.tests
 import numpy as np
@@ -1402,6 +1405,125 @@ class SimplifiedSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.TestC
         differenceStd = computeRobustStatistics(output.difference.image, output.difference.mask,
                                                 makeStats(), statistic=afwMath.STDEV)
         self.assertFloatsAlmostEqual(differenceStd, np.sqrt(2)*noiseLevel, rtol=0.1)
+
+
+class AlardLuptonSubtractWithPsfMatchedTemplateTest(AlardLuptonSubtractTestBase, lsst.utils.tests.TestCase):
+    """End-to-end coupling test between `GetPsfMatchedTemplateTask` and
+    `AlardLuptonSubtractTask`.
+
+    The point isn't to re-test either task in isolation — it's to
+    exercise the boundary: a template produced by the new template task
+    (with a `CoaddPsf` of per-patch matched `KernelPsf`s) must wire
+    cleanly into the AL subtraction pipeline (matching photoCalib, WCS,
+    bbox, filter, and a usable PSF), and the matched pixels must survive
+    the subsequent AL kernel fit well enough to yield a clean
+    difference.
+    """
+    subtractTask = subtractImages.AlardLuptonSubtractTask
+
+    def test_subtractWithPsfMatchedTemplate(self):
+        """A template built by `GetPsfMatchedTemplateTask` produces a
+        difference image whose statistics match the equal-images
+        baseline within tolerance.
+
+        Mirrors the fixture of `AlardLuptonSubtractTest.test_equal_images`
+        — same source positions in science and template, different noise
+        realizations — but routes the template through the new
+        PSF-matching task instead of building it directly.
+        """
+        noiseLevelScience = 1.0
+        noiseLevelTemplate = 0.7
+        # Same source positions and shape as the baseline test (default
+        # seed=5). Different noise seeds for science and patch.
+        science, sources = makeTestImage(
+            psfSize=2.4, noiseLevel=noiseLevelScience, noiseSeed=6,
+        )
+        # `templateBorderSize=20` makes the patch bbox exactly the
+        # `GetPsfMatchedTemplateTask`-grown science bbox, and the source
+        # positions in absolute pixel coords match the science exposure.
+        patch, _ = makeTestImage(
+            psfSize=2.0, noiseLevel=noiseLevelTemplate, noiseSeed=7,
+            templateBorderSize=20, doApplyCalibration=True,
+        )
+
+        dataId = DataCoordinate.standardize(
+            {"tract": 0, "patch": 0, "band": "g", "skymap": "skymap"},
+            universe=DimensionUniverse(),
+        )
+        handle = pipeBase.InMemoryDatasetHandle(
+            patch, storageClass="ExposureF",
+            copy=True, dataId=dataId,
+        )
+
+        template_task = lsst.ip.diffim.GetPsfMatchedTemplateTask()
+        template_result = template_task.run(
+            coaddExposureHandles={0: [handle]},
+            bbox=lsst.geom.Box2I(science.getBBox()),
+            wcs=science.wcs,
+            dataIds={0: [dataId]},
+            physical_filter="g NotACamera",
+        )
+        template = template_result.template
+
+        # Sanity-check the boundary the subtract task is going to read
+        # from: bbox geometry, filter wiring, and PSF-matching metadata.
+        expected_bbox = lsst.geom.Box2I(science.getBBox())
+        expected_bbox.grow(template_task.config.templateBorderSize)
+        self.assertEqual(template.getBBox(), expected_bbox)
+        self.assertEqual(template.filter.bandLabel, "g")
+        self.assertEqual(template.filter.physicalLabel, "g NotACamera")
+        # σ_in = 2.0, default targetPsfStrategy="max", pad=0.05.
+        target_sigma = template.metadata["PSF_MATCHED_TARGET_SIGMA"]
+        self.assertAlmostEqual(target_sigma, 2.0*1.05, places=3)
+
+        statsCtrl = makeStats(badMaskPlanes=("EDGE", "BAD", "NO_DATA",
+                                             "DETECTED", "DETECTED_NEGATIVE"))
+
+        # The matching convolution deflates per-pixel variance by Σ K²;
+        # the template no longer decorrelates standalone, so the
+        # variance plane reports the honest post-convolution marginal
+        # variance. The persisted ``MATCHING_KERNEL_NORMSQ`` records the
+        # same Σ K², which lets the downstream subtraction recover the
+        # original tvar — and lets us verify the relationship here.
+        normSq = template.metadata["MATCHING_KERNEL_NORMSQ"]
+        self.assertGreater(normSq, 0.0)
+        self.assertLess(normSq, 1.0)
+        observed_matched_var = computeRobustStatistics(
+            template.variance, template.mask, statsCtrl,
+        )
+        self.assertFloatsAlmostEqual(
+            observed_matched_var, noiseLevelTemplate**2 * normSq, rtol=0.05,
+        )
+
+        # Run the AL subtraction on the matched template.
+        subtract_task = self._setup_subtraction()
+        output = subtract_task.run(template, science, sources)
+
+        # Difference image should be all-finite and statistically clean.
+        self.assertTrue(np.all(np.isfinite(output.difference.image.array)))
+        meanError = noiseLevelScience/np.sqrt(output.difference.image.array.size)
+        diff_mean = computeRobustStatistics(
+            output.difference.image, output.difference.mask, statsCtrl,
+        )
+        self.assertFloatsAlmostEqual(diff_mean, 0, atol=5*meanError)
+
+        # The observed scatter of the difference image must agree with
+        # AlardLupton's propagated per-pixel variance plane. AL applies
+        # its own (non-Gaussian) matching kernel and a decorrelation
+        # step on top of the GetPsfMatched-reduced template noise; we
+        # don't re-derive that here, but we do require that AL's
+        # variance bookkeeping is internally consistent with the actual
+        # pixel-to-pixel scatter.
+        diff_std = computeRobustStatistics(
+            output.difference.image, output.difference.mask,
+            makeStats(), statistic=afwMath.STDEV,
+        )
+        diff_var_propagated = computeRobustStatistics(
+            output.difference.variance, output.difference.mask, statsCtrl,
+        )
+        self.assertFloatsAlmostEqual(
+            diff_std, np.sqrt(diff_var_propagated), rtol=0.01,
+        )
 
 
 def setup_module(module):
