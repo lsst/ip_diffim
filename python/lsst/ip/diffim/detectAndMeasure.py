@@ -346,6 +346,20 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         doc="Mask planes to clear before running detection.",
         default=("DETECTED", "DETECTED_NEGATIVE", "NOT_DEBLENDED", "STREAK"),
     )
+    doRejectBadMaskPlaneDetections = pexConfig.Field(
+        dtype=bool,
+        default=True,
+        doc="Reject any peaks detected on ``badMaskPlanes`` before measurement."
+            "These should all be rejected downstream by ``badSourceFlags``, "
+            "but filtering earlier can save time."
+    )
+    badMaskPlanes = lsst.pex.config.ListField(
+        dtype=str,
+        doc="Detections whose footprint peak lies on a pixel with any of these"
+            " mask planes set will be rejected before measurement."
+            " Any missing mask planes will be silently ignored.",
+        default=("NO_DATA", "BAD", "SAT", "EDGE"),
+    )
     raiseOnBadSubtractionRatio = pexConfig.Field(
         dtype=bool,
         default=True,
@@ -650,20 +664,16 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         if idFactory is None:
             idFactory = lsst.meas.base.IdGenerator().make_table_id_factory()
 
-        if self.config.doSubtractBackground:
-            # Run background subtraction before clearing the mask planes
-            detectionExposure = difference.clone()
-            background = self.subtractInitialBackground.run(detectionExposure).background
-        else:
-            detectionExposure = difference
-            background = afwMath.BackgroundList()
+        # Run background subtraction (if configured) before clearing the mask
+        # planes.
+        detectionExposure, background = self._subtractInitialBackground(differenceExposure=difference)
 
         self._prepareInputs(detectionExposure)
 
-        if self.config.doFindCosmicRays and not self.config.doSubtractBackground:
-            # Detect and interpolate over any remaining cosmic rays
-            # This only needs to run once, right before the final detection.
-            self.findAndMaskCosmicRays(detectionExposure)
+        # Detect and interpolate over any remaining cosmic rays. When
+        # background subtraction is enabled, this is deferred to the second
+        # pass so it runs only once on a properly background-subtracted image.
+        self._findInitialCosmicRays(differenceExposure=difference)
 
         # Don't use the idFactory until after deblend+merge, so that we aren't
         # generating ids that just get thrown away (footprint merge doesn't
@@ -677,23 +687,12 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         )
 
         if self.config.doSubtractBackground:
-            # Run background subtraction again after detecting peaks
-            # but before measurement
-            # First update the mask using the detection image
-            difference.setMask(detectionExposure.mask)
-            background = self.subtractFinalBackground.run(difference).background
-
-            if self.config.doFindCosmicRays:
-                # Detect and interpolate over any remaining cosmic rays
-                self.findAndMaskCosmicRays(difference)
-
-            # Re-run detection to get final footprints
-            table = afwTable.SourceTable.make(self.schema)
-            results = self.detection.run(
-                table=table,
-                exposure=difference,
+            # Refit the background using the first-pass detection mask, then
+            # find cosmic rays and re-run detection on the difference.
+            results, background = self._subtractFinalBackgroundAndRedetect(
+                differenceExposure=difference,
+                firstPassDetectionExposure=detectionExposure,
                 doSmooth=True,
-                background=background
             )
         measurementResults.differenceBackground = background
 
@@ -740,6 +739,110 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             if mp not in mask.getMaskPlaneDict():
                 mask.addMaskPlane(mp)
         mask &= ~mask.getPlaneBitMask(self.config.clearMaskPlanes)
+
+    def _subtractInitialBackground(self, *, differenceExposure, scoreExposure=None):
+        """Optionally fit and subtract an initial background.
+
+        Parameters
+        ----------
+        differenceExposure : `lsst.afw.image.ExposureF`
+            Template-subtracted difference image. Used only as the input to
+            background fitting; never modified.
+        scoreExposure : `lsst.afw.image.ExposureF`, optional
+            Maximum-likelihood score image, when detection is to be run on
+            the score rather than on the difference.
+
+        Returns
+        -------
+        detectionExposure : `lsst.afw.image.ExposureF`
+            Exposure to use for first-pass detection.
+        background : `lsst.afw.math.BackgroundList`
+            The fit background, or an empty list when background subtraction
+            is disabled.
+        """
+        if not self.config.doSubtractBackground:
+            return (scoreExposure if scoreExposure is not None else differenceExposure,
+                    afwMath.BackgroundList())
+        if scoreExposure is None:
+            detectionExposure = differenceExposure.clone()
+            background = self.subtractInitialBackground.run(detectionExposure).background
+        else:
+            background = self.subtractInitialBackground.run(differenceExposure.clone()).background
+            detectionExposure = scoreExposure.clone()
+            detectionExposure.image -= background.getImage()
+        return detectionExposure, background
+
+    def _findInitialCosmicRays(self, *, differenceExposure, scoreExposure=None):
+        """Find cosmic rays before the first detection pass, if requested.
+
+        Cosmic-ray finding is only performed in the first pass when background
+        subtraction is disabled; with ``doSubtractBackground`` set it is
+        deferred to `_subtractFinalBackgroundAndRedetect` so that it runs on
+        the final background-subtracted image.
+
+        Parameters
+        ----------
+        differenceExposure : `lsst.afw.image.ExposureF`
+            Difference exposure on which cosmic rays are detected; its mask
+            is updated in place.
+        scoreExposure : `lsst.afw.image.ExposureF`, optional
+            Maximum-likelihood score image, used as the detection exposure
+            in the score-image variant. When supplied, the new CR mask bits
+            are OR'd onto its mask.
+        """
+        if not self.config.doFindCosmicRays or self.config.doSubtractBackground:
+            return
+        self.findAndMaskCosmicRays(differenceExposure)
+        if scoreExposure is not None:
+            scoreExposure.mask.array |= differenceExposure.mask.array
+
+    def _subtractFinalBackgroundAndRedetect(self, *, differenceExposure,
+                                            firstPassDetectionExposure,
+                                            scoreExposure=None, doSmooth=True):
+        """Refit the background using the first-pass detection mask, then
+        re-find cosmic rays (if requested) and run final detection.
+
+        Parameters
+        ----------
+        differenceExposure : `lsst.afw.image.ExposureF`
+            Difference exposure used to fit the final background and find
+            cosmic rays. Modified in place.
+        firstPassDetectionExposure : `lsst.afw.image.ExposureF`
+            Exposure that was used for the first detection pass; its mask
+            (carrying first-pass detection bits) is copied onto
+            ``differenceExposure`` before refitting.
+        scoreExposure : `lsst.afw.image.ExposureF`, optional
+            Maximum-likelihood score image. If supplied, the fitted background
+            is also subtracted from it, and it is used for detection.
+        doSmooth : `bool`, optional
+            Whether the detection task should smooth the input before
+            thresholding. Should be `True` unless the score image is used.
+
+        Returns
+        -------
+        detectResults : `lsst.pipe.base.Struct`
+            Positive and negative peaks from detection, to be passed to source
+            measurement.
+        background : `lsst.afw.math.BackgroundList`
+            The refit background.
+        """
+        differenceExposure.setMask(firstPassDetectionExposure.mask)
+        background = self.subtractFinalBackground.run(differenceExposure).background
+        if scoreExposure is not None:
+            scoreExposure.image -= background.getImage()
+        if self.config.doFindCosmicRays:
+            self.findAndMaskCosmicRays(differenceExposure)
+            if scoreExposure is not None:
+                scoreExposure.mask.array |= differenceExposure.mask.array
+        detectionExposure = scoreExposure if scoreExposure is not None else differenceExposure
+        table = afwTable.SourceTable.make(self.schema)
+        detectResults = self.detection.run(
+            table=table,
+            exposure=detectionExposure,
+            doSmooth=doSmooth,
+            background=background,
+        )
+        return detectResults, background
 
     def processResults(self, science, matchedTemplate, difference, sources, idFactory,
                        kernelSources=None, positives=None, negatives=None, measurementResults=None):
@@ -822,6 +925,11 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
         if self.config.doSkySources:
             self.addSkySources(initialDiaSources, difference.mask, difference.info.id)
+
+        if self.config.doRejectBadMaskPlaneDetections:
+            # Save time by rejecting peaks on bad mask planes prior to
+            # measurement.
+            initialDiaSources = self._rejectBadMaskedDetections(initialDiaSources, difference.mask)
 
         if not initialDiaSources.isContiguous():
             initialDiaSources = initialDiaSources.copy(deep=True)
@@ -939,6 +1047,54 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         if len(negatives) > 0:
             sources[-len(negatives):]["is_negative"] = True
         return sources, positives, negatives
+
+    def _rejectBadMaskedDetections(self, initialDiaSources, mask):
+        """Remove detections whose footprint peak lies on a bad-masked pixel.
+
+        Detections are rejected if any peak of the source footprint falls on a
+        pixel with any of the ``config.badMaskPlanes`` bits set.
+
+        Parameters
+        ----------
+        initialDiaSources : `lsst.afw.table.SourceCatalog`
+            The catalog of detected peaks.
+        mask : `lsst.afw.image.Mask`
+            Mask of the image used for detection.
+
+        Returns
+        -------
+        initialDiaSources : `lsst.afw.table.SourceCatalog`
+            The catalog with bad-masked detections removed.
+        """
+        if not self.config.badMaskPlanes or len(initialDiaSources) == 0:
+            self.metadata["nRejectedBadMaskPlanes"] = 0
+            return initialDiaSources
+
+        presentPlanes = [mp for mp in self.config.badMaskPlanes
+                         if mp in mask.getMaskPlaneDict()]
+        if not presentPlanes:
+            self.metadata["nRejectedBadMaskPlanes"] = 0
+            return initialDiaSources
+
+        badBitMask = mask.getPlaneBitMask(presentPlanes)
+        x0, y0 = mask.getXY0()
+
+        selector = np.ones(len(initialDiaSources), dtype=bool)
+        for i, source in enumerate(initialDiaSources):
+            peaks = source.getFootprint().getPeaks()
+            for peak in peaks:
+                ix = peak.getIx() - x0
+                iy = peak.getIy() - y0
+                if mask.array[iy, ix] & badBitMask:
+                    selector[i] = False
+                    break
+        nRejected = np.count_nonzero(~selector)
+        self.metadata["nRejectedBadMaskPlanes"] = nRejected
+        if nRejected > 0:
+            self.log.info("Rejected %d detections on pixels with bad mask "
+                          "planes %s before measurement.",
+                          nRejected, presentPlanes)
+        return initialDiaSources[selector].copy(deep=True)
 
     def _removeBadSources(self, diaSources):
         """Remove unphysical diaSources from the catalog.
@@ -1342,6 +1498,12 @@ class DetectAndMeasureScoreConnections(DetectAndMeasureConnections):
         doc="Maximum likelihood image for detection.",
         dimensions=("instrument", "visit", "detector"),
         storageClass="ExposureF",
+        name="{fakesType}{coaddName}Diff_scoreTempExp",
+    )
+    scoreMeasuredExposure = pipeBase.connectionTypes.Output(
+        doc="Score image after backgrond subtraction and detection.",
+        dimensions=("instrument", "visit", "detector"),
+        storageClass="ExposureF",
         name="{fakesType}{coaddName}Diff_scoreExp",
     )
 
@@ -1368,7 +1530,7 @@ class DetectAndMeasureScoreTask(DetectAndMeasureTask):
 
     @timeMethod
     def run(self, science, matchedTemplate, difference, scoreExposure, kernelSources,
-            idFactory=None):
+            idFactory=None, measurementResults=None):
         """Detect and measure sources on a score image.
 
         Parameters
@@ -1388,6 +1550,10 @@ class DetectAndMeasureScoreTask(DetectAndMeasureTask):
             Generator object used to assign ids to detected sources in the
             difference image. Ids from this generator are not set until after
             deblending and merging positive/negative peaks.
+        measurementResults : `lsst.pipe.base.Struct`, optional
+            Result struct that is modified to allow saving of partial outputs
+            for some failure conditions. If the task completes successfully,
+            this is also returned.
 
         Returns
         -------
@@ -1398,39 +1564,72 @@ class DetectAndMeasureScoreTask(DetectAndMeasureTask):
             ``diaSources``  : `lsst.afw.table.SourceCatalog`
                 The catalog of detected sources.
         """
+        if measurementResults is None:
+            measurementResults = pipeBase.Struct()
         if idFactory is None:
             idFactory = lsst.meas.base.IdGenerator().make_table_id_factory()
 
-        self._prepareInputs(scoreExposure)
+        # Background is measured on the difference image, and then subtracted
+        # from both the difference and score images. The preconvolution kernel
+        # is normalized to 1, so the same background level applies to both.
+        detectionScoreExposure, background = self._subtractInitialBackground(
+            differenceExposure=difference, scoreExposure=scoreExposure,
+        )
+
+        self._prepareInputs(detectionScoreExposure)
+
+        # Cosmic rays are detected on the difference image and the resulting
+        # mask is propagated to the score image used for detection.
+        self._findInitialCosmicRays(
+            differenceExposure=difference, scoreExposure=scoreExposure,
+        )
 
         # Don't use the idFactory until after deblend+merge, so that we aren't
         # generating ids that just get thrown away (footprint merge doesn't
         # know about past ids).
         table = afwTable.SourceTable.make(self.schema)
-        results = self.detection.run(
+        detectResults = self.detection.run(
             table=table,
-            exposure=scoreExposure,
+            exposure=detectionScoreExposure,
             doSmooth=False,
+            background=background,
         )
+
+        if self.config.doSubtractBackground:
+            # Refine the background with detected peaks flagged in the mask.
+            # The refinement is fit on the difference and also applied to the
+            # score image, where the second-pass detection runs.
+            detectResults, background = self._subtractFinalBackgroundAndRedetect(
+                differenceExposure=difference,
+                firstPassDetectionExposure=detectionScoreExposure,
+                scoreExposure=scoreExposure,
+                doSmooth=False,
+            )
+        measurementResults.differenceBackground = background
+        measurementResults.scoreMeasuredExposure = scoreExposure
+
         # Copy the detection mask from the Score image to the difference image
         difference.mask.assign(scoreExposure.mask, scoreExposure.getBBox())
 
         if self.config.doDeblend:
             sources, positives, negatives = self._deblend(difference,
-                                                          results.positive,
-                                                          results.negative)
+                                                          detectResults.positive,
+                                                          detectResults.negative)
 
-            return self.processResults(science, matchedTemplate, difference,
-                                       sources, idFactory, kernelSources,
-                                       positives=positives,
-                                       negatives=negatives)
+            self.processResults(science, matchedTemplate, difference,
+                                sources, idFactory, kernelSources,
+                                positives=positives,
+                                negatives=negatives,
+                                measurementResults=measurementResults)
 
         else:
             positives = afwTable.SourceCatalog(self.schema)
-            results.positive.makeSources(positives)
+            detectResults.positive.makeSources(positives)
             negatives = afwTable.SourceCatalog(self.schema)
-            results.negative.makeSources(negatives)
-            return self.processResults(science, matchedTemplate, difference,
-                                       results.sources, idFactory, kernelSources,
-                                       positives=positives,
-                                       negatives=negatives)
+            detectResults.negative.makeSources(negatives)
+            self.processResults(science, matchedTemplate, difference,
+                                detectResults.sources, idFactory, kernelSources,
+                                positives=positives,
+                                negatives=negatives,
+                                measurementResults=measurementResults)
+        return measurementResults

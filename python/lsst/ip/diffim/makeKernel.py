@@ -122,6 +122,9 @@ class MakeKernelTask(PsfMatchTask):
             Typically the output of `MakeKernelTask.selectKernelSources`.
         preconvolved : `bool`, optional
             Was the science image convolved with its own PSF?
+        templateFwhmPix, scienceFwhmPix : `float`, optional
+            FWHM of the template or science PSF, in pixels.
+            Will be recalculated if not specified.
 
         Returns
         -------
@@ -133,31 +136,9 @@ class MakeKernelTask(PsfMatchTask):
                 Spatially varying background-matching function.
         """
         kernelCellSet = self._buildCellSet(template.maskedImage, science.maskedImage, kernelSources)
-        if (scienceFwhmPix is None) or (templateFwhmPix is None):
-            # Calling getPsfFwhm on template.psf fails on some rare occasions when
-            # the template has no input exposures at the average position of the
-            # stars. So we try getPsfFwhm first on template, and if that fails we
-            # evaluate the PSF on a grid specified by fwhmExposure* fields.
-            # To keep consistent definitions for PSF size on the template and
-            # science images, we use the same method for both.
-            try:
-                templateFwhmPix = getPsfFwhm(template.psf)
-                scienceFwhmPix = getPsfFwhm(science.psf)
-            except (InvalidParameterError, RangeError):
-                self.log.debug("Unable to evaluate PSF at the average position. "
-                               "Evaluting PSF on a grid of points."
-                               )
-                templateFwhmPix = evaluateMeanPsfFwhm(template,
-                                                      fwhmExposureBuffer=self.config.fwhmExposureBuffer,
-                                                      fwhmExposureGrid=self.config.fwhmExposureGrid
-                                                      )
-                scienceFwhmPix = evaluateMeanPsfFwhm(science,
-                                                     fwhmExposureBuffer=self.config.fwhmExposureBuffer,
-                                                     fwhmExposureGrid=self.config.fwhmExposureGrid
-                                                     )
-
-        if preconvolved:
-            scienceFwhmPix *= np.sqrt(2)
+        templateFwhmPix, scienceFwhmPix = self._checkPsfWidths(template, science,
+                                                               templateFwhmPix, scienceFwhmPix,
+                                                               preconvolved=False)
         basisList = self.makeKernelBasisList(templateFwhmPix, scienceFwhmPix,
                                              metadata=self.metadata)
         spatialSolution, psfMatchingKernel, backgroundModel = self._solve(kernelCellSet, basisList)
@@ -180,36 +161,18 @@ class MakeKernelTask(PsfMatchTask):
             Sources to check as possible kernel candidates.
         preconvolved : `bool`, optional
             Was the science image convolved with its own PSF?
+        templateFwhmPix, scienceFwhmPix : `float`, optional
+            FWHM of the template or science PSF, in pixels.
+            Will be recalculated if not specified.
 
         Returns
         -------
         kernelSources : `lsst.afw.table.SourceCatalog`
             Kernel candidates with appropriate sized footprints.
         """
-        if (scienceFwhmPix is None) or (templateFwhmPix is None):
-            # Calling getPsfFwhm on template.psf fails on some rare occasions when
-            # the template has no input exposures at the average position of the
-            # stars. So we try getPsfFwhm first on template, and if that fails we
-            # evaluate the PSF on a grid specified by fwhmExposure* fields.
-            # To keep consistent definitions for PSF size on the template and
-            # science images, we use the same method for both.
-            try:
-                templateFwhmPix = getPsfFwhm(template.psf)
-                scienceFwhmPix = getPsfFwhm(science.psf)
-            except (InvalidParameterError, RangeError):
-                self.log.debug("Unable to evaluate PSF at the average position. "
-                               "Evaluting PSF on a grid of points."
-                               )
-                templateFwhmPix = evaluateMeanPsfFwhm(template,
-                                                      fwhmExposureBuffer=self.config.fwhmExposureBuffer,
-                                                      fwhmExposureGrid=self.config.fwhmExposureGrid
-                                                      )
-                scienceFwhmPix = evaluateMeanPsfFwhm(science,
-                                                     fwhmExposureBuffer=self.config.fwhmExposureBuffer,
-                                                     fwhmExposureGrid=self.config.fwhmExposureGrid
-                                                     )
-        if preconvolved:
-            scienceFwhmPix *= np.sqrt(2)
+        templateFwhmPix, scienceFwhmPix = self._checkPsfWidths(template, science,
+                                                               templateFwhmPix, scienceFwhmPix,
+                                                               preconvolved=False)
         kernelSize = self.makeKernelBasisList(templateFwhmPix, scienceFwhmPix)[0].getWidth()
         kernelSources = self.makeCandidateList(template, science, kernelSize,
                                                candidateList=candidateList,
@@ -452,3 +415,52 @@ class MakeKernelTask(PsfMatchTask):
             New dimensions to use for the kernel.
         """
         return self.kConfig.sizeCellX, self.kConfig.sizeCellY
+
+    def _checkPsfWidths(self, template, science, templateFwhmPix, scienceFwhmPix, preconvolved=False):
+        """Check the science and template FWHM.
+
+        Parameters
+        ----------
+        template : `lsst.afw.image.Exposure`
+            Exposure that will be convolved.
+        science : `lsst.afw.image.Exposure`
+            The exposure that will be matched.
+        templateFwhmPix, scienceFwhmPix : `float`, optional
+            FWHM of the template or science PSF, in pixels.
+            Will be recalculated if not specified.
+        preconvolved : `bool`, optional
+            Was the science image convolved with its own PSF?
+
+        Returns
+        -------
+        templateFwhmPix, scienceFwhmPix : `float`
+            The desired PSF FWHM
+        """
+        if (scienceFwhmPix is None) or (templateFwhmPix is None):
+            # Calling getPsfFwhm on template.psf fails on some rare occasions when
+            # the template has no input exposures at the average position of the
+            # stars. So we try getPsfFwhm first on template, and if that fails we
+            # evaluate the PSF on a grid specified by fwhmExposure* fields.
+            # To keep consistent definitions for PSF size on the template and
+            # science images, we use the same method for both.
+            try:
+                templateFwhmPix = getPsfFwhm(template.psf)
+                scienceFwhmPix = getPsfFwhm(science.psf)
+            except (InvalidParameterError, RangeError):
+                self.log.debug("Unable to evaluate PSF at the average position. "
+                               "Evaluting PSF on a grid of points."
+                               )
+                templateFwhmPix = evaluateMeanPsfFwhm(template,
+                                                      fwhmExposureBuffer=self.config.fwhmExposureBuffer,
+                                                      fwhmExposureGrid=self.config.fwhmExposureGrid
+                                                      )
+                scienceFwhmPix = evaluateMeanPsfFwhm(science,
+                                                     fwhmExposureBuffer=self.config.fwhmExposureBuffer,
+                                                     fwhmExposureGrid=self.config.fwhmExposureGrid
+                                                     )
+            # Apply the Gaussian approximation FWHM boost only when
+            # the size was auto-computed. An explicit ``scienceFwhmPix`` is
+            # assumed already to reflect the preconvolved effective width.
+            if preconvolved:
+                scienceFwhmPix *= np.sqrt(2)
+        return templateFwhmPix, scienceFwhmPix

@@ -168,7 +168,8 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         noiseLevel = 1.
         staticSeed = 1
         fluxLevel = 500
-        kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel, "x0": 12345, "y0": 67890}
+        psfSize = 2.4
+        kwargs = {"seed": staticSeed, "psfSize": psfSize, "fluxLevel": fluxLevel, "x0": 12345, "y0": 67890}
         science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
         science.getInfo().setVisitInfo(makeVisitInfo())
         matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
@@ -204,7 +205,8 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         noiseLevel = 1.
         staticSeed = 1
         fluxLevel = 500
-        kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel, "x0": 12345, "y0": 67890}
+        psfSize = 2.4
+        kwargs = {"seed": staticSeed, "psfSize": psfSize, "fluxLevel": fluxLevel, "x0": 12345, "y0": 67890}
         science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
         matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
         difference = science.clone()
@@ -237,7 +239,8 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         transientSeed = 6
         xSize = 256
         ySize = 256
-        kwargs = {"psfSize": 2.4, "x0": 0, "y0": 0,
+        psfSize = 2.4
+        kwargs = {"psfSize": psfSize, "x0": 0, "y0": 0,
                   "xSize": xSize, "ySize": ySize}
         science, sources = makeTestImage(seed=staticSeed, noiseLevel=noiseLevel, noiseSeed=6,
                                          nSrc=1, **kwargs)
@@ -285,7 +288,8 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         staticSeed = 1
         xSize = 256
         ySize = 256
-        kwargs = {"psfSize": 2.4, "xSize": xSize, "ySize": ySize}
+        psfSize = 2.4
+        kwargs = {"psfSize": psfSize, "xSize": xSize, "ySize": ySize}
         science, sources = makeTestImage(seed=staticSeed, noiseLevel=noiseLevel, noiseSeed=6,
                                          nSrc=1, **kwargs)
         science.getInfo().setVisitInfo(makeVisitInfo())
@@ -331,19 +335,22 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         noiseLevel = 1.
         staticSeed = 1
         transientSeed = 6
+        nTransients = 10
+        transientFlux = 1000
         fluxLevel = 500
-        kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel}
+        psfSize = 2.4
+        kwargs = {"seed": staticSeed, "psfSize": psfSize, "fluxLevel": fluxLevel}
         scienceBase, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
         matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
 
         # Configure the detection Task
         detectionTask = self._setup_detection(doMerge=False, doSkySources=True)
         kwargs["seed"] = transientSeed
-        kwargs["nSrc"] = 10
-        kwargs["fluxLevel"] = 1000
+        kwargs["nSrc"] = nTransients
+        kwargs["fluxLevel"] = transientFlux
 
         # Run detection and check the results
-        def _detection_wrapper(positive=True):
+        def _run_and_check_detections(positive=True):
             transients, transientSources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=8, **kwargs)
             science = scienceBase.clone()
             if positive:
@@ -361,8 +368,8 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
             scale = 1. if positive else -1.
             for diaSource in output.diaSources:
                 self._check_diaSource(transientSources, diaSource, refIds=refIds, scale=scale)
-        _detection_wrapper(positive=True)
-        _detection_wrapper(positive=False)
+        _run_and_check_detections(positive=True)
+        _run_and_check_detections(positive=False)
 
     def test_detect_transients_with_background(self):
         """Run detection on a difference image containing transients and a background.
@@ -371,12 +378,15 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         noiseLevel = 1.
         staticSeed = 1
         transientSeed = 6
+        nTransients = 10
+        transientFlux = 1000
         fluxLevel = 500
         xSize = 512
         ySize = 512
         x0 = 123
         y0 = 456
-        kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel,
+        psfSize = 2.4
+        kwargs = {"seed": staticSeed, "psfSize": psfSize, "fluxLevel": fluxLevel,
                   "xSize": xSize, "ySize": ySize, "x0": x0, "y0": y0}
         params = [2.2, 2.1, 2.0, 1.2, 1.1, 1.0]
 
@@ -389,11 +399,11 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         # Configure the detection Task
         detectionTask = self._setup_detection(doMerge=False, doSubtractBackground=True)
         kwargs["seed"] = transientSeed
-        kwargs["nSrc"] = 10
-        kwargs["fluxLevel"] = 1000
+        kwargs["nSrc"] = nTransients
+        kwargs["fluxLevel"] = transientFlux
 
         # Run detection and check the results
-        def _detection_wrapper(positive=True):
+        def _run_and_check_detections(positive=True):
             transients, transientSources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=8, **kwargs)
             science = scienceBase.clone()
             if positive:
@@ -411,8 +421,8 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
             scale = 1. if positive else -1.
             for transient in transientSources:
                 self._check_diaSource(output.diaSources, transient, refIds=refIds, scale=scale)
-        _detection_wrapper(positive=True)
-        _detection_wrapper(positive=False)
+        _run_and_check_detections(positive=True)
+        _run_and_check_detections(positive=False)
 
     def test_mask_cosmic_rays(self):
         """Run detection on a difference image containing a cosmic ray.
@@ -423,7 +433,9 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         fluxLevel = 500
         xSize = 400
         ySize = 400
-        kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel, "xSize": xSize, "ySize": ySize}
+        psfSize = 2.4
+        kwargs = {"seed": staticSeed, "psfSize": psfSize, "fluxLevel": fluxLevel,
+                  "xSize": xSize, "ySize": ySize}
         science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
         matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
         crMask = science.mask.getPlaneBitMask("CR")
@@ -447,12 +459,14 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         # Add CR-like shape and check that CR is detected
         # Pick two locations on top of sources, since that is what is likely to
         # be missed in the first stage of CR rejection.
-        difference.image.array[crX0:crX0+1, crY0:crY0+5] += 1234  # Arbitrary but large flux for the CRs
-        difference.image.array[crX1:crX1+5, crY1:crY1+1] += 1234
+        crMaskSetInput = np.zeros(difference.image.array.shape, bool)
+        crMaskSetInput[crX0:crX0+1, crY0:crY0+5] = True
+        crMaskSetInput[crX1:crX1+5, crY1:crY1+1] = True
+        difference.image.array[crMaskSetInput] += 1234
         output = detectionTask.run(science, matchedTemplate, difference)
         crMaskSet = (output.subtractedMeasuredExposure.mask.array & crMask) > 0
-        self.assertTrue(np.all(crMaskSet[crX0:crX0+1, crY0:crY0+5]))
-        self.assertTrue(np.all(crMaskSet[crX1:crX1+5, crY1:crY1+1]))
+        self.assertFalse(np.any(crMaskSet[~crMaskSetInput]))
+        self.assertTrue(np.all(crMaskSet[crMaskSetInput]))
 
     def test_missing_mask_planes(self):
         """Check that detection runs with missing mask planes.
@@ -460,7 +474,8 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         # Set up the simulated images
         noiseLevel = 1.
         fluxLevel = 500
-        kwargs = {"psfSize": 2.4, "fluxLevel": fluxLevel, "addMaskPlanes": []}
+        psfSize = 2.4
+        kwargs = {"psfSize": psfSize, "fluxLevel": fluxLevel, "addMaskPlanes": []}
         # Use different seeds for the science and template so every source is a diaSource
         science, sources = makeTestImage(seed=5, noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
         science.getInfo().setVisitInfo(makeVisitInfo())
@@ -485,12 +500,13 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         offset = 1
         xSize = 300
         ySize = 300
-        kernelSize = 32
+        kernelSize = 31
+        psfSize = 2.4
         # Avoid placing sources near the edge for this test, so that we can
         # easily check that the correct number of sources are detected.
         templateBorderSize = kernelSize//2
         dipoleFlag = "ip_diffim_DipoleFit_classification"
-        kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel, "fluxRange": fluxRange,
+        kwargs = {"seed": staticSeed, "psfSize": psfSize, "fluxLevel": fluxLevel, "fluxRange": fluxRange,
                   "nSrc": nSources, "templateBorderSize": templateBorderSize, "kernelSize": kernelSize,
                   "xSize": xSize, "ySize": ySize}
         dipoleFlag = "ip_diffim_DipoleFit_classification"
@@ -533,7 +549,8 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         transientFluxLevel = 1000.
         transientFluxRange = 1.5
         fluxLevel = 500
-        kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel}
+        psfSize = 2.4
+        kwargs = {"seed": staticSeed, "psfSize": psfSize, "fluxLevel": fluxLevel}
         science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
         science.getInfo().setVisitInfo(makeVisitInfo())
         matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
@@ -578,7 +595,8 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         transientSeed = 6
         fluxLevel = 500
         radius = 2
-        kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel}
+        psfSize = 2.4
+        kwargs = {"seed": staticSeed, "psfSize": psfSize, "fluxLevel": fluxLevel}
         science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
         science.getInfo().setVisitInfo(makeVisitInfo())
         detector = DetectorWrapper(numAmps=1).detector
@@ -599,7 +617,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         kwargs["fluxLevel"] = 1000
 
         # Run detection and check the results
-        def _detection_wrapper(setFlags=True):
+        def _run_and_check_detections(setFlags=True):
             transients, transientSources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=8, **kwargs)
             difference = science.clone()
             difference.maskedImage -= matchedTemplate.maskedImage
@@ -624,8 +642,8 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
                             self._check_diaSource(transientSources, diaSource, refIds=refIds)
                     else:
                         self._check_diaSource(transientSources, diaSource, refIds=refIds)
-        _detection_wrapper(setFlags=False)
-        _detection_wrapper(setFlags=True)
+        _run_and_check_detections(setFlags=False)
+        _run_and_check_detections(setFlags=True)
 
     def test_fake_mask_plane_propagation(self):
         """Test that we have the mask planes related to fakes in diffim images.
@@ -719,7 +737,9 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         fluxLevel = 500
         xSize = 400
         ySize = 400
-        kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel, "xSize": xSize, "ySize": ySize}
+        psfSize = 2.4
+        kwargs = {"seed": staticSeed, "psfSize": psfSize, "fluxLevel": fluxLevel,
+                  "xSize": xSize, "ySize": ySize}
         science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
         matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
 
@@ -777,7 +797,8 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         noiseLevel = 1.
         staticSeed = 1
         fluxLevel = 500
-        shared_kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel,
+        psfSize = 2.4
+        shared_kwargs = {"seed": staticSeed, "psfSize": psfSize, "fluxLevel": fluxLevel,
                          "x0": 12345, "y0": 67890}
         science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6,
                                          **shared_kwargs)
@@ -903,7 +924,14 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         noiseLevel = 1.
         staticSeed = 1
         fluxLevel = 500
-        kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel, "x0": 12345, "y0": 67890}
+        kernelSize = 31
+        psfSize = 2.4
+        # Buffer source positions away from the score image's EDGE strip.
+        # Preconvolution adds ~kernelSize//2 pixels of EDGE on top of the
+        # EDGE already set by detection smoothing on the science image.
+        templateBorderSize = kernelSize//2
+        kwargs = {"seed": staticSeed, "psfSize": psfSize, "fluxLevel": fluxLevel, "x0": 12345, "y0": 67890,
+                  "kernelSize": kernelSize, "templateBorderSize": templateBorderSize}
         science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
         matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
         difference = science.clone()
@@ -930,12 +958,9 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         self.assertEqual(len(output.diaSources), len(sources))
         # no sources should be flagged as negative
         self.assertEqual(len(~output.diaSources["is_negative"]), len(output.diaSources))
-        # TODO DM-41496: restore this block once we handle detections on edge
-        # pixels better; at least one of these sources currently has a bad
-        # centroid because most of the source is rejected as EDGE.
-        # refIds = []
-        # for source in sources:
-        #     self._check_diaSource(output.diaSources, source, refIds=refIds)
+        refIds = []
+        for source in sources:
+            self._check_diaSource(output.diaSources, source, refIds=refIds)
 
     def test_measurements_finite(self):
         """Measured fluxes and centroids should always be finite.
@@ -949,7 +974,8 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         transientSeed = 6
         xSize = 256
         ySize = 256
-        kwargs = {"psfSize": 2.4, "x0": 0, "y0": 0,
+        psfSize = 2.4
+        kwargs = {"psfSize": psfSize, "x0": 0, "y0": 0,
                   "xSize": xSize, "ySize": ySize}
         science, sources = makeTestImage(seed=staticSeed, noiseLevel=noiseLevel, noiseSeed=6,
                                          nSrc=1, **kwargs)
@@ -991,8 +1017,11 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         noiseLevel = 1.
         staticSeed = 1
         transientSeed = 6
+        nTransients = 10
+        transientFlux = 1000
         fluxLevel = 500
-        kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel}
+        psfSize = 2.4
+        kwargs = {"seed": staticSeed, "psfSize": psfSize, "fluxLevel": fluxLevel}
         scienceBase, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
         matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
         scienceKernel = scienceBase.psf.getKernel()
@@ -1001,11 +1030,11 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         # Configure the detection Task
         detectionTask = self._setup_detection(doMerge=False)
         kwargs["seed"] = transientSeed
-        kwargs["nSrc"] = 10
-        kwargs["fluxLevel"] = 1000
+        kwargs["nSrc"] = nTransients
+        kwargs["fluxLevel"] = transientFlux
 
         # Run detection and check the results
-        def _detection_wrapper(positive=True):
+        def _run_and_check_detections(positive=True):
             """Simulate positive or negative transients and run detection.
 
             Parameters
@@ -1035,8 +1064,8 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
             for diaSource, goodSrcFlag in zip(output.diaSources, goodSrcFlags):
                 if goodSrcFlag:
                     self._check_diaSource(transientSources, diaSource, refIds=refIds, scale=scale)
-        _detection_wrapper(positive=True)
-        _detection_wrapper(positive=False)
+        _run_and_check_detections(positive=True)
+        _run_and_check_detections(positive=False)
 
     def test_detect_dipoles(self):
         """Run detection on a difference image containing dipoles.
@@ -1050,12 +1079,13 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         offset = 1
         xSize = 300
         ySize = 300
-        kernelSize = 32
+        kernelSize = 31
+        psfSize = 2.4
         # Avoid placing sources near the edge for this test, so that we can
         # easily check that the correct number of sources are detected.
         templateBorderSize = kernelSize//2
         dipoleFlag = "ip_diffim_DipoleFit_classification"
-        kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel, "fluxRange": fluxRange,
+        kwargs = {"seed": staticSeed, "psfSize": psfSize, "fluxLevel": fluxLevel, "fluxRange": fluxRange,
                   "nSrc": nSources, "templateBorderSize": templateBorderSize, "kernelSize": kernelSize,
                   "xSize": xSize, "ySize": ySize}
         science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
@@ -1096,7 +1126,8 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         transientFluxLevel = 1000.
         transientFluxRange = 1.5
         fluxLevel = 500
-        kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel}
+        psfSize = 2.4
+        kwargs = {"seed": staticSeed, "psfSize": psfSize, "fluxLevel": fluxLevel}
         science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
         matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
         transients, transientSources = makeTestImage(seed=transientSeed, psfSize=2.4,
@@ -1144,7 +1175,8 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         transientSeed = 6
         fluxLevel = 500
         radius = 2
-        kwargs = {"seed": staticSeed, "psfSize": 2.4, "fluxLevel": fluxLevel}
+        psfSize = 2.4
+        kwargs = {"seed": staticSeed, "psfSize": psfSize, "fluxLevel": fluxLevel}
         science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
         science.getInfo().setVisitInfo(makeVisitInfo())
         detector = DetectorWrapper(numAmps=1).detector
@@ -1167,7 +1199,7 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         kwargs["fluxLevel"] = 1000
 
         # Run detection and check the results
-        def _detection_wrapper(setFlags=True):
+        def _run_and_check_detections(setFlags=True):
             transients, transientSources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=8, **kwargs)
             difference = science.clone()
             difference.maskedImage -= matchedTemplate.maskedImage
@@ -1194,8 +1226,130 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
                             self._check_diaSource(transientSources, diaSource, refIds=refIds)
                     else:
                         self._check_diaSource(transientSources, diaSource, refIds=refIds)
-        _detection_wrapper(setFlags=False)
-        _detection_wrapper(setFlags=True)
+        _run_and_check_detections(setFlags=False)
+        _run_and_check_detections(setFlags=True)
+
+    def test_detect_transients_with_background(self):
+        """Background measured on the difference image should be subtracted
+        from the score image so that transients are still detected cleanly.
+        """
+        # Set up the simulated images
+        noiseLevel = 1.
+        staticSeed = 1
+        transientSeed = 6
+        nTransients = 10
+        transientFlux = 1000
+        fluxLevel = 500
+        xSize = 512
+        ySize = 512
+        x0 = 123
+        y0 = 456
+        kernelSize = 31
+        psfSize = 2.4
+        templateBorderSize = kernelSize//2
+        kwargs = {"seed": staticSeed, "psfSize": psfSize, "fluxLevel": fluxLevel,
+                  "xSize": xSize, "ySize": ySize, "x0": x0, "y0": y0,
+                  "kernelSize": kernelSize, "templateBorderSize": templateBorderSize}
+        chebyshev_params = [2.2, 2.1, 2.0, 1.2, 1.1, 1.0]
+
+        # The background model must cover the grown image bbox, otherwise it
+        # would be extrapolated outside its declared domain.
+        bbox2D = lsst.geom.Box2D(
+            lsst.geom.Point2D(x0 - templateBorderSize, y0 - templateBorderSize),
+            lsst.geom.Extent2D(xSize + 2*templateBorderSize, ySize + 2*templateBorderSize))
+        background_model = afwMath.Chebyshev1Function2D(chebyshev_params, bbox2D)
+        scienceBase, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6,
+                                             background=background_model, **kwargs)
+        matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
+        subtractTask = subtractImages.AlardLuptonPreconvolveSubtractTask()
+        scienceKernel = scienceBase.psf.getKernel()
+
+        # Configure the detection Task
+        detectionTask = self._setup_detection(doMerge=False, doSubtractBackground=True)
+        kwargs["seed"] = transientSeed
+        kwargs["nSrc"] = nTransients
+        kwargs["fluxLevel"] = transientFlux
+
+        def _run_and_check_detections(positive=True):
+            transients, transientSources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=8, **kwargs)
+            science = scienceBase.clone()
+            if positive:
+                science.maskedImage += transients.maskedImage
+            else:
+                science.maskedImage -= transients.maskedImage
+            difference = science.clone()
+            difference.maskedImage -= matchedTemplate.maskedImage
+            score = subtractTask._convolveExposure(difference, scienceKernel,
+                                                   subtractTask.convolutionControl)
+            # Record the score image metric before detection so we can verify
+            # that the background was actually subtracted from it.
+            originalScoreMedian = np.median(score.image.array[np.isfinite(score.image.array)])
+            originalDiffimMedian = np.median(difference.image.array[np.isfinite(difference.image.array)])
+            output = detectionTask.run(science, matchedTemplate, difference, score, sources)
+
+            # The background subtraction should leave a non-empty BackgroundList.
+            self.assertGreater(len(output.differenceBackground), 0)
+            # The difference image should have been modified in place by the
+            # background subtraction, so its median should shift noticeably.
+            subtractedScoreMedian = np.median(score.image.array[np.isfinite(score.image.array)])
+            self.assertLess(np.abs(subtractedScoreMedian), np.abs(originalScoreMedian))
+            subtractedDiffimMedian = np.median(difference.image.array[np.isfinite(difference.image.array)])
+            self.assertLess(np.abs(subtractedDiffimMedian), np.abs(originalDiffimMedian))
+
+            refIds = []
+            scale = 1. if positive else -1.
+            for transient in transientSources:
+                self._check_diaSource(output.diaSources, transient, refIds=refIds, scale=scale)
+        _run_and_check_detections(positive=True)
+        _run_and_check_detections(positive=False)
+
+    def test_mask_cosmic_rays(self):
+        """Cosmic rays detected on the difference image should propagate
+        to the mask of the returned (measured) exposure.
+        """
+        # Set up the simulated images
+        noiseLevel = 1.
+        staticSeed = 1
+        fluxLevel = 500
+        xSize = 400
+        ySize = 400
+        psfSize = 2.4
+        kwargs = {"seed": staticSeed, "psfSize": psfSize, "fluxLevel": fluxLevel,
+                  "xSize": xSize, "ySize": ySize}
+        science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
+        matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
+        subtractTask = subtractImages.AlardLuptonPreconvolveSubtractTask()
+        scienceKernel = science.psf.getKernel()
+        crMask = science.mask.getPlaneBitMask("CR")
+
+        # Configure the detection Task
+        detectionTask = self._setup_detection(doMerge=False, doSkySources=True)
+
+        # Test that no CRs are detected when none are present.
+        transients, _ = makeTestImage(noiseLevel=noiseLevel, noiseSeed=8, nSrc=10, **kwargs)
+        science.maskedImage += transients.maskedImage
+        difference = science.clone()
+        difference.maskedImage -= matchedTemplate.maskedImage
+        score = subtractTask._convolveExposure(difference, scienceKernel, subtractTask.convolutionControl)
+        output = detectionTask.run(science, matchedTemplate, difference, score, sources)
+        self.assertFalse(np.any((output.subtractedMeasuredExposure.mask.array & crMask) > 0))
+
+        crX0 = round(sources.getX()[0] - science.getX0())
+        crY0 = round(sources.getY()[0] - science.getY0())
+        crX1 = round(sources.getX()[1] - science.getX0())
+        crY1 = round(sources.getY()[1] - science.getY0())
+        # Inject CR-like shapes into the difference image. CR detection runs
+        # on the difference, and the mask should propagate to the measured
+        # exposure returned by the task.
+        crMaskSetInput = np.zeros(difference.image.array.shape, bool)
+        crMaskSetInput[crX0:crX0+1, crY0:crY0+5] = True
+        crMaskSetInput[crX1:crX1+5, crY1:crY1+1] = True
+        difference.image.array[crMaskSetInput] += 1234
+        score = subtractTask._convolveExposure(difference, scienceKernel, subtractTask.convolutionControl)
+        output = detectionTask.run(science, matchedTemplate, difference, score, sources)
+        crMaskSet = (output.subtractedMeasuredExposure.mask.array & crMask) > 0
+        self.assertFalse(np.any(crMaskSet[~crMaskSetInput]))
+        self.assertTrue(np.all(crMaskSet[crMaskSetInput]))
 
 
 class TestNegativePeaks(lsst.utils.tests.TestCase):

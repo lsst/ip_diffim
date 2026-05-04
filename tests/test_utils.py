@@ -27,6 +27,7 @@ from lsst.ip.diffim.utils import populate_sattle_visit_cache
 import lsst.utils.tests
 
 from test_detectAndMeasure import makeVisitInfo, MockResponse
+from utils import makeTestImage
 
 
 class UtilsTest(lsst.utils.tests.TestCase):
@@ -43,3 +44,7 @@ class UtilsTest(lsst.utils.tests.TestCase):
         with mock.patch('requests.put', return_value=response):
             with self.assertRaises(requests.exceptions.HTTPError):
                 populate_sattle_visit_cache(visit_info)
+
+    def test_raise_on_even_kernel(self):
+        with self.assertRaises(ValueError):
+            makeTestImage(kernelSize=32)
