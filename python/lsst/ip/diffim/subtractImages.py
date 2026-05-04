@@ -709,7 +709,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
 
         kernelImage = lsst.afw.image.ImageD(psfMatchingKernel.getDimensions())
         xcen, ycen = bbox.getCenter()
-        norm = psfMatchingKernel.computeImage(kernelImage, False, xcen, ycen)
+        norm = psfMatchingKernel.computeImage(kernelImage, doNormalize=False, x=xcen, y=ycen)
 
         matchedScience = self._convolveExposure(science, psfMatchingKernel,
                                                 self.convolutionControl,
@@ -1321,7 +1321,7 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
                 f"Preconvolution requires an odd-sized PSF kernel, got {dims.x}x{dims.y}. "
             )
         kimg = lsst.afw.image.ImageD(dims)
-        localKernel.computeImage(kimg, True)  # normalize to unit sum
+        localKernel.computeImage(kimg, doNormalize=True)  # normalize to unit sum
         # Reflect about the kernel center. PSF kernels are odd-sized,
         # so ``[::-1, ::-1]`` places the peak at the same pixel.
         kimg.array[...] = kimg.array[::-1, ::-1]

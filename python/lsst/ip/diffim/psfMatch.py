@@ -595,12 +595,9 @@ class PsfMatchTask(pipeBase.Task, abc.ABC):
         """
         # What is the final kernel sum
         kImage = afwImage.ImageD(spatialKernel.getDimensions())
-        # Evaluate the kernel at the cell-set center, not at the world
-        # origin (the default (0, 0) lies outside the cellset bbox for any
-        # non-origin region and produces a meaningless kernel sum).
-        regionBBox = kernelCellSet.getBBox()
-        xcen, ycen = regionBBox.getCenter()
-        kSum = spatialKernel.computeImage(kImage, False, xcen, ycen)
+        # Evaluate the kernel at the cell-set center, not at the world origin.
+        xcen, ycen = kernelCellSet.getBBox().getCenter()
+        kSum = spatialKernel.computeImage(kImage, doNormalize=False, x=xcen, y=ycen)
         self.log.info("Final spatial kernel sum %.3f", kSum)
 
         # Look at how well conditioned the matrix is
@@ -778,7 +775,7 @@ class PsfMatchTask(pipeBase.Task, abc.ABC):
         for j in range(nToUse):
             # Check for NaNs?
             kimage = afwImage.ImageD(pcaBasisList[j].getDimensions())
-            pcaBasisList[j].computeImage(kimage, False)
+            pcaBasisList[j].computeImage(kimage, doNormalize=False)
             if not (True in np.isnan(kimage.array)):
                 trimBasisList.append(pcaBasisList[j])
 
