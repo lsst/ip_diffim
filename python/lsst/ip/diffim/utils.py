@@ -511,14 +511,15 @@ def setSourceFootprints(sources, kernelSize):
     sources : `lsst.afw.table.SourceCatalog`
         The source catalog to add footprints to. Modified in place.
     kernelSize : `int`
-        Width (in pixels) of the PSF-matching kernel. The footprint side is
+        Width (in pixels) of the PSF-matching kernel. The footprint size is
         ``2*kernelSize + 1`` so that the kernel can be convolved across the
         source without falling off the stamp.
 
     Returns
     -------
     sources : `lsst.afw.table.SourceCatalog`
-        The same (modified) source catalog, returned for convenience.
+        The input `sources` catalog that was modified in place,
+        returned for convenience.
     """
     size = 2*kernelSize + 1
     for source in sources:
