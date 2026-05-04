@@ -120,6 +120,11 @@ class GetTemplateConfig(
         doc="Minimum fraction of unmasked pixels needed to set the"
         " HIGH_VARIANCE mask plane.",
     )
+    badMaskPlanes = pexConfig.ListField(
+        dtype=str,
+        default=["BAD", "NO_DATA", "SAT"],
+        doc="Mask planes whose pixels are excluded from the per-tract merge.",
+    )
 
     def setDefaults(self):
         # Use a smaller cache: per SeparableKernel.computeCache, this should
@@ -149,6 +154,12 @@ class GetTemplateConfig(
 class GetTemplateTask(pipeBase.PipelineTask):
     ConfigClass = GetTemplateConfig
     _DefaultName = "getTemplate"
+
+    # Sentinel placed in the output variance plane wherever the merged
+    # template has no usable data. Large enough that 1/var weighting and
+    # image/sqrt(var) SNRs collapse to ~0 there, well below float32 max so
+    # downstream multiplications don't overflow.
+    _noDataVariance = 1e30
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -547,14 +558,12 @@ class GetTemplateTask(pipeBase.PipelineTask):
                 self.log.debug("%s does not overlap template region.", dataId)
                 continue  # nothing in this image overlaps the output
             sub = maskedImage.subset(clippedBox)
-            # Accept pixels with finite-positive variance and finite
-            # image. The image-finiteness check matters because a pixel
-            # can carry good variance and still have a NaN image after
-            # warping.
+            badBitMask = sub.mask.getPlaneBitMask(self.config.badMaskPlanes)
             good = (
                 (sub.variance.array > 0)
                 & np.isfinite(sub.variance.array)
                 & np.isfinite(sub.image.array)
+                & ((sub.mask.array & badBitMask) == 0)
             )
             if good.any():
                 weight = 1.0 / sub.variance.array[good]
@@ -573,6 +582,11 @@ class GetTemplateTask(pipeBase.PipelineTask):
         good = weights.array > 0
         merged.image.array[good] /= weights.array[good]
         merged.variance.array[good] = 1.0 / weights.array[good]
+        # No-data pixels: zero the image, fill variance with the finite
+        # sentinel so downstream 1/var and image/sqrt(var) operations
+        # don't blow up, and flag NO_DATA.
+        merged.image.array[~good] = 0.0
+        merged.variance.array[~good] = self._noDataVariance
         merged.mask.array[~good] |= merged.mask.getPlaneBitMask("NO_DATA")
 
         return merged, good.sum(), included
