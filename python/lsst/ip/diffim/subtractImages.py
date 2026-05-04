@@ -1232,11 +1232,6 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
         """
         self._prepareInputs(template, science, visitSummary=visitSummary)
 
-        # Reflect the PSF kernel in both axes so the preconvolution implements
-        # a matched-filter correlation rather than a convolution, which
-        # centers the score on the true source location even for asymmetric
-        # PSFs. The same reflected kernel is reused as ``preConvKernel`` in
-        # the decorrelation step so that both stages are self-consistent.
         convolutionKernel = self._makePreconvolutionKernel(science.psf)
         matchedScience = self._convolveExposure(science, convolutionKernel, self.convolutionControl,
                                                 interpolateBadMaskPlanes=True)
