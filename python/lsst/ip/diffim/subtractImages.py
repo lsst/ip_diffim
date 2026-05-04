@@ -1265,11 +1265,11 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
 
     @staticmethod
     def _flagScoreEdge(exposure, innerBBox):
-        """Set the ``EDGE`` mask bit on pixels outside ``innerBBox``.
+        """Set the EDGE mask bit on pixels outside a known-valid region.
 
         Parameters
         ----------
-        exposure : `~lsst.afw.image.Mask`
+        exposure : `~lsst.afw.image.Exposure`
             Exposure that will be modified in place. Must have
             an ``EDGE`` mask plane.
         innerBBox : `~lsst.geom.Box2I`
