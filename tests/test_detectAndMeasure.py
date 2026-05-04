@@ -447,12 +447,14 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         # Add CR-like shape and check that CR is detected
         # Pick two locations on top of sources, since that is what is likely to
         # be missed in the first stage of CR rejection.
-        difference.image.array[crX0:crX0+1, crY0:crY0+5] += 1234  # Arbitrary but large flux for the CRs
-        difference.image.array[crX1:crX1+5, crY1:crY1+1] += 1234
+        crMaskSetInput = np.zeros(difference.image.array.shape, bool)
+        crMaskSetInput[crX0:crX0+1, crY0:crY0+5] = True
+        crMaskSetInput[crX1:crX1+5, crY1:crY1+1] = True
+        difference.image.array[crMaskSetInput] += 1234
         output = detectionTask.run(science, matchedTemplate, difference)
         crMaskSet = (output.subtractedMeasuredExposure.mask.array & crMask) > 0
-        self.assertTrue(np.all(crMaskSet[crX0:crX0+1, crY0:crY0+5]))
-        self.assertTrue(np.all(crMaskSet[crX1:crX1+5, crY1:crY1+1]))
+        self.assertFalse(np.any(crMaskSet[~crMaskSetInput]))
+        self.assertTrue(np.all(crMaskSet[crMaskSetInput]))
 
     def test_missing_mask_planes(self):
         """Check that detection runs with missing mask planes.
@@ -1299,8 +1301,7 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         difference.maskedImage -= matchedTemplate.maskedImage
         score = subtractTask._convolveExposure(difference, scienceKernel, subtractTask.convolutionControl)
         output = detectionTask.run(science, matchedTemplate, difference, score, sources)
-        crMaskSet = (output.subtractedMeasuredExposure.mask.array & crMask) > 0
-        self.assertTrue(np.all(crMaskSet == 0))
+        self.assertFalse(np.any((output.subtractedMeasuredExposure.mask.array & crMask) > 0))
 
         crX0 = round(sources.getX()[0] - science.getX0())
         crY0 = round(sources.getY()[0] - science.getY0())
@@ -1309,13 +1310,15 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         # Inject CR-like shapes into the difference image. CR detection runs
         # on the difference, and the mask should propagate to the measured
         # exposure returned by the task.
-        difference.image.array[crX0:crX0+1, crY0:crY0+5] += 1234
-        difference.image.array[crX1:crX1+5, crY1:crY1+1] += 1234
+        crMaskSetInput = np.zeros(difference.image.array.shape, bool)
+        crMaskSetInput[crX0:crX0+1, crY0:crY0+5] = True
+        crMaskSetInput[crX1:crX1+5, crY1:crY1+1] = True
+        difference.image.array[crMaskSetInput] += 1234
         score = subtractTask._convolveExposure(difference, scienceKernel, subtractTask.convolutionControl)
         output = detectionTask.run(science, matchedTemplate, difference, score, sources)
         crMaskSet = (output.subtractedMeasuredExposure.mask.array & crMask) > 0
-        self.assertTrue(np.all(crMaskSet[crX0:crX0+1, crY0:crY0+5]))
-        self.assertTrue(np.all(crMaskSet[crX1:crX1+5, crY1:crY1+1]))
+        self.assertFalse(np.any(crMaskSet[~crMaskSetInput]))
+        self.assertTrue(np.all(crMaskSet[crMaskSetInput]))
 
 
 class TestNegativePeaks(lsst.utils.tests.TestCase):
