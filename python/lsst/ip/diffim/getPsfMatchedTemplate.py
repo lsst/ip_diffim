@@ -48,8 +48,10 @@ class GetPsfMatchedTemplateConfig(GetTemplateConfig, pipelineConnections=GetTemp
     targetPsfSigmaPad = pexConfig.Field(
         dtype=float,
         default=0.05,
-        doc="Fractional padding added to the target Gaussian PSF sigma so "
-        "that every accepted input has a strictly positive matching kernel.",
+        doc="Fractional tolerance for treating a patch as already at the "
+        "target PSF width: any patch whose Gaussian-equivalent sigma is "
+        "within this fraction of the maximum accepted sigma is passed "
+        "through without convolution.",
     )
     outlierRejectionSigma = pexConfig.Field(
         dtype=float,
@@ -64,9 +66,10 @@ class GetPsfMatchedTemplateConfig(GetTemplateConfig, pipelineConnections=GetTemp
         default=3,
         doc="Maximum number of upper-outlier rejection iterations.",
     )
-    minAcceptedPatches = pexConfig.Field(
+    minAcceptedPatches = pexConfig.RangeField(
         dtype=int,
         default=1,
+        min=1,
         doc="Minimum number of input patches that must survive PSF "
         "outlier rejection for a template to be produced.",
     )
@@ -105,8 +108,9 @@ class GetPsfMatchedTemplateTask(GetTemplateTask):
        ``outlierRejectionSigma`` robust standard deviations *above*
        the median. Below-median sigmas are always kept, since a
        narrow-PSF outlier is harmless under the matching convolution.
-    3. Choose a single target Gaussian sigma (the max accepted sigma,
-       padded slightly).
+    3. Choose a single target Gaussian sigma equal to the max accepted
+       sigma. Patches whose sigma is within ``targetPsfSigmaPad``
+       (fractionally) of the target are passed through unconvolved.
     4. *Per-tract data pass* — for each tract, load the full Exposure
        only for accepted patches, convolve each `MaskedImage` with a 2D
        Gaussian kernel of sigma ``sqrt(target**2 - intrinsic**2)``, and
@@ -222,6 +226,7 @@ class GetPsfMatchedTemplateTask(GetTemplateTask):
                     for i, dataId in enumerate(dataIds[tract])
                 ],
                 "wcs": catalog[0].wcs,
+                "pixelScale": catalog[0].wcs.getPixelScale().asArcseconds(),
                 "totalBox": totalBox,
             }
         return tractData
@@ -265,7 +270,11 @@ class GetPsfMatchedTemplateTask(GetTemplateTask):
         numRejected : `int`
             Number of patches rejected by the upper-outlier clip.
         """
-        flatPatches = [p for info in tractData.values() for p in info["patches"]]
+        flatPatches = []
+        flatScales = []
+        for info in tractData.values():
+            flatPatches.extend(info["patches"])
+            flatScales.extend([info["pixelScale"]]*len(info["patches"]))
         sigmas = np.array([p["sigma"] for p in flatPatches], dtype=float)
         keep = self._sigmaClip(sigmas)
 
@@ -275,19 +284,28 @@ class GetPsfMatchedTemplateTask(GetTemplateTask):
                 f"require at least {self.config.minAcceptedPatches}."
             )
 
-        for p, k, sigma in zip(flatPatches, keep, sigmas):
+        for p, k, sigma, scale in zip(flatPatches, keep, sigmas, flatScales):
             p["accepted"] = bool(k)
             if not k:
                 self.log.info(
                     "Rejecting patch tract=%s patch=%s from PSF-matched template:"
-                    " PSF sigma=%.3f px.",
-                    p["dataId"].get("tract"), p["dataId"].get("patch"), sigma,
+                    " PSF FWHM=%.3f arcsec.",
+                    p["dataId"].get("tract"), p["dataId"].get("patch"),
+                    self._psfFwhmArcsec(sigma, scale),
                 )
 
-        targetSigma = self._chooseTargetSigma(sigmas[keep])
-        for p in flatPatches:
-            if p["accepted"]:
-                p["kernelSigma"] = self._matchingKernelSigma(p["sigma"], targetSigma)
+        targetIdx = int(np.argmax(np.where(keep, sigmas, -np.inf)))
+        targetSigma = float(sigmas[targetIdx])
+        self.log.info(
+            "Selected target PSF FWHM %.3f arcsec (passthrough tolerance %.3f).",
+            self._psfFwhmArcsec(targetSigma, flatScales[targetIdx]),
+            self.config.targetPsfSigmaPad,
+        )
+        for p, k, scale in zip(flatPatches, keep, flatScales):
+            if k:
+                p["kernelSigma"] = self._matchingKernelSigma(
+                    p["sigma"], targetSigma, pixelScale=scale,
+                )
         return targetSigma, int((~keep).sum())
 
     def _processTracts(self, tractData, bbox, wcs):
@@ -581,31 +599,42 @@ class GetPsfMatchedTemplateTask(GetTemplateTask):
         )
         return keep
 
-    def _chooseTargetSigma(self, acceptedSigmas):
-        """Choose the common Gaussian sigma all accepted patches will be
-        matched to.
-        """
-        target = float(acceptedSigmas.max())*(1.0 + self.config.targetPsfSigmaPad)
-        self.log.info(
-            "Selected target PSF sigma %.3f px (max input %.3f px, pad %.3f).",
-            target, float(acceptedSigmas.max()), self.config.targetPsfSigmaPad,
-        )
-        return target
+    # FWHM = 2 * sqrt(2 * ln(2)) * sigma for a Gaussian.
+    _SIGMA_TO_FWHM = 2.0*np.sqrt(2.0*np.log(2.0))
 
-    def _matchingKernelSigma(self, sigma, targetSigma):
+    @classmethod
+    def _psfFwhmArcsec(cls, sigmaPixels, pixelScaleArcsec):
+        """Convert a Gaussian-equivalent PSF sigma in pixels to FWHM in
+        arcseconds, given the local pixel scale.
+        """
+        return cls._SIGMA_TO_FWHM*sigmaPixels*pixelScaleArcsec
+
+    def _matchingKernelSigma(self, sigma, targetSigma, pixelScale=None):
         """Return the matching-Gaussian sigma in pixels for a patch with
         intrinsic Gaussian-equivalent ``sigma``, or `None` if no
         convolution should be applied.
 
-        Returns `None` when the patch is already at or above the target,
-        or when the implied kernel sigma is below
-        ``config.minMatchingKernelSigma``.
+        Returns `None` when the patch's sigma is within
+        ``config.targetPsfSigmaPad`` (fractionally) of the target — the
+        max accepted sigma always satisfies this — or when the implied
+        kernel sigma is below ``config.minMatchingKernelSigma``.
+
+        ``pixelScale`` (arcsec/pixel) is used only to format the debug
+        log in arcseconds; pass `None` to skip the FWHM annotation.
         """
-        if targetSigma <= sigma:
-            self.log.debug(
-                "Skipping PSF match: input sigma %.3f >= target %.3f.",
-                sigma, targetSigma,
-            )
+        passthroughSigma = (1.0 - self.config.targetPsfSigmaPad)*targetSigma
+        if sigma >= passthroughSigma:
+            if pixelScale is not None:
+                self.log.debug(
+                    "Skipping PSF match: input FWHM %.3f arcsec within pad"
+                    " of target FWHM %.3f arcsec.",
+                    self._psfFwhmArcsec(sigma, pixelScale),
+                    self._psfFwhmArcsec(targetSigma, pixelScale),
+                )
+            else:
+                self.log.debug(
+                    "Skipping PSF match: input sigma within passthrough pad of target."
+                )
             return None
 
         kernelSigma = float(np.sqrt(targetSigma**2 - sigma**2))

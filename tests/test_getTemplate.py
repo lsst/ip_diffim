@@ -683,7 +683,6 @@ class GetPsfMatchedTemplateTaskTestCase(GetTemplateTaskTestBase):
         """End-to-end: patches with varying sigmas all get matched up to
         the padded max input; the output ``CoaddPsf`` reports that width.
         """
-        # Per-patch sigmas (max = 3.0), replicated across every tract.
         sigmas = {
             (0, 0): 1.5, (0, 1): 2.0, (0, 2): 2.5, (0, 3): 3.0,
             (1, 0): 1.5, (1, 1): 2.0, (1, 2): 2.5, (1, 3): 3.0,
@@ -699,8 +698,10 @@ class GetPsfMatchedTemplateTaskTestCase(GetTemplateTaskTestBase):
                           dataIds=self.dataIds,
                           physical_filter="a_test")
 
-        # Target = (max input σ) × (1 + targetPsfSigmaPad), default 5%.
-        expected_target = 3.0 * 1.05
+        # Target = max input σ. Patches within
+        # ``targetPsfSigmaPad`` of the max are passed through unconvolved;
+        # others are convolved up to the target.
+        expected_target = max(sigmas.values())
         self.assertAlmostEqual(
             result.template.metadata["PSF_MATCHED_TARGET_SIGMA"],
             expected_target, places=4,
@@ -1111,15 +1112,18 @@ class GetPsfMatchedTemplateTaskTestCase(GetTemplateTaskTestBase):
         self.assertEqual(template.psf.getComponentCount(),
                          md["PSF_MATCHED_NUM_PATCHES"])
 
-        # Target = (max input σ) × (1 + pad). Max sigma = 1.5 + 0.1*15 = 3.0.
-        expected_target = 3.0*1.05
+        # Target = max input σ. Patches within
+        # ``targetPsfSigmaPad`` of the max are passed through unconvolved;
+        # others are convolved up to the target.
+        expected_target = max(sigmas.values())
         self.assertAlmostEqual(md["PSF_MATCHED_TARGET_SIGMA"],
                                expected_target, places=4)
 
         # Patch and science exposures use slightly different pixel
-        # scales (0.20"/px vs 0.21"/px), so a patch-pixel sigma maps to
-        # a slightly smaller science-pixel sigma on the output frame.
-        patch_scale, science_scale = self.scale, 1.05*self.scale
+        # scales, so a patch-pixel sigma maps to a slightly different
+        # science-pixel sigma on the output frame.
+        patch_scale = self.patches[0][0].get().wcs.getPixelScale().asArcseconds()
+        science_scale = self.exposure.wcs.getPixelScale().asArcseconds()
         expected_sigma_out = expected_target*patch_scale/science_scale
 
         # Sample the CoaddPsf at five widely-separated points: four
