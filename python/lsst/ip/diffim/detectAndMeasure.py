@@ -331,7 +331,6 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         dtype=str,
         doc="Sources with any of these flags set are removed before writing the output catalog.",
         default=("base_PixelFlags_flag_offimage",
-                 "base_PixelFlags_flag_edge",
                  "base_PixelFlags_flag_interpolatedCenterAll",
                  "base_PixelFlags_flag_badCenter",
                  "base_PixelFlags_flag_edgeCenter",
@@ -785,7 +784,12 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         # Use the temporary detection mask for the final background subtraction.
         # The detection mask planes will be cleared before the final detection
         # step, so it is OK if they get set for differenceExposure.
-        differenceExposure.setMask(detectionExposure.mask)
+        detectedBit = differenceExposure.mask.getPlaneBitMask(["DETECTED"])
+        detectedPix = detectionExposure.mask.array & detectedBit > 0
+        detectedNegativeBit = differenceExposure.mask.getPlaneBitMask(["DETECTED_NEGATIVE"])
+        detectedNegativePix = detectionExposure.mask.array & detectedNegativeBit > 0
+        differenceExposure.mask.array[detectedPix] |= detectedBit
+        differenceExposure.mask.array[detectedNegativePix] |= detectedNegativeBit
         background = self.subtractFinalBackground.run(differenceExposure).background
         if scoreExposure is not None:
             # The preconvolution kernel is normalized to 1, so the same
@@ -1552,8 +1556,19 @@ class DetectAndMeasureScoreTask(DetectAndMeasureTask):
         measurementResults.differenceBackground = background
         measurementResults.scoreMeasuredExposure = scoreExposure
 
-        # Copy the detection mask from the Score image to the difference image
-        difference.mask.assign(scoreExposure.mask, scoreExposure.getBBox())
+        # Copy the final detection masks from the Score image to the difference.
+        # Do not copy all mask planes, since the convolution will grow them by
+        # the size of the convolution kernel.
+        detectedBit = difference.mask.getPlaneBitMask(["DETECTED"])
+        detectedPix = scoreExposure.mask.array & detectedBit > 0
+        detectedNegativeBit = difference.mask.getPlaneBitMask(["DETECTED_NEGATIVE"])
+        detectedNegativePix = scoreExposure.mask.array & detectedNegativeBit > 0
+        difference.mask.array[detectedPix] |= detectedBit
+        difference.mask.array[detectedNegativePix] |= detectedNegativeBit
+        # Also set the EDGE mask, since the science image was convolved
+        edgeBit = difference.mask.getPlaneBitMask(["EDGE"])
+        edgePix = scoreExposure.mask.array & edgeBit > 0
+        difference.mask.array[edgePix] |= edgeBit
 
         if self.config.doDeblend:
             sources, positives, negatives = self._deblend(difference,
