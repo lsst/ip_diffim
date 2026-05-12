@@ -22,7 +22,7 @@
 import collections
 import itertools
 import unittest
-
+from unittest.mock import patch
 import numpy as np
 
 import lsst.afw.geom
@@ -334,6 +334,51 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         # We just check that the pixel values are all finite. We cannot check that pixel values
         # in the template are closer to the original anymore.
         self.assertTrue(np.isfinite(result.template.image.array).all())
+
+    @patch('lsst.log.WARNING')
+    def testCheckPatchGoodPixels(self, mock_warning):
+        """ Check that coadd with no nan pixels and doesn't raise invalid pixel
+        warning.
+        """
+        getTemplate = lsst.ip.diffim.getTemplate.GetTemplateTask()
+        coaddPatch = self.exposure
+        dataId = self.dataIds[0]
+        getTemplate.checkPatch(coaddPatch, dataId)
+        self.assertEqual(mock_warning.call_count, 0)
+
+    @patch('lsst.log.WARNING')
+    def testCheckPatchOneBadPixel(self, mock_warning):
+        """ Check that coadd with one bad pixel raises one warning.
+        """
+        getTemplate = lsst.ip.diffim.getTemplate.GetTemplateTask()
+        coaddPatch = self.exposure
+        coaddPatch[0, 0] = (np.nan, 32, 4.0)
+        dataId = self.dataIds[0]
+        getTemplate.checkPatch(coaddPatch, dataId)
+        self.assertEqual(mock_warning.call_count, 1)
+
+    @patch('lsst.log.WARNING')
+    def testCheckPatchBadPixels(self, mock_warning):
+        """ Check that coadd with multiple bad pixels raises a single warning.
+        """
+        self.assertEqual(mock_warning.call_count, 1)
+
+    @patch('lsst.log.WARNING')
+    def testRunTemplateBadPixels(self):
+        """Test a bounding box that fully fits inside one tract, with only
+            that tract passed as input. This checks that the code handles a single
+            tract input correctly.
+        """
+        box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
+        task = lsst.ip.diffim.GetTemplateTask()
+        # Restrict to tract 0, since the box fits in just that tract.
+        # Task modifies the input bbox, so pass a copy.
+        result = task.run({0: self.patches[0]}, lsst.geom.Box2I(box),
+                          self.exposure.wcs, {0: self.dataIds[0]}, "a_test")
+
+        # All 4 patches from tract 0 are included in this template.
+        self._checkMetadata(result.template, task.config, box, self.exposure.wcs, 4)
+        self._checkPixels(result.template, task.config, box)
 
 
 def setup_module(module):
