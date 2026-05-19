@@ -25,6 +25,7 @@ import numpy as np
 import lsst.afw.image as afwImage
 import lsst.geom as geom
 import lsst.afw.geom as afwGeom
+from lsst.afw.image import ExposureInfo, VisitInfo
 import lsst.afw.table as afwTable
 from lsst.afw.math._warper import computeWarpedBBox
 import lsst.afw.math as afwMath
@@ -186,6 +187,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
             wcs=wcs,
             dataIds=results.dataIds,
             physical_filter=physical_filter,
+            outputRefs=outputRefs,
         )
         butlerQC.put(outputs, outputRefs)
 
@@ -276,7 +278,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
         return pipeBase.Struct(coaddExposures=coaddExposures, dataIds=dataIds)
 
     @timeMethod
-    def run(self, *, coaddExposureHandles, bbox, wcs, dataIds, physical_filter):
+    def run(self, *, coaddExposureHandles, bbox, wcs, dataIds, physical_filter, outputRefs=None):
         """Warp coadds from multiple tracts and patches to form a template to
         subtract from a science image.
 
@@ -383,9 +385,14 @@ class GetTemplateTask(pipeBase.PipelineTask):
 
         # Set a mask plane for any regions with exceptionally high variance.
         self.checkHighVariance(template)
-        template.setPsf(self._makePsf(template, catalog, wcs))
+        visitId = outputRefs.template.dataId['visit'] if outputRefs is not None else 1000
+        template.setInfo(
+            ExposureInfo(visitInfo=VisitInfo(id=visitId))
+        )
+        template.setWcs(wcs)
         template.setFilter(afwImage.FilterLabel(band, physical_filter))
         template.setPhotoCalib(photoCalib)
+        template.setPsf(self._makePsf(template, catalog, wcs))
         return pipeBase.Struct(template=template)
 
     def checkHighVariance(self, template):
