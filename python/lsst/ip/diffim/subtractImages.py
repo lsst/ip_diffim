@@ -420,6 +420,9 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
 
         butlerQC.put(results, outputRefs)
 
+    def fingerprint_image(self, which, where, exposure) -> str:
+        self.log.info("%s image sum at %s: %r", which, where, exposure.image.array.astype(np.float64).sum())
+
     @timeMethod
     def run(self, template, science, sources, visitSummary=None):
         """PSF match, subtract, and decorrelate two images.
@@ -455,8 +458,12 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                 Sources from the input catalog that were used to construct the
                 PSF-matching kernel.
         """
+        self.fingerprint_image("template", "start", template)
+        self.fingerprint_image("science", "start", science)
         self._prepareInputs(template, science, visitSummary=visitSummary)
-
+        self.fingerprint_image("template", "after _prepareInputs", template)
+        self.fingerprint_image("science", "after _prepareInputs", science)
+        
         convolveTemplate = self.chooseConvolutionMethod(template, science)
         self.matchedPsfSize = self.sciencePsfSize if convolveTemplate else self.templatePsfSize
 
@@ -474,6 +481,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         else:
             subtractResults = self.runConvolveScience(template, science, kernelResult.psfMatchingKernel,
                                                       backgroundModel=backgroundModel)
+        self.fingerprint_image("difference", "after runConvolve", subtractResults.difference)
+        
         subtractResults.kernelSources = kernelResult.kernelSources
 
         metrics = computeDifferenceImageMetrics(science, subtractResults.difference, sources)
@@ -581,11 +590,17 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             target = template
             referenceFwhmPix = self.sciencePsfSize
             targetFwhmPix = self.templatePsfSize
+        self.log.info("reference PSF: %r, target PSF: %r", referenceFwhmPix, targetFwhmPix)
         try:
             if runSourceDetection:
                 kernelSources = self.runKernelSourceDetection(template, science)
             else:
                 kernelSources = self._sourceSelector(template, science, sources)
+            self.log.info(
+                "runSourceDetection=%s, len(kernelSources)=%s", runSourceDetection, len(kernelSources)
+            )
+            for name in kernelSources.schema.getOrderedNames():
+                self.log.info("sum(kernelSources[%s]): %r", name, sum(kernelSources[name]))
             kernelResult = self.makeKernel.run(reference, target, kernelSources,
                                                preconvolved=False,
                                                templateFwhmPix=referenceFwhmPix,
@@ -664,6 +679,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                                                  bbox=science.getBBox(),
                                                  psf=science.psf,
                                                  photoCalib=science.photoCalib)
+
+        self.fingerprint_image("matchedTemplate", "after convolution", matchedTemplate)
 
         difference = _subtractImages(science, matchedTemplate, backgroundModel=backgroundModel)
         correctedExposure = self.finalize(template, science, difference,
@@ -779,6 +796,9 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             # We have cleared the template mask plane, so copy the mask plane of
             # the image difference so that we can calculate correct statistics
             # during decorrelation
+            self.fingerprint_image("science", "before decorrelation", science)
+            self.fingerprint_image("template", "before decorelation", template)
+            self.fingerprint_image("difference", "before decorelation", difference)
             correctedExposure = self.decorrelate.run(science, template[science.getBBox()], difference, kernel,
                                                      templateMatched=templateMatched,
                                                      preConvMode=preConvMode,
@@ -1377,6 +1397,7 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
                                                  psf=science.psf,
                                                  interpolateBadMaskPlanes=True,
                                                  photoCalib=science.photoCalib)
+        
         score = _subtractImages(matchedScience, matchedTemplate,
                                 backgroundModel=(kernelResult.backgroundModel
                                                  if self.config.doSubtractBackground else None))

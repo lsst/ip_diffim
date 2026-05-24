@@ -139,6 +139,7 @@ class MakeKernelTask(PsfMatchTask):
         templateFwhmPix, scienceFwhmPix = self._checkPsfWidths(template, science,
                                                                templateFwhmPix, scienceFwhmPix,
                                                                preconvolved=preconvolved)
+        self.log.info("template PSF: %r, science PSF: %r", templateFwhmPix, scienceFwhmPix)
         basisList = self.makeKernelBasisList(templateFwhmPix, scienceFwhmPix,
                                              metadata=self.metadata)
         spatialSolution, psfMatchingKernel, backgroundModel = self._solve(kernelCellSet, basisList)

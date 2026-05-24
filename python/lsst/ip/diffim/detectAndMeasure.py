@@ -614,6 +614,10 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             raise error from e
         butlerQC.put(measurementResults, outputRefs)
 
+
+    def fingerprint_image(self, where, exposure) -> str:
+        self.log.info("Image sum at %s: %r", where, exposure.image.array.astype(np.float64).sum())
+
     @timeMethod
     def run(self, science, matchedTemplate, difference, kernelSources=None,
             idFactory=None, measurementResults=None):
@@ -658,6 +662,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             ``differenceBackground`` : `lsst.afw.math.BackgroundList`
                 Background that was subtracted from the difference image.
         """
+        self.fingerprint_image("at start", difference)
         if measurementResults is None:
             measurementResults = pipeBase.Struct()
         if idFactory is None:
@@ -665,8 +670,10 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
         # Check image properties and clear detection mask planes.
         self._prepareInputs(difference)
+        self.fingerprint_image("after _prepareInputs", difference)
         if self.config.doSubtractBackground:
             background = self._fitAndSubtractBackground(differenceExposure=difference)
+            self.fingerprint_image("after _fitAndSubtractBackground", difference)
         else:
             background = afwMath.BackgroundList()
 
@@ -685,7 +692,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             clearMask=True,
         )
         measurementResults.differenceBackground = background
-
+        self.fingerprint_image("after self.detection.run", difference)
         if self.config.doDeblend:
             sources, positives, negatives = self._deblend(difference,
                                                           results.positive,
@@ -697,12 +704,13 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             negatives = afwTable.SourceCatalog(self.schema)
             results.negative.makeSources(negatives)
             sources = results.sources
-
+        self.fingerprint_image("after _deblend", difference)
         self.processResults(science, matchedTemplate, difference,
                             sources, idFactory, kernelSources,
                             positives=positives,
                             negatives=negatives,
                             measurementResults=measurementResults)
+        self.fingerprint_image("after processResults", difference)
         return measurementResults
 
     def _prepareInputs(self, difference):
