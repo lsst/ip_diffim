@@ -29,6 +29,7 @@ import lsst.afw.table as afwTable
 from lsst.afw.math._warper import computeWarpedBBox
 import lsst.afw.math as afwMath
 import lsst.pex.config as pexConfig
+import lsst.pex.exceptions as pexExceptions
 import lsst.pipe.base as pipeBase
 
 from lsst.skymap import BaseSkyMap
@@ -41,7 +42,55 @@ __all__ = [
     "GetTemplateConfig",
     "GetDcrTemplateTask",
     "GetDcrTemplateConfig",
+    "PsfDiscontinuityError",
 ]
+
+
+class PsfDiscontinuityError(pipeBase.AlgorithmError):
+    """Raised when the assembled template PSF varies discontinuously across
+    the bounding box, in a way that cannot be absorbed by the smooth
+    spatial polynomial used by AL PSF matching.
+
+    Templates with this property (typically caused by input-warp or
+    coadd-patch boundaries projecting onto the detector) leave structured
+    matching residuals along those boundaries and produce large numbers of
+    junk diaSources downstream.
+
+    Parameters
+    ----------
+    maxResidualFrac : `float`
+        Maximum absolute residual after subtracting a smooth polynomial
+        fit from the sampled PSF-size grid, expressed as a fraction of the
+        median PSF determinant radius.
+    rmsResidualFrac : `float`
+        RMS of the same residual map, with the same normalization.
+    threshold : `float`
+        Configured threshold above which the template is rejected.
+    medianRadius : `float`
+        Median PSF determinant radius (pixels) used as the normalization.
+    """
+    def __init__(self, *, maxResidualFrac, rmsResidualFrac, threshold,
+                 medianRadius):
+        msg = (
+            "Template PSF varies discontinuously: max residual"
+            f" {maxResidualFrac:.4f} of median determinant radius exceeds"
+            f" threshold {threshold:.4f}; image differencing on this"
+            " template would produce a large number of junk diaSources."
+        )
+        super().__init__(msg)
+        self.maxResidualFrac = maxResidualFrac
+        self.rmsResidualFrac = rmsResidualFrac
+        self.threshold = threshold
+        self.medianRadius = medianRadius
+
+    @property
+    def metadata(self) -> dict:
+        return {
+            "maxResidualFrac": float(self.maxResidualFrac),
+            "rmsResidualFrac": float(self.rmsResidualFrac),
+            "threshold": float(self.threshold),
+            "medianRadius": float(self.medianRadius),
+        }
 
 
 class GetTemplateConnections(
@@ -118,6 +167,33 @@ class GetTemplateConfig(
         default=0.1,
         doc="Minimum fraction of unmasked pixels needed to set the"
         " HIGH_VARIANCE mask plane.",
+    )
+    psfDiscontinuityGrid = pexConfig.RangeField(
+        dtype=int,
+        default=17,
+        min=4,
+        doc="number of grid points used to sample the template"
+        " PSF for the discontinuity check.",
+    )
+    psfDiscontinuityPolyOrder = pexConfig.RangeField(
+        dtype=int,
+        default=2,
+        min=0,
+        doc="Total order of the 2D polynomial subtracted from the"
+        " template PSF determinant-radius grid before measuring the"
+        " residual. Should match the spatialKernelOrder of the downstream"
+        " AL PSF matching task (default 2) so that the residual reflects"
+        " variation that PSF matching cannot absorb.",
+    )
+    psfDiscontinuityMaxThreshold = pexConfig.RangeField(
+        dtype=float,
+        default=0.05,
+        min=0.0,
+        doc="Maximum allowed value of the template PSF discontinuity"
+        " metric: max(|residual|) / median(determinant radius), after"
+        " subtracting a smooth polynomial of order"
+        " psfDiscontinuityPolyOrder. Templates exceeding this threshold"
+        " raise PsfDiscontinuityError.",
     )
 
     def setDefaults(self):
@@ -384,6 +460,10 @@ class GetTemplateTask(pipeBase.PipelineTask):
         # Set a mask plane for any regions with exceptionally high variance.
         self.checkHighVariance(template)
         template.setPsf(self._makePsf(template, catalog, wcs))
+        # Reject templates whose PSF varies discontinuously: those leave
+        # structured residuals along input-warp boundaries that PSF matching
+        # cannot absorb, generating many junk diaSources.
+        self.checkPsfDiscontinuity(template)
         template.setFilter(afwImage.FilterLabel(band, physical_filter))
         template.setPhotoCalib(photoCalib)
         return pipeBase.Struct(template=template)
@@ -411,6 +491,108 @@ class GetTemplateTask(pipeBase.PipelineTask):
             threshold = self.config.highVarianceThreshold*np.nanmedian(varianceBackground)
             highVariancePix = varianceBackground > threshold
             template.mask.array[highVariancePix] |= 2**highVarianceMaskPlaneBit
+
+    def checkPsfDiscontinuity(self, template):
+        """Reject templates whose PSF varies discontinuously.
+
+        Samples the template PSF determinant radius on a grid, subtracts a
+        smooth 2D polynomial of the same order as the AL PSF matching
+        spatial kernel, and raises if the maximum absolute residual --
+        expressed as a fraction of the median radius -- exceeds the
+        configured threshold. This catches templates where the set of
+        input warps changes across the detector (typically along coadd
+        patch or input-CCD boundaries), which produces step
+        discontinuities that PSF matching cannot absorb and which generate
+        large numbers of junk diaSources downstream.
+
+        If too few grid points yield a valid PSF shape (e.g. mostly
+        NO_DATA), the check is skipped with an info-level log message.
+
+        Parameters
+        ----------
+        template : `lsst.afw.image.Exposure`
+            The assembled template, with PSF already set.
+
+        Raises
+        ------
+        PsfDiscontinuityError
+            If the residual PSF-size variation, as a fraction of the
+            median radius, exceeds
+            ``self.config.psfDiscontinuityMaxThreshold``.
+        """
+        psf = template.getPsf()
+        bbox = template.getBBox()
+        n = self.config.psfDiscontinuityGrid
+        border = self.config.templateBorderSize
+
+        # Sample inside the un-bordered region so that grid points are
+        # within the bbox the science image actually covers.
+        xs = np.linspace(bbox.minX + border, bbox.maxX - border, n)
+        ys = np.linspace(bbox.minY + border, bbox.maxY - border, n)
+        radius = np.full((n, n), np.nan)
+        for i, y in enumerate(ys):
+            for j, x in enumerate(xs):
+                try:
+                    radius[i, j] = psf.computeShape(
+                        geom.Point2D(x, y)).getDeterminantRadius()
+                except pexExceptions.Exception:
+                    # NO_DATA region or pathological PSF; leave as NaN.
+                    continue
+
+        good = np.isfinite(radius)
+        order = self.config.psfDiscontinuityPolyOrder
+        nCoeffs = (order + 1)*(order + 2)//2
+        # Need enough valid points to fit and to leave residual signal.
+        minGood = max(2*nCoeffs, n*n//4)
+        if good.sum() < minGood:
+            self.log.info(
+                "Skipping PSF discontinuity check: only %d of %d grid"
+                " points yielded a valid PSF shape (need at least %d).",
+                int(good.sum()), n*n, minGood,
+            )
+            return
+
+        # Fit a 2D polynomial in coordinates normalized to [-1, 1] for
+        # numerical stability of the least-squares solve.
+        xg, yg = np.meshgrid(xs, ys)
+        xn = 2*(xg - bbox.minX)/bbox.width - 1
+        yn = 2*(yg - bbox.minY)/bbox.height - 1
+        basis = np.stack(
+            [(xn**p)*(yn**q)
+             for p in range(order + 1)
+             for q in range(order + 1 - p)],
+            axis=-1,
+        )
+        flatBasis = basis.reshape(-1, nCoeffs)
+        flatRadius = radius.reshape(-1)
+        flatGood = good.reshape(-1)
+        coeffs, *_ = np.linalg.lstsq(
+            flatBasis[flatGood], flatRadius[flatGood], rcond=None,
+        )
+        fit = (flatBasis @ coeffs).reshape(n, n)
+        residual = radius - fit
+
+        medianRadius = float(np.nanmedian(radius))
+        rmsFrac = float(
+            np.sqrt(np.nanmean(residual[good]**2))/medianRadius
+        )
+        maxFrac = float(np.nanmax(np.abs(residual[good]))/medianRadius)
+        threshold = self.config.psfDiscontinuityMaxThreshold
+
+        self.log.info(
+            "Template PSF discontinuity check: max residual = %.4f,"
+            " rms = %.4f (fraction of median determinant radius %.3f"
+            " pix); threshold = %.4f.",
+            maxFrac, rmsFrac, medianRadius, threshold,
+        )
+
+        if maxFrac > threshold:
+            raise PsfDiscontinuityError(
+                maxResidualFrac=maxFrac,
+                rmsResidualFrac=rmsFrac,
+                threshold=threshold,
+                medianRadius=medianRadius,
+            )
 
     @staticmethod
     def _checkInputs(dataIds, coaddExposures):
