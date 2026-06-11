@@ -25,6 +25,7 @@ import numpy as np
 import lsst.afw.image as afwImage
 import lsst.geom as geom
 import lsst.afw.geom as afwGeom
+from lsst.afw.image import VisitInfo
 import lsst.afw.table as afwTable
 from lsst.afw.math._warper import computeWarpedBBox
 import lsst.afw.math as afwMath
@@ -186,6 +187,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
             wcs=wcs,
             dataIds=results.dataIds,
             physical_filter=physical_filter,
+            visit=outputRefs.template.dataId["visit"],
         )
         butlerQC.put(outputs, outputRefs)
 
@@ -276,7 +278,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
         return pipeBase.Struct(coaddExposures=coaddExposures, dataIds=dataIds)
 
     @timeMethod
-    def run(self, *, coaddExposureHandles, bbox, wcs, dataIds, physical_filter):
+    def run(self, *, coaddExposureHandles, bbox, wcs, dataIds, physical_filter, visit=None):
         """Warp coadds from multiple tracts and patches to form a template to
         subtract from a science image.
 
@@ -304,6 +306,10 @@ class GetTemplateTask(pipeBase.PipelineTask):
             tract id.
         physical_filter : `str`
             Physical filter of the science image.
+        visit : `int`, optional
+            If supplied, over-write the visit ID in the template's visitInfo
+            so that downstream source injection tasks can link the template and
+            science image for the visit.
 
         Returns
         -------
@@ -383,9 +389,11 @@ class GetTemplateTask(pipeBase.PipelineTask):
 
         # Set a mask plane for any regions with exceptionally high variance.
         self.checkHighVariance(template)
-        template.setPsf(self._makePsf(template, catalog, wcs))
+        if visit is not None:
+            template.getInfo().setVisitInfo(VisitInfo(id=visit))
         template.setFilter(afwImage.FilterLabel(band, physical_filter))
         template.setPhotoCalib(photoCalib)
+        template.setPsf(self._makePsf(template, catalog, wcs))
         return pipeBase.Struct(template=template)
 
     def checkHighVariance(self, template):
