@@ -394,6 +394,10 @@ class GetTemplateTask(pipeBase.PipelineTask):
         template.setFilter(afwImage.FilterLabel(band, physical_filter))
         template.setPhotoCalib(photoCalib)
         template.setPsf(self._makePsf(template, catalog, wcs))
+        # Record the input coadd patches as the template's coadd inputs.
+        coaddInputs = afwImage.CoaddInputs(afwTable.ExposureTable.makeMinimalSchema(), self.schema)
+        coaddInputs.ccds.extend(catalog, deep=True)
+        template.getInfo().setCoaddInputs(coaddInputs)
         return pipeBase.Struct(template=template)
 
     def checkHighVariance(self, template):
