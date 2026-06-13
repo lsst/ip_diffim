@@ -191,6 +191,8 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         self.assertEqual(template.filter.bandLabel, "a")
         self.assertEqual(template.filter.physicalLabel, "a_test")
         self.assertEqual(template.psf.getComponentCount(), nPsfs)
+        self.assertTrue(template.getInfo().hasCoaddInputs())
+        self.assertEqual(len(template.getInfo().getCoaddInputs().ccds), nPsfs)
 
     def _checkPixels(self, template, config, box):
         """Check that the pixel values in the template are close to the
