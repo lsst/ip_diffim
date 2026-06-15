@@ -571,6 +571,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         self.makeSubtask("findGlints")
         self.schema.addField("glint_trail", "Flag", "DiaSource is part of a glint trail.")
         self.schema.addField("reliability", type="F", doc="Reliability score of the DiaSource")
+        self.schema.addField("reliabilityVersion", type=str, size=7, doc="Version of the reliability model")
 
         # To get the "merge_*" fields in the schema; have to re-initialize
         # this later, once we have a peak schema post-detection.
