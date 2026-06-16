@@ -28,6 +28,7 @@ import numpy as np
 import lsst.afw.geom
 import lsst.afw.image
 import lsst.afw.math
+import lsst.afw.table
 from lsst.daf.butler import DataCoordinate, DimensionUniverse
 import lsst.geom
 import lsst.ip.diffim
@@ -336,6 +337,63 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         # We just check that the pixel values are all finite. We cannot check that pixel values
         # in the template are closer to the original anymore.
         self.assertTrue(np.isfinite(result.template.image.array).all())
+
+    def testMaskShallowCoverage(self):
+        """Test that maskShallowCoverage flags low-depth regions (e.g. chip
+        gaps) with the HIGH_VARIANCE plane, leaves deep regions alone,
+        deduplicates inputs on (visit, ccd), and grows the masked region.
+        """
+        wcs = lsst.afw.geom.makeSkyWcs(
+            lsst.geom.Point2D(50, 50),
+            lsst.geom.SpherePoint(0, 0, lsst.geom.degrees),
+            lsst.afw.geom.makeCdMatrix(0.2*lsst.geom.arcseconds, 0*lsst.geom.degrees))
+        box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Extent2I(100, 100))
+        fullBox = lsst.geom.Box2D(box)
+        leftBox = lsst.geom.Box2D(
+            lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Extent2I(50, 100)))
+
+        # Build a per-CCD coadd input catalog where the left half is covered by
+        # three CCDs and the right half by only one, so the right half is the
+        # "shallow" region. The inputs share the template WCS, so their
+        # footprints map directly into the template frame.
+        schema = lsst.afw.table.ExposureTable.makeMinimalSchema()
+        schema.addField("visit", type=np.int64, doc="visit id")
+        schema.addField("ccd", type=np.int32, doc="ccd id")
+        ccds = lsst.afw.table.ExposureCatalog(schema)
+
+        def addCcd(visit, ccd, polyBox):
+            record = ccds.addNew()
+            record.setWcs(wcs)
+            record.setBBox(lsst.geom.Box2I(polyBox))
+            record.setValidPolygon(lsst.afw.geom.Polygon(polyBox.getCorners()))
+            record["visit"] = visit
+            record["ccd"] = ccd
+
+        addCcd(1, 1, fullBox)
+        addCcd(2, 1, leftBox)
+        addCcd(3, 1, leftBox)
+        # A duplicate physical image (same visit, ccd) must not inflate depth.
+        addCcd(1, 1, fullBox)
+
+        def flaggedMask(growRadius):
+            template = lsst.afw.image.ExposureF(box)
+            template.setWcs(wcs)
+            config = lsst.ip.diffim.GetTemplateConfig()
+            config.minNumberOfInputImages = 2
+            config.coverageGrowRadius = growRadius
+            task = lsst.ip.diffim.GetTemplateTask(config=config)
+            task.maskShallowCoverage(template, [ccds])
+            return (template.mask.array
+                    & template.mask.getPlaneBitMask("HIGH_VARIANCE")) != 0
+
+        # With no growth, exactly the shallow (right) half is flagged, and the
+        # deep half stays clean (depth 3 even counting the duplicate once).
+        flagged = flaggedMask(0)
+        self.assertEqual(flagged[:, :50].sum(), 0)
+        self.assertTrue(flagged[:, 50:].all())
+
+        # Growing by 5 expands the masked region by 5 columns into the deep half.
+        self.assertEqual(flaggedMask(5).any(axis=0).sum(), 55)
 
 
 def setup_module(module):

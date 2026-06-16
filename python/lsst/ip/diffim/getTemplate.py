@@ -120,6 +120,28 @@ class GetTemplateConfig(
         doc="Minimum fraction of unmasked pixels needed to set the"
         " HIGH_VARIANCE mask plane.",
     )
+    doMaskShallowCoverage = pexConfig.Field(
+        dtype=bool,
+        default=True,
+        doc="Set the HIGH_VARIANCE mask plane on template regions with fewer"
+        " contributing input images than ``minNumberOfInputImages``.",
+    )
+    minNumberOfInputImages = pexConfig.RangeField(
+        dtype=int,
+        default=2,
+        min=1,
+        doc="Template pixels covered by fewer than this many input images are"
+        " flagged with the HIGH_VARIANCE mask plane when"
+        " ``doMaskShallowCoverage`` is set.",
+    )
+    coverageGrowRadius = pexConfig.RangeField(
+        dtype=int,
+        default=0,
+        min=0,
+        doc="Grow the shallow-coverage mask region by this many pixels, to"
+        " account for the spread of the PSF discontinuity by the PSF-matching"
+        " convolution kernel. Only used if ``doMaskShallowCoverage`` is set.",
+    )
 
     def setDefaults(self):
         # Use a smaller cache: per SeparableKernel.computeCache, this should
@@ -331,8 +353,9 @@ class GetTemplateTask(pipeBase.PipelineTask):
 
         warped = {}
         catalogs = []
+        ccdInputCatalogs = []
         for tract in coaddExposureHandles:
-            maskedImages, catalog, totalBox = self._makeExposureCatalog(
+            maskedImages, catalog, totalBox, tractCcdInputs = self._makeExposureCatalog(
                 coaddExposureHandles[tract], dataIds[tract]
             )
             warpedBox = computeWarpedBBox(catalog[0].wcs, bbox, wcs)
@@ -373,6 +396,8 @@ class GetTemplateTask(pipeBase.PipelineTask):
                 tempCatalog.append(catalog[i])
             catalogs.append(tempCatalog)
             warped[tract] = potentialInput.maskedImage
+            # Only count input coverage from tracts that actually contributed.
+            ccdInputCatalogs.extend(tractCcdInputs)
 
         if len(warped) == 0:
             raise pipeBase.NoWorkFound("No patches found to overlap science exposure.")
@@ -389,6 +414,10 @@ class GetTemplateTask(pipeBase.PipelineTask):
 
         # Set a mask plane for any regions with exceptionally high variance.
         self.checkHighVariance(template)
+        # Set the same mask plane on shallow regions (e.g. chip gaps) where the
+        # template PSF varies discontinuously and would break PSF matching.
+        if self.config.doMaskShallowCoverage:
+            self.maskShallowCoverage(template, ccdInputCatalogs)
         if visit is not None:
             template.getInfo().setVisitInfo(VisitInfo(id=visit))
         template.setFilter(afwImage.FilterLabel(band, physical_filter))
@@ -423,6 +452,83 @@ class GetTemplateTask(pipeBase.PipelineTask):
             threshold = self.config.highVarianceThreshold*np.nanmedian(varianceBackground)
             highVariancePix = varianceBackground > threshold
             template.mask.array[highVariancePix] |= 2**highVarianceMaskPlaneBit
+
+    def maskShallowCoverage(self, template, ccdInputCatalogs):
+        """Flag template regions built from too few input images.
+
+        The number of contributing images at each pixel is measured from the
+        per-CCD coadd inputs: each input CCD footprint is warped to the template
+        frame and accumulated into a depth map. Inputs are deduplicated on
+        ``(visit, ccd)`` so that the same exposure contributing to overlapping
+        patches, or to coadds from two tracts (which are usually built from the
+        same images and so are not independent), is only counted once. This also
+        avoids manufacturing a spurious depth discontinuity at tract boundaries.
+
+        Parameters
+        ----------
+        template : `lsst.afw.image.Exposure`
+            The warped template exposure, modified in place.
+        ccdInputCatalogs : `list` [`lsst.afw.table.ExposureCatalog`]
+            Per-CCD coadd input catalogs (``CoaddInputs.ccds``) of every coadd
+            that contributed to the template.
+        """
+        bbox = template.getBBox()
+        wcs = template.getWcs()
+        x0, y0 = bbox.getMinX(), bbox.getMinY()
+        depth = np.zeros((bbox.getHeight(), bbox.getWidth()), dtype=np.int32)
+
+        seen = set()
+        for ccds in ccdInputCatalogs:
+            # Deduplicate on the physical image; fall back to the record id if
+            # the visit/ccd fields are somehow absent.
+            useVisitCcd = {"visit", "ccd"} <= set(ccds.schema.getNames())
+            for record in ccds:
+                key = (record["visit"], record["ccd"]) if useVisitCcd else record.getId()
+                if key in seen:
+                    continue
+                seen.add(key)
+                recordWcs = record.getWcs()
+                if recordWcs is None:
+                    continue
+                polygon = record.getValidPolygon()
+                if polygon is None:
+                    polygon = afwGeom.Polygon(geom.Box2D(record.getBBox()))
+                # Inputs are stored in their own (CCD) pixel frame, so warp the
+                # footprint to the template frame before rasterizing.
+                transform = afwGeom.makeWcsPairTransform(recordWcs, wcs)
+                polygon = polygon.transform(transform)
+                polyBox = geom.Box2I(polygon.getBBox())
+                polyBox.clip(bbox)
+                if polyBox.isEmpty():
+                    continue
+                covered = polygon.createImage(polyBox).array > 0
+                ymin, xmin = polyBox.getMinY() - y0, polyBox.getMinX() - x0
+                sub = depth[ymin:ymin + polyBox.getHeight(), xmin:xmin + polyBox.getWidth()]
+                sub[covered] += 1
+
+        if not depth.any():
+            self.log.warning("No coadd input coverage found; not setting the"
+                             " HIGH_VARIANCE mask plane for shallow coverage.")
+            return
+
+        # Restrict to pixels that actually have template data; pixels with no
+        # data are already flagged NO_DATA and need no further masking.
+        noData = (template.mask.array & template.mask.getPlaneBitMask("NO_DATA")) != 0
+        shallow = (depth < self.config.minNumberOfInputImages) & ~noData
+        nShallow = int(np.count_nonzero(shallow))
+        if nShallow == 0:
+            return
+        self.log.info("Flagging %d pixels (%.1f%%) covered by fewer than %d input"
+                      " images as HIGH_VARIANCE.", nShallow, 100*nShallow/depth.size,
+                      self.config.minNumberOfInputImages)
+
+        highVarianceBitMask = 2**template.mask.addMaskPlane("HIGH_VARIANCE")
+        shallowMask = afwImage.Mask(bbox)
+        shallowMask.array[shallow] = 1
+        spanSet = afwGeom.SpanSet.fromMask(shallowMask, 1)
+        if self.config.coverageGrowRadius > 0:
+            spanSet = spanSet.dilated(self.config.coverageGrowRadius).clippedTo(bbox)
+        spanSet.setMask(template.mask, highVarianceBitMask)
 
     @staticmethod
     def _checkInputs(dataIds, coaddExposures):
@@ -487,12 +593,16 @@ class GetTemplateTask(pipeBase.PipelineTask):
             Catalog of metadata for each exposure
         totalBox : `lsst.geom.Box2I`
             The union of the bounding boxes of all the input exposures.
+        ccdInputCatalogs : `list` [`lsst.afw.table.ExposureCatalog`]
+            The per-CCD coadd input catalogs (``CoaddInputs.ccds``) of each
+            input coadd. Empty if ``config.doMaskShallowCoverage`` is `False`.
         """
         catalog = afwTable.ExposureCatalog(self.schema)
         catalog.reserve(len(exposureRefs))
         exposures = (exposureRef.get() for exposureRef in exposureRefs)
         images = {}
         totalBox = geom.Box2I()
+        ccdInputCatalogs = []
 
         for coadd, dataId in zip(exposures, dataIds):
             images[dataId] = coadd.maskedImage
@@ -509,8 +619,14 @@ class GetTemplateTask(pipeBase.PipelineTask):
             # Weight is used by CoaddPsf, but the PSFs from overlapping patches
             # should be very similar, so this value mostly shouldn't matter.
             record.set("weight", 1)
+            # Keep the per-CCD coadd inputs so that `maskShallowCoverage` can
+            # measure how many input images contribute to each template pixel.
+            if self.config.doMaskShallowCoverage:
+                coaddInputs = coadd.getInfo().getCoaddInputs()
+                if coaddInputs is not None and len(coaddInputs.ccds) > 0:
+                    ccdInputCatalogs.append(coaddInputs.ccds)
 
-        return images, catalog, totalBox
+        return images, catalog, totalBox, ccdInputCatalogs
 
     def _merge(self, maskedImages, bbox, wcs):
         """Merge the images that came from one tract into one larger image,
