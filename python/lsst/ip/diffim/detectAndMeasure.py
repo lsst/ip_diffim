@@ -357,7 +357,7 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         doc="Detections whose footprint peak lies on a pixel with any of these"
             " mask planes set will be rejected before measurement."
             " Any missing mask planes will be silently ignored.",
-        default=("NO_DATA", "BAD", "SAT", "EDGE"),
+        default=("NO_DATA", "BAD", "SAT", "EDGE", "HIGH_VARIANCE"),
     )
     raiseOnBadSubtractionRatio = pexConfig.Field(
         dtype=bool,
