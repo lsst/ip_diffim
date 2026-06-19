@@ -123,16 +123,21 @@ class GetTemplateConfig(
     doMaskShallowCoverage = pexConfig.Field(
         dtype=bool,
         default=True,
-        doc="Set the HIGH_VARIANCE mask plane on template regions with fewer"
-        " contributing input images than ``minNumberOfInputImages``.",
+        doc="Set the HIGH_VARIANCE mask plane on template regions covered by"
+        " fewer input images than ``minNumberOfInputImages`` in every"
+        " contributing tract. This flags shallow regions (e.g. chip gaps) where"
+        " the template PSF varies discontinuously, which breaks the assumption"
+        " of a smoothly-varying PSF when PSF-matching the template to a science"
+        " image.",
     )
     minNumberOfInputImages = pexConfig.RangeField(
         dtype=int,
         default=2,
         min=1,
-        doc="Template pixels covered by fewer than this many input images are"
-        " flagged with the HIGH_VARIANCE mask plane when"
-        " ``doMaskShallowCoverage`` is set.",
+        doc="A tract is considered to cover a pixel deeply if at least this many"
+        " of its distinct input images (deduplicated across overlapping patches)"
+        " cover the pixel."
+        " Only used if ``doMaskShallowCoverage`` is set.",
     )
     coverageGrowRadius = pexConfig.RangeField(
         dtype=int,
@@ -140,7 +145,16 @@ class GetTemplateConfig(
         min=0,
         doc="Grow the shallow-coverage mask region by this many pixels, to"
         " account for the spread of the PSF discontinuity by the PSF-matching"
-        " convolution kernel. Only used if ``doMaskShallowCoverage`` is set.",
+        " convolution kernel."
+        " Only used if ``doMaskShallowCoverage`` is set.",
+    )
+    maxInputVisitsForCoverageCheck = pexConfig.RangeField(
+        dtype=int,
+        default=6,
+        min=1,
+        doc="Skip the (expensive) shallow-coverage depth computation for a tract"
+        " whose shallowest input coadd has at least this many input visits."
+        " Only used if ``doMaskShallowCoverage`` is set.",
     )
 
     def setDefaults(self):
@@ -353,7 +367,13 @@ class GetTemplateTask(pipeBase.PipelineTask):
 
         warped = {}
         catalogs = []
-        ccdInputCatalogs = []
+        # Accumulators (in the template frame) for the shallow-coverage check.
+        # ``anyData`` marks pixels covered by at least one tract; ``anyDeep``
+        # marks pixels that at least one tract covers with sufficient depth. A
+        # pixel is flagged only where it has data but no contributing tract
+        # covers it deeply, i.e. it is shallow in every contributing tract.
+        anyData = np.zeros((bbox.getHeight(), bbox.getWidth()), dtype=bool)
+        anyDeep = np.zeros((bbox.getHeight(), bbox.getWidth()), dtype=bool)
         for tract in coaddExposureHandles:
             maskedImages, catalog, totalBox, tractCcdInputs = self._makeExposureCatalog(
                 coaddExposureHandles[tract], dataIds[tract]
@@ -396,8 +416,11 @@ class GetTemplateTask(pipeBase.PipelineTask):
                 tempCatalog.append(catalog[i])
             catalogs.append(tempCatalog)
             warped[tract] = potentialInput.maskedImage
-            # Only count input coverage from tracts that actually contributed.
-            ccdInputCatalogs.extend(tractCcdInputs)
+            # Accumulate this tract's contribution to the shallow-coverage check.
+            if self.config.doMaskShallowCoverage:
+                self._accumulateShallowCoverage(
+                    tract, potentialInput, tractCcdInputs, wcs, bbox, anyData, anyDeep
+                )
 
         if len(warped) == 0:
             raise pipeBase.NoWorkFound("No patches found to overlap science exposure.")
@@ -417,7 +440,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
         # Set the same mask plane on shallow regions (e.g. chip gaps) where the
         # template PSF varies discontinuously and would break PSF matching.
         if self.config.doMaskShallowCoverage:
-            self.maskShallowCoverage(template, ccdInputCatalogs)
+            self.maskShallowCoverage(template, anyData, anyDeep)
         if visit is not None:
             template.getInfo().setVisitInfo(VisitInfo(id=visit))
         template.setFilter(afwImage.FilterLabel(band, physical_filter))
@@ -453,30 +476,118 @@ class GetTemplateTask(pipeBase.PipelineTask):
             highVariancePix = varianceBackground > threshold
             template.mask.array[highVariancePix] |= 2**highVarianceMaskPlaneBit
 
-    def maskShallowCoverage(self, template, ccdInputCatalogs):
+    def maskShallowCoverage(self, template, anyData, anyDeep):
         """Flag template regions built from too few input images.
 
-        The number of contributing images at each pixel is measured from the
-        per-CCD coadd inputs: each input CCD footprint is warped to the template
-        frame and accumulated into a depth map. Inputs are deduplicated on
-        ``(visit, ccd)`` so that the same exposure contributing to overlapping
-        patches, or to coadds from two tracts (which are usually built from the
-        same images and so are not independent), is only counted once. This also
-        avoids manufacturing a spurious depth discontinuity at tract boundaries.
+        Shallow coverage is assessed per-tract by `_accumulateShallowCoverage`
+        and combined here: a pixel is flagged only if it has template data and
+        no contributing tract covers it deeply. A single tract covering a pixel
+        with sufficient depth is enough to keep it unflagged.
 
         Parameters
         ----------
         template : `lsst.afw.image.Exposure`
             The warped template exposure, modified in place.
-        ccdInputCatalogs : `list` [`lsst.afw.table.ExposureCatalog`]
-            Per-CCD coadd input catalogs (``CoaddInputs.ccds``) of every coadd
-            that contributed to the template.
+        anyData : `numpy.ndarray` [`bool`]
+            Pixels covered by at least one contributing tract.
+        anyDeep : `numpy.ndarray` [`bool`]
+            Pixels covered with at least ``config.minNumberOfInputImages`` input
+            images by at least one contributing tract (or covered by a tract
+            skipped as deep).
         """
-        bbox = template.getBBox()
-        wcs = template.getWcs()
+        noData = (template.mask.array & template.mask.getPlaneBitMask("NO_DATA")) != 0
+        shallow = anyData & ~anyDeep & ~noData
+        nShallow = int(np.count_nonzero(shallow))
+        if nShallow == 0:
+            return
+        self.log.info("Flagging %d pixels (%.1f%%) covered by fewer than %d input"
+                      " images in every contributing tract as HIGH_VARIANCE.",
+                      nShallow, 100*nShallow/shallow.size, self.config.minNumberOfInputImages)
+
+        highVarianceBitMask = 2**template.mask.addMaskPlane("HIGH_VARIANCE")
+        shallowMask = afwImage.Mask(template.getBBox())
+        shallowMask.array[shallow] = 1
+        spanSet = afwGeom.SpanSet.fromMask(shallowMask, 1)
+        if self.config.coverageGrowRadius > 0:
+            spanSet = spanSet.dilated(self.config.coverageGrowRadius).clippedTo(template.getBBox())
+        spanSet.setMask(template.mask, highVarianceBitMask)
+
+    def _accumulateShallowCoverage(self, tract, tractExposure, ccdInputCatalogs, wcs, bbox,
+                                   anyData, anyDeep):
+        """Accumulate one tract's contribution to the shallow-coverage check.
+
+        Parameters
+        ----------
+        tract : `int`
+            Identifier of the tract being accumulated, for logging.
+        tractExposure : `lsst.afw.image.Exposure`
+            This tract's coadd, warped to the template frame.
+        ccdInputCatalogs : `list` [`lsst.afw.table.ExposureCatalog`]
+            The per-CCD coadd input catalogs (``CoaddInputs.ccds``) of this
+            tract's patches.
+        wcs : `lsst.afw.geom.SkyWcs`
+            WCS of the template frame.
+        bbox : `lsst.geom.Box2I`
+            Bounding box of the template frame.
+        anyData : `numpy.ndarray` [`bool`]
+            Accumulator of pixels covered by any tract; updated in place.
+        anyDeep : `numpy.ndarray` [`bool`]
+            Accumulator of pixels covered deeply by any tract; updated in place.
+        """
+        hasData = (tractExposure.mask.array & tractExposure.mask.getPlaneBitMask("NO_DATA")) == 0
+        anyData |= hasData
+
+        if not ccdInputCatalogs:
+            # No coverage information for this tract, so we cannot assess its
+            # depth; do not flag it (treat its whole data region as deep).
+            self.log.warning("No coadd input coverage available for tract %s; not"
+                             " checking it for shallow coverage.", tract)
+            anyDeep |= hasData
+            return
+
+        # Cheap test: the per-pixel depth cannot exceed the number of input
+        # visits, so a tract whose shallowest patch has many visits is very
+        # unlikely to have shallow regions. Skip the depth computation for it.
+        visitCounts = [len(set(ccds["visit"])) for ccds in ccdInputCatalogs
+                       if "visit" in set(ccds.schema.getNames())]
+        if visitCounts and min(visitCounts) >= self.config.maxInputVisitsForCoverageCheck:
+            self.log.info("Skipping shallow-coverage depth computation for tract %s:"
+                          " shallowest input coadd has %d visits (>= %d).",
+                          tract, min(visitCounts), self.config.maxInputVisitsForCoverageCheck)
+            anyDeep |= hasData
+            return
+
+        depth = self._computeDepthMap(ccdInputCatalogs, wcs, bbox)
+        anyDeep |= hasData & (depth >= self.config.minNumberOfInputImages)
+
+    def _computeDepthMap(self, ccdInputCatalogs, wcs, bbox):
+        """Compute the per-pixel number of input images covering the template.
+
+        Each input CCD footprint is warped to the template frame and
+        accumulated. Inputs are deduplicated on ``(visit, ccd)`` so that the
+        same exposure contributing to overlapping patches is only counted once.
+
+        Note that this is a purely geometric measure of coverage: it does not
+        account for pixels individually rejected during coadd assembly (cosmic
+        rays, saturation, etc.), so it captures missing-footprint shallowness
+        (chip gaps) but not shallowness caused by per-pixel masking.
+
+        Parameters
+        ----------
+        ccdInputCatalogs : `list` [`lsst.afw.table.ExposureCatalog`]
+            Per-CCD coadd input catalogs (``CoaddInputs.ccds``) to accumulate.
+        wcs : `lsst.afw.geom.SkyWcs`
+            WCS of the template frame.
+        bbox : `lsst.geom.Box2I`
+            Bounding box of the template frame.
+
+        Returns
+        -------
+        depth : `numpy.ndarray` [`numpy.int32`]
+            Per-pixel count of distinct input images covering each pixel.
+        """
         x0, y0 = bbox.getMinX(), bbox.getMinY()
         depth = np.zeros((bbox.getHeight(), bbox.getWidth()), dtype=np.int32)
-
         seen = set()
         for ccds in ccdInputCatalogs:
             # Deduplicate on the physical image; fall back to the record id if
@@ -505,30 +616,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
                 ymin, xmin = polyBox.getMinY() - y0, polyBox.getMinX() - x0
                 sub = depth[ymin:ymin + polyBox.getHeight(), xmin:xmin + polyBox.getWidth()]
                 sub[covered] += 1
-
-        if not depth.any():
-            self.log.warning("No coadd input coverage found; not setting the"
-                             " HIGH_VARIANCE mask plane for shallow coverage.")
-            return
-
-        # Restrict to pixels that actually have template data; pixels with no
-        # data are already flagged NO_DATA and need no further masking.
-        noData = (template.mask.array & template.mask.getPlaneBitMask("NO_DATA")) != 0
-        shallow = (depth < self.config.minNumberOfInputImages) & ~noData
-        nShallow = int(np.count_nonzero(shallow))
-        if nShallow == 0:
-            return
-        self.log.info("Flagging %d pixels (%.1f%%) covered by fewer than %d input"
-                      " images as HIGH_VARIANCE.", nShallow, 100*nShallow/depth.size,
-                      self.config.minNumberOfInputImages)
-
-        highVarianceBitMask = 2**template.mask.addMaskPlane("HIGH_VARIANCE")
-        shallowMask = afwImage.Mask(bbox)
-        shallowMask.array[shallow] = 1
-        spanSet = afwGeom.SpanSet.fromMask(shallowMask, 1)
-        if self.config.coverageGrowRadius > 0:
-            spanSet = spanSet.dilated(self.config.coverageGrowRadius).clippedTo(bbox)
-        spanSet.setMask(template.mask, highVarianceBitMask)
+        return depth
 
     @staticmethod
     def _checkInputs(dataIds, coaddExposures):

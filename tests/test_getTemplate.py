@@ -338,10 +338,9 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         # in the template are closer to the original anymore.
         self.assertTrue(np.isfinite(result.template.image.array).all())
 
-    def testMaskShallowCoverage(self):
-        """Test that maskShallowCoverage flags low-depth regions (e.g. chip
-        gaps) with the HIGH_VARIANCE plane, leaves deep regions alone,
-        deduplicates inputs on (visit, ccd), and grows the masked region.
+    def testComputeDepthMap(self):
+        """Test that _computeDepthMap counts the distinct input images covering
+        each pixel and deduplicates inputs on (visit, ccd).
         """
         wcs = lsst.afw.geom.makeSkyWcs(
             lsst.geom.Point2D(50, 50),
@@ -352,10 +351,9 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         leftBox = lsst.geom.Box2D(
             lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Extent2I(50, 100)))
 
-        # Build a per-CCD coadd input catalog where the left half is covered by
-        # three CCDs and the right half by only one, so the right half is the
-        # "shallow" region. The inputs share the template WCS, so their
-        # footprints map directly into the template frame.
+        # The left half is covered by visits {1, 2, 3} and the right half by {1}.
+        # The inputs share the template WCS, so their footprints map directly
+        # into the template frame.
         schema = lsst.afw.table.ExposureTable.makeMinimalSchema()
         schema.addField("visit", type=np.int64, doc="visit id")
         schema.addField("ccd", type=np.int32, doc="ccd id")
@@ -372,25 +370,43 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         addCcd(1, 1, fullBox)
         addCcd(2, 1, leftBox)
         addCcd(3, 1, leftBox)
-        # A duplicate physical image (same visit, ccd) must not inflate depth.
+        # A duplicate physical image (same visit, ccd) must not inflate the depth.
         addCcd(1, 1, fullBox)
+
+        task = lsst.ip.diffim.GetTemplateTask()
+        depth = task._computeDepthMap([ccds], wcs, box)
+        self.assertTrue((depth[:, :50] == 3).all())
+        self.assertTrue((depth[:, 50:] == 1).all())
+
+    def testMaskShallowCoverage(self):
+        """Test the cross-tract AND combination and the grow: a pixel is flagged
+        only where every contributing tract is shallow.
+        """
+        box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Extent2I(100, 100))
+        height, width = box.getHeight(), box.getWidth()
+        # One tract covers the whole image but is shallow everywhere; a second,
+        # deep tract covers only the right half (anyDeep). So the left half
+        # (shallow, no deep tract) should be flagged, and the right half (filled
+        # by the deep tract) should not.
+        anyData = np.ones((height, width), dtype=bool)
+        anyDeep = np.zeros((height, width), dtype=bool)
+        anyDeep[:, 50:] = True
 
         def flaggedMask(growRadius):
             template = lsst.afw.image.ExposureF(box)
-            template.setWcs(wcs)
             config = lsst.ip.diffim.GetTemplateConfig()
             config.minNumberOfInputImages = 2
             config.coverageGrowRadius = growRadius
             task = lsst.ip.diffim.GetTemplateTask(config=config)
-            task.maskShallowCoverage(template, [ccds])
+            task.maskShallowCoverage(template, anyData, anyDeep)
             return (template.mask.array
                     & template.mask.getPlaneBitMask("HIGH_VARIANCE")) != 0
 
-        # With no growth, exactly the shallow (right) half is flagged, and the
-        # deep half stays clean (depth 3 even counting the duplicate once).
+        # With no growth, the shallow-only (left) half is flagged and the half a
+        # deep tract fills is left clean.
         flagged = flaggedMask(0)
-        self.assertEqual(flagged[:, :50].sum(), 0)
-        self.assertTrue(flagged[:, 50:].all())
+        self.assertTrue(flagged[:, :50].all())
+        self.assertEqual(flagged[:, 50:].sum(), 0)
 
         # Growing by 5 expands the masked region by 5 columns into the deep half.
         self.assertEqual(flaggedMask(5).any(axis=0).sum(), 55)
