@@ -357,7 +357,7 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         doc="Detections whose footprint peak lies on a pixel with any of these"
             " mask planes set will be rejected before measurement."
             " Any missing mask planes will be silently ignored.",
-        default=("NO_DATA", "BAD", "SAT", "EDGE", "HIGH_VARIANCE"),
+        default=("NO_DATA", "BAD", "SAT", "EDGE", "HIGH_VARIANCE", "PSF_DISCONTINUITY"),
     )
     raiseOnBadSubtractionRatio = pexConfig.Field(
         dtype=bool,
@@ -477,9 +477,11 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
 
         # Keep track of which footprints contain streaks
         self.measurement.plugins["base_PixelFlags"].masksFpAnywhere = [
-            "STREAK", "INJECTED", "INJECTED_TEMPLATE", "HIGH_VARIANCE", "SATURATED_TEMPLATE", "SPIKE"]
+            "STREAK", "INJECTED", "INJECTED_TEMPLATE", "HIGH_VARIANCE", "SATURATED_TEMPLATE", "SPIKE",
+            "PSF_DISCONTINUITY"]
         self.measurement.plugins["base_PixelFlags"].masksFpCenter = [
-            "STREAK", "INJECTED", "INJECTED_TEMPLATE", "HIGH_VARIANCE", "SATURATED_TEMPLATE", "SPIKE"]
+            "STREAK", "INJECTED", "INJECTED_TEMPLATE", "HIGH_VARIANCE", "SATURATED_TEMPLATE", "SPIKE",
+            "PSF_DISCONTINUITY"]
         self.skySources.avoidMask = ["DETECTED", "DETECTED_NEGATIVE", "BAD", "NO_DATA", "EDGE"]
 
     def validate(self):

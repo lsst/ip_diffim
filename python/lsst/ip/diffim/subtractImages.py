@@ -271,7 +271,7 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
     )
     excludeMaskPlanes = lsst.pex.config.ListField(
         dtype=str,
-        default=("NO_DATA", "BAD", "SAT", "EDGE", "FAKE", "HIGH_VARIANCE"),
+        default=("NO_DATA", "BAD", "SAT", "EDGE", "FAKE", "HIGH_VARIANCE", "PSF_DISCONTINUITY"),
         doc="Template mask planes to exclude when selecting sources for PSF matching.",
     )
     badMaskPlanes = lsst.pex.config.ListField(
@@ -281,7 +281,7 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
     )
     preserveTemplateMask = lsst.pex.config.ListField(
         dtype=str,
-        default=("NO_DATA", "BAD", "HIGH_VARIANCE"),
+        default=("NO_DATA", "BAD", "HIGH_VARIANCE", "PSF_DISCONTINUITY"),
         doc="Mask planes from the template to propagate to the image difference."
     )
     renameTemplateMask = lsst.pex.config.ListField(
