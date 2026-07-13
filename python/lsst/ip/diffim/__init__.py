@@ -34,6 +34,8 @@ from .makeKernelBasisList import *
 from .dipoleMeasurement import *
 from .getTemplate import *
 from .dipoleFitTask import *
+from .peakClustering import *
+from .clusterDeblend import *
 from .detectAndMeasure import *
 from .imageDecorrelation import *
 from .imageMapReduce import *
