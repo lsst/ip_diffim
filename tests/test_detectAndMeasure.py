@@ -181,7 +181,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         # Set the subtraction residual metric threshold high, since the template
         # is not actually subtracted from the science image.
         detectionTask = self._setup_detection(doDeblend=True, badSubtractionRatioThreshold=1.,
-                                              doSkySources=False)
+                                              doSkySources=False, peakClusterRadius=1.0)
 
         # Run detection and check the results
         output = detectionTask.run(science, matchedTemplate, difference, sources,
@@ -813,7 +813,8 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
 
         detectionTask = self._setup_detection(doDeblend=True,
                                               badSubtractionRatioThreshold=1.,
-                                              doSkySources=False, run_sattle=True)
+                                              doSkySources=False, run_sattle=True,
+                                              peakClusterRadius=1.0)
 
         return science, matchedTemplate, difference, sources, detectionTask
 
@@ -945,7 +946,7 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         # Set the subtraction residual metric threshold high, since the template
         # is not actually subtracted from the science image.
         detectionTask = self._setup_detection(doDeblend=True, badSubtractionRatioThreshold=1.,
-                                              doSkySources=False)
+                                              doSkySources=False, peakClusterRadius=1.0)
 
         # Run detection and check the results
         output = detectionTask.run(science, matchedTemplate, difference, score, sources,
@@ -1362,57 +1363,6 @@ class TestNegativePeaks(lsst.utils.tests.TestCase):
     various problems found on DM-48596.
     """
 
-    def testDeblendNegatives(self):
-        """Test that negative peaks get deblended and not destroyed: DM-48704.
-        This is only a test of deblending, not of merging.
-        """
-        # Make a science image with one blend of two positive sources, to
-        # subtract from an empty template, resulting in a negative diffim.
-        bbox = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(100, 100))
-        dataset = lsst.meas.base.tests.TestDataset(bbox)
-        delta = 10
-        with dataset.addBlend() as family:
-            family.addChild(instFlux=2E5, centroid=lsst.geom.Point2D(50, 72))
-            family.addChild(instFlux=2.5E5, centroid=lsst.geom.Point2D(50+delta, 74))
-        science, catalog = dataset.realize(noise=1.0,
-                                           schema=lsst.meas.base.tests.TestDataset.makeMinimalSchema())
-        dataset = lsst.meas.base.tests.TestDataset(bbox)
-        template, _ = dataset.realize(noise=1.0,
-                                      schema=lsst.meas.base.tests.TestDataset.makeMinimalSchema())
-        difference = template.clone()
-        difference.image -= science.image
-
-        config = detectAndMeasure.DetectAndMeasureTask.ConfigClass()
-        config.doDeblend = True
-        task = detectAndMeasure.DetectAndMeasureTask(config=config)
-        # prelude steps taken from `detectAndMeasure.run`
-        task._prepareInputs(difference)
-        table = lsst.afw.table.SourceTable.make(task.schema)
-        results = task.detection.run(table=table, exposure=difference, doSmooth=True)
-        # Just run the deblend step so we can check the footprints independently.
-        sources, positives, negatives = task._deblend(difference, results.positive, results.negative)
-
-        # DM-48704 fixed a problem where the peaks were in the footprints, but
-        # the spans were empty.
-        self.assertEqual(len(negatives), 2)
-        self.assertEqual(len(positives), 0)
-        self.assertGreater(negatives[0].getFootprint().getSpans().getArea(), 0)
-        self.assertGreater(negatives[1].getFootprint().getSpans().getArea(), 0)
-        # Deblended children are HeavyFootprints; we have to make sure the
-        # pixel values in those are correct (though DetectAndMeasureTask
-        # doesn't use the fact that they're Heavy).
-        # The sources are positive in the science image, and negative in the
-        # diffim, so the minimum value in the deblended negative footprint is
-        # the maximum value in the science catalog footprint (ignoring the
-        # noise in the science and template, hence rtol).
-        # (catalog[0] is the parent; we want the children)
-        self.assertFloatsAlmostEqual(negatives[0].getFootprint().getImageArray().min(),
-                                     -catalog[1].getFootprint().getImageArray().max(), rtol=1e-4)
-        self.assertFloatsAlmostEqual(negatives[1].getFootprint().getImageArray().min(),
-                                     -catalog[2].getFootprint().getImageArray().max(), rtol=1e-4)
-
-        self.assertEqual(sources["is_negative"].sum(), 2)
-
     def testMergeFootprints(self):
         """Test that merging footprints does not cause negative ones to
         disappear (e.g. get merged into non-connected footprints).
@@ -1497,10 +1447,10 @@ class TestNegativePeaks(lsst.utils.tests.TestCase):
         unique_peaks, counts = np.unique(peaks, axis=0, return_counts=True)
         self.assertEqual(np.sum(counts > 1), 0)
 
-        # There are three positive sources that should not have `is_negative`
-        # set, independent of how deblending/merging of negative sources is
-        # handled.
-        self.assertEqual((~result.diaSources["is_negative"]).sum(), 3)
+        # Two positive sources should not have `is_negative` set: the isolated
+        # source at (25, 26) and the positive blended pair, which stays merged
+        # as a single source because its peaks are within ``peakClusterRadius``.
+        self.assertEqual((~result.diaSources["is_negative"]).sum(), 2)
 
     def testReorderPeaksBySignificance(self):
         """A merged footprint whose most significant peak is negative should

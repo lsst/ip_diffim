@@ -34,7 +34,6 @@ from lsst.ip.diffim.utils import (evaluateMaskFraction, computeDifferenceImageMe
 from lsst.meas.algorithms import SkyObjectsTask, SourceDetectionTask, SetPrimaryFlagsTask, MaskStreaksTask
 from lsst.meas.algorithms import FindGlintTrailsTask, FindCosmicRaysConfig, findCosmicRays
 from lsst.meas.base import ForcedMeasurementTask, ApplyApCorrTask, DetectorVisitIdGeneratorConfig
-import lsst.meas.deblender
 import lsst.meas.extensions.trailedSources  # noqa: F401
 import lsst.meas.extensions.shapeHSM
 import lsst.pex.config as pexConfig
@@ -44,6 +43,8 @@ import lsst.utils
 from lsst.utils.timer import timeMethod
 
 from . import DipoleFitTask
+from .peakClustering import find_peak_clusters
+from .clusterDeblend import deblend_clustered_peaks
 
 __all__ = ["DetectAndMeasureConfig", "DetectAndMeasureTask",
            "DetectAndMeasureScoreConfig", "DetectAndMeasureScoreTask"]
@@ -250,11 +251,20 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
     doDeblend = pexConfig.Field(
         dtype=bool,
         default=False,
-        doc="Deblend DIASources after detection?"
+        doc="Deblend merged footprints by extracting isolated positive peaks "
+            "into their own diaSources? Only used if ``doMerge`` is set."
     )
-    deblend = pexConfig.ConfigurableField(
-        target=lsst.meas.deblender.SourceDeblendTask,
-        doc="Task to split blended sources into their components."
+    growFootprint = pexConfig.Field(
+        dtype=int,
+        default=2,
+        doc="Grow positive and negative footprints by this many pixels before merging"
+    )
+    peakClusterRadius = pexConfig.Field(
+        dtype=float,
+        default=3.0,
+        doc="Radius (in PSF FWHM) to cluster detected peaks within footprints. "
+            "Positive peaks that are isolated after clustering can be deblended "
+            "if doDeblend=True."
     )
     measurement = pexConfig.ConfigurableField(
         target=DipoleFitTask,
@@ -272,11 +282,6 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
     forcedMeasurement = pexConfig.ConfigurableField(
         target=ForcedMeasurementTask,
         doc="Task to force photometer science image at diaSource locations.",
-    )
-    growFootprint = pexConfig.Field(
-        dtype=int,
-        default=2,
-        doc="Grow positive and negative footprints by this many pixels before merging"
     )
     diaSourceMatchRadius = pexConfig.Field(
         dtype=float,
@@ -498,6 +503,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
     ConfigClass = DetectAndMeasureConfig
     _DefaultName = "detectAndMeasure"
 
+    sigma = None
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.schema = afwTable.SourceTable.makeMinimalSchema()
@@ -507,8 +514,6 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             self.makeSubtask("subtractInitialBackground")
             self.makeSubtask("subtractFinalBackground")
         self.makeSubtask("detection", schema=self.schema)
-        if self.config.doDeblend:
-            self.makeSubtask("deblend", schema=self.schema)
         self.makeSubtask("setPrimaryFlags", schema=self.schema, isSingleFrame=True)
         self.makeSubtask("measurement", schema=self.schema,
                          algMetadata=self.algMetadata)
@@ -570,6 +575,9 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             self.makeSubtask("streakDetection")
         self.makeSubtask("findGlints")
         self.schema.addField("glint_trail", "Flag", "DiaSource is part of a glint trail.")
+        self.schema.addField("is_deblended", "Flag",
+                             "The original detected footprint was deblended, producing multiple diaSources."
+                             "The deblended diaSources split the original footprint.")
         self.schema.addField("reliability", type="F", doc="Reliability score of the DiaSource")
         self.schema.addField("reliabilityVersion", type=str, size=7, doc="Version of the reliability model")
 
@@ -687,17 +695,11 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         )
         measurementResults.differenceBackground = background
 
-        if self.config.doDeblend:
-            sources, positives, negatives = self._deblend(difference,
-                                                          results.positive,
-                                                          results.negative)
-
-        else:
-            positives = afwTable.SourceCatalog(self.schema)
-            results.positive.makeSources(positives)
-            negatives = afwTable.SourceCatalog(self.schema)
-            results.negative.makeSources(negatives)
-            sources = results.sources
+        positives = afwTable.SourceCatalog(self.schema)
+        results.positive.makeSources(positives)
+        negatives = afwTable.SourceCatalog(self.schema)
+        results.negative.makeSources(negatives)
+        sources = results.sources
 
         self.processResults(science, matchedTemplate, difference,
                             sources, idFactory, kernelSources,
@@ -724,6 +726,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         sigma = difference.psf.computeShape(difference.psf.getAveragePosition()).getDeterminantRadius()
         if np.isnan(sigma):
             raise pipeBase.UpstreamFailureNoWorkFound("Invalid PSF detected! PSF width evaluates to NaN.")
+        if self.sigma is None:
+            self.sigma = sigma
         # Ensure that we start with an empty detection and deblended mask.
         mask = difference.mask
         for mp in self.config.clearMaskPlanes:
@@ -864,6 +868,10 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             # All positive peaks were added before any negative peaks, so
             # re-order the peaks in each footprint by significance.
             self._reorderPeaksBySignificance(initialDiaSources)
+
+            # Extract isolated and purely positive peaks from large footprints
+            if self.config.doDeblend:
+                initialDiaSources = self._deblendClusteredPeaks(initialDiaSources, difference)
         else:
             initialDiaSources = sources
 
@@ -955,73 +963,75 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             peaks.clear()
             source.getFootprint().setPeakCatalog(newPeaks)
 
-    def _deblend(self, difference, positiveFootprints, negativeFootprints):
-        """Deblend the positive and negative footprints and return a catalog
-        containing just the children, and the deblended footprints.
+    def _deblendClusteredPeaks(self, diaSources, difference):
+        """Extract isolated and purely positive peaks from large footprints.
+
+        For each footprint that contains an isolated positive peak alongside
+        at least one other peak, the isolated peak's pixels are assigned to
+        a new footprint (a new diaSource), and the original source's footprint
+        is reduced to the remaining pixels.  Both the original and the new
+        records are flagged ``is_deblended``.  Footprints without an isolated
+        positive peak are left untouched.
 
         Parameters
         ----------
-        difference : `lsst.afw.image.Exposure`
-            Result of subtracting template from the science image.
-        positiveFootprints, negativeFootprints : `lsst.afw.detection.FootprintSet`
-            Positive and negative polarity footprints measured on
-            ``difference`` to be deblended separately.
+        diaSources : `lsst.afw.table.SourceCatalog`
+            The merged diaSources; modified in place and possibly extended.
+        difference : `lsst.afw.image.ExposureF`
+            Difference image the footprints were detected on, used to weight
+            the peaks.
 
         Returns
         -------
-        sources : `lsst.afw.table.SourceCatalog`
-            Positive and negative deblended children.
-        positives, negatives : `lsst.afw.table.SourceCatalog`
-            Deblended positive and negative polarity sources with footprints
-            detected on ``difference``.
+        diaSources : `lsst.afw.table.SourceCatalog`
+            The updated, contiguous catalog.
         """
+        sigmaToFwhm = np.sqrt(8.0*np.log(2.0))
+        linkingRadius = self.config.peakClusterRadius*self.sigma*sigmaToFwhm
+        # Identify clusters of peaks within each footprint.
+        # Positive peaks that share a footprint with other peaks may be
+        # isolated enough that we can extract them as separate diaSources.
+        peakClusters = find_peak_clusters(diaSources, linkingRadius)
 
-        def deblend(footprints, negative=False):
-            """Deblend a positive or negative footprint set,
-            and return the deblended children.
+        # Precalculate some mask information up front, so the pseudo-deblending
+        # function can be as lightweight as possible
+        presentBadPlanes = [mp for mp in self.config.badMaskPlanes
+                            if mp in difference.mask.getMaskPlaneDict()]
+        badBitmask = difference.mask.getPlaneBitMask(presentBadPlanes) if presentBadPlanes else 0
+        imageArray = difference.image.array
+        maskArray = difference.mask.array
+        imageXY0 = (difference.getBBox().getMinX(), difference.getBBox().getMinY())
+        isDeblendedKey = self.schema.find("is_deblended").key
 
-            Parameters
-            ----------
-            footprints : `lsst.afw.detection.FootprintSet`
-            negative : `bool`
-                Set True if the footprints contain negative fluxes
+        nFootprints = 0
+        nChildren = 0
+        # Loop over each individual footprint, checking whether there are
+        # positive peaks that could be extracted and measured independently
+        for footprintClusters in peakClusters:
+            if not footprintClusters.is_deblendable:
+                continue
+            result = deblend_clustered_peaks(footprintClusters, imageArray, maskArray,
+                                             imageXY0, self.sigma, badBitmask)
+            # Exit early without modifying the footprint catalog if no changes
+            # are needed for this footprint
+            if result is None:
+                continue
+            footprintClusters.source.setFootprint(result.parent)
+            footprintClusters.source.set(isDeblendedKey, True)
+            for childFootprint in result.children:
+                child = diaSources.addNew()
+                child.setFootprint(childFootprint)
+                child.set(isDeblendedKey, True)
+            nFootprints += 1
+            nChildren += len(result.children)
 
-            Returns
-            -------
-            sources : `lsst.afw.table.SourceCatalog`
-            """
-            sources = afwTable.SourceCatalog(self.schema)
-            footprints.makeSources(sources)
-            if negative:
-                # Invert the image so the deblender can run on positive peaks
-                difference_inverted = difference.clone()
-                difference_inverted.image *= -1
-                self.deblend.run(exposure=difference_inverted, sources=sources)
-                children = sources[sources["parent"] != 0]
-                # Set the heavy footprint pixel values back to reality
-                for child in children:
-                    footprint = child.getFootprint()
-                    array = footprint.getImageArray()
-                    array *= -1
-            else:
-                self.deblend.run(exposure=difference, sources=sources)
-            self.setPrimaryFlags.run(sources)
-            children = sources["detect_isDeblendedSource"] == 1
-            sources = sources[children].copy(deep=True)
-            # Clear parents, so that measurement plugins behave correctly.
-            sources['parent'] = 0
-            return sources.copy(deep=True)
-
-        positives = deblend(positiveFootprints)
-        negatives = deblend(negativeFootprints, negative=True)
-
-        sources = afwTable.SourceCatalog(self.schema)
-        sources.reserve(len(positives) + len(negatives))
-        sources.extend(positives, deep=True)
-        sources.extend(negatives, deep=True)
-        if len(negatives) > 0:
-            sources[-len(negatives):]["is_negative"] = True
-        return sources, positives, negatives
+        self.metadata["nClusterDeblendedFootprints"] = nFootprints
+        self.metadata["nClusterDeblendedDiaSources"] = nChildren
+        if nFootprints:
+            self.log.info("Deblended %d footprints into %d diaSources", nFootprints, nChildren)
+        if not diaSources.isContiguous():
+            diaSources = diaSources.copy(deep=True)
+        return diaSources
 
     def _rejectBadMaskedDetections(self, initialDiaSources, mask):
         """Remove detections whose footprint peak lies on a bad-masked pixel.
@@ -1592,25 +1602,13 @@ class DetectAndMeasureScoreTask(DetectAndMeasureTask):
         edgePix = scoreExposure.mask.array & edgeBit > 0
         difference.mask.array[edgePix] |= edgeBit
 
-        if self.config.doDeblend:
-            sources, positives, negatives = self._deblend(difference,
-                                                          detectResults.positive,
-                                                          detectResults.negative)
-
-            self.processResults(science, matchedTemplate, difference,
-                                sources, idFactory, kernelSources,
-                                positives=positives,
-                                negatives=negatives,
-                                measurementResults=measurementResults)
-
-        else:
-            positives = afwTable.SourceCatalog(self.schema)
-            detectResults.positive.makeSources(positives)
-            negatives = afwTable.SourceCatalog(self.schema)
-            detectResults.negative.makeSources(negatives)
-            self.processResults(science, matchedTemplate, difference,
-                                detectResults.sources, idFactory, kernelSources,
-                                positives=positives,
-                                negatives=negatives,
-                                measurementResults=measurementResults)
+        positives = afwTable.SourceCatalog(self.schema)
+        detectResults.positive.makeSources(positives)
+        negatives = afwTable.SourceCatalog(self.schema)
+        detectResults.negative.makeSources(negatives)
+        self.processResults(science, matchedTemplate, difference,
+                            detectResults.sources, idFactory, kernelSources,
+                            positives=positives,
+                            negatives=negatives,
+                            measurementResults=measurementResults)
         return measurementResults
