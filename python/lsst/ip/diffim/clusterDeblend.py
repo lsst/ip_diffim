@@ -33,11 +33,6 @@ import lsst.afw.geom
 import lsst.afw.image
 
 
-# Per-peak flag marking an individual peak as originating from the negative
-# detection set (see peakClustering._NEGATIVE_PEAK_FLAG).
-_NEGATIVE_PEAK_FLAG = "merge_peak_negative"
-
-
 @dataclasses.dataclass
 class DeblendedPeaks:
     """The footprints resulting from deblending one multi-peak footprint.
@@ -45,13 +40,10 @@ class DeblendedPeaks:
     Parameters
     ----------
     parent : `lsst.afw.detection.Footprint`
-        Footprint to set back on the original source record.  This is the
-        remainder (all non-carved clusters) if there is one; otherwise, when
-        the footprint is entirely single positive peaks, it is one of those
-        carved peaks.
+        Footprint of the first cluster, set back on the original source record.
     children : `list` [`lsst.afw.detection.Footprint`]
-        One new footprint per remaining carved single positive peak, each
-        carrying that single peak.
+        One new footprint per remaining cluster, each carrying that cluster's
+        peaks.
     """
 
     parent: lsst.afw.detection.Footprint
@@ -147,7 +139,7 @@ def _footprint_from_bool(pixels, bbox, peak_schema, region):
 
 
 def deblend_clustered_peaks(footprint_clusters, image, mask, image_xy0, sigma, bad_bitmask):
-    """Extract the isolated positive peaks out of one footprint.
+    """Extract every cluster of peaks from a footprint into new footprints.
 
     Parameters
     ----------
@@ -168,22 +160,20 @@ def deblend_clustered_peaks(footprint_clusters, image, mask, image_xy0, sigma, b
     -------
     result : `DeblendedPeaks` or `None`
         The parent footprint (kept on the original record) and the new
-        footprints, or `None` if the footprint should be left unmodified.
+        footprints, or `None` if the footprint did not split into more than
+        one cluster.
     """
     footprint = footprint_clusters.footprint
     peaks = footprint.getPeaks()
     n_peaks = len(peaks)
     peak_schema = peaks.getSchema()
-    negative_key = peak_schema.find(_NEGATIVE_PEAK_FLAG).key
     x0, y0 = image_xy0
 
     positions = np.zeros((n_peaks, 2), dtype=int)
     amplitudes = np.zeros(n_peaks, dtype=float)
-    is_negative = np.zeros(n_peaks, dtype=bool)
     for i, peak in enumerate(peaks):
         ix, iy = peak.getIx(), peak.getIy()
         positions[i] = (ix, iy)
-        is_negative[i] = peak.get(negative_key)
         amplitudes[i] = _peak_amplitude(image, mask, ix - x0, iy - y0, bad_bitmask)
 
     # weighted[p, j]: influence of peak p evaluated at peak j's pixel.
@@ -195,16 +185,9 @@ def deblend_clustered_peaks(footprint_clusters, image, mask, image_xy0, sigma, b
     peak_clusters = _merge_peak_clusters(
         [cluster.peak_indices for cluster in footprint_clusters.clusters], weighted, n_peaks)
 
-    def is_isolated_positive(peak_cluster):
-        return len(peak_cluster) == 1 and not is_negative[peak_cluster[0]]
-
-    # Extract each single positive peak into its own source.
-    # Every other cluster pools into one remainder.
-    extracted_peaks = [peak_cluster for peak_cluster in peak_clusters if is_isolated_positive(peak_cluster)]
-    remainder_peak_clusters = [peak_cluster for peak_cluster in peak_clusters
-                               if not is_isolated_positive(peak_cluster)]
-    n_sources = len(extracted_peaks) + (1 if remainder_peak_clusters else 0)
-    if not extracted_peaks or n_sources < 2:
+    # Extract every cluster into its own source; skip footprints that did not
+    # split into more than one cluster.
+    if len(peak_clusters) < 2:
         return None
 
     # Assign every footprint pixel to the cluster of highest influence.
@@ -213,9 +196,8 @@ def deblend_clustered_peaks(footprint_clusters, image, mask, image_xy0, sigma, b
     footprint_mask = _spans_to_bool(footprint.getSpans(), bbox)
     xx, yy = np.meshgrid(np.arange(min_x, bbox.getMaxX() + 1),
                          np.arange(min_y, bbox.getMaxY() + 1))
-    ordered = extracted_peaks + remainder_peak_clusters
-    influence = np.empty((len(ordered), bbox.getHeight(), bbox.getWidth()), dtype=float)
-    for index, peak_cluster in enumerate(ordered):
+    influence = np.empty((len(peak_clusters), bbox.getHeight(), bbox.getWidth()), dtype=float)
+    for index, peak_cluster in enumerate(peak_clusters):
         accumulator = np.zeros(footprint_mask.shape, dtype=float)
         for peak in peak_cluster:
             r_sq = (xx - positions[peak, 0])**2 + (yy - positions[peak, 1])**2
@@ -224,28 +206,18 @@ def deblend_clustered_peaks(footprint_clusters, image, mask, image_xy0, sigma, b
     labels = np.argmax(influence, axis=0)
     # Guarantee each cluster owns its own peak pixels (breaks any influence
     # ties in the owner's favour, so no cluster ends up empty).
-    for index, peak_cluster in enumerate(ordered):
+    for index, peak_cluster in enumerate(peak_clusters):
         for peak in peak_cluster:
             labels[positions[peak, 1] - min_y, positions[peak, 0] - min_x] = index
 
+    # One footprint per cluster, carrying that cluster's peaks.
     region = footprint.getRegion()
-    # One footprint per extracted single positive peak.
-    extracted_footprints = []
-    for index, peak_cluster in enumerate(extracted_peaks):
+    footprints = []
+    for index, peak_cluster in enumerate(peak_clusters):
         fp = _footprint_from_bool(footprint_mask & (labels == index), bbox, peak_schema, region)
-        fp.getPeaks().append(peaks[peak_cluster[0]])
-        extracted_footprints.append(fp)
+        for peak in peak_cluster:
+            fp.getPeaks().append(peaks[peak])
+        footprints.append(fp)
 
-    if remainder_peak_clusters:
-        remainder_pixels = np.zeros(footprint_mask.shape, dtype=bool)
-        for index in range(len(extracted_peaks), len(ordered)):
-            remainder_pixels |= footprint_mask & (labels == index)
-        remainder = _footprint_from_bool(remainder_pixels, bbox, peak_schema, region)
-        for peak_cluster in remainder_peak_clusters:
-            for peak in peak_cluster:
-                remainder.getPeaks().append(peaks[peak])
-        return DeblendedPeaks(parent=remainder, children=extracted_footprints)
-
-    # No remainder cluster: the footprint is entirely single positive peaks,
-    # so the first stays on the original record and the rest are new records.
-    return DeblendedPeaks(parent=extracted_footprints[0], children=extracted_footprints[1:])
+    # The first cluster stays on the original record; the rest are new records.
+    return DeblendedPeaks(parent=footprints[0], children=footprints[1:])

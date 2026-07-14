@@ -86,9 +86,9 @@ class ClusterDeblendTestCase(lsst.utils.tests.TestCase):
     def setUp(self):
         self.schema, self.peakSchema = makeSchemas()
 
-    def test_extract_isolated_positive_from_dipole(self):
-        """An isolated positive peak is split off; the dipole stays behind."""
-        # Isolated positive at (8, 20); dipole at (30, 20)/(32, 20).
+    def test_extract_clusters_from_footprint(self):
+        """A footprint that splits into two clusters yields two sources."""
+        # Lone peak at (8, 20); dipole at (30, 20)/(32, 20).
         footprint, image, mask, _ = makeFootprintAndImage(
             self.peakSchema, [(8, 20, False), (30, 20, False), (32, 20, True)])
         fc = makeClusters(self.schema, footprint, linkingRadius=5.0)
@@ -98,18 +98,19 @@ class ClusterDeblendTestCase(lsst.utils.tests.TestCase):
         self.assertIsNotNone(result)
         self.assertEqual(len(result.children), 1)
 
+        # The first cluster (the lone peak at (8, 20)) stays on the parent.
+        self.assertEqual(len(result.parent.getPeaks()), 1)
+        self.assertEqual((result.parent.getPeaks()[0].getIx(),
+                          result.parent.getPeaks()[0].getIy()), (8, 20))
+
+        # The dipole is the other cluster, keeping both its peaks.
         child = result.children[0]
-        self.assertEqual(len(child.getPeaks()), 1)
-        self.assertEqual((child.getPeaks()[0].getIx(), child.getPeaks()[0].getIy()), (8, 20))
-        self.assertTrue(child.getSpans().contains(geom.Point2I(8, 20)))
+        self.assertEqual(len(child.getPeaks()), 2)
+        self.assertTrue(child.getSpans().contains(geom.Point2I(30, 20)))
+        self.assertTrue(child.getSpans().contains(geom.Point2I(32, 20)))
 
-        # The dipole is the remainder (parent), keeping both its peaks.
-        self.assertEqual(len(result.parent.getPeaks()), 2)
-        self.assertTrue(result.parent.getSpans().contains(geom.Point2I(30, 20)))
-        self.assertTrue(result.parent.getSpans().contains(geom.Point2I(32, 20)))
-
-        # The extracted and remainder pixels exactly tile the original footprint.
-        self.assertEqual(child.getSpans().getArea() + result.parent.getSpans().getArea(),
+        # The extracted pixels exactly tile the original footprint.
+        self.assertEqual(result.parent.getSpans().getArea() + child.getSpans().getArea(),
                          footprint.getSpans().getArea())
         # Peak schema (with merge flags) is preserved on the outputs.
         self.assertIn("merge_peak_negative", child.getPeaks().schema.getNames())
@@ -144,14 +145,32 @@ class ClusterDeblendTestCase(lsst.utils.tests.TestCase):
         result = deblend_clustered_peaks(fc, image, mask, (0, 0), sigma=4.0, bad_bitmask=0)
         self.assertIsNone(result)
 
-    def test_no_isolated_positive_returns_none(self):
-        """A footprint with only a dipole has nothing to extract."""
+    def test_single_cluster_dipole_returns_none(self):
+        """A footprint that is a single cluster (here a dipole) is untouched."""
         footprint, image, mask, _ = makeFootprintAndImage(
             self.peakSchema, [(20, 20, False), (22, 20, True)])
         fc = makeClusters(self.schema, footprint, linkingRadius=5.0)
         self.assertFalse(fc.is_deblendable)
         result = deblend_clustered_peaks(fc, image, mask, (0, 0), sigma=4.0, bad_bitmask=0)
         self.assertIsNone(result)
+
+    def test_extract_negative_cluster(self):
+        """Negative and positive clusters are both extracted (polarity is not
+        a constraint in this version).
+        """
+        # Lone negative at (8, 20); lone positive at (32, 20); beyond radius.
+        footprint, image, mask, _ = makeFootprintAndImage(
+            self.peakSchema, [(8, 20, True), (32, 20, False)])
+        fc = makeClusters(self.schema, footprint, linkingRadius=5.0)
+        self.assertTrue(fc.is_deblendable)
+
+        result = deblend_clustered_peaks(fc, image, mask, (0, 0), sigma=4.0, bad_bitmask=0)
+        self.assertIsNotNone(result)
+        self.assertEqual(len(result.children), 1)
+        # Both peaks are extracted, one per output footprint.
+        outputs = [result.parent] + result.children
+        extracted = {(fp.getPeaks()[0].getIx(), fp.getPeaks()[0].getIy()) for fp in outputs}
+        self.assertEqual(extracted, {(8, 20), (32, 20)})
 
     def test_dominated_isolated_peak_is_merged(self):
         """A faint 'isolated' peak dominated by a bright neighbour is merged
