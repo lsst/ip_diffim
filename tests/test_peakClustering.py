@@ -82,8 +82,7 @@ class PeakClusteringTestCase(lsst.utils.tests.TestCase):
         clusters = cluster_peaks(footprint.getPeaks(), self.radius)
         self.assertEqual(len(clusters), 2)
         for cluster in clusters:
-            self.assertTrue(cluster.is_singleton)
-            self.assertTrue(cluster.is_isolated_positive)
+            self.assertEqual(len(cluster.peak_indices), 1)
 
     def test_two_peaks_close(self):
         """Peaks within the linking radius merge into one cluster."""
@@ -91,8 +90,6 @@ class PeakClusteringTestCase(lsst.utils.tests.TestCase):
                                   [(10, 10, 100, False), (12, 10, 90, False)])
         clusters = cluster_peaks(footprint.getPeaks(), self.radius)
         self.assertEqual(len(clusters), 1)
-        self.assertFalse(clusters[0].is_singleton)
-        self.assertFalse(clusters[0].is_isolated_positive)
         self.assertEqual(sorted(clusters[0].peak_indices), [0, 1])
 
     def test_transitive_chain(self):
@@ -106,37 +103,35 @@ class PeakClusteringTestCase(lsst.utils.tests.TestCase):
         self.assertEqual(sorted(clusters[0].peak_indices), [0, 1, 2])
 
     def test_dipole_single_cluster(self):
-        """A close positive/negative pair clusters together, not isolated."""
+        """A close positive/negative pair clusters together."""
         footprint = makeFootprint(self.peakSchema,
                                   [(10, 10, 100, False), (12, 10, -90, True)])
         clusters = cluster_peaks(footprint.getPeaks(), self.radius)
         self.assertEqual(len(clusters), 1)
         cluster = clusters[0]
-        self.assertFalse(cluster.is_isolated_positive)
         self.assertEqual(cluster.is_negative.tolist(), [False, True])
         self.assertEqual(cluster.peak_values.tolist(), [100, -90])
 
-    def test_isolated_positive_beside_dipole(self):
-        """An isolated positive peak is separated from a nearby dipole."""
+    def test_lone_peak_beside_dipole(self):
+        """A lone peak is separated from a nearby dipole into two clusters."""
         footprint = makeFootprint(self.peakSchema,
-                                  [(50, 50, 200, False),           # isolated positive
+                                  [(50, 50, 200, False),           # lone peak
                                    (10, 10, 100, False), (12, 10, -90, True)])  # dipole
         clusters = cluster_peaks(footprint.getPeaks(), self.radius)
         self.assertEqual(len(clusters), 2)
-        isolated = clusterContaining(clusters, 0)
+        lone = clusterContaining(clusters, 0)
         dipole = clusterContaining(clusters, 1)
-        self.assertTrue(isolated.is_isolated_positive)
-        self.assertFalse(dipole.is_isolated_positive)
+        self.assertEqual(lone.peak_indices, [0])
         self.assertEqual(sorted(dipole.peak_indices), [1, 2])
 
-    def test_isolated_negative_not_extracted(self):
-        """A lone negative peak is a singleton but not an isolated positive."""
+    def test_lone_negative_is_own_cluster(self):
+        """A lone negative peak forms its own singleton cluster."""
         footprint = makeFootprint(self.peakSchema,
                                   [(50, 50, 200, False), (10, 10, -80, True)])
         clusters = cluster_peaks(footprint.getPeaks(), self.radius)
         negative = clusterContaining(clusters, 1)
-        self.assertTrue(negative.is_singleton)
-        self.assertFalse(negative.is_isolated_positive)
+        self.assertEqual(negative.peak_indices, [1])
+        self.assertEqual(negative.is_negative.tolist(), [True])
 
     def test_positions_and_values(self):
         """Cluster arrays carry the peaks' positions and signed values."""
@@ -187,35 +182,23 @@ class FindPeakClustersTestCase(lsst.utils.tests.TestCase):
         self.assertEqual(results[0].source_id, 2)
 
     def test_deblendable_classification(self):
-        """is_deblendable requires both an extraction candidate and a
-        remainder.
-        """
-        # Isolated positive + dipole: deblendable.
-        mixed = makeFootprint(self.peakSchema,
-                              [(50, 50, 200, False),
-                               (10, 10, 100, False), (12, 10, -90, True)])
-        # Two isolated positives beyond the radius: deblendable into two
-        # sources even though there is no remainder cluster.
-        allIsolated = makeFootprint(self.peakSchema,
-                                    [(10, 10, 100, False), (50, 50, 120, False)])
-        # One tight blend: a remainder but nothing isolated to extract.
-        blend = makeFootprint(self.peakSchema,
-                              [(10, 10, 100, False), (12, 10, 90, False)])
-        catalog = self.makeCatalog([mixed, allIsolated, blend])
+        """is_deblendable is true when the footprint splits into >1 cluster."""
+        # A lone peak plus a dipole: two clusters, deblendable.
+        twoClusters = makeFootprint(self.peakSchema,
+                                    [(50, 50, 200, False),
+                                     (10, 10, 100, False), (12, 10, -90, True)])
+        # One tight blend: a single cluster, not deblendable.
+        oneCluster = makeFootprint(self.peakSchema,
+                                   [(10, 10, 100, False), (12, 10, 90, False)])
+        catalog = self.makeCatalog([twoClusters, oneCluster])
         results = find_peak_clusters(catalog, self.radius)
         byId = {r.source_id: r for r in results}
 
         self.assertTrue(byId[1].is_deblendable)
-        self.assertEqual(len(byId[1].isolated_positive), 1)
-        self.assertEqual(len(byId[1].retained), 1)
+        self.assertEqual(len(byId[1].clusters), 2)
 
-        self.assertTrue(byId[2].is_deblendable)
-        self.assertEqual(len(byId[2].isolated_positive), 2)
-        self.assertEqual(len(byId[2].retained), 0)
-
-        self.assertFalse(byId[3].is_deblendable)
-        self.assertEqual(len(byId[3].isolated_positive), 0)
-        self.assertEqual(len(byId[3].retained), 1)
+        self.assertFalse(byId[2].is_deblendable)
+        self.assertEqual(len(byId[2].clusters), 1)
 
     def test_source_handle_is_live(self):
         """The stored source is the live catalog record, so deblender edits

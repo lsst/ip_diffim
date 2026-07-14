@@ -964,14 +964,14 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             source.getFootprint().setPeakCatalog(newPeaks)
 
     def _deblendClusteredPeaks(self, diaSources, difference):
-        """Extract isolated and purely positive peaks from large footprints.
+        """Extract clusters of peaks from large footprints into new diaSources.
 
-        For each footprint that contains an isolated positive peak alongside
-        at least one other peak, the isolated peak's pixels are assigned to
-        a new footprint (a new diaSource), and the original source's footprint
-        is reduced to the remaining pixels.  Both the original and the new
-        records are flagged ``is_deblended``.  Footprints without an isolated
-        positive peak are left untouched.
+        For each footprint whose peaks split into more than one cluster, every
+        cluster is assigned its own footprint: the first stays on the original
+        record and the rest become new diaSources.  All resulting records are
+        flagged ``is_deblended``, and ``is_negative`` is set from the polarity
+        of each new footprint's peaks.  Footprints with a single cluster are
+        left untouched.
 
         Parameters
         ----------
@@ -988,9 +988,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         """
         sigmaToFwhm = np.sqrt(8.0*np.log(2.0))
         linkingRadius = self.config.peakClusterRadius*self.sigma*sigmaToFwhm
-        # Identify clusters of peaks within each footprint.
-        # Positive peaks that share a footprint with other peaks may be
-        # isolated enough that we can extract them as separate diaSources.
+        # Identify clusters of peaks within each footprint. Footprints whose
+        # peaks split into more than one cluster can be deblended.
         peakClusters = find_peak_clusters(diaSources, linkingRadius)
 
         # Precalculate some mask information up front, so the pseudo-deblending
@@ -1002,11 +1001,12 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         maskArray = difference.mask.array
         imageXY0 = (difference.getBBox().getMinX(), difference.getBBox().getMinY())
         isDeblendedKey = self.schema.find("is_deblended").key
+        isNegativeKey = self.schema.find("is_negative").key
 
         nFootprints = 0
         nChildren = 0
-        # Loop over each individual footprint, checking whether there are
-        # positive peaks that could be extracted and measured independently
+        # Loop over each individual footprint, checking whether its peaks split
+        # into clusters that can be extracted and measured independently
         for footprintClusters in peakClusters:
             if not footprintClusters.is_deblendable:
                 continue
@@ -1016,12 +1016,15 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             # are needed for this footprint
             if result is None:
                 continue
-            footprintClusters.source.setFootprint(result.parent)
-            footprintClusters.source.set(isDeblendedKey, True)
-            for childFootprint in result.children:
-                child = diaSources.addNew()
-                child.setFootprint(childFootprint)
-                child.set(isDeblendedKey, True)
+            # The first cluster stays on the original record; the rest are new.
+            records = [footprintClusters.source]
+            records += [diaSources.addNew() for _ in result.children]
+            negativePeakKey = result.parent.getPeaks().getSchema().find("merge_peak_negative").key
+            for record, newFootprint in zip(records, [result.parent] + result.children):
+                record.setFootprint(newFootprint)
+                record.set(isDeblendedKey, True)
+                # A source is negative if all of its peaks are negative.
+                record.set(isNegativeKey, all(peak.get(negativePeakKey) for peak in newFootprint.getPeaks()))
             nFootprints += 1
             nChildren += len(result.children)
 

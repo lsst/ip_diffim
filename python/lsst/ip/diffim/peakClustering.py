@@ -47,8 +47,7 @@ class PeakCluster:
 
     Peaks are grouped by single-linkage clustering on their positions,
     ignoring polarity, so a dipole's positive and negative lobes should fall
-    into the same cluster.  A cluster with a single member is "isolated": no other
-    peak in the footprint lies within the linking radius.
+    into the same cluster.
 
     Parameters
     ----------
@@ -69,19 +68,6 @@ class PeakCluster:
     positions: np.ndarray
     peak_values: np.ndarray
     is_negative: np.ndarray
-
-    @property
-    def is_singleton(self):
-        """Whether this cluster holds exactly one peak (`bool`)."""
-        return len(self.peak_indices) == 1
-
-    @property
-    def is_isolated_positive(self):
-        """Whether this cluster is a single positive peak (`bool`).
-
-        These are the peaks the deblender extracts as new footprints.
-        """
-        return self.is_singleton and not bool(self.is_negative[0])
 
 
 @dataclasses.dataclass
@@ -123,27 +109,11 @@ class FootprintPeakClusters:
         return sum(len(cluster.peak_indices) for cluster in self.clusters)
 
     @property
-    def isolated_positive(self):
-        """Single-peak positive clusters (`list` [`PeakCluster`]).
-
-        The candidates for extracting into their own footprints.
-        """
-        return [cluster for cluster in self.clusters if cluster.is_isolated_positive]
-
-    @property
-    def retained(self):
-        """Clusters whose pixels stay in the footprint (`list` [`PeakCluster`]).
-
-        Everything that is not an isolated positive peak: multi-peak blends,
-        dipoles, and isolated negative peaks.
-        """
-        return [cluster for cluster in self.clusters if not cluster.is_isolated_positive]
-
-    @property
     def is_deblendable(self):
-        """Whether the footprint can be split by cluster deblending.
+        """Whether the footprint splits into more than one cluster, so that
+        deblending would extract more than one source (`bool`).
         """
-        return bool(self.isolated_positive) and len(self.clusters) >= 2
+        return len(self.clusters) >= 2
 
 
 def _single_linkage_labels(positions, linking_radius):
