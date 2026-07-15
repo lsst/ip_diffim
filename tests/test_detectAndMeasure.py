@@ -25,8 +25,10 @@ import unittest
 from unittest import mock
 import requests
 
+import lsst.afw.detection as afwDetection
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
+import lsst.afw.table as afwTable
 import lsst.afw.math as afwMath
 import lsst.geom
 from lsst.ip.diffim import detectAndMeasure, subtractImages
@@ -1499,6 +1501,41 @@ class TestNegativePeaks(lsst.utils.tests.TestCase):
         # set, independent of how deblending/merging of negative sources is
         # handled.
         self.assertEqual((~result.diaSources["is_negative"]).sum(), 3)
+
+    def testReorderPeaksBySignificance(self):
+        """A merged footprint whose most significant peak is negative should
+        have that peak first after re-ordering, even though the merge lists
+        positive peaks before negative ones.
+        """
+        config = detectAndMeasure.DetectAndMeasureTask.ConfigClass()
+        task = detectAndMeasure.DetectAndMeasureTask(config=config)
+
+        # Peak schema with a significance field, as SourceDetectionTask
+        # produces for pixel_stdev thresholds.
+        mapper = afwTable.SchemaMapper(afwDetection.PeakTable.makeMinimalSchema())
+        mapper.addMinimalSchema(afwDetection.PeakTable.makeMinimalSchema())
+        mapper.addOutputField("significance", type=float, doc="")
+        peakSchema = mapper.getOutputSchema()
+
+        diaSources = afwTable.SourceCatalog(task.schema)
+        source = diaSources.addNew()
+        spans = afwGeom.SpanSet(geom.Box2I(geom.Point2I(0, 0), geom.Extent2I(10, 10)))
+        footprint = afwDetection.Footprint(spans, peakSchema)
+        # Merge order is [positive, negative]: a weak positive peak first,
+        # then a more significant negative peak.
+        footprint.addPeak(1, 1, 30.0)
+        footprint.peaks[-1]["significance"] = 5.0
+        footprint.addPeak(2, 2, -500.0)
+        footprint.peaks[-1]["significance"] = 40.0
+        source.setFootprint(footprint)
+
+        task._reorderPeaksBySignificance(diaSources)
+
+        peaks = source.getFootprint().peaks
+        self.assertEqual(peaks[0].getPeakValue(), -500.0)
+        self.assertEqual(peaks[0]["significance"], 40.0)
+        self.assertEqual(peaks[1].getPeakValue(), 30.0)
+        self.assertEqual(peaks[1]["significance"], 5.0)
 
 
 def makeVisitInfo(id=1):
