@@ -290,6 +290,11 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
         doc="Mask planes from the template to propagate to the image difference"
         "with '_TEMPLATE' appended to the name."
     )
+    preserveMaskPlanes = lsst.pex.config.ListField(
+        dtype=str,
+        default=("INJECTED", "INJECTED_CORE", "INJECTED_TEMPLATE", "INJECTED_CORE_TEMPLATE"),
+        doc="Mask planes to preserve without dilation when convolving the image.",
+    )
     allowKernelSourceDetection = lsst.pex.config.Field(
         dtype=bool,
         default=False,
@@ -899,9 +904,29 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             nInterp = _interpolateImage(convolvedExposure.maskedImage,
                                         self.config.badMaskPlanes)
             self.metadata["nInterpolated"] = nInterp
+
+        # Snapshot the footprints of mask planes that must not be dilated by
+        # the convolution.
+        preservePlanes = [mp for mp in self.config.preserveMaskPlanes
+                          if mp in convolvedExposure.mask.getMaskPlaneDict()]
+        maskResetDict = {
+            mp: (convolvedExposure.mask.array
+                 & convolvedExposure.mask.getPlaneBitMask(mp)) > 0
+            for mp in preservePlanes
+        }
+
         convolvedImage = lsst.afw.image.MaskedImageF(convolvedExposure.getBBox())
         lsst.afw.math.convolve(convolvedImage, convolvedExposure.maskedImage, kernel, convolutionControl)
         convolvedExposure.setMaskedImage(convolvedImage)
+
+        # Undo the convolution's dilation of the preserved planes: clear the
+        # dilated bits, then restore each mask plane for the pixels that were
+        # previously set.
+        self._clearMask(convolvedExposure.mask, clearMaskPlanes=preservePlanes)
+        for maskPlane, maskSetPixels in maskResetDict.items():
+            bit = convolvedExposure.mask.getPlaneBitMask(maskPlane)
+            convolvedExposure.mask.array[maskSetPixels] |= bit
+
         if bbox is None:
             return convolvedExposure
         else:
