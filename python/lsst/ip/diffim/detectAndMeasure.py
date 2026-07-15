@@ -861,6 +861,9 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             initialDiaSources["is_negative"] = initialDiaSources["merge_footprint_negative"] & \
                 ~initialDiaSources["merge_footprint_positive"]
             self.log.info("Merging detections into %d sources", len(initialDiaSources))
+            # All positive peaks were added before any negative peaks, so
+            # re-order the peaks in each footprint by significance.
+            self._reorderPeaksBySignificance(initialDiaSources)
         else:
             initialDiaSources = sources
 
@@ -933,6 +936,24 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                       np.count_nonzero(diaSources["sky_source"])
                       )
         return measurementResults
+
+    def _reorderPeaksBySignificance(self, diaSources):
+        """Sort each merged source's footprint peaks by significance.
+
+        Parameters
+        ----------
+        diaSources : `lsst.afw.table.SourceCatalog`
+            Merged sources whose footprint peaks are re-ordered in place.
+        """
+        for source in diaSources:
+            peaks = source.getFootprint().getPeaks()
+            if len(peaks) < 2 or "significance" not in peaks.schema.getNames():
+                continue
+            ordered = sorted(peaks, key=lambda peak: peak["significance"], reverse=True)
+            newPeaks = afwDetection.PeakCatalog(peaks.table)
+            newPeaks.extend(ordered)
+            peaks.clear()
+            source.getFootprint().setPeakCatalog(newPeaks)
 
     def _deblend(self, difference, positiveFootprints, negativeFootprints):
         """Deblend the positive and negative footprints and return a catalog
