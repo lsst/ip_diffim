@@ -211,7 +211,8 @@ class RunTestCase(lsst.utils.tests.TestCase):
         self.schema, self.peakSchema = makeSchemas()
 
     def makeExposure(self, psfSigma=2.0):
-        # Only the PSF is used by the task, to set the clustering scale.
+        # The PSF sets the clustering scale; the mask is updated in place with
+        # the NOT_DEBLENDED plane for any guardrail-skipped footprints.
         bbox = geom.Box2I(geom.Point2I(0, 0), geom.Extent2I(64, 64))
         exposure = afwImage.ExposureF(bbox)
         exposure.setPsf(afwDetection.GaussianPsf(11, 11, psfSigma))
@@ -236,14 +237,18 @@ class RunTestCase(lsst.utils.tests.TestCase):
         footprint = makeFootprint(self.peakSchema, [(10, 20, False, 100.0), (50, 20, False, 100.0)])
         catalog = self.makeCatalog([footprint])
         task = self.makeTask()
+        difference = self.makeExposure()
 
-        result = task.run(catalog, self.makeExposure())
+        result = task.run(catalog, difference)
 
         self.assertEqual(len(result.diaSources), 2)
         self.assertTrue(all(record["is_deblended"] for record in result.diaSources))
         self.assertEqual(task.metadata["nDeblendedFootprints"], 1)
         self.assertEqual(task.metadata["nDeblendedDiaSources"], 1)
         self.assertEqual(task.metadata["nSkipped"], 0)
+        # Nothing was skipped, so no pixels are flagged NOT_DEBLENDED.
+        notDeblended = difference.mask.getPlaneBitMask("NOT_DEBLENDED")
+        self.assertTrue(np.all((difference.mask.array & notDeblended) == 0))
 
     def test_run_leaves_single_cluster_untouched(self):
         """A footprint that is one cluster is not modified or flagged."""
@@ -270,29 +275,40 @@ class RunTestCase(lsst.utils.tests.TestCase):
         self.assertEqual(byNegative, [False, True])
 
     def test_run_skips_too_many_peaks(self):
-        """A deblendable footprint with more peaks than maxPeaks is skipped."""
+        """A deblendable footprint with more peaks than maxPeaks is skipped and
+        its pixels are flagged NOT_DEBLENDED.
+        """
         footprint = makeFootprint(
             self.peakSchema, [(10, 20, False, 100.0), (30, 20, False, 100.0), (50, 20, False, 100.0)])
         catalog = self.makeCatalog([footprint])
         task = self.makeTask(maxPeaks=2)
+        difference = self.makeExposure()
 
-        result = task.run(catalog, self.makeExposure())
+        result = task.run(catalog, difference)
 
         self.assertEqual(len(result.diaSources), 1)
         self.assertFalse(result.diaSources[0]["is_deblended"])
         self.assertEqual(task.metadata["nSkipped"], 1)
+        # The whole (full-frame) footprint is flagged NOT_DEBLENDED.
+        notDeblended = difference.mask.getPlaneBitMask("NOT_DEBLENDED")
+        self.assertTrue(np.all((difference.mask.array & notDeblended) != 0))
 
     def test_run_skips_too_large_area(self):
-        """A deblendable footprint bigger than maxFootprintArea is skipped."""
+        """A deblendable footprint bigger than maxFootprintArea is skipped and
+        its pixels are flagged NOT_DEBLENDED.
+        """
         footprint = makeFootprint(self.peakSchema, [(10, 20, False, 100.0), (50, 20, False, 100.0)])
         catalog = self.makeCatalog([footprint])
-        task = self.makeTask(maxFootprintArea=100)  # footprint area is SIZE**2
+        task = self.makeTask(maxFootprintArea=100)  # footprint area is 64**2
+        difference = self.makeExposure()
 
-        result = task.run(catalog, self.makeExposure())
+        result = task.run(catalog, difference)
 
         self.assertEqual(len(result.diaSources), 1)
         self.assertFalse(result.diaSources[0]["is_deblended"])
         self.assertEqual(task.metadata["nSkipped"], 1)
+        notDeblended = difference.mask.getPlaneBitMask("NOT_DEBLENDED")
+        self.assertTrue(np.all((difference.mask.array & notDeblended) != 0))
 
 
 class MemoryTester(lsst.utils.tests.MemoryTestCase):

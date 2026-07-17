@@ -246,15 +246,12 @@ class DeblendDifferenceFootprintsConfig(pexConfig.Config):
     maxFootprintArea = pexConfig.Field(
         dtype=int,
         default=50000,
-        doc="Footprints whose bounding-box area (pixels) exceeds this are left "
-            "un-deblended, bounding the per-footprint cost so a single large "
-            "footprint cannot dominate the processing time."
+        doc="Skip deblending footprints whose area exceeds this threshold."
     )
     maxPeaks = pexConfig.Field(
         dtype=int,
         default=40,
-        doc="Footprints with more than this many peaks are left un-deblended, "
-            "bounding the per-footprint deblending cost."
+        doc="Footprints with more than this many peaks are left un-deblended."
     )
 
 
@@ -282,8 +279,10 @@ class DeblendDifferenceFootprintsTask(pipeBase.Task):
             flags, and footprint peak catalogs the ``merge_peak_negative`` and
             ``significance`` fields.
         difference : `lsst.afw.image.ExposureF`
-            Difference image the footprints were detected on.  Only its PSF is
-            used, to set the clustering and influence scale.
+            Difference image the footprints were detected on.  Its PSF sets the
+            clustering and influence scale, and its mask is updated in place:
+            the ``NOT_DEBLENDED`` plane is set for footprints that can't be
+            deblended.
 
         Returns
         -------
@@ -297,6 +296,8 @@ class DeblendDifferenceFootprintsTask(pipeBase.Task):
         linkingRadius = self.config.clusterRadius*sigma*_SIGMA_TO_FWHM
         isDeblendedKey = diaSources.schema.find("is_deblended").key
         isNegativeKey = diaSources.schema.find("is_negative").key
+        difference.mask.addMaskPlane("NOT_DEBLENDED")
+        notDeblendedBitmask = difference.mask.getPlaneBitMask("NOT_DEBLENDED")
 
         nFootprints = 0
         nChildren = 0
@@ -314,6 +315,7 @@ class DeblendDifferenceFootprintsTask(pipeBase.Task):
             if (footprint.getBBox().getArea() > self.config.maxFootprintArea
                     or len(footprint.getPeaks()) > self.config.maxPeaks):
                 nSkipped += 1
+                footprint.getSpans().setMask(difference.mask, notDeblendedBitmask)
                 continue
             result = _deblend_footprint(footprint, clusters, sigma)
             if result is None:
