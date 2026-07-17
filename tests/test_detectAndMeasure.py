@@ -126,7 +126,7 @@ class DetectAndMeasureTestBase:
 
     def _setup_detection(self, doSkySources=True, nSkySources=5,
                          doSubtractBackground=False, run_sattle=False,
-                         badSourceFlags=None, **kwargs):
+                         badSourceFlags=None, clusterRadius=None, **kwargs):
         """Setup and configure the detection and measurement PipelineTask.
 
         Parameters
@@ -148,6 +148,8 @@ class DetectAndMeasureTestBase:
         if doSkySources:
             config.skySources.nSources = nSkySources
         config.update(**kwargs)
+        if clusterRadius is not None:
+            config.deblend.clusterRadius = clusterRadius
 
         config.run_sattle = run_sattle
 
@@ -193,7 +195,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         # Set the subtraction residual metric threshold high, since the template
         # is not actually subtracted from the science image.
         detectionTask = self._setup_detection(doDeblend=True, badSubtractionRatioThreshold=1.,
-                                              doSkySources=False, peakClusterRadius=1.0)
+                                              doSkySources=False, clusterRadius=1.5)
 
         # Run detection and check the results
         output = detectionTask.run(science, matchedTemplate, difference, sources,
@@ -826,7 +828,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         detectionTask = self._setup_detection(doDeblend=True,
                                               badSubtractionRatioThreshold=1.,
                                               doSkySources=False, run_sattle=True,
-                                              peakClusterRadius=1.0)
+                                              clusterRadius=1.5)
 
         return science, matchedTemplate, difference, sources, detectionTask
 
@@ -958,7 +960,7 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         # Set the subtraction residual metric threshold high, since the template
         # is not actually subtracted from the science image.
         detectionTask = self._setup_detection(doDeblend=True, badSubtractionRatioThreshold=1.,
-                                              doSkySources=False, peakClusterRadius=1.0)
+                                              doSkySources=False, clusterRadius=1.5)
 
         # Run detection and check the results
         output = detectionTask.run(science, matchedTemplate, difference, score, sources,
@@ -1491,7 +1493,7 @@ class TestNegativePeaks(lsst.utils.tests.TestCase):
 
         # Two positive sources should not have `is_negative` set: the isolated
         # source at (25, 26) and the positive blended pair, which stays merged
-        # as a single source because its peaks are within ``peakClusterRadius``.
+        # as a single source because its peaks are within ``clusterRadius``.
         self.assertEqual((~result.diaSources["is_negative"]).sum(), 2)
 
     def testReorderPeaksBySignificance(self):
@@ -1548,30 +1550,34 @@ class TestNegativePeaks(lsst.utils.tests.TestCase):
     def testDeblendGuardrailSkipsManyPeaks(self):
         """A deblendable footprint with more peaks than the cap is left whole."""
         config = detectAndMeasure.DetectAndMeasureTask.ConfigClass()
-        config.maxDeblendPeaks = 2
+        config.doDeblend = True
+        config.deblend.maxPeaks = 2
         task = detectAndMeasure.DetectAndMeasureTask(config=config)
-        task.sigma = 1.0
+        # psfSize=1 keeps the linking radius small enough that the peaks below
+        # split into separate clusters, so the footprint is deblendable.
+        difference, _ = makeTestImage(psfSize=1., x0=0, y0=0)
         bbox = geom.Box2I(geom.Point2I(0, 0), geom.Extent2I(40, 40))
         # Three peaks, spaced beyond the linking radius, so the footprint is
-        # deblendable but exceeds maxDeblendPeaks.
+        # deblendable but exceeds maxPeaks.
         diaSources = self._makeDeblendableCatalog(task.schema, bbox, [(8, 20), (20, 20), (32, 20)])
-        result = task._deblendClusteredPeaks(diaSources, afwImage.ExposureF(bbox))
+        result = task.deblend.run(diaSources, difference).diaSources
         self.assertEqual(len(result), 1)
         self.assertFalse(result[0]["is_deblended"])
-        self.assertEqual(task.metadata["nClusterDeblendSkipped"], 1)
+        self.assertEqual(task.deblend.metadata["nSkipped"], 1)
 
     def testDeblendGuardrailSkipsLargeArea(self):
         """A deblendable footprint bigger than the area cap is left whole."""
         config = detectAndMeasure.DetectAndMeasureTask.ConfigClass()
-        config.maxDeblendFootprintArea = 100
+        config.doDeblend = True
+        config.deblend.maxFootprintArea = 100
         task = detectAndMeasure.DetectAndMeasureTask(config=config)
-        task.sigma = 1.0
+        difference, _ = makeTestImage(psfSize=1., x0=0, y0=0)
         bbox = geom.Box2I(geom.Point2I(0, 0), geom.Extent2I(40, 40))  # area 1600 > 100
         diaSources = self._makeDeblendableCatalog(task.schema, bbox, [(8, 20), (20, 20), (32, 20)])
-        result = task._deblendClusteredPeaks(diaSources, afwImage.ExposureF(bbox))
+        result = task.deblend.run(diaSources, difference).diaSources
         self.assertEqual(len(result), 1)
         self.assertFalse(result[0]["is_deblended"])
-        self.assertEqual(task.metadata["nClusterDeblendSkipped"], 1)
+        self.assertEqual(task.deblend.metadata["nSkipped"], 1)
 
 
 def makeVisitInfo(id=1):
