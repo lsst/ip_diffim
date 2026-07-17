@@ -43,8 +43,7 @@ import lsst.utils
 from lsst.utils.timer import timeMethod
 
 from . import DipoleFitTask
-from .peakClustering import find_peak_clusters
-from .clusterDeblend import deblend_clustered_peaks
+from .deblendDifferenceFootprints import DeblendDifferenceFootprintsTask
 
 __all__ = ["DetectAndMeasureConfig", "DetectAndMeasureTask",
            "DetectAndMeasureScoreConfig", "DetectAndMeasureScoreTask"]
@@ -250,36 +249,20 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
     )
     doDeblend = pexConfig.Field(
         dtype=bool,
-        default=False,
-        doc="Deblend merged footprints by extracting isolated positive peaks "
-            "into their own diaSources? Only used if ``doMerge`` is set."
+        default=True,
+        doc="Deblend merged footprints by clustering their peaks and "
+            "extracting each cluster into its own diaSource? Only used if "
+            "``doMerge`` is set."
     )
     growFootprint = pexConfig.Field(
         dtype=int,
         default=2,
         doc="Grow positive and negative footprints by this many pixels before merging"
     )
-    peakClusterRadius = pexConfig.Field(
-        dtype=float,
-        default=3.0,
-        doc="Radius (in PSF FWHM) to cluster detected peaks within footprints. "
-            "Positive peaks that are isolated after clustering can be deblended "
-            "if doDeblend=True."
-    )
-    maxDeblendFootprintArea = pexConfig.Field(
-        dtype=int,
-        default=250000,
-        doc="Footprints whose bounding-box area (pixels) exceeds this are left "
-            "un-deblended, bounding the per-footprint deblending cost so a "
-            "single large footprint cannot blow the processing time budget. "
+    deblend = pexConfig.ConfigurableField(
+        target=DeblendDifferenceFootprintsTask,
+        doc="Task to deblend merged footprints by clustering their peaks. "
             "Only used if doDeblend=True."
-    )
-    maxDeblendPeaks = pexConfig.Field(
-        dtype=int,
-        default=200,
-        doc="Footprints with more than this many peaks are left un-deblended, "
-            "bounding the per-footprint deblending cost. Only used if "
-            "doDeblend=True."
     )
     measurement = pexConfig.ConfigurableField(
         target=DipoleFitTask,
@@ -593,6 +576,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         self.schema.addField("is_deblended", "Flag",
                              "The original detected footprint was deblended, producing multiple diaSources."
                              "The deblended diaSources split the original footprint.")
+        if self.config.doDeblend:
+            self.makeSubtask("deblend")
         self.schema.addField("reliability", type="F", doc="Reliability score of the DiaSource")
         self.schema.addField("reliabilityVersion", type=str, size=7, doc="Version of the reliability model")
 
@@ -884,9 +869,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             # re-order the peaks in each footprint by significance.
             self._reorderPeaksBySignificance(initialDiaSources)
 
-            # Extract isolated and purely positive peaks from large footprints
             if self.config.doDeblend:
-                initialDiaSources = self._deblendClusteredPeaks(initialDiaSources, difference)
+                initialDiaSources = self.deblend.run(initialDiaSources, difference).diaSources
         else:
             initialDiaSources = sources
 
@@ -977,91 +961,6 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             newPeaks.extend(ordered)
             peaks.clear()
             source.getFootprint().setPeakCatalog(newPeaks)
-
-    def _deblendClusteredPeaks(self, diaSources, difference):
-        """Extract clusters of peaks from large footprints into new diaSources.
-
-        For each footprint whose peaks split into more than one cluster, every
-        cluster is assigned its own footprint: the first stays on the original
-        record and the rest become new diaSources.  All resulting records are
-        flagged ``is_deblended``, and ``is_negative`` is set from the polarity
-        of each new footprint's peaks.  Footprints with a single cluster are
-        left untouched.
-
-        Parameters
-        ----------
-        diaSources : `lsst.afw.table.SourceCatalog`
-            The merged diaSources; modified in place and possibly extended.
-        difference : `lsst.afw.image.ExposureF`
-            Difference image the footprints were detected on, used to weight
-            the peaks.
-
-        Returns
-        -------
-        diaSources : `lsst.afw.table.SourceCatalog`
-            The updated, contiguous catalog.
-        """
-        sigmaToFwhm = np.sqrt(8.0*np.log(2.0))
-        linkingRadius = self.config.peakClusterRadius*self.sigma*sigmaToFwhm
-        # Identify clusters of peaks within each footprint. Footprints whose
-        # peaks split into more than one cluster can be deblended.
-        peakClusters = find_peak_clusters(diaSources, linkingRadius)
-
-        # Precalculate some mask information up front, so the pseudo-deblending
-        # function can be as lightweight as possible
-        presentBadPlanes = [mp for mp in self.config.badMaskPlanes
-                            if mp in difference.mask.getMaskPlaneDict()]
-        badBitmask = difference.mask.getPlaneBitMask(presentBadPlanes) if presentBadPlanes else 0
-        imageArray = difference.image.array
-        maskArray = difference.mask.array
-        imageXY0 = (difference.getBBox().getMinX(), difference.getBBox().getMinY())
-        isDeblendedKey = self.schema.find("is_deblended").key
-        isNegativeKey = self.schema.find("is_negative").key
-
-        nFootprints = 0
-        nChildren = 0
-        nSkipped = 0
-        # Loop over each individual footprint, checking whether its peaks split
-        # into clusters that can be extracted and measured independently
-        for footprintClusters in peakClusters:
-            if not footprintClusters.is_deblendable:
-                continue
-            # Leave pathologically large footprints un-deblended: the deblending
-            # cost grows steeply with footprint area and peak count, so a single
-            # huge footprint could otherwise dominate the processing time.
-            if (footprintClusters.footprint.getBBox().getArea() > self.config.maxDeblendFootprintArea
-                    or footprintClusters.n_peaks > self.config.maxDeblendPeaks):
-                nSkipped += 1
-                continue
-            result = deblend_clustered_peaks(footprintClusters, imageArray, maskArray,
-                                             imageXY0, self.sigma, badBitmask)
-            # Exit early without modifying the footprint catalog if no changes
-            # are needed for this footprint
-            if result is None:
-                continue
-            # The first cluster stays on the original record; the rest are new.
-            records = [footprintClusters.source]
-            records += [diaSources.addNew() for _ in result.children]
-            negativePeakKey = result.parent.getPeaks().getSchema().find("merge_peak_negative").key
-            for record, newFootprint in zip(records, [result.parent] + result.children):
-                record.setFootprint(newFootprint)
-                record.set(isDeblendedKey, True)
-                # A source is negative if all of its peaks are negative.
-                record.set(isNegativeKey, all(peak.get(negativePeakKey) for peak in newFootprint.getPeaks()))
-            nFootprints += 1
-            nChildren += len(result.children)
-
-        self.metadata["nClusterDeblendedFootprints"] = nFootprints
-        self.metadata["nClusterDeblendedDiaSources"] = nChildren
-        self.metadata["nClusterDeblendSkipped"] = nSkipped
-        if nFootprints:
-            self.log.info("Deblended %d footprints into %d diaSources", nFootprints, nChildren)
-        if nSkipped:
-            self.log.info("Left %d oversized footprints un-deblended (area > %d or peaks > %d)",
-                          nSkipped, self.config.maxDeblendFootprintArea, self.config.maxDeblendPeaks)
-        if not diaSources.isContiguous():
-            diaSources = diaSources.copy(deep=True)
-        return diaSources
 
     def _rejectBadMaskedDetections(self, initialDiaSources, mask):
         """Remove detections whose footprint peak lies on a bad-masked pixel.
