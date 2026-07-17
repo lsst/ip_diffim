@@ -266,6 +266,21 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
             "Positive peaks that are isolated after clustering can be deblended "
             "if doDeblend=True."
     )
+    maxDeblendFootprintArea = pexConfig.Field(
+        dtype=int,
+        default=250000,
+        doc="Footprints whose bounding-box area (pixels) exceeds this are left "
+            "un-deblended, bounding the per-footprint deblending cost so a "
+            "single large footprint cannot blow the processing time budget. "
+            "Only used if doDeblend=True."
+    )
+    maxDeblendPeaks = pexConfig.Field(
+        dtype=int,
+        default=200,
+        doc="Footprints with more than this many peaks are left un-deblended, "
+            "bounding the per-footprint deblending cost. Only used if "
+            "doDeblend=True."
+    )
     measurement = pexConfig.ConfigurableField(
         target=DipoleFitTask,
         doc="Task to measure sources on the difference image.",
@@ -1005,10 +1020,18 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
         nFootprints = 0
         nChildren = 0
+        nSkipped = 0
         # Loop over each individual footprint, checking whether its peaks split
         # into clusters that can be extracted and measured independently
         for footprintClusters in peakClusters:
             if not footprintClusters.is_deblendable:
+                continue
+            # Leave pathologically large footprints un-deblended: the deblending
+            # cost grows steeply with footprint area and peak count, so a single
+            # huge footprint could otherwise dominate the processing time.
+            if (footprintClusters.footprint.getBBox().getArea() > self.config.maxDeblendFootprintArea
+                    or footprintClusters.n_peaks > self.config.maxDeblendPeaks):
+                nSkipped += 1
                 continue
             result = deblend_clustered_peaks(footprintClusters, imageArray, maskArray,
                                              imageXY0, self.sigma, badBitmask)
@@ -1030,8 +1053,12 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
         self.metadata["nClusterDeblendedFootprints"] = nFootprints
         self.metadata["nClusterDeblendedDiaSources"] = nChildren
+        self.metadata["nClusterDeblendSkipped"] = nSkipped
         if nFootprints:
             self.log.info("Deblended %d footprints into %d diaSources", nFootprints, nChildren)
+        if nSkipped:
+            self.log.info("Left %d oversized footprints un-deblended (area > %d or peaks > %d)",
+                          nSkipped, self.config.maxDeblendFootprintArea, self.config.maxDeblendPeaks)
         if not diaSources.isContiguous():
             diaSources = diaSources.copy(deep=True)
         return diaSources

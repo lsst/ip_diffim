@@ -1487,6 +1487,50 @@ class TestNegativePeaks(lsst.utils.tests.TestCase):
         self.assertEqual(peaks[1].getPeakValue(), 30.0)
         self.assertEqual(peaks[1]["significance"], 5.0)
 
+    def _makeDeblendableCatalog(self, schema, bbox, peakXY):
+        """A single-source catalog whose footprint has well-separated peaks."""
+        peakSchema = afwDetection.FootprintMergeList(
+            afwTable.SourceTable.makeMinimalSchema(), ["positive", "negative"]).getPeakSchema()
+        negativeKey = peakSchema.find("merge_peak_negative").key
+        positiveKey = peakSchema.find("merge_peak_positive").key
+        catalog = afwTable.SourceCatalog(schema)
+        source = catalog.addNew()
+        footprint = afwDetection.Footprint(afwGeom.SpanSet(bbox), peakSchema)
+        for ix, iy in peakXY:
+            peak = footprint.addPeak(ix, iy, 100.0)
+            peak.set(negativeKey, False)
+            peak.set(positiveKey, True)
+        source.setFootprint(footprint)
+        return catalog
+
+    def testDeblendGuardrailSkipsManyPeaks(self):
+        """A deblendable footprint with more peaks than the cap is left whole."""
+        config = detectAndMeasure.DetectAndMeasureTask.ConfigClass()
+        config.maxDeblendPeaks = 2
+        task = detectAndMeasure.DetectAndMeasureTask(config=config)
+        task.sigma = 1.0
+        bbox = geom.Box2I(geom.Point2I(0, 0), geom.Extent2I(40, 40))
+        # Three peaks, spaced beyond the linking radius, so the footprint is
+        # deblendable but exceeds maxDeblendPeaks.
+        diaSources = self._makeDeblendableCatalog(task.schema, bbox, [(8, 20), (20, 20), (32, 20)])
+        result = task._deblendClusteredPeaks(diaSources, afwImage.ExposureF(bbox))
+        self.assertEqual(len(result), 1)
+        self.assertFalse(result[0]["is_deblended"])
+        self.assertEqual(task.metadata["nClusterDeblendSkipped"], 1)
+
+    def testDeblendGuardrailSkipsLargeArea(self):
+        """A deblendable footprint bigger than the area cap is left whole."""
+        config = detectAndMeasure.DetectAndMeasureTask.ConfigClass()
+        config.maxDeblendFootprintArea = 100
+        task = detectAndMeasure.DetectAndMeasureTask(config=config)
+        task.sigma = 1.0
+        bbox = geom.Box2I(geom.Point2I(0, 0), geom.Extent2I(40, 40))  # area 1600 > 100
+        diaSources = self._makeDeblendableCatalog(task.schema, bbox, [(8, 20), (20, 20), (32, 20)])
+        result = task._deblendClusteredPeaks(diaSources, afwImage.ExposureF(bbox))
+        self.assertEqual(len(result), 1)
+        self.assertFalse(result[0]["is_deblended"])
+        self.assertEqual(task.metadata["nClusterDeblendSkipped"], 1)
+
 
 def makeVisitInfo(id=1):
     """Return a non-NaN visitInfo."""
