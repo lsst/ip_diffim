@@ -93,21 +93,26 @@ def _cluster_peak_indices(peaks, linking_radius):
     return [np.nonzero(labels == label)[0].tolist() for label in np.unique(labels)]
 
 
-def _merge_dominated_clusters(clusters, weighted, n_peaks):
-    """Merge clusters until every peak owns (dominates) its own peak pixel.
+def _merge_clusters(clusters, contamination, n_peaks, max_contamination):
+    """Merge clusters whose mutual PSF-flux contamination exceeds the limit.
 
-    A cluster is absorbed into another when the other has a strictly greater
-    summed influence at one of the first cluster's own peak pixels.
+    Two clusters are merged when, at one cluster's peak, the summed
+    contamination from the other cluster exceeds ``max_contamination`` (a
+    fraction of that peak's own PSF flux).  Merging repeats until every
+    surviving cluster's peaks are contaminated by less than the limit.
 
     Parameters
     ----------
     clusters : `list` [`list` [`int`]]
         Initial clusters, each a list of peak indices.
-    weighted : `numpy.ndarray`
-        ``(n_peaks, n_peaks)`` array where ``weighted[p, j]`` is peak ``p``'s
-        influence evaluated at peak ``j``'s pixel.
+    contamination : `numpy.ndarray`
+        ``(n_peaks, n_peaks)`` array where ``contamination[p, j]`` is the
+        fractional PSF-flux contamination peak ``p`` imposes on peak ``j``.
     n_peaks : `int`
         Number of peaks.
+    max_contamination : `float`
+        Maximum fractional contamination a peak may receive from another
+        cluster before the two clusters are merged.
 
     Returns
     -------
@@ -122,13 +127,13 @@ def _merge_dominated_clusters(clusters, weighted, n_peaks):
                 owner[peak] = index
         merged = False
         for j in range(n_peaks):
-            # Check whether the owning cluster has the most significant
-            # influence at peak j's pixel; if not, merge it into the one that
-            # does.
-            influence = np.array([weighted[cluster, j].sum() for cluster in clusters])
-            best = int(np.argmax(influence))
-            if influence[best] > influence[owner[j]]:
-                low, high = sorted((owner[j], best))
+            # Total contamination of peak j from each cluster; a peak is not
+            # contaminated by its own cluster.
+            received = np.array([contamination[cluster, j].sum() for cluster in clusters])
+            received[owner[j]] = 0.0
+            worst = int(np.argmax(received))
+            if received[worst] > max_contamination:
+                low, high = sorted((owner[j], worst))
                 clusters[low] = clusters[low] + clusters[high]
                 del clusters[high]
                 merged = True
@@ -157,12 +162,14 @@ def _footprint_from_bool(pixels, bbox, peak_schema, region):
     return footprint
 
 
-def _deblend_footprint(footprint, clusters, sigma):
+def _deblend_footprint(footprint, clusters, sigma, max_contamination=0.05):
     """Extract every cluster of peaks from a footprint into new footprints.
 
-    Each peak's influence is calculated as a gaussian-approximation of the PSF
-    with amplitude equal to the absolute value of the signal to noise of the
-    peak on the detection image (```peak['significance']```).
+    Nearby clusters are first merged when the PSF-flux contamination one would
+    impose on the other exceeds ``max_contamination``; each remaining cluster
+    is then extracted into its own footprint.  Peak amplitudes are the
+    detection significance (``peak['significance']``), used as a proxy for
+    relative flux.
 
     Parameters
     ----------
@@ -174,6 +181,9 @@ def _deblend_footprint(footprint, clusters, sigma):
     sigma : `float`
         Width (in pixels) of the 2D Gaussian used to weight each peak's
         influence on the footprint pixels.
+    max_contamination : `float`, optional
+        Maximum fractional PSF-flux contamination a source may receive from a
+        neighboring cluster before the two are merged.
 
     Returns
     -------
@@ -189,13 +199,18 @@ def _deblend_footprint(footprint, clusters, sigma):
     positions = np.array([(peak.getIx(), peak.getIy()) for peak in peaks], dtype=int)
     amplitudes = np.array([peak["significance"] for peak in peaks], dtype=float)
 
-    # weighted[p, j]: influence of peak p evaluated at peak j's pixel.
+    # inv_two_sigma_sq weights the PSF *value* at a pixel (for pixel
+    # assignment); inv_four_sigma_sq is the PSF-flux *overlap* of two peaks
+    # (for the contamination merge).
     inv_two_sigma_sq = 1.0/(2.0*sigma*sigma)
+    inv_four_sigma_sq = 1.0/(4.0*sigma*sigma)
     delta = positions[:, np.newaxis, :] - positions[np.newaxis, :, :]
     dist_sq = np.sum(delta*delta, axis=2)
-    weighted = amplitudes[:, np.newaxis]*np.exp(-dist_sq*inv_two_sigma_sq)
+    # contamination[p, j]: fractional PSF-flux bias peak p imposes on peak j --
+    # the Gaussian-PSF flux overlap scaled by the significance (flux) ratio.
+    contamination = (amplitudes[:, np.newaxis]/amplitudes[np.newaxis, :])*np.exp(-dist_sq*inv_four_sigma_sq)
 
-    clusters = _merge_dominated_clusters(clusters, weighted, n_peaks)
+    clusters = _merge_clusters(clusters, contamination, n_peaks, max_contamination)
 
     # Extract every cluster into its own source; skip footprints that did not
     # split into more than one cluster.
@@ -239,9 +254,11 @@ class DeblendDifferenceFootprintsConfig(pexConfig.Config):
 
     clusterRadius = pexConfig.Field(
         dtype=float,
-        default=3.0,
-        doc="Radius (in PSF FWHM) within which detected peaks are grouped into "
-            "one cluster. Each cluster is extracted into its own diaSource."
+        default=2.,
+        doc="Initial clustering radius (in PSF FWHM) to group tightly-packed "
+            "peaks. Clusters may ultimately merge with significantly "
+            "contaminating neighbors. Each final cluster is extracted into its "
+            "own diaSource."
     )
     maxFootprintArea = pexConfig.Field(
         dtype=int,
@@ -250,8 +267,18 @@ class DeblendDifferenceFootprintsConfig(pexConfig.Config):
     )
     maxPeaks = pexConfig.Field(
         dtype=int,
-        default=40,
+        default=100,
         doc="Footprints with more than this many peaks are left un-deblended."
+    )
+    maxContamination = pexConfig.Field(
+        dtype=float,
+        default=0.05,
+        doc="Maximum fractional PSF-flux contamination a diaSource may receive "
+            "from a neighboring cluster before the two are merged into one "
+            "(un-deblended) source. For example, 0.05 keeps each deblended "
+            "source's PSF flux biased by less than 5% by its neighbors. "
+            "Contamination is the Gaussian-PSF flux overlap scaled by the "
+            "neighbor-to-source significance ratio."
     )
 
 
@@ -317,7 +344,7 @@ class DeblendDifferenceFootprintsTask(pipeBase.Task):
                 nSkipped += 1
                 footprint.getSpans().setMask(difference.mask, notDeblendedBitmask)
                 continue
-            result = _deblend_footprint(footprint, clusters, sigma)
+            result = _deblend_footprint(footprint, clusters, sigma, self.config.maxContamination)
             if result is None:
                 continue
             self._extractRecords(diaSources, source, result, isDeblendedKey, isNegativeKey)
