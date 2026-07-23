@@ -1416,6 +1416,9 @@ class TestNegativePeaks(lsst.utils.tests.TestCase):
 
         config = detectAndMeasure.DetectAndMeasureTask.ConfigClass()
         config.doDeblend = True
+        # Keep the positive blended pair (~10 px apart) in a single cluster, so
+        # this test exercises footprint merging rather than deblend splitting.
+        config.deblend.clusterRadius = 3.0
         config.raiseOnBadSubtractionRatio = False
         config.raiseOnNoDiaSources = False
         task = detectAndMeasure.DetectAndMeasureTask(config=config)
