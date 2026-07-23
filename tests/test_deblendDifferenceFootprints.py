@@ -131,11 +131,12 @@ class DeblendFootprintTestCase(lsst.utils.tests.TestCase):
     def setUp(self):
         self.schema, self.peakSchema = makeSchemas()
 
-    def _deblend(self, peaks, linkingRadius=5.0, sigma=4.0):
+    def _deblend(self, peaks, linkingRadius=5.0, sigma=4.0, max_contamination=0.05):
         footprint = makeFootprint(self.peakSchema, peaks)
 
         clusters = _cluster_peak_indices(footprint.getPeaks(), linkingRadius)
-        result = _deblend_footprint(footprint, clusters, sigma=sigma)
+        result = _deblend_footprint(footprint, clusters, sigma=sigma,
+                                    max_contamination=max_contamination)
         return footprint, clusters, result
 
     def test_extract_clusters_from_footprint(self):
@@ -194,14 +195,36 @@ class DeblendFootprintTestCase(lsst.utils.tests.TestCase):
         self.assertEqual(extracted, {(8, 20), (32, 20)})
 
     def test_low_significance_peak_is_merged(self):
-        """A faint (low-significance) peak dominated by a bright neighbour is
-        merged back in, leaving nothing to extract.
+        """A faint (low-significance) peak heavily contaminated by a bright
+        neighbour is merged back in, leaving nothing to extract.
         """
         # Faint positive at (12, 20); bright dipole at (16, 20)/(18, 20).
         _, _, result = self._deblend(
             [(12, 20, False, 5.0), (16, 20, False, 100.0), (18, 20, True, 100.0)],
             linkingRadius=3.0, sigma=2.0)
         self.assertIsNone(result)
+
+    def test_contamination_merges_beyond_cluster_radius(self):
+        """Peaks the KD step leaves separate are still merged when their PSF
+        flux contamination exceeds ``max_contamination``.
+        """
+        # d=5 px, sigma=2 -> overlap exp(-25/16)=0.21 > 0.05, but the peaks are
+        # beyond linkingRadius=3 px, so the contamination test drives the merge.
+        _, clusters, result = self._deblend(
+            [(20, 20, False, 100.0), (25, 20, False, 100.0)],
+            linkingRadius=3.0, sigma=2.0, max_contamination=0.05)
+        self.assertEqual(len(clusters), 2)   # KD kept them separate
+        self.assertIsNone(result)            # contamination merged them
+
+    def test_no_merge_when_contamination_below_limit(self):
+        """Peaks whose mutual contamination is below the limit stay separate."""
+        # d=10 px, sigma=2 -> overlap exp(-100/16)=0.0019 < 0.05.
+        _, clusters, result = self._deblend(
+            [(20, 20, False, 100.0), (30, 20, False, 100.0)],
+            linkingRadius=3.0, sigma=2.0, max_contamination=0.05)
+        self.assertEqual(len(clusters), 2)
+        self.assertIsNotNone(result)
+        self.assertEqual(len(result.children), 1)
 
 
 class RunTestCase(lsst.utils.tests.TestCase):
