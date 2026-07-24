@@ -114,7 +114,8 @@ class DetectAndMeasureTestBase:
 
     def _setup_detection(self, doSkySources=True, nSkySources=5,
                          doSubtractBackground=False, run_sattle=False,
-                         badSourceFlags=None, clusterRadius=None, **kwargs):
+                         badSourceFlags=None, clusterRadius=None,
+                         doReplaceWithNoise=None, **kwargs):
         """Setup and configure the detection and measurement PipelineTask.
 
         Parameters
@@ -138,6 +139,8 @@ class DetectAndMeasureTestBase:
         config.update(**kwargs)
         if clusterRadius is not None:
             config.deblend.clusterRadius = clusterRadius
+        if doReplaceWithNoise is not None:
+            config.measurement.doReplaceWithNoise = doReplaceWithNoise
 
         config.run_sattle = run_sattle
 
@@ -201,6 +204,64 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         refIds = []
         for source in sources:
             self._check_diaSource(output.diaSources, source, refIds=refIds)
+
+    def test_deblended_measurement_limited_to_footprint(self):
+        """Deblended sources should be measured from only their own footprint
+        pixels: with neighbor pixels replaced by noise, a source's aperture
+        flux recovers its injected value, but should be biased without
+        replacement.
+        """
+        # Set up the simulated images.
+        noiseLevel = 1.
+        staticSeed = 1
+        transientSeed = 6
+        psfSize = 2.4
+        apColumn = "base_CircularApertureFlux_12_0_instFlux"
+        kwargs = {"psfSize": psfSize, "x0": 0, "y0": 0, "xSize": 256, "ySize": 256}
+        science, _ = makeTestImage(seed=staticSeed, noiseLevel=noiseLevel, noiseSeed=6, nSrc=1, **kwargs)
+        science.getInfo().setVisitInfo(makeVisitInfo())
+        matchedTemplate, _ = makeTestImage(seed=staticSeed, noiseLevel=noiseLevel/4, noiseSeed=7,
+                                           nSrc=1, **kwargs)
+
+        # Two equal-flux transients, close enough to share a footprint (so they
+        # are deblended) but far enough apart to be detected as separate peaks
+        # and split into two clusters. Their separation is well within the 12
+        # pixel aperture, so each source's aperture overlaps the other.
+        fluxLevel = 3000.
+        separation = 10.
+        center = 128.
+        xLoc = [center - separation/2, center + separation/2]
+        yLoc = [center, center]
+        transients, _ = makeTestImage(seed=transientSeed, nSrc=2, xLoc=xLoc, yLoc=yLoc,
+                                      flux=[fluxLevel, fluxLevel],
+                                      noiseLevel=noiseLevel, noiseSeed=8, **kwargs)
+        difference = science.clone()
+        difference.maskedImage -= matchedTemplate.maskedImage
+        difference.maskedImage += transients.maskedImage
+
+        def _run(doReplaceWithNoise):
+            detectionTask = self._setup_detection(doDeblend=True, doSkySources=False,
+                                                  clusterRadius=1.0, badSubtractionRatioThreshold=1.,
+                                                  doReplaceWithNoise=doReplaceWithNoise)
+            diaSources = detectionTask.run(
+                science, matchedTemplate, difference.clone(),
+                idFactory=self.idGenerator.make_table_id_factory()).diaSources
+            # The blend should split into two separate deblended diaSources.
+            self.assertEqual(len(diaSources), 2)
+            self.assertTrue(all(diaSources["is_deblended"]))
+            return np.array(diaSources[apColumn])
+
+        apFluxReplaced = _run(doReplaceWithNoise=True)
+        apFluxContaminated = _run(doReplaceWithNoise=False)
+
+        # Every source's aperture flux is inflated by its neighbor when the
+        # neighbor pixels are left in place.
+        self.assertTrue(np.all(apFluxContaminated > apFluxReplaced))
+        # With the neighbor replaced by noise, aperture flux recovers the
+        # injected flux; without it, the aperture flux is inflated well beyond
+        # tolerance.
+        self.assertFloatsAlmostEqual(np.mean(apFluxReplaced), fluxLevel, rtol=0.1)
+        self.assertGreater(np.mean(apFluxContaminated), fluxLevel*1.3)
 
     def test_raise_bad_psf(self):
         """Detection should raise if the PSF width is NaN
@@ -966,6 +1027,68 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         refIds = []
         for source in sources:
             self._check_diaSource(output.diaSources, source, refIds=refIds)
+
+    def test_deblended_measurement_limited_to_footprint(self):
+        """Deblended sources should be measured from only their own footprint
+        pixels: with neighbor pixels replaced by noise, a source's aperture
+        flux recovers its injected value, but should be biased without
+        replacement.
+        """
+        # Set up the simulated images.
+        noiseLevel = 1.
+        staticSeed = 1
+        transientSeed = 6
+        psfSize = 2.4
+        apColumn = "base_CircularApertureFlux_12_0_instFlux"
+        kwargs = {"psfSize": psfSize, "x0": 0, "y0": 0, "xSize": 256, "ySize": 256}
+        science, sources = makeTestImage(seed=staticSeed, noiseLevel=noiseLevel, noiseSeed=6,
+                                         nSrc=1, **kwargs)
+        science.getInfo().setVisitInfo(makeVisitInfo())
+        matchedTemplate, _ = makeTestImage(seed=staticSeed, noiseLevel=noiseLevel/4, noiseSeed=7,
+                                           nSrc=1, **kwargs)
+
+        # Two equal-flux transients, close enough to share a footprint (so they
+        # are deblended) but far enough apart to be detected as separate peaks
+        # and split into two clusters. Their separation is well within the 12
+        # pixel aperture, so each source's aperture overlaps the other.
+        fluxLevel = 3000.
+        separation = 10.
+        center = 128.
+        xLoc = [center - separation/2, center + separation/2]
+        yLoc = [center, center]
+        transients, _ = makeTestImage(seed=transientSeed, nSrc=2, xLoc=xLoc, yLoc=yLoc,
+                                      flux=[fluxLevel, fluxLevel],
+                                      noiseLevel=noiseLevel, noiseSeed=8, **kwargs)
+        difference = science.clone()
+        difference.maskedImage -= matchedTemplate.maskedImage
+        difference.maskedImage += transients.maskedImage
+        subtractTask = subtractImages.AlardLuptonPreconvolveSubtractTask()
+        scienceKernel = science.psf.getKernel()
+        score = subtractTask._convolveExposure(difference, scienceKernel, subtractTask.convolutionControl)
+
+        def _run(doReplaceWithNoise):
+            detectionTask = self._setup_detection(doDeblend=True, doSkySources=False,
+                                                  clusterRadius=1.0, badSubtractionRatioThreshold=1.,
+                                                  doReplaceWithNoise=doReplaceWithNoise)
+            diaSources = detectionTask.run(
+                science, matchedTemplate, difference.clone(), score.clone(), sources,
+                idFactory=self.idGenerator.make_table_id_factory()).diaSources
+            # The blend should split into two separate deblended diaSources.
+            self.assertEqual(len(diaSources), 2)
+            self.assertTrue(all(diaSources["is_deblended"]))
+            return np.array(diaSources[apColumn])
+
+        apFluxReplaced = _run(doReplaceWithNoise=True)
+        apFluxContaminated = _run(doReplaceWithNoise=False)
+
+        # Every source's aperture flux is inflated by its neighbor when the
+        # neighbor pixels are left in place.
+        self.assertTrue(np.all(apFluxContaminated > apFluxReplaced))
+        # With the neighbor replaced by noise, aperture flux recovers the
+        # injected flux; without it, the aperture flux is inflated well beyond
+        # tolerance.
+        self.assertFloatsAlmostEqual(np.mean(apFluxReplaced), fluxLevel, rtol=0.1)
+        self.assertGreater(np.mean(apFluxContaminated), fluxLevel*1.3)
 
     def test_measurements_finite(self):
         """Measured fluxes and centroids should always be finite.

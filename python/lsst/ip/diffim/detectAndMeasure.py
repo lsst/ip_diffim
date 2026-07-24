@@ -472,6 +472,12 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         self.measurement.slots.psfShape = "ext_shapeHSM_HsmPsfMoments"
         self.measurement.slots.shape = "ext_shapeHSM_HsmSourceMoments"
         self.measurement.plugins["base_SdssCentroid"].maxDistToPeak = 5.0
+        # Replace neighboring sources with noise while measuring each diaSource.
+        # Important when deblending so that the deblended diaSource flux
+        # measurements are unbiased. Note that this deblending merely divides
+        # the diaSource footprints - it does not fit fractional flux from
+        # overlapping diaSources in contaminated pixels.
+        self.measurement.doReplaceWithNoise = True
         self.forcedMeasurement.plugins = ["base_TransformedCentroid", "base_PsfFlux"]
         self.forcedMeasurement.copyColumns = {
             "id": "objectId", "parent": "parentObjectId", "coord_ra": "coord_ra", "coord_dec": "coord_dec"}
