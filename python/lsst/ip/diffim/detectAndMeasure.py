@@ -506,6 +506,12 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         self.measurement.slots.psfShape = "ext_shapeHSM_HsmPsfMoments"
         self.measurement.slots.shape = "ext_shapeHSM_HsmSourceMoments"
         self.measurement.plugins["base_SdssCentroid"].maxDistToPeak = 5.0
+        # Replace neighboring sources with noise while measuring each diaSource.
+        # Important when deblending so that the deblended diaSource flux
+        # measurements are unbiased. Note that this deblending merely divides
+        # the diaSource footprints - it does not fit fractional flux from
+        # overlapping diaSources in contaminated pixels.
+        self.measurement.doReplaceWithNoise = True
         self.forcedMeasurement.plugins = ["base_TransformedCentroid", "base_PsfFlux"]
         self.forcedMeasurement.copyColumns = {
             "id": "objectId", "parent": "parentObjectId", "coord_ra": "coord_ra", "coord_dec": "coord_dec"}
@@ -1346,7 +1352,9 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             difference.mask.addMaskPlane(mp)
         # Note that this may not be correct if we convolved the science image.
         # In the future we may wish to persist the matchedScience image.
-        self.measurement.run(diaSources, difference, science, matchedTemplate)
+        # The exposure ID seeds the noise that replaces neighboring sources.
+        self.measurement.run(diaSources, difference, science, matchedTemplate,
+                             exposureId=difference.info.id)
         if self.config.doApCorr:
             apCorrMap = difference.getInfo().getApCorrMap()
             if apCorrMap is None:
@@ -1374,7 +1382,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         # Run forced psf photometry on the image at the diaSource locations.
         # Copy the measured flux and error into the diaSource.
         forcedSources = self.forcedMeasurement.generateMeasCat(image, diaSources, wcs)
-        self.forcedMeasurement.run(forcedSources, image, diaSources, wcs)
+        self.forcedMeasurement.run(forcedSources, image, diaSources, wcs, exposureId=image.info.id)
 
         if template:
             base_key = 'ip_diffim_forced_template_PsfFlux'
