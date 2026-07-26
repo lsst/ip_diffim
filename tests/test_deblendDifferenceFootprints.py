@@ -71,6 +71,25 @@ def makeFootprint(peakSchema, peaks):
     return footprint
 
 
+def makeDiagonalFootprint(peakSchema, peaks, width=3):
+    """Build a thin diagonal footprint carrying the given peaks.
+    """
+    mask = afwImage.Mask(geom.Box2I(geom.Point2I(0, 0), geom.Extent2I(64, 64)))
+    bit = mask.getPlaneBitMask("DETECTED")
+    rows, columns = np.mgrid[0:64, 0:64]
+    mask.array[np.abs(rows - columns) <= width] = bit
+    footprint = afwDetection.Footprint(afwGeom.SpanSet.fromMask(mask, bit), peakSchema)
+    negativeKey = peakSchema.find("merge_peak_negative").key
+    positiveKey = peakSchema.find("merge_peak_positive").key
+    significanceKey = peakSchema.find("significance").key
+    for ix, iy, isNegative, significance in peaks:
+        peak = footprint.addPeak(ix, iy, -significance if isNegative else significance)
+        peak.set(negativeKey, isNegative)
+        peak.set(positiveKey, not isNegative)
+        peak.set(significanceKey, significance)
+    return footprint
+
+
 class ClusterPeaksTestCase(lsst.utils.tests.TestCase):
     """Tests of the initial single-linkage peak clustering."""
 
@@ -332,6 +351,69 @@ class RunTestCase(lsst.utils.tests.TestCase):
         self.assertEqual(task.metadata["nSkipped"], 1)
         notDeblended = difference.mask.getPlaneBitMask("NOT_DEBLENDED")
         self.assertTrue(np.all((difference.mask.array & notDeblended) != 0))
+
+
+class FootprintAreaTestCase(lsst.utils.tests.TestCase):
+    """Tests for the limits on footprint size."""
+
+    def setUp(self):
+        self.schema, self.peakSchema = makeSchemas()
+        # Well beyond the KD tree linking radius, and both on the diagonal.
+        self.peaks = [(10, 10, False, 100.0), (50, 50, False, 100.0)]
+
+    def makeExposure(self):
+        bbox = geom.Box2I(geom.Point2I(0, 0), geom.Extent2I(64, 64))
+        exposure = afwImage.ExposureF(bbox)
+        exposure.setPsf(afwDetection.GaussianPsf(21, 21, 2.0))
+        exposure.variance.array[:] = 1.0
+        return exposure
+
+    def runTask(self, footprint, **configKwargs):
+        catalog = afwTable.SourceCatalog(self.schema)
+        catalog.addNew().setFootprint(footprint)
+        config = DeblendDifferenceFootprintsTask.ConfigClass()
+        config.clusterRadius = 2.0
+        for key, value in configKwargs.items():
+            setattr(config, key, value)
+        task = DeblendDifferenceFootprintsTask(config=config)
+        return task, task.run(catalog, self.makeExposure()).diaSources
+
+    def test_diagonal_footprint_is_deblended(self):
+        """A narrow but long diagonal footprint should be deblended."""
+        # The footprint should have ~400 pixels
+        footprint = makeDiagonalFootprint(self.peakSchema, self.peaks)
+        self.assertLess(footprint.getArea(), 1000)
+        self.assertGreater(footprint.getBBox().getArea(), 1000)
+
+        task, diaSources = self.runTask(footprint, maxFootprintArea=1000)
+
+        self.assertEqual(len(diaSources), 2)
+        self.assertEqual(task.metadata["nSkipped"], 0)
+
+    def test_compact_footprint_of_same_bbox_is_skipped(self):
+        """An equivalent filled footprint will be skipped."""
+        footprint = makeFootprint(self.peakSchema, self.peaks)
+        self.assertGreater(footprint.getArea(), 1000)
+        self.assertGreater(footprint.getBBox().getArea(), 1000)
+
+        task, diaSources = self.runTask(footprint, maxFootprintArea=1000)
+
+        self.assertEqual(len(diaSources), 1)
+        self.assertEqual(task.metadata["nSkipped"], 1)
+
+    def test_bbox_backstop_skips_widely_spread_footprint(self):
+        """A narrow diagonal footprint will be skipped if the bbox is large
+        enough.
+        """
+        footprint = makeDiagonalFootprint(self.peakSchema, self.peaks)
+        self.assertLess(footprint.getArea(), 1000)
+        self.assertGreater(footprint.getBBox().getArea(), 1000)
+
+        task, diaSources = self.runTask(footprint, maxFootprintArea=1000,
+                                        maxFootprintBBoxArea=1000)
+
+        self.assertEqual(len(diaSources), 1)
+        self.assertEqual(task.metadata["nSkipped"], 1)
 
 
 class MemoryTester(lsst.utils.tests.MemoryTestCase):

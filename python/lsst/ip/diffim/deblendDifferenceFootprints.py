@@ -262,8 +262,14 @@ class DeblendDifferenceFootprintsConfig(pexConfig.Config):
     )
     maxFootprintArea = pexConfig.Field(
         dtype=int,
-        default=50000,
-        doc="Skip deblending footprints whose area exceeds this threshold."
+        default=10000,
+        doc="Skip deblending footprints larger than this, in pixels."
+    )
+    maxFootprintBBoxArea = pexConfig.Field(
+        dtype=int,
+        default=100000,
+        doc="Additional check to skip deblending footprints with an enclosing "
+            "bounding box larger than this, in pixels."
     )
     maxPeaks = pexConfig.Field(
         dtype=int,
@@ -339,7 +345,8 @@ class DeblendDifferenceFootprintsTask(pipeBase.Task):
             if len(clusters) < 2:
                 continue
             # Leave very large footprints un-deblended
-            if (footprint.getBBox().getArea() > self.config.maxFootprintArea
+            if (footprint.getArea() > self.config.maxFootprintArea
+                    or footprint.getBBox().getArea() > self.config.maxFootprintBBoxArea
                     or len(footprint.getPeaks()) > self.config.maxPeaks):
                 nSkipped += 1
                 footprint.getSpans().setMask(difference.mask, notDeblendedBitmask)
