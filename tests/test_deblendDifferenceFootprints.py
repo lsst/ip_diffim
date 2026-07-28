@@ -90,6 +90,38 @@ def makeDiagonalFootprint(peakSchema, peaks, width=3):
     return footprint
 
 
+def addGaussian(image, x, y, amplitude, psfSigma):
+    """Add one Gaussian of the given peak amplitude to an image array."""
+    yy, xx = np.mgrid[0:image.shape[0], 0:image.shape[1]]
+    image += amplitude*np.exp(-((xx - x)**2 + (yy - y)**2)/(2.0*psfSigma**2))
+
+
+def addPointSource(image, x, y, significance, psfSigma):
+    """Add a point source of the given detection significance.
+
+    Detection smooths with a unit-sum Gaussian of the PSF width, which halves a
+    point source's peak and reduces the noise by ``sqrt(4*pi*psfSigma**2)``, so
+    a raw peak of ``significance/(psfSigma*sqrt(pi))`` is detected at
+    ``significance`` in an image with unit variance.
+    """
+    addGaussian(image, x, y, significance/(psfSigma*np.sqrt(np.pi)), psfSigma)
+
+
+def addTrail(image, start, end, significance, psfSigma, step=0.25):
+    """Add a PSF-convolved trail of the given ridge significance.
+
+    A line of unit flux per pixel of length has a smoothed ridge of
+    ``1/(2*psfSigma*sqrt(pi))``, the same as the smoothed image noise, so the
+    linear flux density equals the ridge significance.
+    """
+    length = np.hypot(end[0] - start[0], end[1] - start[1])
+    amplitude = significance*step/(2.0*np.pi*psfSigma**2)
+    for index in range(int(length/step) + 1):
+        fraction = index*step/length
+        addGaussian(image, start[0] + fraction*(end[0] - start[0]),
+                    start[1] + fraction*(end[1] - start[1]), amplitude, psfSigma)
+
+
 class ClusterPeaksTestCase(lsst.utils.tests.TestCase):
     """Tests of the initial single-linkage peak clustering."""
 
@@ -257,7 +289,8 @@ class RunTestCase(lsst.utils.tests.TestCase):
         # the NOT_DEBLENDED plane for any guardrail-skipped footprints.
         bbox = geom.Box2I(geom.Point2I(0, 0), geom.Extent2I(64, 64))
         exposure = afwImage.ExposureF(bbox)
-        exposure.setPsf(afwDetection.GaussianPsf(11, 11, psfSigma))
+        exposure.setPsf(afwDetection.GaussianPsf(21, 21, psfSigma))
+        exposure.variance.array[:] = 1.0
         return exposure
 
     def makeCatalog(self, footprints):
@@ -414,6 +447,135 @@ class FootprintAreaTestCase(lsst.utils.tests.TestCase):
 
         self.assertEqual(len(diaSources), 1)
         self.assertEqual(task.metadata["nSkipped"], 1)
+
+
+class TrailTestCase(lsst.utils.tests.TestCase):
+    """Tests that trailed sources are not split into several diaSources.
+
+    Every case uses the same two crests, far enough apart that the clustering
+    and contamination steps both leave them separate, so only the trail test can
+    keep them together.  The pixels then decide: a trail merges, an equivalent
+    pair of point sources does not.
+    """
+
+    def setUp(self):
+        self.schema, self.peakSchema = makeSchemas()
+        self.psfSigma = 2.0
+        # 12 pixels apart, beyond the ~9.4 pixel (2 FWHM) linking radius.
+        self.crests = [(20, 32), (32, 32)]
+        self.significance = 20.0
+
+    def makeExposure(self):
+        bbox = geom.Box2I(geom.Point2I(0, 0), geom.Extent2I(64, 64))
+        exposure = afwImage.ExposureF(bbox)
+        exposure.setPsf(afwDetection.GaussianPsf(21, 21, self.psfSigma))
+        exposure.variance.array[:] = 1.0
+        return exposure
+
+    def makeTask(self, **configKwargs):
+        config = DeblendDifferenceFootprintsTask.ConfigClass()
+        config.clusterRadius = 2.0
+        for key, value in configKwargs.items():
+            setattr(config, key, value)
+        return DeblendDifferenceFootprintsTask(config=config)
+
+    def runTask(self, exposure, peaks):
+        catalog = afwTable.SourceCatalog(self.schema)
+        catalog.addNew().setFootprint(makeFootprint(self.peakSchema, peaks))
+        task = self.makeTask()
+        return task, task.run(catalog, exposure).diaSources
+
+    def crestPeaks(self, extra=()):
+        peaks = [(x, y, False, self.significance) for x, y in self.crests]
+        return peaks + list(extra)
+
+    def test_trail_stays_one_source(self):
+        """Two crests joined by a continuous trail stay a single diaSource."""
+        exposure = self.makeExposure()
+        # Extend past both crests so their smoothed flux is not cut by the ends.
+        addTrail(exposure.image.array, (14, 32), (38, 32), self.significance, self.psfSigma)
+
+        task, diaSources = self.runTask(exposure, self.crestPeaks())
+
+        self.assertEqual(len(diaSources), 1)
+        self.assertFalse(diaSources[0]["is_deblended"])
+        self.assertEqual(len(diaSources[0].getFootprint().getPeaks()), 2)
+        self.assertEqual(task.metadata["nTrailedDiaSources"], 1)
+        # The trail is flagged NOT_DEBLENDED for the trailed source measurement.
+        notDeblended = exposure.mask.getPlaneBitMask("NOT_DEBLENDED")
+        self.assertTrue(np.all((exposure.mask.array & notDeblended) != 0))
+
+    def test_point_source_pair_still_splits(self):
+        """The same peaks, with no flux between them, still deblend."""
+        exposure = self.makeExposure()
+        for x, y in self.crests:
+            addPointSource(exposure.image.array, x, y, self.significance, self.psfSigma)
+
+        task, diaSources = self.runTask(exposure, self.crestPeaks())
+
+        self.assertEqual(len(diaSources), 2)
+        self.assertTrue(all(record["is_deblended"] for record in diaSources))
+        self.assertEqual(task.metadata["nTrailedDiaSources"], 0)
+        notDeblended = exposure.mask.getPlaneBitMask("NOT_DEBLENDED")
+        self.assertTrue(np.all((exposure.mask.array & notDeblended) == 0))
+
+    def test_negative_peak_blocks_trail(self):
+        """A cluster holding a negative peak is never merged as a trail.
+
+        Trailed sources appear only in the science image, so a negative peak
+        means the cluster is not part of one, however continuous the flux is.
+        """
+        exposure = self.makeExposure()
+        addTrail(exposure.image.array, (14, 32), (38, 32), self.significance, self.psfSigma)
+        # 3 pixels from the first crest, so it joins that cluster, and on the
+        # far side so it does not chain the two crests together.
+        negative = [(17, 32, True, self.significance)]
+
+        task, diaSources = self.runTask(exposure, self.crestPeaks(negative))
+
+        self.assertEqual(len(diaSources), 2)
+        self.assertEqual(task.metadata["nTrailedDiaSources"], 0)
+
+    def test_neighbor_wings_do_not_make_a_trail(self):
+        """Flux from a source that is not one of the footprint's peaks does not
+        merge two point sources.
+
+        The wings of a bright neighbor leave a residual between the two peaks
+        that is significant against the noise but only a small fraction of the
+        peaks themselves, so only the fraction test can reject it.
+        """
+        exposure = self.makeExposure()
+        for x, y in self.crests:
+            addPointSource(exposure.image.array, x, y, self.significance, self.psfSigma)
+        # Below the midpoint, and never added as a peak, so it cannot be
+        # modelled: its wings leave ~3 sigma between the crests, well above
+        # minTrailSignificance but far below minTrailFraction of a crest.
+        addPointSource(exposure.image.array, 26, 26, 2.0*self.significance, self.psfSigma)
+
+        task, diaSources = self.runTask(exposure, self.crestPeaks())
+        self.assertEqual(len(diaSources), 2)
+        self.assertEqual(task.metadata["nTrailedDiaSources"], 0)
+
+        # Without the fraction test the same peaks merge, so it is what rejects
+        # them, not the noise threshold.
+        catalog = afwTable.SourceCatalog(self.schema)
+        catalog.addNew().setFootprint(makeFootprint(self.peakSchema, self.crestPeaks()))
+        permissive = self.makeTask(minTrailFraction=0.0)
+        self.assertEqual(len(permissive.run(catalog, exposure).diaSources), 1)
+
+    def test_off_line_peak_blocks_trail(self):
+        """A cluster holding a peak off the trail line is not merged."""
+        exposure = self.makeExposure()
+        addTrail(exposure.image.array, (14, 32), (38, 32), self.significance, self.psfSigma)
+        # 8 pixels perpendicular: within the linking radius of the first crest,
+        # so it joins that cluster, but well beyond trailWidth of the line.
+        offLine = [(20, 40, False, self.significance)]
+        addPointSource(exposure.image.array, 20, 40, self.significance, self.psfSigma)
+
+        task, diaSources = self.runTask(exposure, self.crestPeaks(offLine))
+
+        self.assertEqual(len(diaSources), 2)
+        self.assertEqual(task.metadata["nTrailedDiaSources"], 0)
 
 
 class MemoryTester(lsst.utils.tests.MemoryTestCase):
