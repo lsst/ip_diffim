@@ -724,25 +724,38 @@ class GetTemplateTask(pipeBase.PipelineTask):
             Description
         """
         nSubfilters = None
+        coaddBBox = coadd.getBBox()
         for dcrRecord in dcrCatalog:
             if nSubfilters is None:
                 nSubfilters = int(dcrRecord['numSubfilters'])
             wl_use = self.effectiveWavelength - self.config.dcrWavelengthShift
             dcrShift = calculateDcr(visitInfo, coadd.wcs, wl_use, self.bandwidth,
-                                    nSubfilters, bbox=coadd.getBBox())
-            bbox = dcrRecord.getFootprint().getBBox()
+                                    nSubfilters, bbox=coaddBBox)
+            footprint = dcrRecord.getFootprint()
+            fpBBox = footprint.getBBox()
+            # The footprints were not necessarily measured on this coadd, so
+            # they may extend past its edge. Only correct the pixels we have;
+            # the rest of the source is handled by the neighboring patch.
+            bbox = fpBBox.clippedTo(coaddBBox)
+            if bbox.isEmpty():
+                self.log.debug("DCR correction footprint %s does not overlap the coadd; skipping.",
+                               dcrRecord.getId())
+                continue
             # flux = dcrRecord['modelFlux']
             # ``fill`` must be set: it defaults to NaN, which would poison
             # every pixel of the bbox that is outside the footprint.
-            model = dcrRecord.getFootprint().extractImage(fill=0.).array
-            model *= self.config.dcrModelScale
+            modelImage = footprint.extractImage(fill=0.)
+            modelImage.array *= self.config.dcrModelScale
+            # Shift the full model and clip afterwards, so that flux moving in
+            # from beyond the coadd edge is not lost.
+            shiftedImage = afwImage.ImageF(fpBBox)
 
-            coadd[bbox].image.array -= model
+            coadd[bbox].image.array -= modelImage[bbox].array
             for subfilter, shift in enumerate(dcrShift):
-                shift2 = (sh*self.config.dcrScale for sh in shift)
+                shift2 = tuple(sh*self.config.dcrScale for sh in shift)
                 subFlux = dcrRecord[f'subfilterWeight_{subfilter}']
-                shiftedCutout = ndimage.shift(model, shift2)
-                coadd[bbox].image.array += subFlux*shiftedCutout
+                shiftedImage.array[:] = ndimage.shift(modelImage.array, shift2)
+                coadd[bbox].image.array += subFlux*shiftedImage[bbox].array
         return coadd
 
 
