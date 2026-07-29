@@ -733,7 +733,9 @@ class GetTemplateTask(pipeBase.PipelineTask):
                                     nSubfilters, bbox=coadd.getBBox())
             bbox = dcrRecord.getFootprint().getBBox()
             # flux = dcrRecord['modelFlux']
-            model = dcrRecord.getFootprint().extractImage().array
+            # ``fill`` must be set: it defaults to NaN, which would poison
+            # every pixel of the bbox that is outside the footprint.
+            model = dcrRecord.getFootprint().extractImage(fill=0.).array
             model *= self.config.dcrModelScale
 
             coadd[bbox].image.array -= model
