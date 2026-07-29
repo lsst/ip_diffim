@@ -80,7 +80,8 @@ class GetTemplateConnections(
         deferGraphConstraint=True,
     )
     visitInfo = pipeBase.connectionTypes.Input(
-        doc="VisitInfo of exposure used for applying the DCR correction catalog.",
+        doc="VisitInfo of the exposure that we will construct the template for."
+        " Used to determine the observing conditions for DCR.",
         name="{fakesType}calexp.visitInfo",
         storageClass="VisitInfo",
         dimensions=("instrument", "visit", "detector"),
@@ -112,7 +113,6 @@ class GetTemplateConnections(
         super().__init__(config=config)
 
         if not config.useDcrCorrection:
-            self.inputs.remove("visitInfo")
             self.inputs.remove("dcrCorrectionCatalogs")
             self.inputs.remove("throughput")
 
@@ -225,17 +225,16 @@ class GetTemplateTask(pipeBase.PipelineTask):
         wcs = inputs.pop("wcs")
         coaddExposures = inputs.pop("coaddExposures")
         skymap = inputs.pop("skyMap")
+        visitInfo = inputs.pop("visitInfo")
         if self.config.useDcrCorrection:
             dcrCorrectionCatalogs = inputs.pop("dcrCorrectionCatalogs")
             throughput = fitThroughput(inputs.pop("throughput"))
             self.effectiveWavelength = throughput.effectiveWavelength
             self.bandwidth = throughput.bandwidth
-            visitInfo = inputs.pop("visitInfo")
         else:
             dcrCorrectionCatalogs = None
             self.effectiveWavelength = None
             self.bandwidth = None
-            visitInfo = None
 
         # This should not happen with a properly configured execution context.
         assert not inputs, "runQuantum got more inputs than expected"
