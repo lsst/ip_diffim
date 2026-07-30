@@ -237,13 +237,13 @@ class GetTemplateTask(pipeBase.PipelineTask):
             visitInfo = inputs.pop("visitInfo")
             dcrCorrectionCatalogs = inputs.pop("dcrCorrectionCatalogs")
             throughput = fitThroughput(inputs.pop("throughput"))
-            self.effectiveWavelength = throughput.effectiveWavelength
-            self.bandwidth = throughput.bandwidth
+            effectiveWavelength = throughput.effectiveWavelength
+            bandwidth = throughput.bandwidth
         else:
             visitInfo = None
             dcrCorrectionCatalogs = None
-            self.effectiveWavelength = None
-            self.bandwidth = None
+            effectiveWavelength = None
+            bandwidth = None
 
         # This should not happen with a properly configured execution context.
         assert not inputs, "runQuantum got more inputs than expected"
@@ -259,6 +259,8 @@ class GetTemplateTask(pipeBase.PipelineTask):
             visit=outputRefs.template.dataId["visit"],
             visitInfo=visitInfo,
             dcrCorrectionHandles=results.dcrCorrectionCatalogs,
+            effectiveWavelength=effectiveWavelength,
+            bandwidth=bandwidth,
         )
         butlerQC.put(outputs, outputRefs)
 
@@ -375,7 +377,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
 
     @timeMethod
     def run(self, *, coaddExposureHandles, bbox, wcs, dataIds, physical_filter, visit=None,
-            visitInfo=None, dcrCorrectionHandles=None):
+            visitInfo=None, dcrCorrectionHandles=None, effectiveWavelength=None, bandwidth=None):
         """Warp coadds from multiple tracts and patches to form a template to
         subtract from a science image.
 
@@ -408,7 +410,18 @@ class GetTemplateTask(pipeBase.PipelineTask):
             so that downstream source injection tasks can link the template and
             science image for the visit.
         visitInfo : `lsst.afw.image.VisitInfo`, optional
-            VisitInfo of exposure used for applying the DCR correction catalog
+            VisitInfo of the science exposure, used to calculate the DCR of each
+            subfilter. Required if ``dcrCorrectionHandles`` is supplied.
+        dcrCorrectionHandles : `dict` [`int`, `list` \
+                [`lsst.daf.butler.DeferredDatasetHandle`]], optional
+            DCR correction catalogs of each patch, indexed on tract id and in the
+            same order as ``coaddExposureHandles``.
+        effectiveWavelength : `float`, optional
+            Effective wavelength of the filter, in nm. Required if
+            ``dcrCorrectionHandles`` is supplied.
+        bandwidth : `float`, optional
+            Bandwidth of the filter, in nm. Required if
+            ``dcrCorrectionHandles`` is supplied.
 
         Returns
         -------
@@ -423,7 +436,14 @@ class GetTemplateTask(pipeBase.PipelineTask):
         ------
         NoWorkFound
             If no coadds are found with sufficient un-masked pixels.
+        ValueError
+            If ``dcrCorrectionHandles`` is supplied without the filter
+            parameters needed to calculate DCR.
         """
+        if dcrCorrectionHandles is not None and (visitInfo is None or effectiveWavelength is None
+                                                 or bandwidth is None):
+            raise ValueError("`visitInfo`, `effectiveWavelength` and `bandwidth` must all be supplied "
+                             "in order to apply a DCR correction.")
         band, photoCalib = self._checkInputs(dataIds, coaddExposureHandles)
 
         bbox.grow(self.config.templateBorderSize)
@@ -431,9 +451,11 @@ class GetTemplateTask(pipeBase.PipelineTask):
         warped = {}
         catalogs = []
         for tract in coaddExposureHandles:
-            dcrCorrectionHandlesTract = dcrCorrectionHandles[tract] if self.config.useDcrCorrection else None
+            dcrCorrectionHandlesTract = (dcrCorrectionHandles[tract]
+                                         if dcrCorrectionHandles is not None else None)
             maskedImages, catalog, totalBox = self._makeExposureCatalog(
                 coaddExposureHandles[tract], dataIds[tract], visitInfo, dcrCorrectionHandlesTract,
+                effectiveWavelength, bandwidth,
             )
             warpedBox = computeWarpedBBox(catalog[0].wcs, bbox, wcs)
             warpedBox.grow(5)  # to ensure we catch all relevant input pixels
@@ -567,7 +589,8 @@ class GetTemplateTask(pipeBase.PipelineTask):
         photoCalib = photoCalibs[0]
         return band, photoCalib
 
-    def _makeExposureCatalog(self, exposureRefs, dataIds, visitInfo=None, dcrCorrectionRefs=None):
+    def _makeExposureCatalog(self, exposureRefs, dataIds, visitInfo=None, dcrCorrectionRefs=None,
+                             effectiveWavelength=None, bandwidth=None):
         """Make an exposure catalog for one tract.
 
         Parameters
@@ -578,12 +601,19 @@ class GetTemplateTask(pipeBase.PipelineTask):
         dataIds : `list` [`lsst.daf.butler.DataCoordinate`]
             Data ids of each of the included exposures; must have "tract" and
             "patch" entries.
+        visitInfo : `lsst.afw.image.VisitInfo`, optional
+            VisitInfo of the science exposure, used to calculate the DCR of each
+            subfilter.
         dcrCorrectionRefs : `list` of [`lsst.daf.butler.DeferredDatasetHandle` of \
                         `lsst.afw.table.SourceCatalog`], optional
             Catalogs with heavy footprints of DCR models for sources in each
             patch, in the same order as ``exposureRefs``. Entries may be `None`
             for patches that have no DCR correction catalog, which are then
             used without a DCR correction.
+        effectiveWavelength : `float`, optional
+            Effective wavelength of the filter, in nm.
+        bandwidth : `float`, optional
+            Bandwidth of the filter, in nm.
 
         Returns
         -------
@@ -614,7 +644,8 @@ class GetTemplateTask(pipeBase.PipelineTask):
             if dcrCatalog is None:
                 images[dataId] = coadd.maskedImage
             else:
-                images[dataId] = self.applyDcr(coadd, visitInfo, dcrCatalog).maskedImage
+                images[dataId] = self.applyDcr(coadd, visitInfo, dcrCatalog,
+                                               effectiveWavelength, bandwidth).maskedImage
             bbox = coadd.getBBox()
             totalBox = totalBox.expandedTo(bbox)
             record = catalog.addNew()
@@ -740,7 +771,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
         )
         return coaddPsf
 
-    def applyDcr(self, coadd, visitInfo, dcrCatalog):
+    def applyDcr(self, coadd, visitInfo, dcrCatalog, effectiveWavelength, bandwidth):
         """Replace the DCR of the coadd with the DCR of the science visit, for
         each source in a DCR correction catalog.
 
@@ -765,6 +796,10 @@ class GetTemplateTask(pipeBase.PipelineTask):
             with ``isCoaddModel`` set, whose footprint is the DCR-smeared model
             of the source in the coadd, and one without, whose footprint is the
             un-shifted model.
+        effectiveWavelength : `float`
+            Effective wavelength of the filter, in nm.
+        bandwidth : `float`
+            Bandwidth of the filter, in nm.
 
         Returns
         -------
@@ -777,10 +812,10 @@ class GetTemplateTask(pipeBase.PipelineTask):
         nSubfilters = self._getNumSubfilters(dcrCatalog)
         # The shift depends only on the observation and the coadd, so calculate
         # it once for the whole catalog.
-        effectiveWavelength = self.effectiveWavelength - self.config.dcrWavelengthShift
+        shiftedWavelength = effectiveWavelength - self.config.dcrWavelengthShift
         dcrShift = [tuple(sh*self.config.dcrScale for sh in shift)
-                    for shift in calculateDcr(visitInfo, coadd.wcs, effectiveWavelength,
-                                              self.bandwidth, nSubfilters, bbox=coaddBBox)]
+                    for shift in calculateDcr(visitInfo, coadd.wcs, shiftedWavelength,
+                                              bandwidth, nSubfilters, bbox=coaddBBox)]
         if not np.all(np.isfinite(dcrShift)):
             self.log.warning("DCR shifts are not all finite (%s); no DCR correction can be applied to"
                              " this patch. Check the filter throughput and the exposure metadata.",
