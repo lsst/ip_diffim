@@ -781,6 +781,11 @@ class GetTemplateTask(pipeBase.PipelineTask):
         dcrShift = [tuple(sh*self.config.dcrScale for sh in shift)
                     for shift in calculateDcr(visitInfo, coadd.wcs, effectiveWavelength,
                                               self.bandwidth, nSubfilters, bbox=coaddBBox)]
+        if not np.all(np.isfinite(dcrShift)):
+            self.log.warning("DCR shifts are not all finite (%s); no DCR correction can be applied to"
+                             " this patch. Check the filter throughput and the exposure metadata.",
+                             dcrShift)
+            return coadd
 
         # Each source has a second record holding the model of the source as it
         # appears in the coadd, which is what has to be subtracted.
@@ -789,7 +794,9 @@ class GetTemplateTask(pipeBase.PipelineTask):
 
         nBadWeights = 0
         worstWeightSum = 1.
+        worstDeviation = 0.
         nUnpaired = 0
+        nNotFinite = 0
         for dcrRecord in dcrCatalog:
             if dcrRecord['isCoaddModel']:
                 continue
@@ -799,11 +806,17 @@ class GetTemplateTask(pipeBase.PipelineTask):
             # subfilters if the weights sum to one. If they do not, applying it
             # would change the flux of the source in the template, so leave the
             # source uncorrected instead.
-            weightSum = sum(subfilterWeights)
-            if abs(weightSum - 1) > self.config.dcrWeightTolerance:
+            # Note the inverted comparison: a NaN weight must fail this check,
+            # and every direct comparison with NaN is False.
+            deviation = abs(sum(subfilterWeights) - 1)
+            if not (deviation <= self.config.dcrWeightTolerance):
                 nBadWeights += 1
-                if abs(weightSum - 1) > abs(worstWeightSum - 1):
-                    worstWeightSum = weightSum
+                # Rank NaN weights above any finite deviation, so that they are
+                # the ones reported as the worst offender.
+                rank = np.inf if np.isnan(deviation) else deviation
+                if rank > worstDeviation:
+                    worstDeviation = rank
+                    worstWeightSum = sum(subfilterWeights)
                 continue
             footprint = dcrRecord.getFootprint()
             fpBBox = footprint.getBBox()
@@ -829,8 +842,21 @@ class GetTemplateTask(pipeBase.PipelineTask):
             unshiftedModel = footprint.extractImage(fill=0.).array
             for shift, subFlux in zip(dcrShift, subfilterWeights):
                 correction.array += subFlux*ndimage.shift(unshiftedModel, shift)
+            # Last check before the correction reaches the template: a single
+            # non-finite pixel in either stored model would spread over the
+            # whole footprint when it is shifted, and would then be averaged
+            # into the template with full weight by `_merge`.
+            if not np.all(np.isfinite(correction.array)):
+                nNotFinite += 1
+                continue
             coadd[bbox].image.array += self.config.dcrModelScale*correction[bbox].array
 
+        if nNotFinite:
+            self.log.warning(
+                "Left %d sources uncorrected because their DCR correction was not finite; the model"
+                " footprints in the DCR correction catalog contain NaN or infinite pixels.",
+                nNotFinite,
+            )
         if nUnpaired:
             self.log.warning(
                 "Left %d sources uncorrected because they have no matching coadd model record;"
