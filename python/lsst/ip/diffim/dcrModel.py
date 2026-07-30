@@ -20,6 +20,7 @@
 # see <https://www.lsstcorp.org/LegalNotices/>.
 #
 
+import astropy.units as u
 import numpy as np
 from scipy import ndimage
 from lsst.afw.coord import differentialRefraction
@@ -891,12 +892,70 @@ def wavelengthGenerator(effectiveWavelength, bandwidth, dcrNumSubfilters):
 
 
 def fitThroughput(throughput):
-    wl = np.asarray(throughput["wavelength"])
-    th = np.asarray(throughput["throughput"])
-    effectiveWavelength = np.sum(wl*th)/np.sum(th)
-    inBand = th >= np.max(th)/2
+    """Measure the effective wavelength and bandwidth of a filter from its
+    throughput curve.
 
-    bandwidth = np.max(wl[inBand]) - np.min(wl[inBand])
+    Parameters
+    ----------
+    throughput : `astropy.table.Table`
+        Throughput curve of the filter, with a ``wavelength`` column and a
+        ``throughput`` column. The wavelengths are converted to nanometers if
+        the column has units, and are assumed to be in nanometers if it does
+        not. The units of ``throughput`` do not matter, since both quantities
+        measured here are invariant under a rescaling of the curve.
+
+    Returns
+    -------
+    result : `lsst.pipe.base.Struct`
+        A struct with attributes:
+
+        ``effectiveWavelength``
+            Throughput-weighted mean wavelength of the filter, in nanometers
+            (`float`).
+        ``bandwidth``
+            Full width at half maximum of the throughput curve, in nanometers
+            (`float`).
+
+    Raises
+    ------
+    ValueError
+        If the throughput curve is empty or sums to zero.
+
+    Notes
+    -----
+    ``bandwidth`` is the full width of the band, as consumed by
+    `wavelengthGenerator`, which tiles the subfilters across
+    ``[effectiveWavelength - bandwidth/2, effectiveWavelength + bandwidth/2]``.
+    For the LSST filters the band edges are the half-maximum points, so the
+    FWHM measured here reproduces the conventional bandwidth: the ComCam g
+    system throughput gives 477.7 nm and 150.0 nm, against the 476.31 nm and
+    147 nm (552 - 405) used in the unit tests.
+
+    The half maximum is crossed only on either side of the peak, so that
+    out-of-band structure such as the y band red leak cannot inflate the
+    measured bandwidth.
+    """
+    wavelengths = throughput["wavelength"]
+    if getattr(wavelengths, "unit", None) is not None:
+        wl = wavelengths.quantity.to_value(u.nm)
+    else:
+        wl = np.asarray(wavelengths, dtype=float)
+    th = np.asarray(throughput["throughput"], dtype=float)
+    if th.size == 0 or not np.any(th > 0):
+        raise ValueError("Cannot fit a throughput curve that is empty or everywhere zero.")
+
+    effectiveWavelength = np.sum(wl*th)/np.sum(th)
+
+    # Walk outwards from the peak so that a secondary lobe above the half
+    # maximum is not mistaken for the edge of the band.
+    peak = np.argmax(th)
+    halfMax = th[peak]/2
+    below = np.nonzero(th[:peak] < halfMax)[0]
+    above = np.nonzero(th[peak:] < halfMax)[0]
+    first = below[-1] + 1 if below.size else 0
+    last = peak + above[0] - 1 if above.size else len(th) - 1
+    bandwidth = wl[last] - wl[first]
+
     return pipeBase.Struct(effectiveWavelength=effectiveWavelength,
                            bandwidth=bandwidth,
                            )

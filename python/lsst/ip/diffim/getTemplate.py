@@ -741,14 +741,18 @@ class GetTemplateTask(pipeBase.PipelineTask):
         dcrCatalog : TYPE
             Description
         """
-        nSubfilters = None
+        if len(dcrCatalog) == 0:
+            return coadd
         coaddBBox = coadd.getBBox()
+        nSubfilters = self._getNumSubfilters(dcrCatalog)
+        # The shift depends only on the observation and the coadd, so calculate
+        # it once for the whole catalog.
+        effectiveWavelength = self.effectiveWavelength - self.config.dcrWavelengthShift
+        dcrShift = [tuple(sh*self.config.dcrScale for sh in shift)
+                    for shift in calculateDcr(visitInfo, coadd.wcs, effectiveWavelength,
+                                              self.bandwidth, nSubfilters, bbox=coaddBBox)]
+
         for dcrRecord in dcrCatalog:
-            if nSubfilters is None:
-                nSubfilters = int(dcrRecord['numSubfilters'])
-            wl_use = self.effectiveWavelength - self.config.dcrWavelengthShift
-            dcrShift = calculateDcr(visitInfo, coadd.wcs, wl_use, self.bandwidth,
-                                    nSubfilters, bbox=coaddBBox)
             footprint = dcrRecord.getFootprint()
             fpBBox = footprint.getBBox()
             # The footprints were not necessarily measured on this coadd, so
@@ -770,8 +774,42 @@ class GetTemplateTask(pipeBase.PipelineTask):
 
             coadd[bbox].image.array -= modelImage[bbox].array
             for subfilter, shift in enumerate(dcrShift):
-                shift2 = tuple(sh*self.config.dcrScale for sh in shift)
                 subFlux = dcrRecord[f'subfilterWeight_{subfilter}']
-                shiftedImage.array[:] = ndimage.shift(modelImage.array, shift2)
+                shiftedImage.array[:] = ndimage.shift(modelImage.array, shift)
                 coadd[bbox].image.array += subFlux*shiftedImage[bbox].array
         return coadd
+
+    @staticmethod
+    def _getNumSubfilters(dcrCatalog):
+        """Return the number of subfilters that a DCR correction catalog was
+        modeled with.
+
+        Parameters
+        ----------
+        dcrCatalog : `lsst.afw.table.SourceCatalog`
+            Catalog of sub-band fluxes and footprints for one patch.
+
+        Returns
+        -------
+        nSubfilters : `int`
+            Number of subfilters used to model the sources in the catalog.
+
+        Raises
+        ------
+        RuntimeError
+            If the records do not all use the same number of subfilters, or if
+            the catalog is missing any of the corresponding weight fields.
+        """
+        nSubfilters = {int(record['numSubfilters']) for record in dcrCatalog}
+        if len(nSubfilters) > 1:
+            raise RuntimeError("DCR correction catalog mixes records with different numbers of "
+                               f"subfilters: {sorted(nSubfilters)}.")
+        nSubfilters = nSubfilters.pop()
+
+        names = dcrCatalog.schema.getNames()
+        missing = [f"subfilterWeight_{subfilter}" for subfilter in range(nSubfilters)
+                   if f"subfilterWeight_{subfilter}" not in names]
+        if missing:
+            raise RuntimeError(f"DCR correction catalog has numSubfilters={nSubfilters}, but is "
+                               f"missing the weight fields {missing}.")
+        return nSubfilters
