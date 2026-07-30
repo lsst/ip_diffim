@@ -345,9 +345,18 @@ class GetTemplateTask(pipeBase.PipelineTask):
                 dataIds[dataId["tract"]].append(dataId)
 
                 if self.config.useDcrCorrection:
-                    dcrCorrectionCatalogs[dataId["tract"]].append(
-                        dcrCorrectionTempRefs[dataId["tract"]][dataId["patch"]]
-                    )
+                    # A patch with no DCR catalog is still usable, it just
+                    # cannot be corrected. Append `None` to keep the list
+                    # aligned with the coadds and dataIds.
+                    dcrRef = dcrCorrectionTempRefs[dataId["tract"]].get(dataId["patch"])
+                    if dcrRef is None:
+                        self.log.warning(
+                            "No DCR correction catalog for tract=%s, patch=%s;"
+                            " including this patch without a DCR correction.",
+                            dataId["tract"],
+                            dataId["patch"],
+                        )
+                    dcrCorrectionCatalogs[dataId["tract"]].append(dcrRef)
 
         if not overlappingArea:
             raise pipeBase.NoWorkFound("No patches overlap detector")
@@ -562,7 +571,10 @@ class GetTemplateTask(pipeBase.PipelineTask):
             "patch" entries.
         dcrCorrectionRefs : `list` of [`lsst.daf.butler.DeferredDatasetHandle` of \
                         `lsst.afw.table.SourceCatalog`], optional
-            Catalogs with heavy footprints of DCR models for sources in each patch.
+            Catalogs with heavy footprints of DCR models for sources in each
+            patch, in the same order as ``exposureRefs``. Entries may be `None`
+            for patches that have no DCR correction catalog, which are then
+            used without a DCR correction.
 
         Returns
         -------
@@ -576,18 +588,24 @@ class GetTemplateTask(pipeBase.PipelineTask):
         catalog = afwTable.ExposureCatalog(self.schema)
         catalog.reserve(len(exposureRefs))
         exposures = (exposureRef.get() for exposureRef in exposureRefs)
-        if self.config.useDcrCorrection:
-            dcrCatalogs = (dcrCorrectionRef.get() for dcrCorrectionRef in dcrCorrectionRefs)
-        else:
+        if dcrCorrectionRefs is None:
             dcrCatalogs = [None, ]*len(exposureRefs)
+        else:
+            # `getExposures` builds this list alongside the coadds, so a length
+            # mismatch means they are no longer aligned and the corrections
+            # would be applied to the wrong patches.
+            if len(dcrCorrectionRefs) != len(exposureRefs):
+                raise RuntimeError(f"Got {len(dcrCorrectionRefs)} DCR correction catalogs for "
+                                   f"{len(exposureRefs)} coadds; these must correspond one to one.")
+            dcrCatalogs = (None if ref is None else ref.get() for ref in dcrCorrectionRefs)
         images = {}
         totalBox = geom.Box2I()
 
         for coadd, dataId, dcrCatalog in zip(exposures, dataIds, dcrCatalogs):
-            if self.config.useDcrCorrection:
-                images[dataId] = self.applyDcr(coadd, visitInfo, dcrCatalog).maskedImage
-            else:
+            if dcrCatalog is None:
                 images[dataId] = coadd.maskedImage
+            else:
+                images[dataId] = self.applyDcr(coadd, visitInfo, dcrCatalog).maskedImage
             bbox = coadd.getBBox()
             totalBox = totalBox.expandedTo(bbox)
             record = catalog.addNew()
