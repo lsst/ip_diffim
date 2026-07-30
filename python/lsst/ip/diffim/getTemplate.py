@@ -157,7 +157,8 @@ class GetTemplateConfig(
     dcrModelScale = pexConfig.Field(
         dtype=float,
         default=1,
-        doc="Fudge scaling factor of the model",
+        doc="Fraction of the DCR correction to apply to each source. Zero leaves"
+        " the coadd unchanged, and one applies the full correction.",
     )
     dcrScale = pexConfig.Field(
         dtype=float,
@@ -168,6 +169,14 @@ class GetTemplateConfig(
         dtype=float,
         default=0,
         doc="Fudge shift of the effective wavelength",
+    )
+    dcrWeightTolerance = pexConfig.Field(
+        dtype=float,
+        default=1e-3,
+        doc="Maximum amount by which the sum of a source's subfilter weights may"
+        " differ from one. The DCR correction conserves the flux of a source"
+        " only if its weights sum to one, so sources that fail this check are"
+        " left uncorrected.",
     )
 
     def setDefaults(self):
@@ -732,14 +741,35 @@ class GetTemplateTask(pipeBase.PipelineTask):
         return coaddPsf
 
     def applyDcr(self, coadd, visitInfo, dcrCatalog):
-        """Summary
+        """Replace the DCR of the coadd with the DCR of the science visit, for
+        each source in a DCR correction catalog.
+
+        The sources in a coadd are smeared along the parallactic direction by
+        the average DCR of all of the visits that went into it, while in the
+        science image they are shifted by the DCR of that observation alone. For
+        each modeled source this subtracts the model of the source as it appears
+        in the coadd, and adds back the un-shifted model of the source shifted to
+        the position of each subfilter in this observation.
 
         Parameters
         ----------
-        coadd : TYPE
-            Description
-        dcrCatalog : TYPE
-            Description
+        coadd : `lsst.afw.image.Exposure`
+            One patch of the coadd, modified in place. Only the image plane is
+            changed; the mask and variance planes are left alone.
+        visitInfo : `lsst.afw.image.VisitInfo`
+            Metadata of the science exposure the template is being built for,
+            used to calculate the DCR of each subfilter.
+        dcrCatalog : `lsst.afw.table.SourceCatalog`
+            Catalog of sub-band fluxes and model footprints for this patch. Each
+            source is represented by a pair of records sharing the same id: one
+            with ``isCoaddModel`` set, whose footprint is the DCR-smeared model
+            of the source in the coadd, and one without, whose footprint is the
+            un-shifted model.
+
+        Returns
+        -------
+        coadd : `lsst.afw.image.Exposure`
+            The same coadd that was supplied, with the corrections applied.
         """
         if len(dcrCatalog) == 0:
             return coadd
@@ -752,9 +782,35 @@ class GetTemplateTask(pipeBase.PipelineTask):
                     for shift in calculateDcr(visitInfo, coadd.wcs, effectiveWavelength,
                                               self.bandwidth, nSubfilters, bbox=coaddBBox)]
 
+        # Each source has a second record holding the model of the source as it
+        # appears in the coadd, which is what has to be subtracted.
+        coaddModels = {record.getId(): record.getFootprint()
+                       for record in dcrCatalog if record['isCoaddModel']}
+
+        nBadWeights = 0
+        worstWeightSum = 1.
+        nUnpaired = 0
         for dcrRecord in dcrCatalog:
+            if dcrRecord['isCoaddModel']:
+                continue
+            subfilterWeights = [dcrRecord[f'subfilterWeight_{subfilter}']
+                                for subfilter in range(nSubfilters)]
+            # The correction only redistributes a source's flux between the
+            # subfilters if the weights sum to one. If they do not, applying it
+            # would change the flux of the source in the template, so leave the
+            # source uncorrected instead.
+            weightSum = sum(subfilterWeights)
+            if abs(weightSum - 1) > self.config.dcrWeightTolerance:
+                nBadWeights += 1
+                if abs(weightSum - 1) > abs(worstWeightSum - 1):
+                    worstWeightSum = weightSum
+                continue
             footprint = dcrRecord.getFootprint()
             fpBBox = footprint.getBBox()
+            coaddFootprint = coaddModels.get(dcrRecord.getId())
+            if coaddFootprint is None or coaddFootprint.getBBox() != fpBBox:
+                nUnpaired += 1
+                continue
             # The footprints were not necessarily measured on this coadd, so
             # they may extend past its edge. Only correct the pixels we have;
             # the rest of the source is handled by the neighboring patch.
@@ -763,20 +819,33 @@ class GetTemplateTask(pipeBase.PipelineTask):
                 self.log.debug("DCR correction footprint %s does not overlap the coadd; skipping.",
                                dcrRecord.getId())
                 continue
-            # flux = dcrRecord['modelFlux']
             # ``fill`` must be set: it defaults to NaN, which would poison
             # every pixel of the bbox that is outside the footprint.
-            modelImage = footprint.extractImage(fill=0.)
-            modelImage.array *= self.config.dcrModelScale
-            # Shift the full model and clip afterwards, so that flux moving in
-            # from beyond the coadd edge is not lost.
-            shiftedImage = afwImage.ImageF(fpBBox)
+            # Build the whole correction on the footprint's own bbox and clip
+            # once at the end, so that flux moving in from beyond the coadd edge
+            # is not lost.
+            correction = afwImage.ImageF(fpBBox)
+            correction.array -= coaddFootprint.extractImage(fill=0.).array
+            unshiftedModel = footprint.extractImage(fill=0.).array
+            for shift, subFlux in zip(dcrShift, subfilterWeights):
+                correction.array += subFlux*ndimage.shift(unshiftedModel, shift)
+            coadd[bbox].image.array += self.config.dcrModelScale*correction[bbox].array
 
-            coadd[bbox].image.array -= modelImage[bbox].array
-            for subfilter, shift in enumerate(dcrShift):
-                subFlux = dcrRecord[f'subfilterWeight_{subfilter}']
-                shiftedImage.array[:] = ndimage.shift(modelImage.array, shift)
-                coadd[bbox].image.array += subFlux*shiftedImage[bbox].array
+        if nUnpaired:
+            self.log.warning(
+                "Left %d sources uncorrected because they have no matching coadd model record;"
+                " the DCR correction catalog should contain one record with `isCoaddModel` set"
+                " and one without, on the same bbox, for every source.",
+                nUnpaired,
+            )
+        if nBadWeights:
+            self.log.warning(
+                "Left %d of %d sources uncorrected because their subfilter weights do not sum to"
+                " one (worst sum %g); the DCR correction would have changed their flux.",
+                nBadWeights,
+                len(dcrCatalog) - len(coaddModels),
+                worstWeightSum,
+            )
         return coadd
 
     @staticmethod
