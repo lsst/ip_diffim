@@ -1369,6 +1369,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
         return sattle_output.json()['allow_list']
 
+    @timeMethod
     def filterSatellites(self, diaSources, science):
         """Remove diaSources overlapping predicted satellite positions.
 
