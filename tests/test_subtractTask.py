@@ -349,7 +349,6 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
                                         templateBorderSize=20, doApplyCalibration=True)
             task = self._setup_subtraction(mode="convolveScience")
             output = task.run(template, science, sources)
-            self.assertFloatsAlmostEqual(task.metadata["scaleTemplateVarianceFactor"], 1., atol=.05)
             self.assertFloatsAlmostEqual(task.metadata["scaleScienceVarianceFactor"], 1., atol=.05)
             # Mean of difference image should be close to zero.
             nGoodPix = np.sum(np.isfinite(output.difference.image.array))
@@ -385,7 +384,6 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
                                         templateBorderSize=20, doApplyCalibration=True)
             task = self._setup_subtraction()
             output = task.run(template, science, sources)
-            self.assertFloatsAlmostEqual(task.metadata["scaleTemplateVarianceFactor"], 1., atol=.05)
             self.assertFloatsAlmostEqual(task.metadata["scaleScienceVarianceFactor"], 1., atol=.05)
             # There should be no NaNs in the image if we convolve the template with a buffer
             self.assertTrue(np.all(np.isfinite(output.difference.image.array)))
@@ -632,8 +630,6 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
                                            )
             output = task.run(template.clone(), science.clone(), sources)
             if doScaleVariance:
-                self.assertFloatsAlmostEqual(task.metadata["scaleTemplateVarianceFactor"],
-                                             scaleFactor, atol=0.05)
                 self.assertFloatsAlmostEqual(task.metadata["scaleScienceVarianceFactor"],
                                              scaleFactor, atol=0.05)
 
@@ -646,7 +642,8 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
                                                         statsCtrl)
 
             if doScaleVariance:
-                templateNoise *= scaleFactor
+                # Only the science variance is scaled here. The template
+                # variance is scaled independently in ``GetTemplateTask``.
                 scienceNoise *= scaleFactor
             varMean = computeRobustStatistics(output.difference.variance, output.difference.mask, statsCtrl)
             self.assertFloatsAlmostEqual(varMean, scienceNoise + templateNoise, rtol=0.1)
@@ -666,8 +663,7 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
                               doDecorrelation=False, doScaleVariance=False)
 
         # Verify that the variance plane of the difference image is correct
-        #  when the template variance plane is incorrect
-        template.variance.array /= scaleFactor
+        #  when the input science variance plane is incorrect
         science.variance.array /= scaleFactor
         _run_and_check_images(science, template, sources, statsCtrl,
                               doDecorrelation=True, doScaleVariance=True, scaleFactor=scaleFactor)
@@ -700,8 +696,6 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
                                            )
             output = task.run(template.clone(), science.clone(), sources)
             if doScaleVariance:
-                self.assertFloatsAlmostEqual(task.metadata["scaleTemplateVarianceFactor"],
-                                             scaleFactor, atol=0.05)
                 self.assertFloatsAlmostEqual(task.metadata["scaleScienceVarianceFactor"],
                                              scaleFactor, atol=0.05)
 
@@ -714,7 +708,8 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
                                                        statsCtrl)
 
             if doScaleVariance:
-                templateNoise *= scaleFactor
+                # Only the science variance is scaled here. The template
+                # variance is scaled independently in ``GetTemplateTask``.
                 scienceNoise *= scaleFactor
 
             varMean = computeRobustStatistics(output.difference.variance, output.difference.mask, statsCtrl)
@@ -735,9 +730,8 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
                               doDecorrelation=False, doScaleVariance=False)
 
         # Verify that the variance plane of the difference image is correct
-        #  when the template and science variance planes are incorrect
+        #  when the input science variance plane is incorrect
         science.variance.array /= scaleFactor
-        template.variance.array /= scaleFactor
         _run_and_check_images(science, template, sources, statsCtrl,
                               doDecorrelation=True, doScaleVariance=True, scaleFactor=scaleFactor)
         _run_and_check_images(science, template, sources, statsCtrl,
@@ -1259,8 +1253,6 @@ class AlardLuptonPreconvolveSubtractTest(AlardLuptonSubtractTestBase, lsst.utils
                                            )
             output = task.run(template.clone(), science.clone(), sources)
             if doScaleVariance:
-                self.assertFloatsAlmostEqual(task.metadata["scaleTemplateVarianceFactor"],
-                                             scaleFactor, atol=0.05)
                 self.assertFloatsAlmostEqual(task.metadata["scaleScienceVarianceFactor"],
                                              scaleFactor, atol=0.05)
 
@@ -1278,7 +1270,8 @@ class AlardLuptonPreconvolveSubtractTest(AlardLuptonSubtractTestBase, lsst.utils
                                                         output.matchedTemplate.mask,
                                                         statsCtrl)
             if doScaleVariance:
-                templateNoise *= scaleFactor
+                # Only the science variance is scaled here. The template
+                # variance is scaled independently in ``GetTemplateTask``.
                 scienceNoise *= scaleFactor
             varMean = computeRobustStatistics(output.scoreExposure.variance,
                                               output.scoreExposure.mask,
@@ -1302,8 +1295,7 @@ class AlardLuptonPreconvolveSubtractTest(AlardLuptonSubtractTestBase, lsst.utils
                               doDecorrelation=False, doScaleVariance=False)
 
         # Verify that the variance plane of the Score image is correct
-        #  when the template variance plane is incorrect
-        template.variance.array /= scaleFactor
+        #  when the input science variance plane is incorrect
         science.variance.array /= scaleFactor
         _run_and_check_images(science, template, sources, statsCtrl,
                               doDecorrelation=True, doScaleVariance=True, scaleFactor=scaleFactor)

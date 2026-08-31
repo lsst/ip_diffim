@@ -207,7 +207,8 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
     doScaleVariance = lsst.pex.config.Field(
         dtype=bool,
         default=True,
-        doc="Scale variance of the image difference?"
+        doc="Scale variance of the science image? Note that the template variance is NOT scaled"
+        " here. The template variance may be scaled independently in ``GetTemplateTask``."
     )
     scaleVariance = lsst.pex.config.ConfigurableField(
         target=ScaleVarianceTask,
@@ -1044,13 +1045,11 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         self.metadata["templateCoveragePercent"] = 100*templateCoverageFraction
 
         if self.config.doScaleVariance:
-            # Scale the variance of the template and science images before
-            # convolution, subtraction, or decorrelation so that they have the
-            # correct ratio.
-            templateVarFactor = self.scaleVariance.run(template.maskedImage)
+            # Scale the variance of the science image before
+            # convolution, subtraction, or decorrelation so that it has the
+            # correct ratio. Note that the template variance is scaled
+            # independently in ``GetTemplateTask``.
             sciVarFactor = self.scaleVariance.run(science.maskedImage)
-            self.log.info("Template variance scaling factor: %.2f", templateVarFactor)
-            self.metadata["scaleTemplateVarianceFactor"] = templateVarFactor
             self.log.info("Science variance scaling factor: %.2f", sciVarFactor)
             self.metadata["scaleScienceVarianceFactor"] = sciVarFactor
 

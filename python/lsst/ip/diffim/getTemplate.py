@@ -34,7 +34,7 @@ import lsst.pipe.base as pipeBase
 
 from lsst.skymap import BaseSkyMap
 from lsst.ip.diffim.dcrModel import DcrModel
-from lsst.meas.algorithms import CoaddPsf, CoaddPsfConfig, SubtractBackgroundTask
+from lsst.meas.algorithms import CoaddPsf, CoaddPsfConfig, SubtractBackgroundTask, ScaleVarianceTask
 from lsst.utils.timer import timeMethod
 
 __all__ = [
@@ -120,6 +120,15 @@ class GetTemplateConfig(
         doc="Minimum fraction of unmasked pixels needed to set the"
         " HIGH_VARIANCE mask plane.",
     )
+    doScaleVariance = pexConfig.Field(
+        dtype=bool,
+        default=True,
+        doc="Scale variance of the template image?"
+    )
+    scaleVariance = pexConfig.ConfigurableField(
+        target=ScaleVarianceTask,
+        doc="Subtask to rescale the variance of the template to the statistically expected level."
+    )
 
     def setDefaults(self):
         # Use a smaller cache: per SeparableKernel.computeCache, this should
@@ -152,6 +161,8 @@ class GetTemplateTask(pipeBase.PipelineTask):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if self.config.doScaleVariance:
+            self.makeSubtask("scaleVariance")
         self.warper = afwMath.Warper.fromConfig(self.config.warp)
         self.schema = afwTable.ExposureTable.makeMinimalSchema()
         self.schema.addField(
@@ -381,6 +392,14 @@ class GetTemplateTask(pipeBase.PipelineTask):
         if count == 0:
             raise pipeBase.NoWorkFound("No valid pixels in warped template.")
 
+        if self.config.doScaleVariance:
+            # Scale the variance of the template image before subtraction, if
+            # needed. Note that the science variance is scaled
+            # independently in ``AlardLuptonSubtractTask``.
+            varianceFactor = self.scaleVariance.run(template.maskedImage)
+            self.log.info("Template variance scaling factor: %.2f", varianceFactor)
+            self.metadata["scaleTemplateVarianceFactor"] = varianceFactor
+
         # Make a single catalog containing all the inputs that were accepted.
         catalog = afwTable.ExposureCatalog(self.schema)
         catalog.reserve(sum([len(c) for c in catalogs]))
@@ -394,6 +413,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
         template.setFilter(afwImage.FilterLabel(band, physical_filter))
         template.setPhotoCalib(photoCalib)
         template.setPsf(self._makePsf(template, catalog, wcs))
+
         # Record the input coadd patches as the template's coadd inputs.
         coaddInputs = afwImage.CoaddInputs(afwTable.ExposureTable.makeMinimalSchema(), self.schema)
         coaddInputs.ccds.extend(catalog, deep=True)
