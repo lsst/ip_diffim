@@ -337,6 +337,94 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         # in the template are closer to the original anymore.
         self.assertTrue(np.isfinite(result.template.image.array).all())
 
+    def _scaleInputVariance(self, tract, factor):
+        """Return fresh handles for one tract's patches, with their variance
+        planes multiplied by ``factor``.
+
+        Parameters
+        ----------
+        tract : `int`
+            Id of the tract whose patches should be copied.
+        factor : `float`
+            Factor to multiply the input variance planes by.
+
+        Returns
+        -------
+        handles : `list` [`lsst.pipe.base.InMemoryDatasetHandle`]
+            Handles to the modified patches.
+        """
+        handles = []
+        for handle in self.patches[tract]:
+            # ``copy=True`` on the original handles means this is a copy, so
+            # the patches shared with the other tests are left untouched.
+            patch = handle.get()
+            patch.variance.array *= factor
+            handles.append(pipeBase.InMemoryDatasetHandle(patch,
+                                                          storageClass="ExposureF",
+                                                          copy=True,
+                                                          dataId=handle.dataId))
+        return handles
+
+    def testScaleVariance(self):
+        """Test that the template variance plane is rescaled to match the
+        empirical pixel noise, and that the factor used is recorded in the
+        task metadata.
+        """
+        scaleFactor = 1.345
+        box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
+
+        def _configureAndRunTask(doScaleVariance, varianceScale=1.):
+            """Build a template from tract 0, optionally rescaling the input
+            variance planes by ``varianceScale`` first.
+            """
+            config = lsst.ip.diffim.GetTemplateTask.ConfigClass()
+            config.doScaleVariance = doScaleVariance
+            task = lsst.ip.diffim.GetTemplateTask(config=config)
+            # Task modifies the input bbox, so pass a copy.
+            result = task.run(coaddExposureHandles={0: self._scaleInputVariance(0, varianceScale)},
+                              bbox=lsst.geom.Box2I(box),
+                              wcs=self.exposure.wcs,
+                              dataIds={0: self.dataIds[0]},
+                              physical_filter="a_test")
+            return task, result.template
+
+        # With scaling disabled the subtask is never constructed, and nothing
+        # is recorded in the metadata.
+        taskOff, templateOff = _configureAndRunTask(False)
+        self.assertFalse(hasattr(taskOff, "scaleVariance"))
+        self.assertNotIn("scaleTemplateVarianceFactor", taskOff.metadata)
+
+        # Both warps -- lanczos5 in ``_makePatches`` and lanczos3 in the
+        # task -- correlate the noise. The variance plane tracks only the
+        # per-pixel diagonal, which the second warp leaves too low, so
+        # ``scaleVariance`` measures a factor well above 1 even though the
+        # input variance planes are correct.
+        #
+        taskOn, templateOn = _configureAndRunTask(True)
+        factor = taskOn.metadata["scaleTemplateVarianceFactor"]
+        # TODO DM-55879: this value is pinned on purpose. The lanczos warping
+        # kernels introduce small correlations that artificially suppress the
+        # image pixel stddev and inflate the variance scaling factor. This
+        # should be changed to 1.0 after DM-55879 is merged.
+        self.assertFloatsAlmostEqual(factor, 1.1465, atol=0.01,
+                                     msg="Measured template variance scaling changed; see the"
+                                         " comment above if the correlation correction landed.")
+        # The only difference from the unscaled template is the constant
+        # factor applied to the variance plane.
+        self.assertFloatsAlmostEqual(templateOn.variance.array,
+                                     templateOff.variance.array*factor, rtol=1e-5)
+        # Tolerance here is float32 round-off: repeated runs of the task are
+        # not bitwise identical.
+        self.assertImagesAlmostEqual(templateOn.image, templateOff.image, rtol=1e-5, atol=1e-5)
+
+        # If the input variance planes under-estimate the noise by a known
+        # factor, the measured factor grows by that amount and the same
+        # output variance plane is recovered.
+        taskLow, templateLow = _configureAndRunTask(True, varianceScale=1/scaleFactor)
+        self.assertFloatsAlmostEqual(taskLow.metadata["scaleTemplateVarianceFactor"],
+                                     factor*scaleFactor, rtol=1e-5)
+        self.assertImagesAlmostEqual(templateLow.variance, templateOn.variance, rtol=1e-5)
+
 
 def setup_module(module):
     lsst.utils.tests.init()
