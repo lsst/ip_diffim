@@ -28,6 +28,7 @@ import numpy as np
 import lsst.afw.geom
 import lsst.afw.image
 import lsst.afw.math
+import lsst.afw.table
 from lsst.daf.butler import DataCoordinate, DimensionUniverse
 import lsst.geom
 import lsst.ip.diffim
@@ -159,6 +160,9 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
             warpedPsf = lsst.meas.algorithms.WarpedPsf(self.exposure.psf, xyTransform)
             warped = warper.warpExposure(patch.wcs, self.exposure, destBBox=box)
             warped.setPsf(warpedPsf)
+
+            warped.getInfo().setCoaddInputs(
+                self._makeCoaddInputs([(self.exposure.wcs, self.exposure.getBBox())]))
             dataRef = pipeBase.InMemoryDatasetHandle(
                 warped,
                 storageClass="ExposureF",
@@ -212,10 +216,20 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         # tolerances large enough to account for that.
         self.assertImagesAlmostEqual(template.image, self.exposure[expectedBox].image,
                                      rtol=.1, atol=4)
-        # Variance plane ==2 in the original image, but the warped images will
-        # have some structure due to the warping.
-        self.assertImagesAlmostEqual(template.variance, self.exposure[expectedBox].variance,
-                                     rtol=0.55, msg="variance planes differ")
+        # Variance plane ==4 in the original image (realize() takes a noise
+        # sigma). Warping sets the level from the pixel areas and the two
+        # warping kernels, which `_correctVariance` corrects up to the
+        # difference between the configured coaddWarpKernel and the lanczos5
+        # `_makePatches` really used. A per-pixel ripple that no scalar
+        # correction can remove remains on top of that, so check the level
+        # tightly and allow for the ripple around it.
+        variance = template.variance.array[np.isfinite(template.variance.array)]
+        median = np.median(variance)
+        self.assertFloatsAlmostEqual(median,
+                                     np.median(self.exposure[expectedBox].variance.array),
+                                     rtol=0.35, msg="variance level differs")
+        self.assertLess(np.percentile(variance, 99)/median, 1.6, msg="variance ripple too large")
+        self.assertGreater(np.percentile(variance, 1)/median, 0.6, msg="variance ripple too large")
         # Not checking the mask, as warping changes the sizes of the masks.
 
     def testRunOneTractInput(self):
@@ -336,6 +350,31 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         # We just check that the pixel values are all finite. We cannot check that pixel values
         # in the template are closer to the original anymore.
         self.assertTrue(np.isfinite(result.template.image.array).all())
+
+    @staticmethod
+    def _makeCoaddInputs(records):
+        """Make a CoaddInputs holding the given input records.
+
+        Parameters
+        ----------
+        records : `list` [`tuple` [`lsst.afw.geom.SkyWcs` or `None`, \
+                                   `lsst.geom.Box2I`]]
+            The WCS and bbox to record for each input. A `None` WCS makes a
+            record that `_plateScaleFactor` has to skip. May be empty, to
+            simulate a coadd whose plate scale cannot be reconstructed.
+        """
+        ccdSchema = lsst.afw.table.ExposureTable.makeMinimalSchema()
+        weightKey = ccdSchema.addField("weight", type=float, doc="Coadd weight")
+        coaddInputs = lsst.afw.image.CoaddInputs(
+            lsst.afw.table.ExposureTable.makeMinimalSchema(), ccdSchema)
+        for wcs, bbox in records:
+            record = coaddInputs.ccds.addNew()
+            record.setWcs(wcs)
+            record.setBBox(bbox)
+            # Included because real coadds have it, though a single-record
+            # correction does not use it.
+            record.set(weightKey, 1.0)
+        return coaddInputs
 
     def _scaleInputVariance(self, tract, factor):
         """Return fresh handles for one tract's patches, with their variance
