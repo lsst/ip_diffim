@@ -20,9 +20,11 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
+import scipy.signal
 
 import lsst.geom
 
+import lsst.afw.image as afwImage
 import lsst.afw.table as afwTable
 import lsst.pipe.base as pipeBase
 import lsst.pex.config as pexConfig
@@ -164,6 +166,13 @@ class SpatiallySampledMetricsTask(lsst.pipe.base.PipelineTask):
             "Median of diffim variance at location.",
             units="nJy^2")
         self.schema.addField(
+            "diffim_chi2PerPix", "F",
+            "Robust normalized noise of diffim at location:"
+            " (1.4826*MAD(image))^2 / median(variance), evaluated on background"
+            " pixels (DETECTED, DETECTED_NEGATIVE, BAD, SAT, EDGE, NO_DATA excluded)."
+            " Expected ~1.0 for a well-decorrelated diffim; values >>1 indicate"
+            " residual structure, <<1 indicates over-estimated variance.")
+        self.schema.addField(
             "science_psfSize", "F",
             "Width of the science image PSF at location.",
             units="pixel")
@@ -199,6 +208,12 @@ class SpatiallySampledMetricsTask(lsst.pipe.base.PipelineTask):
             "psfMatchingKernel_direction", "F",
             "PSF matching kernel centroid offset direction in detector plane.",
             units="radian")
+        self.schema.addField(
+            "psfMatchingKernel_residualNorm", "F",
+            "Shape-only PSF match residual at location:"
+            "L2 norm of (K-convolved template PSF - science PSF),"
+            " relative to the science PSF L2 norm. Larger values indicate worse"
+            " PSF matching. Assumes the kernel was solved to convolve the template.")
 
     @timeMethod
     def run(self, science, template, difference, diaSources, psfMatchingKernel):
@@ -308,6 +323,7 @@ class SpatiallySampledMetricsTask(lsst.pipe.base.PipelineTask):
         src.set('science_variance', scienceVar)
         src.set('diffim_value', diffimVal)
         src.set('diffim_variance', diffimVar)
+        src.set('diffim_chi2PerPix', self._diffimChi2PerPix(difference[bbox]))
         for maskPlane in metricsMaskPlanes:
             src.set("%s_mask_fraction"%maskPlane.lower(),
                     evaluateMaskFraction(difference.mask[bbox], maskPlane)
@@ -333,3 +349,85 @@ class SpatiallySampledMetricsTask(lsst.pipe.base.PipelineTask):
         src.set('psfMatchingKernel_length', length*pixScale.asArcseconds())
         src.set('psfMatchingKernel_position_angle', position_angle)  # in E of N position angle
         src.set('psfMatchingKernel_direction', direction)  # direction offset in detector
+
+        src.set('psfMatchingKernel_residualNorm',
+                self._psfMatchResidualNorm(psfMatchingKernel, science.psf, template.psf,
+                                           src.get('x'), src.get('y')))
+
+    def _diffimChi2PerPix(self, difference):
+        """Robust normalized noise of the difference image.
+
+        Computes ``(1.4826 * MAD(image))^2 / median(variance)`` on
+        background-only pixels. The 1.4826 factor rescales the
+        Median Absolute Deviation to a Gaussian-sigma estimate, so the
+        ratio has expectation 1.0 on pure noise.
+
+        Returns NaN if no usable pixels remain or the median variance
+        is non-positive.
+        """
+        image = difference.image.array
+        variance = difference.variance.array
+        mask = difference.mask
+        excludePlanes = [p for p in ("DETECTED", "DETECTED_NEGATIVE", "BAD",
+                                     "SAT", "EDGE", "NO_DATA")
+                         if p in mask.getMaskPlaneDict()]
+        if excludePlanes:
+            badBits = mask.getPlaneBitMask(excludePlanes)
+            good = (mask.array & badBits) == 0
+        else:
+            good = np.ones(image.shape, dtype=bool)
+        good &= np.isfinite(image) & np.isfinite(variance) & (variance > 0)
+        if not np.any(good):
+            return np.nan
+        varMed = np.median(variance[good])
+        if not np.isfinite(varMed) or varMed <= 0:
+            return np.nan
+        imgGood = image[good]
+        mad = np.median(np.abs(imgGood - np.median(imgGood)))
+        return float((1.4826*mad)**2/varMed)
+
+    def _psfMatchResidualNorm(self, kernel, sciencePsf, templatePsf, x, y):
+        """Relative L2 norm of the PSF-match residual at (x, y).
+
+        Convolves the template PSF with the matching kernel evaluated at
+        (x, y) and compares to the science PSF at the same position, both
+        renormalized to unit sum so the result captures shape mismatch only.
+        The kernel is assumed to convolve the template.
+
+        Returns NaN if either PSF cannot be evaluated at the position or
+        the resulting images cannot be normalized.
+        """
+        point = lsst.geom.Point2D(x, y)
+        try:
+            psfSci = sciencePsf.computeKernelImage(point).array
+            psfTmp = templatePsf.computeKernelImage(point).array
+        except (InvalidParameterError, RangeError):
+            return np.nan
+
+        kImage = afwImage.ImageD(kernel.getDimensions())
+        kernel.computeImage(kImage, doNormalize=True, x=x, y=y)
+        matched = scipy.signal.fftconvolve(psfTmp, kImage.array, mode='same')
+
+        matchedSum = matched.sum()
+        psfSciSum = psfSci.sum()
+        if matchedSum <= 0 or psfSciSum <= 0:
+            return np.nan
+        matched = matched/matchedSum
+        psfSci = psfSci/psfSciSum
+
+        # PSF stamps may differ in size between the two exposures; crop
+        # both to a common centered region before differencing.
+        h = min(matched.shape[0], psfSci.shape[0])
+        w = min(matched.shape[1], psfSci.shape[1])
+
+        def _crop(a):
+            sy = (a.shape[0] - h)//2
+            sx = (a.shape[1] - w)//2
+            return a[sy:sy + h, sx:sx + w]
+        matched = _crop(matched)
+        psfSci = _crop(psfSci)
+
+        sciNorm = np.sqrt(np.sum(psfSci**2))
+        if sciNorm == 0:
+            return np.nan
+        return float(np.sqrt(np.sum((matched - psfSci)**2))/sciNorm)
