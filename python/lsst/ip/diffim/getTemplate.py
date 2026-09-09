@@ -19,6 +19,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import collections
+import dataclasses
 
 import numpy as np
 
@@ -86,6 +87,14 @@ class GetTemplateConnections(
         name="{fakesType}{coaddName}Diff_templateExp{warpTypeSuffix}",
     )
 
+    def __init__(self, *, config=None):
+        super().__init__(config=config)
+        if config.requireCoaddAtGraphBuild:
+            self.coaddExposures = dataclasses.replace(
+                self.coaddExposures,
+                deferGraphConstraint=False,
+            )
+
 
 class GetTemplateConfig(
     pipeBase.PipelineTaskConfig, pipelineConnections=GetTemplateConnections
@@ -128,6 +137,12 @@ class GetTemplateConfig(
     scaleVariance = pexConfig.ConfigurableField(
         target=ScaleVarianceTask,
         doc="Subtask to rescale the variance of the template to the statistically expected level."
+    )
+    requireCoaddAtGraphBuild = pexConfig.Field(
+        dtype=bool,
+        default=False,
+        doc="If True, include the coadd dataset existence in the"
+        " initial butler query during QuantumGraph generation.",
     )
 
     def setDefaults(self):
