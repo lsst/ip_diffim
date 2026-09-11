@@ -1,0 +1,290 @@
+# Column names defined in http://ls.st/dpdd with some modification as needed
+# by database schema defined in lsst.dax.apdb
+funcs:
+    skyId:  # Critical for association - groups DiaSources by spatial location
+        functor: Column
+        args: skyId
+    diaSourceId: # the index of deepCoadd_disSource IS the diaSourceId
+        functor: Column
+        args: id
+    day_obs:
+        functor: Column
+        args: day_obs
+    band:
+        functor: Column
+        args: band
+    diaObjectId:
+        functor: Column
+        args: diaObjectId
+    ssObjectId:
+        functor: Column
+        args: ssObjectId
+    parentDiaSourceId:
+        functor: Column
+        args: parent
+    midpointMjdTai:
+        functor: Column
+        args: midpointMjdTai
+    bboxSize:
+        functor: Column
+        args: bboxSize
+    # TODO: is this one really necessary here?
+    time_processed:  # filled in automatically
+        functor: Column
+        args: time_processed
+    flags:
+        functor: Column
+        args: flags
+    ra:
+        functor: RAColumn
+    dec:
+        functor: DecColumn
+    raErr:
+        functor: RAErrColumn
+    decErr:
+        functor: DecErrColumn
+    ra_dec_Cov:
+        functor: RADecCovColumn
+    x:
+        functor: Column
+        args: slot_Centroid_x
+    y:
+        functor: Column
+        args: slot_Centroid_y
+    xErr:
+        functor: Column
+        args: slot_Centroid_xErr
+    yErr:
+        functor: Column
+        args: slot_Centroid_yErr
+    # x_y_Cov: not available
+    apFlux:
+        functor: LocalNanojansky
+        args:
+            - slot_ApFlux_instFlux
+            - slot_ApFlux_instFluxErr
+            - base_LocalPhotoCalib
+    apFluxErr:
+        functor: LocalNanojanskyErr
+        args:
+            - slot_ApFlux_instFlux
+            - slot_ApFlux_instFluxErr
+            - base_LocalPhotoCalib
+    snr:
+        functor: Column
+        args: snr
+    psfFlux:
+        functor: LocalNanojansky
+        args:
+            - slot_PsfFlux_instFlux
+            - slot_PsfFlux_instFluxErr
+            - base_LocalPhotoCalib
+    psfFluxErr:
+        functor: LocalNanojanskyErr
+        args:
+            - slot_PsfFlux_instFlux
+            - slot_PsfFlux_instFluxErr
+            - base_LocalPhotoCalib
+    # psfFlux_psfRa_cov not implemented
+    # psfFlux_psfDec_cov not implemented
+    # psfLnl not implemented
+    psfChi2:
+        functor: Column
+        args: slot_PsfFlux_chi2
+    psfNdata:
+        functor: Column
+        args: slot_PsfFlux_npixels
+    trailFlux:
+        functor: LocalNanojansky
+        args:
+            - ext_trailedSources_Naive_flux
+            - ext_trailedSources_Naive_fluxErr
+            - base_LocalPhotoCalib
+            - base_LocalPhotoCalibErr
+    trailFluxErr:
+        functor: LocalNanojansky
+        args:
+            - ext_trailedSources_Naive_flux
+            - ext_trailedSources_Naive_fluxErr
+            - base_LocalPhotoCalib
+    trailRa:
+        functor: Column
+        args: ext_trailedSources_Naive_ra
+    trailDec:
+        functor: Column
+        args: ext_trailedSources_Naive_dec
+    trailLength:
+        functor: ConvertPixelToArcseconds
+        args:
+            - ext_trailedSources_Naive_length
+            - base_LocalWcs_CDMatrix_1_1
+            - base_LocalWcs_CDMatrix_1_2
+            - base_LocalWcs_CDMatrix_2_1
+            - base_LocalWcs_CDMatrix_2_2
+    trailAngle:
+        functor: ConvertDetectorAngleToPositionAngle
+        args:
+            - ext_trailedSources_Naive_angle
+            - base_LocalWcs_CDMatrix_1_1
+            - base_LocalWcs_CDMatrix_1_2
+            - base_LocalWcs_CDMatrix_2_1
+            - base_LocalWcs_CDMatrix_2_2
+    # trailCov[15] not implemented
+    # trailLnL not implemented
+    # trailChi2 not implemented
+    # trailNdata not implemented
+    dipoleMeanFlux:
+        functor: LocalDipoleMeanFlux
+        args:
+            - ip_diffim_DipoleFit_pos_instFlux
+            - ip_diffim_DipoleFit_neg_instFlux
+            - ip_diffim_DipoleFit_pos_instFluxErr
+            - ip_diffim_DipoleFit_neg_instFluxErr
+            - base_LocalPhotoCalib
+    dipoleMeanFluxErr:
+        functor: LocalDipoleMeanFluxErr
+        args:
+            - ip_diffim_DipoleFit_pos_instFlux
+            - ip_diffim_DipoleFit_neg_instFlux
+            - ip_diffim_DipoleFit_pos_instFluxErr
+            - ip_diffim_DipoleFit_neg_instFluxErr
+            - base_LocalPhotoCalib
+    dipoleFluxDiff:
+        functor: LocalDipoleDiffFlux
+        args:
+            - ip_diffim_DipoleFit_pos_instFlux
+            - ip_diffim_DipoleFit_neg_instFlux
+            - ip_diffim_DipoleFit_pos_instFluxErr
+            - ip_diffim_DipoleFit_neg_instFluxErr
+            - base_LocalPhotoCalib
+    dipoleFluxDiffErr:
+        functor: LocalDipoleDiffFluxErr
+        args:
+            - ip_diffim_DipoleFit_pos_instFlux
+            - ip_diffim_DipoleFit_neg_instFlux
+            - ip_diffim_DipoleFit_pos_instFluxErr
+            - ip_diffim_DipoleFit_neg_instFluxErr
+            - base_LocalPhotoCalib
+    # dipoleRa not implemented
+    # dipoleDec not implemented
+    # TODO: the below statement is false! Previously, position was from the
+    # NaiveDipoleCentroid, which defaulted to NaiveCentroid for sources without
+    # a positive/negaive double peak.
+    #    (this may be redundant with RA/DEC as the default centroid is the
+    #     dip model, defaulting to SdssCentroid on Dip-Fit failure.)
+    dipoleLength:
+        functor: ConvertPixelToArcseconds
+        args:
+            - ip_diffim_DipoleFit_separation
+            - base_LocalWcs_CDMatrix_1_1
+            - base_LocalWcs_CDMatrix_1_2
+            - base_LocalWcs_CDMatrix_2_1
+            - base_LocalWcs_CDMatrix_2_2
+    dipoleAngle:
+        functor: ConvertDetectorAngleToPositionAngle
+        args:
+            - ip_diffim_DipoleFit_orientation
+            - base_LocalWcs_CDMatrix_1_1
+            - base_LocalWcs_CDMatrix_1_2
+            - base_LocalWcs_CDMatrix_2_1
+            - base_LocalWcs_CDMatrix_2_2
+    # dipoleCov not implemented
+    # dipoleLnl not implemented
+    dipoleChi2:
+        functor: Column
+        args: ip_diffim_DipoleFit_chi2dof
+    isDipole:
+        functor: Column
+        args: ip_diffim_DipoleFit_classification
+    dipoleFitAttempted:
+        functor: Column
+        args: ip_diffim_DipoleFit_classificationAttempted
+    dipoleNdata:
+        functor: Column
+        args: ip_diffim_DipoleFit_nData
+    scienceFlux:
+        functor: LocalNanojansky
+        args:
+            - ip_diffim_forced_PsfFlux_instFlux
+            - ip_diffim_forced_PsfFlux_instFluxErr
+            - base_LocalPhotoCalib
+    scienceFluxErr:
+        functor: LocalNanojanskyErr
+        args:
+            - ip_diffim_forced_PsfFlux_instFlux
+            - ip_diffim_forced_PsfFlux_instFluxErr
+            - base_LocalPhotoCalib
+    # snapDiffFlux not implemented and likely dropped due to no snaps.
+    # snapDiffFluxErr not implemented and likely dropped due to no snaps.
+    # fpBkgd not measured yet. DM-
+    # fpBkgdErr not measured yet. DM-
+
+    # These values below work but need a new functor for converting pixel^2
+    # units to arcsec^2 DM-
+    ixx:
+        functor: ConvertPixelSqToArcsecondsSq
+        args:
+            - slot_Shape_xx
+            - base_LocalWcs_CDMatrix_1_1
+            - base_LocalWcs_CDMatrix_1_2
+            - base_LocalWcs_CDMatrix_2_1
+            - base_LocalWcs_CDMatrix_2_2
+    iyy:
+        functor: ConvertPixelSqToArcsecondsSq
+        args:
+            - slot_Shape_yy
+            - base_LocalWcs_CDMatrix_1_1
+            - base_LocalWcs_CDMatrix_1_2
+            - base_LocalWcs_CDMatrix_2_1
+            - base_LocalWcs_CDMatrix_2_2
+    ixy:
+        functor: ConvertPixelSqToArcsecondsSq
+        args:
+            - slot_Shape_xy
+            - base_LocalWcs_CDMatrix_1_1
+            - base_LocalWcs_CDMatrix_1_2
+            - base_LocalWcs_CDMatrix_2_1
+            - base_LocalWcs_CDMatrix_2_2
+    # icov not implemented
+    ixxPSF:
+        functor: ConvertPixelSqToArcsecondsSq
+        args:
+            - slot_PsfShape_xx
+            - base_LocalWcs_CDMatrix_1_1
+            - base_LocalWcs_CDMatrix_1_2
+            - base_LocalWcs_CDMatrix_2_1
+            - base_LocalWcs_CDMatrix_2_2
+    iyyPSF:
+        functor: ConvertPixelSqToArcsecondsSq
+        args:
+            - slot_PsfShape_yy
+            - base_LocalWcs_CDMatrix_1_1
+            - base_LocalWcs_CDMatrix_1_2
+            - base_LocalWcs_CDMatrix_2_1
+            - base_LocalWcs_CDMatrix_2_2
+    ixyPSF:
+        functor: ConvertPixelSqToArcsecondsSq
+        args:
+            - slot_PsfShape_xy
+            - base_LocalWcs_CDMatrix_1_1
+            - base_LocalWcs_CDMatrix_1_2
+            - base_LocalWcs_CDMatrix_2_1
+            - base_LocalWcs_CDMatrix_2_2
+    is_negative:
+        functor: Column
+        args: is_negative
+    extendedness:
+        functor: Column
+        args: base_ClassificationSizeExtendedness_value
+    reliability:
+        functor: Column
+        args: reliability
+    glint_trail:
+        functor: Column
+        args: glint_trail
+    tract:
+        functor: Column
+        args: tract
+    patch:
+        functor: Column
+        args: patch
