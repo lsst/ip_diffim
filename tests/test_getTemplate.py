@@ -74,6 +74,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         self.patches = collections.defaultdict(list)
         self.dataIds = collections.defaultdict(list)
         self.exposure = self._makeExposure()
+        self.varianceBox = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
 
         if debug:
             display.image(self.exposure, "base exposure")
@@ -351,6 +352,34 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         # in the template are closer to the original anymore.
         self.assertTrue(np.isfinite(result.template.image.array).all())
 
+    def _runCorrection(self, doCorrectVariancePlateScale=False, doScaleVariance=False,
+                       handles=None):
+        """Run the task on tract 0 with the named variance corrections.
+
+        Everything defaults to off, so each test turns on exactly what it is
+        exercising.
+        """
+        config = lsst.ip.diffim.GetTemplateTask.ConfigClass()
+        config.doCorrectVariancePlateScale = doCorrectVariancePlateScale
+        config.doScaleVariance = doScaleVariance
+        task = lsst.ip.diffim.GetTemplateTask(config=config)
+        result = task.run(coaddExposureHandles={0: handles or self.patches[0]},
+                          bbox=lsst.geom.Box2I(self.varianceBox),
+                          wcs=self.exposure.wcs,
+                          dataIds={0: self.dataIds[0]},
+                          physical_filter="a_test")
+        return task, result.template
+
+    def _makeScaledWcs(self, factor):
+        """Make a WCS like the base exposure's, but with its pixel scale
+        multiplied by ``factor``.
+        """
+        cdMatrix = lsst.afw.geom.makeCdMatrix(factor*1.05*self.scale*lsst.geom.arcseconds,
+                                              93*lsst.geom.degrees)
+        return lsst.afw.geom.makeSkyWcs(lsst.geom.Point2D(120, 150),
+                                        lsst.geom.SpherePoint(0, 0, lsst.geom.radians),
+                                        cdMatrix)
+
     @staticmethod
     def _makeCoaddInputs(records):
         """Make a CoaddInputs holding the given input records.
@@ -375,6 +404,68 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
             # correction does not use it.
             record.set(weightKey, 1.0)
         return coaddInputs
+
+    def _patchHandles(self, tract, records):
+        """Return handles for a tract's patches, with their CoaddInputs
+        replaced by ``records``.
+        """
+        handles = []
+        for ref in self.patches[tract]:
+            coadd = ref.get()
+            coadd.getInfo().setCoaddInputs(self._makeCoaddInputs(records))
+            handles.append(pipeBase.InMemoryDatasetHandle(
+                coadd, storageClass="ExposureF", copy=True, dataId=ref.dataId))
+        return handles
+
+    def testCorrectVariancePlateScale(self):
+        """The plate scale correction is the total pixel area change from the
+        images the coadds were built from to the science image.
+        """
+        _, off = self._runCorrection()
+
+        # The fixture's records are the science image itself, so there is no
+        # net change in pixel area: the same-instrument case.
+        task, on = self._runCorrection(doCorrectVariancePlateScale=True)
+        self.assertFloatsAlmostEqual(task.metadata["variancePlateScaleFactor"], 1.0, rtol=1e-6)
+
+        # Coarser original pixels than science pixels, the DECam-template
+        # case: the correction is the ratio of their areas.
+        for scaleFactor in (1.315, 0.5):
+            with self.subTest(scaleFactor=scaleFactor):
+                handles = self._patchHandles(
+                    0, [(self._makeScaledWcs(scaleFactor), self.exposure.getBBox())])
+                task, on = self._runCorrection(doCorrectVariancePlateScale=True,
+                                               handles=handles)
+                factor = task.metadata["variancePlateScaleFactor"]
+                self.assertFloatsAlmostEqual(factor, scaleFactor**2, rtol=1e-6)
+                self.assertFloatsAlmostEqual(on.variance.array, off.variance.array*factor,
+                                             rtol=1e-5, ignoreNaNs=True)
+
+    def testCorrectVariancePlateScaleUsesOneRecord(self):
+        """Only the first usable coadd input is read.
+
+        The spread between records is just the local pixel scale, a few
+        tenths of a percent across a real focal plane, so one stands for all
+        of them.
+        """
+        handles = self._patchHandles(
+            0, [(None, self.exposure.getBBox()),
+                (self._makeScaledWcs(2.0), self.exposure.getBBox()),
+                (self.exposure.wcs, self.exposure.getBBox())])
+        task, _ = self._runCorrection(doCorrectVariancePlateScale=True, handles=handles)
+
+        # The first record with a WCS: the one without is skipped, and the
+        # last (which would give 1.0) is never reached.
+        self.assertFloatsAlmostEqual(task.metadata["variancePlateScaleFactor"], 4.0, rtol=1e-6)
+
+    def testCorrectVariancePlateScaleNeedsCoaddInputs(self):
+        """Without usable coadd inputs the plate scale cannot be
+        reconstructed, and the task must say so rather than silently applying
+        only part of the correction.
+        """
+        handles = self._patchHandles(0, [])
+        with self.assertRaisesRegex(RuntimeError, "doCorrectVariancePlateScale"):
+            self._runCorrection(doCorrectVariancePlateScale=True, handles=handles)
 
     def _scaleInputVariance(self, tract, factor):
         """Return fresh handles for one tract's patches, with their variance
