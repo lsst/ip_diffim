@@ -108,6 +108,16 @@ class GetTemplateConfig(
         dtype=afwMath.Warper.ConfigClass,
         doc="warper configuration",
     )
+    doCorrectVariancePlateScale = pexConfig.Field(
+        dtype=bool,
+        default=False,
+        doc="Correct the template variance for the total change in pixel"
+        " area between the images the coadds were built from and the science"
+        " image? This matters when the two have different plate scales, such"
+        " as DECam templates used for Rubin science images. The coadd pixel"
+        " grid cancels out of the total, so the skymap does not enter. It is a"
+        " single scalar factor, applied to the final template variance plane.",
+    )
     coaddPsf = pexConfig.ConfigField(
         doc="Configuration for CoaddPsf",
         dtype=CoaddPsfConfig,
@@ -357,6 +367,18 @@ class GetTemplateTask(pipeBase.PipelineTask):
 
         warped = {}
         catalogs = []
+        # Determine the ratio of the original pixel area to the pixel area of
+        # the science image, if configured. This will only be different from 1
+        # if the coadd was from a different instrument. The ratio can be
+        # determined once from the components of one coadd exposure, so that no
+        # pixels have to be read yet. Coadds comprising images from multiple
+        # different instruments are not supported.
+        plateScaleFactor = None
+        if self.config.doCorrectVariancePlateScale and coaddExposureHandles:
+            plateScaleFactor = self._plateScaleFactor(
+                next(iter(coaddExposureHandles.values()))[0], wcs, bbox
+            )
+
         for tract in coaddExposureHandles:
             maskedImages, catalog, totalBox = self._makeExposureCatalog(
                 coaddExposureHandles[tract], dataIds[tract]
@@ -379,7 +401,6 @@ class GetTemplateTask(pipeBase.PipelineTask):
             potentialInput = self.warper.warpExposure(
                 wcs, unwarped.subset(warpedBox), destBBox=bbox
             )
-
             # Delete the single large `unwarped` image after warping to reduce peak memory use
             del unwarped
             if np.all(
@@ -402,6 +423,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
 
         if len(warped) == 0:
             raise pipeBase.NoWorkFound("No patches found to overlap science exposure.")
+
         # At this point, all entries will be valid, so we can ignore included.
         template, count, _ = self._merge(warped, bbox, wcs)
         if count == 0:
@@ -414,6 +436,8 @@ class GetTemplateTask(pipeBase.PipelineTask):
             varianceFactor = self.scaleVariance.run(template.maskedImage)
             self.log.info("Template variance scaling factor: %.2f", varianceFactor)
             self.metadata["scaleTemplateVarianceFactor"] = varianceFactor
+
+        self._correctVariance(template, plateScaleFactor)
 
         # Make a single catalog containing all the inputs that were accepted.
         catalog = afwTable.ExposureCatalog(self.schema)
@@ -434,6 +458,96 @@ class GetTemplateTask(pipeBase.PipelineTask):
         coaddInputs.ccds.extend(catalog, deep=True)
         template.getInfo().setCoaddInputs(coaddInputs)
         return pipeBase.Struct(template=template)
+
+    def _correctVariance(self, template, plateScaleFactor):
+        """Correct the template variance plane for the effects of warping.
+
+        Compute a multiplicative correction factor for the template variance
+        if the plate scale of the coadd's constituent images is different than
+        the science image the template is being constructed for. This should
+        only be necessary if the coadd images were from a different instrument
+        than the science image. If the plate scale of the science instrument is
+        smaller than the plate scale of the coadd instrument, then the template
+        pixels will be correlated and the true variance will be higher than the
+        image pixel noise level would suggest.
+
+        Parameters
+        ----------
+        template : `lsst.afw.image.Exposure`
+            Assembled template; its variance plane is modified in place.
+        plateScaleFactor : `float` or `None`
+            Correction for the change in pixel area, from `_plateScaleFactor`.
+
+        Raises
+        ------
+        RuntimeError
+            Raised if ``doCorrectVariancePlateScale`` is set but the factor
+            could not be reconstructed from the coadd inputs.
+        """
+        scale = 1.0
+        if self.config.doCorrectVariancePlateScale:
+            if plateScaleFactor is None:
+                raise RuntimeError(
+                    "doCorrectVariancePlateScale is set but no usable coaddInputs were found."
+                )
+            scale *= plateScaleFactor
+            self.metadata["variancePlateScaleFactor"] = plateScaleFactor
+            self.log.info(
+                "Applying a plate scale variance factor of %.4f, reconstructed from the"
+                " coadd inputs.",
+                plateScaleFactor,
+            )
+
+        if scale == 1.0:
+            return
+        template.variance.array *= scale
+        self.metadata["templateVarianceCorrectionFactor"] = scale
+        self.log.info(
+            "Corrected the template variance plane for warping by a factor of %.4f.",
+            scale,
+        )
+
+    def _plateScaleFactor(self, coaddHandle, wcs, bbox):
+        """Compute the variance correction for the total change in pixel area
+        between the coadd's constituent images and the science image.
+
+        Parameters
+        ----------
+        coaddHandle : `lsst.daf.butler.DeferredDatasetHandle` of \
+                      `lsst.afw.image.Exposure`
+            Handle to one of the input coadd patches. Only its ``coaddInputs``
+            component is read; the pixels are left alone.
+        wcs : `lsst.afw.geom.SkyWcs`
+            WCS of the science image the template is being built for.
+        bbox : `lsst.geom.Box2I`
+            Bounding box of the template, used only to choose where to
+            evaluate the science image pixel scale.
+
+        Returns
+        -------
+        factor : `float` or `None`
+            The correction factor equivalent to the ratio of the area of a pixel
+            from the coadd's instrument to the science instrument, or `None` if
+            this patch carries no input record from which it could be computed.
+        """
+        coaddInputs = coaddHandle.get(component="coaddInputs")
+        if coaddInputs is None:
+            return None
+        scienceScale = wcs.getPixelScale(geom.Box2D(bbox).getCenter()).asArcseconds()
+
+        for record in coaddInputs.ccds:
+            # Iterate through the records, and use the first one with a WCS
+            # that gives a usable pixel area.
+            originalWcs = record.getWcs()
+            if originalWcs is None:
+                continue
+            center = geom.Box2D(record.getBBox()).getCenter()
+            pviScale = originalWcs.getPixelScale(center).asArcseconds()
+            # The area of one original pixel, expressed in science pixels.
+            factor = (pviScale/scienceScale)**2
+            if np.isfinite(factor) and factor > 0:
+                return factor
+        return None
 
     def checkHighVariance(self, template):
         """Set a mask plane for regions with unusually high variance.
