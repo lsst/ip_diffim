@@ -56,6 +56,14 @@ class GetTemplateConnections(
         name="{fakesType}calexp.bbox",
         storageClass="Box2I",
         dimensions=("instrument", "visit", "detector"),
+        deprecated="Replaced by the `detector` connection. Will be removed after v31.",
+    )
+    detector = pipeBase.connectionTypes.Input(
+        doc="Detector of the exposure that we will construct the template for."
+        " Its bounding box sets the geometry of the output template.",
+        name="{fakesType}calexp.detector",
+        storageClass="Detector",
+        dimensions=("instrument", "visit", "detector"),
     )
     wcs = pipeBase.connectionTypes.Input(
         doc="WCS of the exposure that we will construct the template for.",
@@ -89,6 +97,8 @@ class GetTemplateConnections(
 
     def __init__(self, *, config=None):
         super().__init__(config=config)
+        # Kept only so that older config files still load.
+        del self.bbox
         if config.requireCoaddAtGraphBuild:
             self.coaddExposures = dataclasses.replace(
                 self.coaddExposures,
@@ -207,7 +217,8 @@ class GetTemplateTask(pipeBase.PipelineTask):
 
     def runQuantum(self, butlerQC, inputRefs, outputRefs):
         inputs = butlerQC.get(inputRefs)
-        bbox = inputs.pop("bbox")
+        detector = inputs.pop("detector")
+        bbox = detector.getBBox()
         wcs = inputs.pop("wcs")
         coaddExposures = inputs.pop("coaddExposures")
         skymap = inputs.pop("skyMap")
@@ -830,7 +841,8 @@ class GetDcrTemplateTask(GetTemplateTask):
 
     def runQuantum(self, butlerQC, inputRefs, outputRefs):
         inputs = butlerQC.get(inputRefs)
-        bbox = inputs.pop("bbox")
+        detector = inputs.pop("detector")
+        bbox = detector.getBBox()
         wcs = inputs.pop("wcs")
         dcrCoaddExposureHandles = inputs.pop("dcrCoadds")
         skymap = inputs.pop("skyMap")
