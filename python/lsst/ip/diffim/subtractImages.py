@@ -1137,10 +1137,15 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         # the `renameTemplateMask` config will be copied to new planes with
         # "_TEMPLATE" appended to their names, and the original mask plane will
         # be cleared.
-        clearMaskPlanes = [mp for mp in template.mask.getMaskPlaneDict().keys()
-                           if mp not in self.config.preserveTemplateMask]
         renameMaskPlanes = [mp for mp in self.config.renameTemplateMask
                             if mp in template.mask.getMaskPlaneDict().keys()]
+        # afw's mask planes are global, so if the "*_TEMPLATE" mask planes were
+        # defined anywhere previously they would now also be cleared unless we
+        # exclude them.
+        renamedMaskPlanes = {maskPlane + "_TEMPLATE" for maskPlane in renameMaskPlanes}
+        clearMaskPlanes = [mp for mp in template.mask.getMaskPlaneDict().keys()
+                           if mp not in self.config.preserveTemplateMask
+                           and mp not in renamedMaskPlanes]
 
         # propagate the mask plane related to Fake source injection
         # NOTE: the fake source injection sets FAKE plane, but it should be INJECTED
