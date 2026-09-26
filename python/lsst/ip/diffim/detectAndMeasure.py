@@ -171,6 +171,12 @@ class DetectAndMeasureConnections(pipeBase.PipelineTaskConnections,
         dimensions=("instrument", "visit", "detector"),
         name="{fakesType}{coaddName}Diff_streaks",
     )
+    streakMaskedImage = pipeBase.connectionTypes.Output(
+        doc="Temporary difference image with binned detection mask plane filled in.",
+        dimensions=("instrument", "visit", "detector"),
+        storageClass="MaskedImageF",
+        name="difference_temporary",
+    )
     glintTrailInfo = pipeBase.connectionTypes.Output(
         doc='Dict of fit parameters for glint trails in the catalog.',
         storageClass="ArrowNumpyDict",
@@ -463,7 +469,7 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         # Copy configs for binned streak detection from the base detection task
         self.streakDetection.thresholdType = self.detection.thresholdType
         self.streakDetection.reEstimateBackground = False
-        self.streakDetection.excludeMaskPlanes = self.detection.excludeMaskPlanes
+        self.streakDetection.excludeMaskPlanes = ["NO_DATA", "SAT", "BAD", "EDGE"]
         self.streakDetection.thresholdValue = self.detection.thresholdValue
         # Only detect positive streaks
         self.streakDetection.thresholdPolarity = "positive"
@@ -641,6 +647,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             diaSources=None,
             maskedStreaks=None,
             differenceBackground=None,
+            streakMaskedImage=None,
         )
         try:
             self.run(**inputs, idFactory=idFactory, measurementResults=measurementResults)
@@ -653,6 +660,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                 measurementResults.scoreMeasuredExposure,
                 measurementResults.diaSources,
                 measurementResults.maskedStreaks,
+                measurementResults.streakMaskedImage,
                 log=self.log
             )
             if self.config.image_type == "future":
@@ -1021,6 +1029,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
         if self.config.doMaskStreaks and self.config.writeStreakInfo:
             measurementResults.maskedStreaks = streakInfo.maskedStreaks
+            measurementResults.streakMaskedImage = streakInfo.streakMaskedImage
 
         if kernelSources is not None:
             self.calculateMetrics(science, difference, diaSources, kernelSources)
@@ -1568,7 +1577,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         else:
             streakInfo = {'rho': np.array([]), 'theta': np.array([]), 'sigma': np.array([]),
                           'reducedChi2': np.array([]), 'modelMaximum': np.array([])}
-        return pipeBase.Struct(maskedStreaks=streakInfo)
+        return pipeBase.Struct(maskedStreaks=streakInfo, streakMaskedImage=streakMaskedImage)
 
 
 class DetectAndMeasureScoreConnections(DetectAndMeasureConnections):
