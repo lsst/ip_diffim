@@ -19,6 +19,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import dataclasses
+
 from astropy import units as u
 from astropy.stats import gaussian_fwhm_to_sigma
 import numpy as np
@@ -27,6 +29,9 @@ import lsst.afw.detection as afwDetection
 import lsst.afw.image
 import lsst.afw.math
 import lsst.geom
+from lsst.images import DifferenceImage
+from lsst.images.convolution_kernels import ImageBasisConvolutionKernel
+from lsst.images.fields import ChebyshevField
 from lsst.ip.diffim.utils import (evaluateMeanPsfFwhm, getPsfFwhm,
                                   computeDifferenceImageMetrics,
                                   checkMask, setSourceFootprints)
@@ -69,7 +74,9 @@ class SubtractInputConnections(lsst.pipe.base.PipelineTaskConnections,
                                dimensions=_dimensions,
                                defaultTemplates=_defaultTemplates):
     template = connectionTypes.Input(
-        doc="Input warped template to subtract.",
+        doc="Input warped template to subtract."
+        " With image_type='future' this is read as a lsst.images.DifferenceImage, so that the"
+        " record of the coadds that went into it can be passed on to the outputs.",
         dimensions=("instrument", "visit", "detector"),
         storageClass="ExposureF",
         name="{fakesType}{coaddName}Diff_templateExp"
@@ -100,6 +107,8 @@ class SubtractInputConnections(lsst.pipe.base.PipelineTaskConnections,
         super().__init__(config=config)
         if not config.doApplyExternalCalibrations:
             del self.visitSummary
+        if config.image_type == "future":
+            self.template = dataclasses.replace(self.template, storageClass="DifferenceImage")
 
 
 class SubtractImageOutputConnections(lsst.pipe.base.PipelineTaskConnections,
@@ -130,6 +139,13 @@ class SubtractImageOutputConnections(lsst.pipe.base.PipelineTaskConnections,
         name="{fakesType}{coaddName}Diff_psfMatchSources"
     )
 
+    def __init__(self, *, config=None):
+        super().__init__(config=config)
+        if config.image_type == "future":
+            self.difference = dataclasses.replace(self.difference, storageClass="DifferenceImage")
+            self.matchedTemplate = dataclasses.replace(self.matchedTemplate,
+                                                       storageClass="DifferenceImage")
+
 
 class SubtractScoreOutputConnections(lsst.pipe.base.PipelineTaskConnections,
                                      dimensions=_dimensions,
@@ -152,6 +168,11 @@ class SubtractScoreOutputConnections(lsst.pipe.base.PipelineTaskConnections,
         storageClass="SourceCatalog",
         name="{fakesType}{coaddName}Diff_psfScoreMatchSources"
     )
+
+    def __init__(self, *, config=None):
+        super().__init__(config=config)
+        if config.image_type == "future":
+            self.scoreExposure = dataclasses.replace(self.scoreExposure, storageClass="DifferenceImage")
 
 
 class AlardLuptonSubtractConnections(SubtractInputConnections, SubtractImageOutputConnections):
@@ -302,6 +323,16 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
         doc="Re-run source detection for kernel candidates if an error is"
         " encountered while calculating the matching kernel."
     )
+    image_type = lsst.pex.config.ChoiceField[str](
+        doc="Which image type to use for the image outputs of this task "
+        "(difference and matchedTemplate, or scoreExposure).",
+        allowed={
+            "legacy": "Write as a lsst.afw.image.ExposureF.",
+            "future": "Write as a lsst.images.DifferenceImage.",
+        },
+        optional=False,
+        default="legacy",
+    )
 
     def setDefaults(self):
         self.makeKernel.kernel.name = "AL"
@@ -357,6 +388,16 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
     """Whether this task preconvolves the science image with its own PSF
     before kernel-matching. Subclasses that preconvolve override this to
     `True`."""
+
+    futureImageOutputs = ("difference", "matchedTemplate")
+    """Names of the images in the results struct that will be converted, in the
+    same order as the output connections that carry them(`tuple` [`str`]).
+    Subclasses with different image outputs override this."""
+
+    futureBackgroundOutput = "difference"
+    """Name of the difference image in the results struct that the background
+    should be attached to (`str`). Subclasses that subtract it from
+    a different image override this."""
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -416,15 +457,101 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
 
     def runQuantum(self, butlerQC, inputRefs, outputRefs):
         inputs = butlerQC.get(inputRefs)
+        templateInfo = None
+        if self.config.image_type == "future":
+            template = inputs["template"]
+            # Read the `TemplateInfo` from the template while it is still in the
+            # `DifferenceImage` format, since legacy exposures don't carry it.
+            templateInfo = template.templates
+            inputs["template"] = template.to_legacy()
 
         try:
             results = self.run(**inputs)
         except lsst.pipe.base.AlgorithmError as e:
             error = lsst.pipe.base.AnnotatedPartialOutputsError.annotate(e, self, log=self.log)
-            # No partial outputs for butler to put
+            # No partial outputs for butler to put, so nothing to convert.
             raise error from e
 
+        if self.config.image_type == "future":
+            self.convert_outputs_to_future(results, butlerQC.quantum.dataId, templateInfo=templateInfo)
+
         butlerQC.put(results, outputRefs)
+
+    def convert_outputs_to_future(self, results, data_id, templateInfo=None):
+        """Convert the image outputs to `lsst.images` types.
+
+        Each image named in `futureImageOutputs` that is present on
+        ``results`` is replaced by an `lsst.images.DifferenceImage`, with the
+        PSF matching kernel attached to it, and the differential background
+        attached to the one named by `futureBackgroundOutput`.
+
+        Parameters
+        ----------
+        results : `lsst.pipe.base.Struct`
+            Output struct to read and modify in place.
+        data_id : `lsst.daf.butler.DataCoordinate`
+            The data ID of the science image.
+        templates : `list` [`lsst.images.DifferenceImageTemplateInfo`],
+            optional (for unit tests)
+            Record of the coadds that went into the template, taken from the
+            template this task subtracted. Attached to every converted
+            output.
+
+        Raises
+        ------
+        TypeError
+            Raised if the PSF matching kernel cannot be stored on an
+            `lsst.images.DifferenceImage`.
+        RuntimeError
+            Raised if an output has pixels set in a mask plane that
+            `lsst.images.get_legacy_difference_image_mask_planes` does not
+            map, or if an output has no detector and there is no science
+            image detector to take one from.
+
+        Notes
+        -----
+        This uses the default legacy mask plane map of
+        `lsst.images.get_legacy_difference_image_mask_planes` and adds any
+        planes from `~lsst.images.get_legacy_optional_mask_planes` that are set
+        for any pixels in the image.
+        """
+        # The science image and every output built from it share the science
+        # pixel grid, so its detector applies to all of them.
+        science = results.matchedScience
+        try:
+            kernel = ImageBasisConvolutionKernel.from_legacy(results.psfMatchingKernel)
+        except (TypeError, ValueError, AttributeError) as e:
+            raise TypeError("The supplied PSF matching kernel cannot be attached to an"
+                            f" lsst.images.DifferenceImage: {e}") from e
+        background = None
+        if self.config.doSubtractBackground:
+            background = ChebyshevField.from_legacy_function2(results.backgroundModel, unit=u.nJy)
+        for name in self.futureImageOutputs:
+            exposure = getattr(results, name, None)
+            if exposure is None:
+                continue
+            if exposure.getDetector() is None:
+                # Fall back on the science detector for images without a
+                # detector of their own (e.g. matchedTemplate)
+                exposure.setDetector(science.getDetector())
+            image = DifferenceImage.from_legacy(
+                exposure,
+                unit=u.nJy,
+                instrument=data_id["instrument"],
+                visit=data_id["visit"],
+            )
+            if kernel is not None:
+                image.kernel = kernel
+            if templateInfo:
+                image.templates = templateInfo
+            if background is not None and name == self.futureBackgroundOutput:
+                image.backgrounds.add(
+                    "subtracted", background,
+                    description="Differential background subtracted from this image when solving for"
+                                " the PSF matching kernel.",
+                    is_subtracted=True,
+                )
+            setattr(results, name, image)
 
     @timeMethod
     def run(self, template, science, sources, visitSummary=None):
@@ -1215,6 +1342,10 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
     ConfigClass = AlardLuptonPreconvolveSubtractConfig
     _DefaultName = "alardLuptonPreconvolveSubtract"
     usePreconvolution = True
+    # This task just writes the score image instead of the difference image and
+    # matchedTemplate
+    futureImageOutputs = ("scoreExposure",)
+    futureBackgroundOutput = "scoreExposure"
 
     def run(self, template, science, sources, visitSummary=None):
         """Preconvolve the science image with its own PSF,

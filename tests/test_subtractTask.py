@@ -20,13 +20,17 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import unittest
+import uuid
 
 from astropy import units as u
 
+import lsst.afw.cameraGeom.testUtils
+import lsst.afw.image
 import lsst.afw.math as afwMath
 import lsst.afw.table as afwTable
 import lsst.geom
 import lsst.meas.algorithms as measAlg
+from lsst.images import Box, DifferenceImage, DifferenceImageTemplateInfo, Polygon
 from lsst.ip.diffim import subtractImages, InsufficientKernelSourcesError
 from lsst.pex.config import FieldValidationError
 from lsst.pipe.base import NoWorkFound
@@ -195,6 +199,36 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
                 self.assertEqual(diffimSum, 0)
             else:
                 self.assertTrue(diffimSum >= scienceSum)
+
+    def test_renamed_template_mask_survives_registered_plane(self):
+        """A renamed template plane keeps its pixels whether or not the plane
+        it is renamed to is already registered.
+
+        afw's mask plane dictionary is shared by every mask in the process, so
+        reading an image that defines SAT_TEMPLATE puts that plane in the
+        template's dictionary as well, with no pixels set.
+        """
+        for preRegistered in (False, True):
+            with self.subTest(preRegistered=preRegistered):
+                science, _ = makeTestImage(psfSize=self.midPsfSize, noiseLevel=1., noiseSeed=6)
+                template, _ = makeTestImage(psfSize=self.goodPsfSize, noiseLevel=1., noiseSeed=7,
+                                            templateBorderSize=20, doApplyCalibration=True)
+                template.mask.addMaskPlane("SAT")
+                satBitMask = template.mask.getPlaneBitMask("SAT")
+                template.mask.array[10:20, 10:20] |= satBitMask
+                expected = np.count_nonzero(template.mask.array & satBitMask)
+                self.assertGreater(expected, 0)
+
+                if preRegistered:
+                    lsst.afw.image.Mask(1, 1).addMaskPlane("SAT_TEMPLATE")
+
+                task = self._setup_subtraction(mode="convolveTemplate")
+                task.updateMasks(template, science)
+
+                satTemplateBitMask = template.mask.getPlaneBitMask("SAT_TEMPLATE")
+                self.assertEqual(np.count_nonzero(template.mask.array & satTemplateBitMask), expected)
+                # The plane the pixels were renamed from is still cleared.
+                self.assertEqual(np.count_nonzero(template.mask.array & satBitMask), 0)
 
     def test_equal_images(self):
         """Test that running with enough sources produces reasonable output,
@@ -1394,6 +1428,454 @@ class SimplifiedSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.TestC
         differenceStd = computeRobustStatistics(output.difference.image, output.difference.mask,
                                                 makeStats(), statistic=afwMath.STDEV)
         self.assertFloatsAlmostEqual(differenceStd, np.sqrt(2)*noiseLevel, rtol=0.1)
+
+
+class OutputImageTypeTest(lsst.utils.tests.TestCase):
+    """Tests of the optional conversion of the image outputs to
+    `lsst.images` types.
+    """
+    # `makeTestImage` does not attach a detector or a VisitInfo, so supply a
+    # detector with real amplifier geometry and a simple data id.
+    dataId = {"instrument": "testCam", "visit": 12345}
+
+    def setUp(self):
+        self.detector = list(lsst.afw.cameraGeom.testUtils.CameraWrapper().camera)[0]
+
+    def _setup_subtraction(self, taskClass, **kwargs):
+        """Configure one of the subtraction tasks with the shared test
+        settings.
+
+        Parameters
+        ----------
+        taskClass : `lsst.pipe.base.PipelineTask`
+            The subtraction task class to configure.
+        **kwargs
+            Any additional config parameters to set.
+
+        Returns
+        -------
+        task : `lsst.pipe.base.PipelineTask`
+            The configured task.
+        """
+        helper = AlardLuptonSubtractTestBase()
+        helper.subtractTask = taskClass
+        return helper._setup_subtraction(**kwargs)
+
+    def _make_images(self):
+        """Make a science and template image pair to subtract.
+
+        Returns
+        -------
+        science : `lsst.afw.image.ExposureF`
+            The science image, with a detector attached.
+        template : `lsst.afw.image.ExposureF`
+            The template image, with no detector attached.
+        sources : `lsst.afw.table.SourceCatalog`
+            Sources detected on the science image.
+        """
+        noiseLevel = 1.
+        science, sources = makeTestImage(psfSize=2.4, noiseLevel=noiseLevel, noiseSeed=6)
+        template, _ = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=7,
+                                    templateBorderSize=20, doApplyCalibration=True)
+        science.setDetector(self.detector)
+        return science, template, sources
+
+    def _check_converted(self, image, kernelExpected=True):
+        """Check that one converted image is a fully-formed DifferenceImage.
+
+        Parameters
+        ----------
+        image : `lsst.images.DifferenceImage`
+            The converted output to check.
+        kernelExpected : `bool`, optional
+            Should the PSF matching kernel be attached?
+        """
+        self.assertIsInstance(image, DifferenceImage)
+        self.assertEqual(image.unit, u.nJy)
+        # `makeTestImage` does not attach a VisitInfo, so the data id supplied
+        # to the conversion is the only source of these.
+        frame = image.sky_projection.pixel_frame
+        self.assertEqual(frame.instrument, self.dataId["instrument"])
+        self.assertEqual(frame.visit, self.dataId["visit"])
+        self.assertEqual(image.detector.id, self.detector.getId())
+        if kernelExpected:
+            self.assertIsNotNone(image.kernel)
+        else:
+            # An unset kernel raises, rather than returning None.
+            with self.assertRaises(AttributeError):
+                image.kernel
+        # Populating this needs the visitSummary PhotoCalib; it is deferred.
+        self.assertIsNone(image.photometric_scaling)
+
+    def test_connections_legacy(self):
+        """Test that the default configuration leaves the output connections
+        with the legacy storage classes.
+        """
+        for configClass, connectionsClass in (
+            (subtractImages.AlardLuptonSubtractConfig,
+             subtractImages.AlardLuptonSubtractConnections),
+            (subtractImages.AlardLuptonPreconvolveSubtractConfig,
+             subtractImages.AlardLuptonPreconvolveSubtractConnections),
+            (subtractImages.SimplifiedSubtractConfig,
+             subtractImages.SimplifiedSubtractConnections),
+        ):
+            with self.subTest(configClass=configClass.__name__):
+                config = configClass()
+                self.assertEqual(config.image_type, "legacy")
+                connections = connectionsClass(config=config)
+                for name in connections.outputs:
+                    if name in ("difference", "matchedTemplate", "scoreExposure"):
+                        self.assertEqual(getattr(connections, name).storageClass, "ExposureF")
+
+    def test_connections_future(self):
+        """Test that ``image_type="future"`` swaps the storage class of
+        every image output, and only those.
+        """
+        for configClass, connectionsClass, expected in (
+            (subtractImages.AlardLuptonSubtractConfig,
+             subtractImages.AlardLuptonSubtractConnections,
+             ("difference", "matchedTemplate")),
+            (subtractImages.AlardLuptonPreconvolveSubtractConfig,
+             subtractImages.AlardLuptonPreconvolveSubtractConnections,
+             ("scoreExposure",)),
+            (subtractImages.SimplifiedSubtractConfig,
+             subtractImages.SimplifiedSubtractConnections,
+             ("difference", "matchedTemplate")),
+        ):
+            with self.subTest(configClass=configClass.__name__):
+                config = configClass()
+                config.image_type = "future"
+                connections = connectionsClass(config=config)
+                for name in expected:
+                    self.assertEqual(getattr(connections, name).storageClass, "DifferenceImage")
+                # The kernel has no converter to or from the new types, so it
+                # must remain a separate output in both modes.
+                if "psfMatchingKernel" in connections.outputs:
+                    self.assertEqual(connections.psfMatchingKernel.storageClass, "MatchingKernel")
+
+    def test_connections_future_simplified_existing_kernel(self):
+        """Test the storage class swap for the connection variant that
+        consumes an existing kernel.
+        """
+        config = subtractImages.SimplifiedSubtractConfig()
+        config.image_type = "future"
+        config.useExistingKernel = True
+        connections = subtractImages.SimplifiedSubtractConnections(config=config)
+        self.assertEqual(connections.difference.storageClass, "DifferenceImage")
+        self.assertEqual(connections.matchedTemplate.storageClass, "DifferenceImage")
+        self.assertEqual(connections.inputPsfMatchingKernel.storageClass, "MatchingKernel")
+        self.assertNotIn("psfMatchingKernel", connections.outputs)
+
+    def test_convert_outputs_to_future(self):
+        """Test converting the outputs of `AlardLuptonSubtractTask`.
+        """
+        science, template, sources = self._make_images()
+        task = self._setup_subtraction(subtractImages.AlardLuptonSubtractTask,
+                                       image_type="future")
+        results = task.run(template, science, sources)
+        # The template has no detector, so neither does the matched template.
+        self.assertIsNone(results.matchedTemplate.getDetector())
+        legacyDifference = results.difference.image.array.copy()
+
+        task.convert_outputs_to_future(results, self.dataId)
+
+        self._check_converted(results.difference)
+        self._check_converted(results.matchedTemplate)
+        self.assertEqual(results.difference.bbox.to_legacy(), science.getBBox())
+        np.testing.assert_array_equal(results.difference.image.array, legacyDifference)
+        # The kernel outputs are untouched.
+        self.assertIsInstance(results.psfMatchingKernel, afwMath.LinearCombinationKernel)
+        self.assertIsInstance(results.kernelSources, afwTable.SourceCatalog)
+
+    def test_convert_outputs_to_future_score(self):
+        """Test converting the outputs of
+        `AlardLuptonPreconvolveSubtractTask`, which writes a score image.
+        """
+        science, template, sources = self._make_images()
+        task = self._setup_subtraction(subtractImages.AlardLuptonPreconvolveSubtractTask,
+                                       image_type="future")
+        results = task.run(template, science, sources)
+
+        task.convert_outputs_to_future(results, self.dataId)
+
+        self._check_converted(results.scoreExposure)
+        self.assertIsInstance(results.psfMatchingKernel, afwMath.LinearCombinationKernel)
+
+    def test_convert_outputs_to_future_simplified(self):
+        """Test converting the outputs of `SimplifiedSubtractTask` running
+        with a pre-existing kernel.
+        """
+        science, template, sources = self._make_images()
+        alTask = self._setup_subtraction(subtractImages.AlardLuptonSubtractTask)
+        alResults = alTask.run(template.clone(), science.clone(), sources)
+        task = self._setup_subtraction(subtractImages.SimplifiedSubtractTask,
+                                       useExistingKernel=True,
+                                       image_type="future")
+        results = task.run(template.clone(), science.clone(),
+                           inputPsfMatchingKernel=alResults.psfMatchingKernel)
+
+        task.convert_outputs_to_future(results, self.dataId)
+
+        self._check_converted(results.difference)
+        self._check_converted(results.matchedTemplate)
+
+    def test_convert_outputs_to_future_missing_output(self):
+        """Test that conversion skips outputs that are absent from the result
+        struct, instead of failing.
+        """
+        science, template, sources = self._make_images()
+        task = self._setup_subtraction(subtractImages.AlardLuptonSubtractTask,
+                                       image_type="future")
+        results = task.run(template, science, sources)
+        del results.matchedTemplate
+
+        task.convert_outputs_to_future(results, self.dataId)
+
+        self._check_converted(results.difference)
+        self.assertFalse(hasattr(results, "matchedTemplate"))
+
+    @staticmethod
+    def _makeTemplateInfo(tract=9813, patch=42):
+        """Return one record of a coadd that went into a template.
+
+        Parameters
+        ----------
+        tract, patch : `int`, optional
+            Identifiers of the coadd the record describes.
+
+        Returns
+        -------
+        info : `lsst.images.DifferenceImageTemplateInfo`
+            The record.
+        """
+        return DifferenceImageTemplateInfo(
+            skymap="skymap", tract=tract, patch=patch, dataset_id=uuid.uuid4(),
+            dataset_run="a/template/run", bounds=Polygon.from_box(Box.factory[0:50, 0:50]),
+            psf_shape_xx=4.0, psf_shape_yy=4.0, psf_shape_xy=0.0, psf_shape_flag=False)
+
+    def _make_future_template(self, template, templateInfo=None):
+        """Convert a legacy template to the type the ``future`` mode reads.
+
+        Parameters
+        ----------
+        template : `lsst.afw.image.ExposureF`
+            Template from `_make_images`, which has no detector.
+        templateInfo : `list` [`lsst.images.DifferenceImageTemplateInfo`], optional
+            Record of the coadds that went into it, left off if `None`.
+
+        Returns
+        -------
+        template : `lsst.images.DifferenceImage`
+            The converted template.
+        """
+        template = template.clone()
+        template.setDetector(self.detector)
+        image = DifferenceImage.from_legacy(template, unit=u.nJy, instrument=self.dataId["instrument"],
+                                            visit=self.dataId["visit"])
+        if templateInfo is not None:
+            image.templates = templateInfo
+        return image
+
+    def _check_background(self, image, legacyBackground):
+        """Check that a converted image carries the background
+        that was subtracted from it.
+
+        Parameters
+        ----------
+        image : `lsst.images.DifferenceImage`
+            The converted image to check.
+        legacyBackground : `lsst.afw.math.Chebyshev1Function2D`
+            Background model from the result struct.
+        """
+        self.assertEqual(list(image.backgrounds), ["subtracted"])
+        field = image.backgrounds.subtracted.field
+        self.assertEqual(field.unit, u.nJy)
+        bbox = field.bounds.bbox.to_legacy()
+        rendered = field.render().array
+        for y in np.linspace(bbox.getMinY(), bbox.getMaxY(), 5, dtype=int):
+            for x in np.linspace(bbox.getMinX(), bbox.getMaxX(), 5, dtype=int):
+                self.assertFloatsAlmostEqual(rendered[y - bbox.getMinY(), x - bbox.getMinX()],
+                                             legacyBackground(float(x), float(y)), rtol=1e-12)
+
+    def test_convert_outputs_to_future_background(self):
+        """The background goes on the difference image, which is
+        the one it was subtracted from.
+        """
+        science, template, sources = self._make_images()
+        task = self._setup_subtraction(subtractImages.AlardLuptonSubtractTask,
+                                       doSubtractBackground=True,
+                                       image_type="future")
+        results = task.run(template, science, sources)
+        legacyBackground = results.backgroundModel
+        self.assertNotEqual(list(legacyBackground.getParameters()), [0.0]*len(
+            legacyBackground.getParameters()))
+
+        task.convert_outputs_to_future(results, self.dataId)
+
+        self._check_background(results.difference, legacyBackground)
+        self.assertEqual(results.difference.backgrounds.subtracted.field.bounds.bbox.to_legacy(),
+                         science.getBBox())
+        # The background was only taken out of the difference image.
+        self.assertEqual(len(results.matchedTemplate.backgrounds), 0)
+
+    def test_convert_outputs_to_future_background_score(self):
+        """The score image gets the background, over the inner region that
+        the kernel was fit on.
+        """
+        science, template, sources = self._make_images()
+        task = self._setup_subtraction(subtractImages.AlardLuptonPreconvolveSubtractTask,
+                                       doSubtractBackground=True,
+                                       image_type="future")
+        results = task.run(template, science, sources)
+        legacyBackground = results.backgroundModel
+
+        task.convert_outputs_to_future(results, self.dataId)
+
+        self._check_background(results.scoreExposure, legacyBackground)
+        bbox = results.scoreExposure.backgrounds.subtracted.field.bounds.bbox.to_legacy()
+        self.assertTrue(results.scoreExposure.bbox.to_legacy().contains(bbox))
+        self.assertNotEqual(bbox, results.scoreExposure.bbox.to_legacy())
+
+    def test_convert_outputs_to_future_background_not_subtracted(self):
+        """A background the task fit but did not subtract is left off the
+        outputs.
+        """
+        science, template, sources = self._make_images()
+        for taskClass, output in ((subtractImages.AlardLuptonSubtractTask, "difference"),
+                                  (subtractImages.AlardLuptonPreconvolveSubtractTask, "scoreExposure")):
+            with self.subTest(taskClass=taskClass.__name__):
+                task = self._setup_subtraction(taskClass, doSubtractBackground=False,
+                                               image_type="future")
+                results = task.run(template.clone(), science.clone(), sources)
+
+                task.convert_outputs_to_future(results, self.dataId)
+
+                self.assertEqual(len(getattr(results, output).backgrounds), 0)
+
+    def test_convert_outputs_to_future_background_convolve_science(self):
+        """In ``convolveScience`` mode the actual background used is inverted.
+        """
+        science, template, sources = self._make_images()
+        task = self._setup_subtraction(subtractImages.AlardLuptonSubtractTask,
+                                       mode="convolveScience",
+                                       doSubtractBackground=True,
+                                       image_type="future")
+        results = task.run(template, science, sources)
+        self.assertEqual(task.metadata["convolvedExposure"], "Science")
+        legacyBackground = results.backgroundModel
+
+        task.convert_outputs_to_future(results, self.dataId)
+
+        self._check_background(results.difference, legacyBackground)
+
+    def test_convert_outputs_to_future_templates(self):
+        """The record of the coadds that went into the template is copied to
+        every converted output.
+        """
+        science, template, sources = self._make_images()
+        task = self._setup_subtraction(subtractImages.AlardLuptonSubtractTask,
+                                       image_type="future")
+        results = task.run(template, science, sources)
+        templateInfo = [self._makeTemplateInfo(patch=41), self._makeTemplateInfo(patch=42)]
+
+        task.convert_outputs_to_future(results, self.dataId, templateInfo=templateInfo)
+
+        for image in (results.difference, results.matchedTemplate):
+            self.assertEqual([(t.tract, t.patch) for t in image.templates],
+                             [(9813, 41), (9813, 42)])
+
+    def test_convert_outputs_to_future_no_templates(self):
+        """A template with no record of its coadds leaves the outputs without
+        one, rather than with an empty list.
+        """
+        science, template, sources = self._make_images()
+        task = self._setup_subtraction(subtractImages.AlardLuptonSubtractTask,
+                                       image_type="future")
+        results = task.run(template, science, sources)
+
+        task.convert_outputs_to_future(results, self.dataId)
+
+        with self.assertRaises(AttributeError):
+            results.difference.templates
+
+    def test_run_quantum_puts_future_types(self):
+        """``runQuantum`` converts before putting in future mode, and does not
+        convert in legacy mode.
+        """
+        science, template, sources = self._make_images()
+        templateInfo = [self._makeTemplateInfo()]
+        for imageType, expectedType in (("legacy", lsst.afw.image.ExposureF),
+                                        ("future", DifferenceImage)):
+            with self.subTest(imageType=imageType):
+                task = self._setup_subtraction(subtractImages.AlardLuptonSubtractTask,
+                                               image_type=imageType)
+                if imageType == "future":
+                    inputTemplate = self._make_future_template(template, templateInfo)
+                else:
+                    inputTemplate = template.clone()
+                butlerQC = _RecordingQuantumContext(self.dataId)
+                task.runQuantum(butlerQC,
+                                _FakeRefs(template=inputTemplate, science=science.clone(),
+                                          sources=sources),
+                                _FakeRefs())
+                self.assertIsInstance(butlerQC.put_values.difference, expectedType)
+                self.assertIsInstance(butlerQC.put_values.matchedTemplate, expectedType)
+                # The kernel is a separate output in both modes.
+                self.assertIsInstance(butlerQC.put_values.psfMatchingKernel,
+                                      afwMath.LinearCombinationKernel)
+                if imageType == "future":
+                    self.assertEqual(butlerQC.put_values.difference.templates, templateInfo)
+                    self.assertEqual(butlerQC.put_values.matchedTemplate.templates, templateInfo)
+
+    def test_run_quantum_simplified_puts_future_types(self):
+        """``runQuantum`` converts the outputs of `SimplifiedSubtractTask`,
+        which loads an existing kernel rather than fitting one.
+        """
+        science, template, sources = self._make_images()
+        templateInfo = [self._makeTemplateInfo()]
+        alTask = self._setup_subtraction(subtractImages.AlardLuptonSubtractTask)
+        alResults = alTask.run(template.clone(), science.clone(), sources)
+        for useExistingKernel in (True, False):
+            with self.subTest(useExistingKernel=useExistingKernel):
+                task = self._setup_subtraction(subtractImages.SimplifiedSubtractTask,
+                                               useExistingKernel=useExistingKernel,
+                                               image_type="future")
+                refs = {"template": self._make_future_template(template, templateInfo),
+                        "science": science.clone()}
+                if useExistingKernel:
+                    refs["inputPsfMatchingKernel"] = alResults.psfMatchingKernel
+                butlerQC = _RecordingQuantumContext(self.dataId)
+
+                task.runQuantum(butlerQC, _FakeRefs(**refs), _FakeRefs())
+
+                self._check_converted(butlerQC.put_values.difference)
+                self._check_converted(butlerQC.put_values.matchedTemplate)
+                self.assertEqual(butlerQC.put_values.difference.templates, templateInfo)
+
+
+class _FakeRefs:
+    """Stand-in for an input or output ``QuantizedConnection``."""
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
+
+
+class _RecordingQuantumContext:
+    """Minimal `~lsst.pipe.base.QuantumContext` that records what was put.
+
+    Parameters
+    ----------
+    dataId : `dict`
+        Data ID to report as the quantum data ID.
+    """
+    def __init__(self, dataId):
+        self.quantum = _FakeRefs(dataId=dataId)
+        self.put_values = None
+
+    def get(self, refs):
+        return dict(refs.__dict__)
+
+    def put(self, values, refs):
+        self.put_values = values
 
 
 def setup_module(module):

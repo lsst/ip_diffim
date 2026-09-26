@@ -22,8 +22,11 @@
 import numpy as np
 import os
 import unittest
+import uuid
 from unittest import mock
 import requests
+
+import astropy.units
 
 import lsst.afw.detection as afwDetection
 import lsst.afw.geom as afwGeom
@@ -31,10 +34,16 @@ import lsst.afw.image as afwImage
 import lsst.afw.table as afwTable
 import lsst.afw.math as afwMath
 import lsst.geom
+from lsst.images import Box, DifferenceImage, DifferenceImageTemplateInfo, Polygon
+from lsst.images.convolution_kernels import ImageBasisConvolutionKernel
+import lsst.images.psfs
+import lsst.images.serialization
 from lsst.ip.diffim import detectAndMeasure, subtractImages
 from lsst.afw.table import IdFactory
-from lsst.afw.cameraGeom.testUtils import DetectorWrapper
+from lsst.afw.cameraGeom.testUtils import CameraWrapper, DetectorWrapper
 import lsst.meas.algorithms as measAlg
+import lsst.pipe.base
+import lsst.pipe.base.testUtils
 from lsst.pipe.base import InvalidQuantumError, UpstreamFailureNoWorkFound, AlgorithmError
 import lsst.utils.tests
 import lsst.meas.base.tests
@@ -1555,6 +1564,391 @@ def makeVisitInfo(id=1):
                                   11.1*geom.degrees, 22.2*geom.degrees, 0.333),
                               weather=Weather(1.1, 2.2, 34.5),
                               )
+
+
+class DetectAndMeasureOutputFormatTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
+    """Tests of the conversion of the output images to `lsst.images` types.
+    """
+    detectionTask = detectAndMeasure.DetectAndMeasureTask
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # `DifferenceImage.from_legacy` needs a detector with per-amplifier
+        # raw geometry and a FIELD_ANGLE transform; the simpler
+        # `DetectorWrapper` detector used elsewhere in this file does not
+        # have either, and fails to convert.
+        cls.detector = list(CameraWrapper().camera)[0]
+
+    def setUp(self):
+        self.dataId = lsst.daf.butler.DataCoordinate.standardize(
+            instrument="I",
+            visit=42,
+            detector=12,
+            universe=lsst.daf.butler.DimensionUniverse(),
+        )
+
+    @staticmethod
+    def _makeTemplateInfo(patch=42):
+        """Return one record of a coadd that went into a template.
+
+        Parameters
+        ----------
+        patch : `int`, optional
+            Identifier of the patch the record describes.
+
+        Returns
+        -------
+        info : `lsst.images.DifferenceImageTemplateInfo`
+            The record.
+        """
+        return DifferenceImageTemplateInfo(
+            skymap="skymap", tract=9813, patch=patch, dataset_id=uuid.uuid4(),
+            dataset_run="a/template/run", bounds=Polygon.from_box(Box.factory[0:50, 0:50]),
+            psf_shape_xx=4.0, psf_shape_yy=4.0, psf_shape_xy=0.0, psf_shape_flag=False)
+
+    @staticmethod
+    def _makeKernel(scale=1.0):
+        """Return a PSF matching kernel of the one form that can be attached
+        to a difference image.
+
+        Parameters
+        ----------
+        scale : `float`, optional
+            Coefficient of the first basis kernel, to tell two kernels apart.
+
+        Returns
+        -------
+        kernel : `lsst.images.convolution_kernels.ImageBasisConvolutionKernel`
+            The kernel.
+        """
+        basis = []
+        for sigma in (1.0, 2.0):
+            image = afwImage.ImageD(5, 5)
+            y, x = np.mgrid[-2:3, -2:3]
+            image.array[:] = np.exp(-(x**2 + y**2)/(2*sigma**2))
+            basis.append(afwMath.FixedKernel(image))
+        bbox = lsst.geom.Box2D(lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Extent2I(100, 100)))
+        legacy = afwMath.LinearCombinationKernel(basis, afwMath.Chebyshev1Function2D(1, bbox))
+        legacy.setSpatialParameters([[scale, 0.0, 0.0], [0.5, 0.0, 0.0]])
+        return ImageBasisConvolutionKernel.from_legacy(legacy)
+
+    def _makeFutureInput(self, exposure, templateInfo=None, kernel=None):
+        """Convert a legacy image to a `lsst.images.DifferenceImage`.
+
+        Parameters
+        ----------
+        exposure : `lsst.afw.image.ExposureF`
+            Image from `_make_images`.
+        templateInfo : `list` [`lsst.images.DifferenceImageTemplateInfo`], optional
+            Record of the coadds that went into the template.
+        kernel : `lsst.images.convolution_kernels.ImageBasisConvolutionKernel`, optional
+            PSF matching kernel.
+
+        Returns
+        -------
+        image : `lsst.images.DifferenceImage`
+            The converted image.
+        """
+        image = DifferenceImage.from_legacy(
+            exposure, unit=astropy.units.nJy,
+            instrument=self.dataId["instrument"], visit=self.dataId["visit"])
+        if templateInfo is not None:
+            image.templates = templateInfo
+        if kernel is not None:
+            image.kernel = kernel
+        return image
+
+    def _make_images(self, withScore=False):
+        """Make a science/template/difference image set for detection.
+
+        The template is not actually subtracted from the science image, so
+        that there are plenty of detections; configure the detection task
+        with ``badSubtractionRatioThreshold=1.`` to match.
+
+        Parameters
+        ----------
+        withScore : `bool`, optional
+            Also make and return a score (maximum likelihood) image?
+
+        Returns
+        -------
+        images : `tuple`
+            The science exposure, the source catalog, the matched template,
+            the difference image, and (if ``withScore``) the score image.
+        """
+        kernelSize = 31
+        kwargs = {"seed": 1, "psfSize": 2.4, "fluxLevel": 500, "x0": 12345, "y0": 67890,
+                  "kernelSize": kernelSize, "templateBorderSize": kernelSize//2}
+        science, sources = makeTestImage(noiseLevel=1., noiseSeed=6, **kwargs)
+        matchedTemplate, _ = makeTestImage(noiseLevel=0.25, noiseSeed=7, **kwargs)
+        # `makeTestImage` does not set a detector, but conversion needs one.
+        science.setDetector(self.detector)
+        matchedTemplate.setDetector(self.detector)
+        difference = science.clone()
+        if not withScore:
+            return science, sources, matchedTemplate, difference
+        subtractTask = subtractImages.AlardLuptonPreconvolveSubtractTask()
+        score = subtractTask._convolveExposure(difference, science.psf.getKernel(),
+                                               subtractTask.convolutionControl)
+        score.setDetector(self.detector)
+        return science, sources, matchedTemplate, difference, score
+
+    def _setup_task(self, **kwargs):
+        """Configure a detection task to go with `_make_images`.
+
+        Parameters
+        ----------
+        **kwargs
+            Any additional config parameters to set.
+
+        Returns
+        -------
+        task : `lsst.pipe.base.PipelineTask`
+            The configured task to use for detection and measurement.
+        """
+        # The template is not actually subtracted from the science image in
+        # `_make_images`, so the subtraction residual metric threshold has to
+        # be set high.
+        kwargs.setdefault("badSubtractionRatioThreshold", 1.)
+        return self._setup_detection(doSkySources=False, **kwargs)
+
+    def _check_converted(self, image, legacyBbox):
+        """Check the properties common to every converted output image.
+
+        Parameters
+        ----------
+        image : `lsst.images.DifferenceImage`
+            The converted image.
+        legacyBbox : `lsst.geom.Box2I`
+            Bounding box of the legacy exposure it was converted from.
+        """
+        self.assertIsInstance(image, DifferenceImage)
+        self.assertEqual(image.bbox.x.start, legacyBbox.getMinX())
+        self.assertEqual(image.bbox.x.stop, legacyBbox.getMaxX() + 1)
+        self.assertEqual(image.bbox.y.start, legacyBbox.getMinY())
+        self.assertEqual(image.bbox.y.stop, legacyBbox.getMaxY() + 1)
+        self.assertEqual(image.unit, astropy.units.nJy)
+        self.assertIsNotNone(image.detector)
+        # Populating this needs the visit summary PhotoCalib, which this task
+        # does not have as an input, so it is deliberately left unset.
+        self.assertIsNone(image.photometric_scaling)
+
+    def test_connections(self):
+        """Check that the output storage classes follow ``image_type``,
+        and that the background output is kept in both modes.
+        """
+        for configClass, connectionsClass in (
+            (detectAndMeasure.DetectAndMeasureConfig, detectAndMeasure.DetectAndMeasureConnections),
+            (detectAndMeasure.DetectAndMeasureScoreConfig,
+             detectAndMeasure.DetectAndMeasureScoreConnections),
+        ):
+            for imageType, storageClass in (("legacy", "ExposureF"), ("future", "DifferenceImage")):
+                with self.subTest(configClass=configClass.__name__, imageType=imageType):
+                    config = configClass()
+                    config.image_type = imageType
+                    config.doSubtractBackground = True
+                    config.doWriteBackground = True
+                    connections = connectionsClass(config=config)
+                    self.assertEqual(connections.subtractedMeasuredExposure.storageClass, storageClass)
+                    if connectionsClass is detectAndMeasure.DetectAndMeasureScoreConnections:
+                        self.assertEqual(connections.scoreMeasuredExposure.storageClass, storageClass)
+                    # The background is a separate dataset in both modes.
+                    self.assertIn("differenceBackground", connections.outputs)
+                    self.assertEqual(connections.differenceBackground.storageClass, "Background")
+
+    def test_run_returns_legacy_types(self):
+        """``run`` always returns legacy types, even in future mode."""
+        science, sources, matchedTemplate, difference = self._make_images()
+        task = self._setup_task(image_type="future")
+        output = task.run(science, matchedTemplate, difference, sources)
+        self.assertIsInstance(output.subtractedMeasuredExposure, afwImage.ExposureF)
+
+    def test_legacy_mode_does_not_convert(self):
+        """Legacy mode is unchanged, with no conversion..
+        """
+        science, sources, matchedTemplate, difference = self._make_images()
+        task = self._setup_task(doSubtractBackground=True, image_type="legacy")
+        output = task.run(science, matchedTemplate, difference, sources)
+        self.assertIsInstance(output.subtractedMeasuredExposure, afwImage.ExposureF)
+        self.assertIsInstance(output.differenceBackground, afwMath.BackgroundList)
+        lsst.pipe.base.testUtils.assertValidOutput(task, output)
+
+    def test_convert_outputs_to_future(self):
+        """Convert the outputs of ``DetectAndMeasureTask``."""
+        science, sources, matchedTemplate, difference = self._make_images()
+        task = self._setup_task(doSubtractBackground=True, image_type="future")
+        output = task.run(science, matchedTemplate, difference, sources)
+        legacyBbox = output.subtractedMeasuredExposure.getBBox()
+        background = output.differenceBackground
+        task.convert_outputs_to_future(output, self.dataId)
+
+        self._check_converted(output.subtractedMeasuredExposure, legacyBbox)
+        self.assertIn("subtracted", output.subtractedMeasuredExposure.backgrounds)
+        # The separate background dataset is still written in future mode.
+        self.assertIs(output.differenceBackground, background)
+        self.assertIsInstance(output.differenceBackground, afwMath.BackgroundList)
+
+    def test_convert_outputs_to_future_source_injection(self):
+        """Convert a difference image from a pipeline that injects sources.
+
+        The injection planes are optional, so the conversion adds them for
+        an image that has pixels set in them instead of raising.
+        """
+        planes = ("INJECTED", "INJECTED_CORE", "INJECTED_TEMPLATE", "INJECTED_CORE_TEMPLATE")
+        science, sources, matchedTemplate, difference = self._make_images()
+        task = self._setup_task(image_type="future")
+        output = task.run(science, matchedTemplate, difference, sources)
+        mask = output.subtractedMeasuredExposure.mask
+        for n, plane in enumerate(planes):
+            mask.addMaskPlane(plane)
+            mask.array[0, n] |= mask.getPlaneBitMask(plane)
+
+        task.convert_outputs_to_future(output, self.dataId)
+
+        image = output.subtractedMeasuredExposure
+        self.assertIsInstance(image, DifferenceImage)
+        for plane in planes:
+            with self.subTest(plane=plane):
+                self.assertEqual(np.count_nonzero(image.mask.get(plane)), 1)
+
+    def test_convert_outputs_to_future_score(self):
+        """Convert the outputs of ``DetectAndMeasureScoreTask``."""
+        self.detectionTask = detectAndMeasure.DetectAndMeasureScoreTask
+        science, sources, matchedTemplate, difference, score = self._make_images(withScore=True)
+        task = self._setup_task(doSubtractBackground=True, image_type="future")
+        output = task.run(science, matchedTemplate, difference, score, sources)
+        legacyBboxes = {name: getattr(output, name).getBBox()
+                        for name in ("subtractedMeasuredExposure", "scoreMeasuredExposure")}
+        task.convert_outputs_to_future(output, self.dataId)
+
+        for name, legacyBbox in legacyBboxes.items():
+            with self.subTest(name=name):
+                self._check_converted(getattr(output, name), legacyBbox)
+                # The same background is subtracted from both images.
+                self.assertIn("subtracted", getattr(output, name).backgrounds)
+
+    def test_convert_outputs_to_future_empty_background(self):
+        """An empty background list cannot be converted to a field, and must
+        not break the conversion of the images.
+        """
+        science, sources, matchedTemplate, difference = self._make_images()
+        task = self._setup_task(doSubtractBackground=False, image_type="future")
+        output = task.run(science, matchedTemplate, difference, sources)
+        self.assertEqual(len(output.differenceBackground), 0)
+        legacyBbox = output.subtractedMeasuredExposure.getBBox()
+        task.convert_outputs_to_future(output, self.dataId)
+        self._check_converted(output.subtractedMeasuredExposure, legacyBbox)
+        self.assertEqual(len(output.subtractedMeasuredExposure.backgrounds), 0)
+
+    def test_stray_struct_field_is_ignored(self):
+        """``DetectAndMeasureTask`` seeds ``scoreMeasuredExposure`` in its
+        result struct even though it has no such output connection; check
+        that such a stray field is ignored.
+        """
+        science, sources, matchedTemplate, difference = self._make_images()
+        task = self._setup_task(image_type="legacy")
+        output = task.run(science, matchedTemplate, difference, sources)
+        output.scoreMeasuredExposure = difference
+        connections = task.config.ConnectionsClass(config=task.config)
+        self.assertNotIn("scoreMeasuredExposure", connections.outputs)
+        lsst.pipe.base.testUtils.assertValidOutput(task, output)
+
+    def test_run_quantum(self):
+        """``runQuantum`` converts before putting in future mode, and leaves
+        the legacy types alone otherwise.
+        """
+        templateInfo = [self._makeTemplateInfo()]
+        kernel = self._makeKernel()
+        for imageType, expectedType in (("legacy", afwImage.ExposureF),
+                                        ("future", DifferenceImage)):
+            with self.subTest(imageType=imageType):
+                science, sources, matchedTemplate, difference = self._make_images()
+                if imageType == "future":
+                    difference = self._makeFutureInput(difference, templateInfo, kernel)
+                task = self._setup_task(doSubtractBackground=True, image_type=imageType)
+                butlerQC = _RecordingQuantumContext(self.dataId)
+                task.runQuantum(butlerQC,
+                                _FakeRefs(science=science, matchedTemplate=matchedTemplate,
+                                          difference=difference, kernelSources=sources),
+                                _FakeRefs())
+                out = butlerQC.put_values.subtractedMeasuredExposure
+                self.assertIsInstance(out, expectedType)
+                # The background is a separate dataset in both modes.
+                self.assertIsInstance(butlerQC.put_values.differenceBackground, afwMath.BackgroundList)
+                if imageType == "future":
+                    # The provenance of the image this was measured from
+                    # survives, rather than being worked out again.
+                    self.assertEqual(out.templates, templateInfo)
+                    self.assertEqual(out.kernel, kernel)
+
+    def test_run_quantum_score_task_provenance(self):
+        """Each output takes the kernel of the image it is measured from,
+        which for the score task are two different kernels.
+        """
+        self.detectionTask = detectAndMeasure.DetectAndMeasureScoreTask
+        science, sources, matchedTemplate, difference, score = self._make_images(withScore=True)
+        templateInfo = [self._makeTemplateInfo()]
+        differenceKernel = self._makeKernel(scale=1.0)
+        scoreKernel = self._makeKernel(scale=3.0)
+        self.assertNotEqual(differenceKernel, scoreKernel)
+        task = self._setup_task(image_type="future")
+        butlerQC = _RecordingQuantumContext(self.dataId)
+
+        task.runQuantum(butlerQC,
+                        _FakeRefs(science=science, matchedTemplate=matchedTemplate,
+                                  difference=self._makeFutureInput(difference, templateInfo,
+                                                                   differenceKernel),
+                                  scoreExposure=self._makeFutureInput(score, templateInfo, scoreKernel),
+                                  kernelSources=sources),
+                        _FakeRefs())
+
+        out = butlerQC.put_values.subtractedMeasuredExposure
+        scoreOut = butlerQC.put_values.scoreMeasuredExposure
+        self.assertEqual(out.templates, templateInfo)
+        self.assertEqual(scoreOut.templates, templateInfo)
+        self.assertEqual(out.kernel, differenceKernel)
+        self.assertEqual(scoreOut.kernel, scoreKernel)
+
+    def test_connections_future_reads_difference_image(self):
+        """The inputs whose provenance is copied ask for the type that
+        carries it, and only in future mode.
+        """
+        for imageType, expected in (("legacy", "ExposureF"), ("future", "DifferenceImage")):
+            with self.subTest(imageType=imageType):
+                config = detectAndMeasure.DetectAndMeasureScoreTask.ConfigClass()
+                config.image_type = imageType
+                connections = config.connections.ConnectionsClass(config=config)
+                self.assertEqual(connections.difference.storageClass, expected)
+                self.assertEqual(connections.scoreExposure.storageClass, expected)
+                # Nothing is copied off these, so the butler converts them.
+                self.assertEqual(connections.science.storageClass, "ExposureF")
+                self.assertEqual(connections.matchedTemplate.storageClass, "ExposureF")
+
+
+class _FakeRefs:
+    """Stand-in for an input or output ``QuantizedConnection``."""
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
+
+
+class _RecordingQuantumContext:
+    """Minimal `~lsst.pipe.base.QuantumContext` that records what was put.
+
+    Parameters
+    ----------
+    dataId : `lsst.daf.butler.DataCoordinate`
+        Data ID to report as the quantum data ID.
+    """
+    def __init__(self, dataId):
+        self.quantum = _FakeRefs(dataId=dataId)
+        self.put_values = None
+
+    def get(self, refs):
+        return dict(refs.__dict__)
+
+    def put(self, values, refs):
+        self.put_values = values
 
 
 class MockResponse:
