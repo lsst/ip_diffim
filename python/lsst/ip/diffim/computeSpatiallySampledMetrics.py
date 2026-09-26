@@ -29,7 +29,7 @@ import lsst.afw.table as afwTable
 import lsst.pipe.base as pipeBase
 import lsst.pex.config as pexConfig
 
-from lsst.ip.diffim.utils import getPsfFwhm, angleMean, evaluateMaskFraction, getKernelCenterDisplacement
+from lsst.ip.diffim.utils import getPsfFwhm, angleMean, getKernelCenterDisplacement
 from lsst.meas.algorithms import SkyObjectsTask
 from lsst.pex.exceptions import InvalidParameterError, RangeError
 from lsst.utils.timer import timeMethod
@@ -88,7 +88,8 @@ class SpatiallySampledMetricsConfig(pipeBase.PipelineTaskConfig,
     """
     metricsMaskPlanes = lsst.pex.config.ListField(
         dtype=str,
-        doc="List of mask planes to include in metrics",
+        doc="List of mask planes to include in metrics. "
+            "A mask plane that is not registered reports 0 pixels set.",
         default=('BAD', 'CLIPPED', 'CR', 'DETECTED', 'DETECTED_NEGATIVE', 'EDGE',
                  'INEXACT_PSF', 'INJECTED', 'INJECTED_TEMPLATE', 'INTRP', 'NOT_DEBLENDED',
                  'NO_DATA', 'REJECTED', 'SAT', 'SAT_TEMPLATE', 'SENSOR_EDGE', 'STREAK', 'SUSPECT',
@@ -247,12 +248,16 @@ class SpatiallySampledMetricsTask(lsst.pipe.base.PipelineTask):
 
         self.metricSources.run(mask=science.mask, seed=difference.info.id, catalog=spatiallySampledMetrics)
 
-        metricsMaskPlanes = []
+        # Mask plane bits are looked up in the global afw dict, not the
+        # image's own. A plane that is not registered in this process has no
+        # pixels set in any image.
+        metricsMaskPlanes = {}
         for maskPlane in self.config.metricsMaskPlanes:
             try:
-                metricsMaskPlanes.append(maskPlane)
+                metricsMaskPlanes[maskPlane] = afwImage.Mask.getPlaneBitMask(maskPlane)
             except InvalidParameterError:
-                self.log.info("Unable to calculate metrics for mask plane %s: not in image"%maskPlane)
+                self.log.info("Mask plane %s is not registered; its metrics will be zero.", maskPlane)
+                metricsMaskPlanes[maskPlane] = 0
 
         for src in spatiallySampledMetrics:
             self._evaluateLocalMetric(src, science, template, difference, diaSources,
@@ -275,8 +280,9 @@ class SpatiallySampledMetricsTask(lsst.pipe.base.PipelineTask):
             The science image.
         difference : `lsst.afw.image.Exposure`
             Result of subtracting template from the science image.
-        metricsMaskPlanes : `list` of `str`
-            Mask planes to calculate metrics from.
+        metricsMaskPlanes : `dict` [`str`, `int`]
+            Mask planes to calculate metrics from, mapped to their bitmask.
+            The bitmask is 0 for a plane that is not registered.
         psfMatchingKernel : `~lsst.afw.math.LinearCombinationKernel`
             The PSF matching kernel of the subtraction to evaluate.
         """
@@ -324,9 +330,10 @@ class SpatiallySampledMetricsTask(lsst.pipe.base.PipelineTask):
         src.set('diffim_value', diffimVal)
         src.set('diffim_variance', diffimVar)
         src.set('diffim_chi2PerPix', self._diffimChi2PerPix(difference[bbox]))
-        for maskPlane in metricsMaskPlanes:
+        differenceMask = difference.mask[bbox].array
+        for maskPlane, bitMask in metricsMaskPlanes.items():
             src.set("%s_mask_fraction"%maskPlane.lower(),
-                    evaluateMaskFraction(difference.mask[bbox], maskPlane)
+                    np.count_nonzero(differenceMask & bitMask)/differenceMask.size
                     )
 
         krnlSum, dx, dy, direction, length = getKernelCenterDisplacement(
