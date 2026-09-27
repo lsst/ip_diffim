@@ -52,7 +52,7 @@ from lsst.afw.coord import Observatory, Weather
 import lsst.geom as geom
 import lsst.pex.config as pexConfig
 
-from utils import makeTestImage, checkMask
+from utils import makeTestExposureRecord, makeTestImage, makeTestVisitInfo, checkMask
 
 
 class DetectAndMeasureTestBase:
@@ -1587,6 +1587,11 @@ class DetectAndMeasureOutputFormatTest(DetectAndMeasureTestBase, lsst.utils.test
             detector=12,
             universe=lsst.daf.butler.DimensionUniverse(),
         )
+        # The exposure record that `runQuantum` rebuilds from the
+        # observation metadata of the input difference image.
+        self.exposureRecord = makeTestExposureRecord(self.dataId.universe,
+                                                     instrument=self.dataId["instrument"],
+                                                     visit=self.dataId["visit"])
 
     @staticmethod
     def _makeTemplateInfo(patch=42):
@@ -1651,8 +1656,7 @@ class DetectAndMeasureOutputFormatTest(DetectAndMeasureTestBase, lsst.utils.test
             The converted image.
         """
         image = DifferenceImage.from_legacy(
-            exposure, unit=astropy.units.nJy,
-            instrument=self.dataId["instrument"], visit=self.dataId["visit"])
+            exposure, unit=astropy.units.nJy, exposure_record=self.exposureRecord)
         if templateInfo is not None:
             image.templates = templateInfo
         if kernel is not None:
@@ -1682,9 +1686,11 @@ class DetectAndMeasureOutputFormatTest(DetectAndMeasureTestBase, lsst.utils.test
                   "kernelSize": kernelSize, "templateBorderSize": kernelSize//2}
         science, sources = makeTestImage(noiseLevel=1., noiseSeed=6, **kwargs)
         matchedTemplate, _ = makeTestImage(noiseLevel=0.25, noiseSeed=7, **kwargs)
-        # `makeTestImage` does not set a detector, but conversion needs one.
+        # Add components to the basic test image
         science.setDetector(self.detector)
         matchedTemplate.setDetector(self.detector)
+        for exposure in (science, matchedTemplate):
+            exposure.info.setVisitInfo(makeTestVisitInfo(self.dataId["visit"]))
         difference = science.clone()
         if not withScore:
             return science, sources, matchedTemplate, difference
@@ -1781,7 +1787,7 @@ class DetectAndMeasureOutputFormatTest(DetectAndMeasureTestBase, lsst.utils.test
         output = task.run(science, matchedTemplate, difference, sources)
         legacyBbox = output.subtractedMeasuredExposure.getBBox()
         background = output.differenceBackground
-        task.convert_outputs_to_future(output, self.dataId)
+        task.convert_outputs_to_future(output, self.exposureRecord)
 
         self._check_converted(output.subtractedMeasuredExposure, legacyBbox)
         self.assertIn("subtracted", output.subtractedMeasuredExposure.backgrounds)
@@ -1804,7 +1810,7 @@ class DetectAndMeasureOutputFormatTest(DetectAndMeasureTestBase, lsst.utils.test
             mask.addMaskPlane(plane)
             mask.array[0, n] |= mask.getPlaneBitMask(plane)
 
-        task.convert_outputs_to_future(output, self.dataId)
+        task.convert_outputs_to_future(output, self.exposureRecord)
 
         image = output.subtractedMeasuredExposure
         self.assertIsInstance(image, DifferenceImage)
@@ -1820,7 +1826,7 @@ class DetectAndMeasureOutputFormatTest(DetectAndMeasureTestBase, lsst.utils.test
         output = task.run(science, matchedTemplate, difference, score, sources)
         legacyBboxes = {name: getattr(output, name).getBBox()
                         for name in ("subtractedMeasuredExposure", "scoreMeasuredExposure")}
-        task.convert_outputs_to_future(output, self.dataId)
+        task.convert_outputs_to_future(output, self.exposureRecord)
 
         for name, legacyBbox in legacyBboxes.items():
             with self.subTest(name=name):
@@ -1837,7 +1843,7 @@ class DetectAndMeasureOutputFormatTest(DetectAndMeasureTestBase, lsst.utils.test
         output = task.run(science, matchedTemplate, difference, sources)
         self.assertEqual(len(output.differenceBackground), 0)
         legacyBbox = output.subtractedMeasuredExposure.getBBox()
-        task.convert_outputs_to_future(output, self.dataId)
+        task.convert_outputs_to_future(output, self.exposureRecord)
         self._check_converted(output.subtractedMeasuredExposure, legacyBbox)
         self.assertEqual(len(output.subtractedMeasuredExposure.backgrounds), 0)
 

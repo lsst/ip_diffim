@@ -38,6 +38,7 @@ from lsst.daf.butler import DataCoordinate, DatasetRef, DatasetType, DimensionUn
 import lsst.geom
 import lsst.images
 import lsst.images.psfs
+from lsst.images.tests import compare_masked_image_to_legacy
 import lsst.ip.diffim
 import lsst.meas.algorithms
 import lsst.meas.base.tests
@@ -46,6 +47,8 @@ import lsst.pipe.base as pipeBase
 import lsst.pipe.base.testUtils
 import lsst.skymap
 import lsst.utils.tests
+
+from utils import makeTestExposureRecord
 
 from utils import generate_data_id
 
@@ -690,9 +693,15 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         detector = list(lsst.afw.cameraGeom.testUtils.CameraWrapper().camera)[0]
         result, box = self._runLegacyForFuture()
         result.template = self.futureTask.convert_outputs_to_future(
-            result.template, {"instrument": "testCam", "visit": self.visit}, self._coaddRefs(0),
-            detector=detector)
+            result.template, self._coaddRefs(0), detector=detector,
+            exposureRecord=self._exposureRecord())
         return result, box, detector
+
+    def _exposureRecord(self):
+        """Return the exposure record that ``runQuantum`` rebuilds from the
+        observation metadata of the science image.
+        """
+        return makeTestExposureRecord(DimensionUniverse(), visit=self.visit)
 
     def _coaddRefs(self, tract):
         """Return butler references for the coadds of one tract, like the
@@ -719,11 +728,18 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
 
     def testConvertOutputsToFuture(self):
         """Test that the output template is converted to a DifferenceImage
-        that keeps the pixel geometry and the detector it was built on.
+        that keeps the pixels and the detector it was built on.
         """
-        result, box, detector = self._runFuture()
+        detector = list(lsst.afw.cameraGeom.testUtils.CameraWrapper().camera)[0]
+        result, box = self._runLegacyForFuture()
+        legacy = result.template.clone()
+        result.template = self.futureTask.convert_outputs_to_future(
+            result.template, self._coaddRefs(0), detector=detector,
+            exposureRecord=self._exposureRecord())
 
         self.assertIsInstance(result.template, lsst.images.DifferenceImage)
+        compare_masked_image_to_legacy(result.template, legacy.maskedImage,
+                                       plane_map=lsst.images.get_legacy_template_mask_planes())
         self.assertEqual(result.template.unit, u.nJy)
         self.assertIsNotNone(result.template.detector)
         self.assertEqual(result.template.detector.name, detector.getName())
@@ -750,17 +766,21 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         for n, plane in enumerate(planes):
             mask.addMaskPlane(plane)
             mask.array[0, n] |= mask.getPlaneBitMask(plane)
+        legacyTemplate = result.template.clone()
 
         result.template = self.futureTask.convert_outputs_to_future(
-            result.template, {"instrument": "testCam", "visit": self.visit}, self._coaddRefs(0),
-            detector=detector)
+            result.template, self._coaddRefs(0), detector=detector,
+            exposureRecord=self._exposureRecord())
 
         template = result.template
         self.assertIsInstance(template, lsst.images.DifferenceImage)
-        for n, plane in enumerate(planes):
-            with self.subTest(plane=plane):
-                self.assertIn(plane, template.mask.schema.names)
-                self.assertEqual(np.count_nonzero(template.mask.get(plane)), 1)
+        # Name the optional planes that have pixels set in the map, so that
+        # dropping one fails the comparison instead of skipping it. The others
+        # are left out because they may be registered by unrelated tests.
+        optional = lsst.images.get_legacy_optional_mask_planes()
+        planeMap = lsst.images.get_legacy_template_mask_planes()
+        planeMap.update({plane: optional[plane] for plane in planes if plane in optional})
+        compare_masked_image_to_legacy(template, legacyTemplate.maskedImage, plane_map=planeMap)
         # The butler converts a DifferenceImage to an ExposureF with the
         # difference image plane map, which does not name the coadd planes;
         # they keep their own names instead of being dropped.
@@ -798,8 +818,8 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         legacyPsf = result.template.getPsf()
 
         result.template = self.futureTask.convert_outputs_to_future(
-            result.template, {"instrument": "testCam", "visit": self.visit}, self._coaddRefs(0),
-            detector=detector)
+            result.template, self._coaddRefs(0), detector=detector,
+            exposureRecord=self._exposureRecord())
 
         psf = result.template.psf
         self.assertIsInstance(psf, lsst.images.psfs.GaussianPointSpreadFunction)
@@ -833,16 +853,20 @@ class GetTemplateConnectionsTestCase(lsst.utils.tests.TestCase):
 
         connections = Connections(config=config)
         self.assertEqual(connections.template.storageClass, "ExposureF")
+        self.assertNotIn("obs_info", connections.inputs)
 
         config.output_image_type = "future"
         connections = Connections(config=config)
         self.assertEqual(connections.template.storageClass, "DifferenceImage")
         # The dataset name is unchanged; only its storage class differs.
         self.assertEqual(connections.template.name, "goodSeeingDiff_templateExp")
-        # The detector the conversion needs comes from the science image, so
-        # the future mode adds no input of its own.
+        # The detector the conversion needs comes from the science image.
         self.assertEqual(connections.detector.name, "calexp.detector")
         self.assertEqual(connections.detector.storageClass, "Detector")
+        # The observation metadata is only read in future mode, where it is
+        # the one input the conversion adds.
+        self.assertEqual(connections.obs_info.name, "calexp.obs_info")
+        self.assertEqual(connections.obs_info.storageClass, "ObservationInfo")
 
     def testLintConnections(self):
         """Check that the connections are self-consistent in both modes.

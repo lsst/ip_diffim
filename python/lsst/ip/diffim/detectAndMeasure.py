@@ -35,7 +35,7 @@ import lsst.geom
 from lsst.images import DifferenceImage
 from lsst.images.fields import field_from_legacy_background
 from lsst.ip.diffim.utils import (evaluateMaskFraction, computeDifferenceImageMetrics,
-                                  populate_sattle_visit_cache)
+                                  populate_sattle_visit_cache, record_from_obs_info)
 from lsst.meas.algorithms import SkyObjectsTask, SourceDetectionTask, SetPrimaryFlagsTask, MaskStreaksTask
 from lsst.meas.algorithms import FindGlintTrailsTask, FindCosmicRaysConfig, findCosmicRays
 from lsst.meas.base import ForcedMeasurementTask, ApplyApCorrTask, DetectorVisitIdGeneratorConfig
@@ -615,13 +615,16 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         detector = inputs["science"].getDetector()
 
         templateInfo = None
+        exposureRecord = None
         matchingKernels = {}
         if self.config.image_type == "future":
             difference = inputs["difference"]
-            # Read the `TemplateInfo` from the difference while it is still in
-            # the `DifferenceImage` format, since legacy exposures don't carry
-            # it.
+            # Read the `TemplateInfo` and the observation metadata from the
+            # difference while it is still in the `DifferenceImage` format.
             templateInfo = difference.templates
+            dataId = butlerQC.quantum.dataId
+            exposureRecord = record_from_obs_info(difference.obs_info, dataId["instrument"],
+                                                  dataId["visit"], dataId.universe)
             # Assign the kernel from the input difference image to the
             # corresponding output image
             matchingKernels["subtractedMeasuredExposure"] = difference.kernel
@@ -654,18 +657,18 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                 log=self.log
             )
             if self.config.image_type == "future":
-                self.convert_outputs_to_future(measurementResults, butlerQC.quantum.dataId,
+                self.convert_outputs_to_future(measurementResults, exposureRecord,
                                                detector=detector, matchingKernels=matchingKernels,
                                                templateInfo=templateInfo)
             butlerQC.put(measurementResults, outputRefs)
             raise error from e
         if self.config.image_type == "future":
-            self.convert_outputs_to_future(measurementResults, butlerQC.quantum.dataId,
+            self.convert_outputs_to_future(measurementResults, exposureRecord,
                                            detector=detector, matchingKernels=matchingKernels,
                                            templateInfo=templateInfo)
         butlerQC.put(measurementResults, outputRefs)
 
-    def convert_outputs_to_future(self, results, data_id, detector=None, matchingKernels=None,
+    def convert_outputs_to_future(self, results, exposureRecord, detector=None, matchingKernels=None,
                                   templateInfo=None):
         """Convert the output images in a result struct to `lsst.images` types.
 
@@ -677,9 +680,9 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         ----------
         results : `lsst.pipe.base.Struct`
             Output struct to read and modify in place.
-        data_id : `lsst.daf.butler.DataCoordinate`
-            The data ID of the images, which must have ``instrument`` and
-            ``visit`` keys.
+        exposureRecord : `lsst.daf.butler.DimensionRecord`
+            The ``exposure`` record of the observation, which supplies the
+            observation metadata recorded on each converted output.
         detector : `lsst.afw.cameraGeom.Detector`, optional
             Detector to set on an output image that has none; all of these
             images are on the science image's pixel grid, so this should be
@@ -708,8 +711,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             image = DifferenceImage.from_legacy(
                 exposure,
                 unit=astropy.units.nJy,
-                instrument=data_id["instrument"],
-                visit=data_id["visit"],
+                exposure_record=exposureRecord,
             )
             if templateInfo:
                 image.templates = templateInfo

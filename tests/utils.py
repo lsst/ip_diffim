@@ -24,6 +24,7 @@
 __all__ = ["DipoleTestImage"]
 
 
+import astropy.time
 import numpy as np
 import lsst.geom as geom
 import lsst.afw.detection as afwDet
@@ -31,9 +32,11 @@ import lsst.afw.display as afwDisplay
 import lsst.afw.detection as afwDetection
 import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
+from lsst.afw.coord import Observatory
+import lsst.daf.base as dafBase
 import lsst.afw.math as afwMath
 import lsst.afw.table as afwTable
-from lsst.daf.butler import DataCoordinate, DimensionUniverse
+from lsst.daf.butler import DataCoordinate, DimensionUniverse, Timespan
 import lsst.meas.algorithms as measAlg
 import lsst.meas.base as measBase
 from lsst.meas.algorithms.testUtils import plantSources
@@ -1150,6 +1153,78 @@ class CustomCoaddPsf(measAlg.CoaddPsf):
     """
     def getAveragePosition(self):
         return geom.Point2D(-10000, -10000)
+
+
+def makeTestVisitInfo(visit=12345):
+    """Return a visit info for the test images.
+
+    Converting an exposure to an `lsst.images` type reads the observation
+    metadata it still carries from its visit info, so an exposure that will
+    be converted needs one. The date matches the timespan of
+    `makeTestExposureRecord`.
+
+    Parameters
+    ----------
+    visit : `int`, optional
+        Id of the visit to record.
+
+    Returns
+    -------
+    visitInfo : `lsst.afw.image.VisitInfo`
+        The visit info.
+    """
+    return afwImage.VisitInfo(
+        id=visit,
+        exposureTime=30.0,
+        date=dafBase.DateTime(60815.000174, dafBase.DateTime.MJD, dafBase.DateTime.TAI),
+        boresightRaDec=geom.SpherePoint(23.1, 73.2, geom.degrees),
+        boresightAzAlt=geom.SpherePoint(120.0, 60.0, geom.degrees),
+        boresightRotAngle=73.2*geom.degrees,
+        rotType=afwImage.RotType.SKY,
+        observatory=Observatory(11.1*geom.degrees, 22.2*geom.degrees, 0.333),
+    )
+
+
+def makeTestExposureRecord(universe, instrument="testCam", visit=12345):
+    """Return an ``exposure`` dimension record for the test images.
+
+    The record stands in for the one a task reads from the butler, and holds
+    the observation metadata that converting an image to an `lsst.images`
+    type needs.
+
+    Parameters
+    ----------
+    universe : `lsst.daf.butler.DimensionUniverse`
+        Dimension universe that defines the record's schema.
+    instrument : `str`, optional
+        Name of the instrument to record.
+    visit : `int`, optional
+        Id of the visit to record. The conversion takes the visit id of an
+        image from the id of its exposure record.
+
+    Returns
+    -------
+    record : `lsst.daf.butler.DimensionRecord`
+        The ``exposure`` record.
+    """
+    begin = astropy.time.Time(60815.0, format="mjd", scale="tai")
+    exposureTime = 30.0
+    return universe["exposure"].RecordClass(
+        instrument=instrument,
+        id=visit,
+        obs_id=f"test_{visit}",
+        group=str(visit),
+        day_obs=20250520,
+        physical_filter="test filter",
+        exposure_time=exposureTime,
+        seq_num=1,
+        seq_start=1,
+        seq_end=1,
+        can_see_sky=True,
+        azimuth=120.0,
+        zenith_angle=30.0,
+        timespan=Timespan(begin=begin, end=begin + astropy.time.TimeDelta(exposureTime, format="sec")),
+    )
 
 
 def generate_data_id(*,

@@ -34,7 +34,7 @@ from lsst.images.convolution_kernels import ImageBasisConvolutionKernel
 from lsst.images.fields import ChebyshevField
 from lsst.ip.diffim.utils import (evaluateMeanPsfFwhm, getPsfFwhm,
                                   computeDifferenceImageMetrics, computePSFNoiseEquivalentArea,
-                                  checkMask, setSourceFootprints)
+                                  checkMask, record_from_obs_info, setSourceFootprints)
 from lsst.meas.algorithms import ScaleVarianceTask, ScienceSourceSelectorTask
 import lsst.pex.config
 import lsst.pipe.base
@@ -458,11 +458,15 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
     def runQuantum(self, butlerQC, inputRefs, outputRefs):
         inputs = butlerQC.get(inputRefs)
         templateInfo = None
+        exposureRecord = None
         if self.config.image_type == "future":
             template = inputs["template"]
-            # Read the `TemplateInfo` from the template while it is still in the
-            # `DifferenceImage` format, since legacy exposures don't carry it.
+            # Read the `TemplateInfo` and the observation metadata from the
+            # template while it is still in the `DifferenceImage` format.
             templateInfo = template.templates
+            dataId = butlerQC.quantum.dataId
+            exposureRecord = record_from_obs_info(template.obs_info, dataId["instrument"],
+                                                  dataId["visit"], dataId.universe)
             inputs["template"] = template.to_legacy()
 
         try:
@@ -473,11 +477,11 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             raise error from e
 
         if self.config.image_type == "future":
-            self.convert_outputs_to_future(results, butlerQC.quantum.dataId, templateInfo=templateInfo)
+            self.convert_outputs_to_future(results, exposureRecord, templateInfo=templateInfo)
 
         butlerQC.put(results, outputRefs)
 
-    def convert_outputs_to_future(self, results, data_id, templateInfo=None):
+    def convert_outputs_to_future(self, results, exposureRecord, templateInfo=None):
         """Convert the image outputs to `lsst.images` types.
 
         Each image named in `futureImageOutputs` that is present on
@@ -489,8 +493,9 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         ----------
         results : `lsst.pipe.base.Struct`
             Output struct to read and modify in place.
-        data_id : `lsst.daf.butler.DataCoordinate`
-            The data ID of the science image.
+        exposureRecord : `lsst.daf.butler.DimensionRecord`
+            The ``exposure`` record of the observation, which supplies the
+            observation metadata recorded on each converted output.
         templates : `list` [`lsst.images.DifferenceImageTemplateInfo`],
             optional (for unit tests)
             Record of the coadds that went into the template, taken from the
@@ -537,8 +542,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             image = DifferenceImage.from_legacy(
                 exposure,
                 unit=u.nJy,
-                instrument=data_id["instrument"],
-                visit=data_id["visit"],
+                exposure_record=exposureRecord,
             )
             if kernel is not None:
                 image.kernel = kernel
