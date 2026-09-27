@@ -647,10 +647,15 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
                                      factor*scaleFactor, rtol=1e-5)
         self.assertImagesAlmostEqual(templateLow.variance, templateOn.variance, rtol=1e-5)
 
-    def _runLegacyForFuture(self):
+    def _runLegacyForFuture(self, raiseOnUndefinedMaskMap=True):
         """Build a template from tract 0 with a task configured for the
         future output type, and attach the detector that ``runQuantum`` reads
         from the science image, but do not convert it.
+
+        Parameters
+        ----------
+        raiseOnUndefinedMaskMap : `bool`, optional
+            Value of the task config field of the same name.
 
         Returns
         -------
@@ -662,6 +667,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         """
         config = lsst.ip.diffim.GetTemplateTask.ConfigClass()
         config.output_image_type = "future"
+        config.raiseOnUndefinedMaskMap = raiseOnUndefinedMaskMap
         task = lsst.ip.diffim.GetTemplateTask(config=config)
         self.visit = 9876
         box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
@@ -790,6 +796,55 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
                 self.assertIn(plane, legacy.mask.getMaskPlaneDict())
                 self.assertEqual(
                     np.count_nonzero(legacy.mask.array & legacy.mask.getPlaneBitMask(plane)), 1)
+
+    def _addUnmappedMaskPlane(self, template):
+        """Set one pixel in the template's BRIGHT_OBJECT plane, which the
+        template plane map does not include, and one in its CLIPPED plane,
+        which it does.
+        """
+        mask = template.mask
+        for n, plane in enumerate(("BRIGHT_OBJECT", "CLIPPED")):
+            mask.addMaskPlane(plane)
+            mask.array[0, n] |= mask.getPlaneBitMask(plane)
+
+    def testConvertOutputsToFutureUnmappedMaskPlaneRaises(self):
+        """By default, a template with pixels set in an unmapped mask plane
+        cannot be converted.
+        """
+        detector = list(lsst.afw.cameraGeom.testUtils.CameraWrapper().camera)[0]
+        result, _ = self._runLegacyForFuture()
+        self._addUnmappedMaskPlane(result.template)
+        with self.assertRaisesRegex(RuntimeError, "BRIGHT_OBJECT"):
+            self.futureTask.convert_outputs_to_future(
+                result.template, self._coaddRefs(0), detector=detector,
+                exposureRecord=self._exposureRecord())
+
+    def testConvertOutputsToFutureUnmappedMaskPlaneWarns(self):
+        """With raiseOnUndefinedMaskMap=False, an unmapped mask plane is
+        dropped with a warning and the mapped planes are kept.
+        """
+        detector = list(lsst.afw.cameraGeom.testUtils.CameraWrapper().camera)[0]
+        result, _ = self._runLegacyForFuture(raiseOnUndefinedMaskMap=False)
+        self._addUnmappedMaskPlane(result.template)
+        with self.assertLogs(self.futureTask.log.name, level="WARNING") as cm:
+            template = self.futureTask.convert_outputs_to_future(
+                result.template, self._coaddRefs(0), detector=detector,
+                exposureRecord=self._exposureRecord())
+        self.assertIn("BRIGHT_OBJECT", "\n".join(cm.output))
+        self.assertIsInstance(template, lsst.images.DifferenceImage)
+        self.assertNotIn("BRIGHT_OBJECT", template.mask.schema.names)
+        self.assertEqual(np.count_nonzero(template.mask.get("CLIPPED")), 1)
+
+    def testConvertOutputsToFutureLosesProvenance(self):
+        """The coadd inputs that `run` attaches are not carried by
+        `lsst.images.DifferenceImage`.
+
+        This pins limitation (2) of ``output_image_type``.
+        """
+        legacy, _ = self._runLegacyForFuture()
+        self.assertTrue(legacy.template.getInfo().hasCoaddInputs())
+        result, _, _ = self._runFuture()
+        self.assertFalse(result.template.to_legacy().getInfo().hasCoaddInputs())
 
     def testConvertOutputsToFutureTemplates(self):
         """The coadds that went into the template are recorded on the
