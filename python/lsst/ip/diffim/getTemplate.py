@@ -260,10 +260,11 @@ class GetTemplateTask(pipeBase.PipelineTask):
             outputs.template = self.convert_outputs_to_future(outputs.template,
                                                               butlerQC.quantum.dataId,
                                                               inputRefs.coaddExposures,
-                                                              detector=detector)
+                                                              detector=detector,
+                                                              exposureRecord=outputRefs.template)
         butlerQC.put(outputs, outputRefs)
 
-    def convert_outputs_to_future(self, template, data_id, coadd_refs, detector):
+    def convert_outputs_to_future(self, template, data_id, coadd_refs, detector, exposureRecord):
         """Convert a template image to DifferenceImage format.
 
         This replaces ``template`` with an `lsst.images.DifferenceImage`
@@ -311,10 +312,9 @@ class GetTemplateTask(pipeBase.PipelineTask):
                        for ref in coadd_refs}
         convertedTemplate = DifferenceImage.from_legacy(
             template,
+            exposure_record=exposureRecord,
             unit=astropy.units.nJy,
             plane_map=get_legacy_template_mask_planes(),
-            instrument=data_id["instrument"],
-            visit=data_id["visit"],
         )
         del template
         convertedTemplate.templates = DifferenceImageTemplateInfo.from_legacy_psf(
