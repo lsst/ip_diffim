@@ -38,6 +38,7 @@ from lsst.images import DifferenceImage, DifferenceImageTemplateInfo, get_legacy
 from lsst.images.psfs import GaussianPointSpreadFunction
 from lsst.skymap import BaseSkyMap
 from lsst.ip.diffim.dcrModel import DcrModel
+from lsst.ip.diffim.utils import record_from_obs_info
 from lsst.meas.algorithms import CoaddPsf, CoaddPsfConfig, SubtractBackgroundTask, ScaleVarianceTask
 from lsst.utils.timer import timeMethod
 
@@ -72,6 +73,13 @@ class GetTemplateConnections(
         " Its bounding box sets the geometry of the output template.",
         name="{fakesType}calexp.detector",
         storageClass="Detector",
+        dimensions=("instrument", "visit", "detector"),
+    )
+    obs_info = pipeBase.connectionTypes.Input(
+        doc="Observation metadata of the exposure the template is built for."
+        " Only read with output_image_type='future'.",
+        name="{fakesType}calexp.obs_info",
+        storageClass="ObservationInfo",
         dimensions=("instrument", "visit", "detector"),
     )
     wcs = pipeBase.connectionTypes.Input(
@@ -115,6 +123,8 @@ class GetTemplateConnections(
             )
         if config.output_image_type == "future":
             self.template = dataclasses.replace(self.template, storageClass="DifferenceImage")
+        else:
+            del self.obs_info
 
 
 class GetTemplateConfig(
@@ -240,6 +250,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
         detector = inputs.pop("detector")
         bbox = detector.getBBox()
         wcs = inputs.pop("wcs")
+        obsInfo = inputs.pop("obs_info", None)
         coaddExposures = inputs.pop("coaddExposures")
         skymap = inputs.pop("skyMap")
 
@@ -257,14 +268,16 @@ class GetTemplateTask(pipeBase.PipelineTask):
             visit=outputRefs.template.dataId["visit"],
         )
         if self.config.output_image_type == "future":
+            dataId = butlerQC.quantum.dataId
+            exposureRecord = record_from_obs_info(obsInfo, dataId["instrument"], dataId["visit"],
+                                                  dataId.universe)
             outputs.template = self.convert_outputs_to_future(outputs.template,
-                                                              butlerQC.quantum.dataId,
                                                               inputRefs.coaddExposures,
                                                               detector=detector,
-                                                              exposureRecord=outputRefs.template)
+                                                              exposureRecord=exposureRecord)
         butlerQC.put(outputs, outputRefs)
 
-    def convert_outputs_to_future(self, template, data_id, coadd_refs, detector, exposureRecord):
+    def convert_outputs_to_future(self, template, coadd_refs, detector, exposureRecord):
         """Convert a template image to DifferenceImage format.
 
         This replaces ``template`` with an `lsst.images.DifferenceImage`
@@ -279,15 +292,16 @@ class GetTemplateTask(pipeBase.PipelineTask):
             have a detector with per-amplifier raw geometry and a field angle
             transform, which is why `runQuantum` sets the science image's
             detector on it first.
-        data_id : `lsst.daf.butler.DataCoordinate`
-            Data ID of the science image the template was built for; supplies
-            the instrument name and visit id recorded on the output.
         coadd_refs : `list` [`lsst.daf.butler.DatasetRef`]
             References to the coadds that may have gone into the template.
             May be a superset of the coadds that were used; supplies the
             dataset id and RUN collection recorded for each coadd that was.
         detector : `lsst.afw.image.Detector`
             Detector of the science image that the template was built for.
+        exposureRecord : `lsst.daf.butler.DimensionRecord`
+            The ``exposure`` record of the observation the template was built
+            for, which supplies the observation metadata recorded on the
+            output.
 
         Returns
         -------
@@ -980,6 +994,9 @@ class GetDcrTemplateTask(GetTemplateTask):
         dcrCoaddExposureHandles = inputs.pop("dcrCoadds")
         skymap = inputs.pop("skyMap")
         visitInfo = inputs.pop("visitInfo")
+        # This task never converts its output, so the observation metadata
+        # that the conversion needs is dropped here.
+        inputs.pop("obs_info", None)
 
         # This should not happen with a properly configured execution context.
         assert not inputs, "runQuantum got more inputs than expected"

@@ -45,6 +45,8 @@ import lsst.pipe.base.testUtils
 import lsst.skymap
 import lsst.utils.tests
 
+from utils import makeTestExposureRecord
+
 from utils import generate_data_id
 
 # Change this to True, `setup display_ds9`, and open ds9 (or use another afw
@@ -609,9 +611,15 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         detector = list(lsst.afw.cameraGeom.testUtils.CameraWrapper().camera)[0]
         result, box = self._runLegacyForFuture()
         result.template = self.futureTask.convert_outputs_to_future(
-            result.template, {"instrument": "testCam", "visit": self.visit}, self._coaddRefs(0),
-            detector=detector)
+            result.template, self._coaddRefs(0), detector=detector,
+            exposureRecord=self._exposureRecord())
         return result, box, detector
+
+    def _exposureRecord(self):
+        """Return the exposure record that ``runQuantum`` rebuilds from the
+        observation metadata of the science image.
+        """
+        return makeTestExposureRecord(DimensionUniverse(), visit=self.visit)
 
     def _coaddRefs(self, tract):
         """Return butler references for the coadds of one tract, like the
@@ -671,8 +679,8 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
             mask.array[0, n] |= mask.getPlaneBitMask(plane)
 
         result.template = self.futureTask.convert_outputs_to_future(
-            result.template, {"instrument": "testCam", "visit": self.visit}, self._coaddRefs(0),
-            detector=detector)
+            result.template, self._coaddRefs(0), detector=detector,
+            exposureRecord=self._exposureRecord())
 
         template = result.template
         self.assertIsInstance(template, lsst.images.DifferenceImage)
@@ -731,8 +739,8 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         expected = legacyPsf.computeShape(center).getTraceRadius()
 
         result.template = self.futureTask.convert_outputs_to_future(
-            result.template, {"instrument": "testCam", "visit": self.visit}, self._coaddRefs(0),
-            detector=detector)
+            result.template, self._coaddRefs(0), detector=detector,
+            exposureRecord=self._exposureRecord())
 
         psf = result.template.psf
         self.assertIsInstance(psf, lsst.images.psfs.GaussianPointSpreadFunction)
@@ -806,16 +814,20 @@ class GetTemplateConnectionsTestCase(lsst.utils.tests.TestCase):
 
         connections = Connections(config=config)
         self.assertEqual(connections.template.storageClass, "ExposureF")
+        self.assertNotIn("obs_info", connections.inputs)
 
         config.output_image_type = "future"
         connections = Connections(config=config)
         self.assertEqual(connections.template.storageClass, "DifferenceImage")
         # The dataset name is unchanged; only its storage class differs.
         self.assertEqual(connections.template.name, "goodSeeingDiff_templateExp")
-        # The detector the conversion needs comes from the science image, so
-        # the future mode adds no input of its own.
+        # The detector the conversion needs comes from the science image.
         self.assertEqual(connections.detector.name, "calexp.detector")
         self.assertEqual(connections.detector.storageClass, "Detector")
+        # The observation metadata is only read in future mode, where it is
+        # the one input the conversion adds.
+        self.assertEqual(connections.obs_info.name, "calexp.obs_info")
+        self.assertEqual(connections.obs_info.storageClass, "ObservationInfo")
 
     def testLintConnections(self):
         """Check that the connections are self-consistent in both modes.

@@ -30,6 +30,7 @@ import lsst.afw.math as afwMath
 import lsst.afw.table as afwTable
 import lsst.geom
 import lsst.meas.algorithms as measAlg
+from lsst.daf.butler import DataCoordinate, DimensionUniverse
 from lsst.images import Box, DifferenceImage, DifferenceImageTemplateInfo, Polygon
 from lsst.ip.diffim import subtractImages, InsufficientKernelSourcesError
 from lsst.pex.config import FieldValidationError
@@ -40,7 +41,8 @@ from lsst.ip.diffim.utils import (computeRobustStatistics, computePSFNoiseEquiva
                                   evaluateMeanPsfFwhm, getPsfFwhm)
 from lsst.pex.exceptions import InvalidParameterError
 
-from utils import makeStats, makeTestImage, CustomCoaddPsf
+from utils import (makeStats, makeTestExposureRecord, makeTestImage, makeTestVisitInfo,
+                   CustomCoaddPsf)
 
 
 class AlardLuptonSubtractTestBase:
@@ -1434,12 +1436,20 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
     """Tests of the optional conversion of the image outputs to
     `lsst.images` types.
     """
-    # `makeTestImage` does not attach a detector or a VisitInfo, so supply a
-    # detector with real amplifier geometry and a simple data id.
-    dataId = {"instrument": "testCam", "visit": 12345}
-
     def setUp(self):
+        # `makeTestImage` does not attach a detector or a VisitInfo, so
+        # supply a detector with real amplifier geometry, a data id, and the
+        # exposure record the conversion takes its metadata from.
         self.detector = list(lsst.afw.cameraGeom.testUtils.CameraWrapper().camera)[0]
+        self.dataId = DataCoordinate.standardize(
+            instrument="testCam",
+            visit=12345,
+            detector=self.detector.getId(),
+            universe=DimensionUniverse(),
+        )
+        self.exposureRecord = makeTestExposureRecord(self.dataId.universe,
+                                                     instrument=self.dataId["instrument"],
+                                                     visit=self.dataId["visit"])
 
     def _setup_subtraction(self, taskClass, **kwargs):
         """Configure one of the subtraction tasks with the shared test
@@ -1478,6 +1488,8 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
         template, _ = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=7,
                                     templateBorderSize=20, doApplyCalibration=True)
         science.setDetector(self.detector)
+        for exposure in (science, template):
+            exposure.info.setVisitInfo(makeTestVisitInfo(self.dataId["visit"]))
         return science, template, sources
 
     def _check_converted(self, image, kernelExpected=True):
@@ -1577,7 +1589,7 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
         self.assertIsNone(results.matchedTemplate.getDetector())
         legacyDifference = results.difference.image.array.copy()
 
-        task.convert_outputs_to_future(results, self.dataId)
+        task.convert_outputs_to_future(results, self.exposureRecord)
 
         self._check_converted(results.difference)
         self._check_converted(results.matchedTemplate)
@@ -1596,7 +1608,7 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
                                        image_type="future")
         results = task.run(template, science, sources)
 
-        task.convert_outputs_to_future(results, self.dataId)
+        task.convert_outputs_to_future(results, self.exposureRecord)
 
         self._check_converted(results.scoreExposure)
         self.assertIsInstance(results.psfMatchingKernel, afwMath.LinearCombinationKernel)
@@ -1614,7 +1626,7 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
         results = task.run(template.clone(), science.clone(),
                            inputPsfMatchingKernel=alResults.psfMatchingKernel)
 
-        task.convert_outputs_to_future(results, self.dataId)
+        task.convert_outputs_to_future(results, self.exposureRecord)
 
         self._check_converted(results.difference)
         self._check_converted(results.matchedTemplate)
@@ -1629,7 +1641,7 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
         results = task.run(template, science, sources)
         del results.matchedTemplate
 
-        task.convert_outputs_to_future(results, self.dataId)
+        task.convert_outputs_to_future(results, self.exposureRecord)
 
         self._check_converted(results.difference)
         self.assertFalse(hasattr(results, "matchedTemplate"))
@@ -1670,8 +1682,7 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
         """
         template = template.clone()
         template.setDetector(self.detector)
-        image = DifferenceImage.from_legacy(template, unit=u.nJy, instrument=self.dataId["instrument"],
-                                            visit=self.dataId["visit"])
+        image = DifferenceImage.from_legacy(template, unit=u.nJy, exposure_record=self.exposureRecord)
         if templateInfo is not None:
             image.templates = templateInfo
         return image
@@ -1710,7 +1721,7 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
         self.assertNotEqual(list(legacyBackground.getParameters()), [0.0]*len(
             legacyBackground.getParameters()))
 
-        task.convert_outputs_to_future(results, self.dataId)
+        task.convert_outputs_to_future(results, self.exposureRecord)
 
         self._check_background(results.difference, legacyBackground)
         self.assertEqual(results.difference.backgrounds.subtracted.field.bounds.bbox.to_legacy(),
@@ -1729,7 +1740,7 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
         results = task.run(template, science, sources)
         legacyBackground = results.backgroundModel
 
-        task.convert_outputs_to_future(results, self.dataId)
+        task.convert_outputs_to_future(results, self.exposureRecord)
 
         self._check_background(results.scoreExposure, legacyBackground)
         bbox = results.scoreExposure.backgrounds.subtracted.field.bounds.bbox.to_legacy()
@@ -1748,7 +1759,7 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
                                                image_type="future")
                 results = task.run(template.clone(), science.clone(), sources)
 
-                task.convert_outputs_to_future(results, self.dataId)
+                task.convert_outputs_to_future(results, self.exposureRecord)
 
                 self.assertEqual(len(getattr(results, output).backgrounds), 0)
 
@@ -1764,7 +1775,7 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
         self.assertEqual(task.metadata["convolvedExposure"], "Science")
         legacyBackground = results.backgroundModel
 
-        task.convert_outputs_to_future(results, self.dataId)
+        task.convert_outputs_to_future(results, self.exposureRecord)
 
         self._check_background(results.difference, legacyBackground)
 
@@ -1778,7 +1789,7 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
         results = task.run(template, science, sources)
         templateInfo = [self._makeTemplateInfo(patch=41), self._makeTemplateInfo(patch=42)]
 
-        task.convert_outputs_to_future(results, self.dataId, templateInfo=templateInfo)
+        task.convert_outputs_to_future(results, self.exposureRecord, templateInfo=templateInfo)
 
         for image in (results.difference, results.matchedTemplate):
             self.assertEqual([(t.tract, t.patch) for t in image.templates],
@@ -1793,7 +1804,7 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
                                        image_type="future")
         results = task.run(template, science, sources)
 
-        task.convert_outputs_to_future(results, self.dataId)
+        task.convert_outputs_to_future(results, self.exposureRecord)
 
         with self.assertRaises(AttributeError):
             results.difference.templates
