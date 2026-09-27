@@ -34,7 +34,12 @@ import lsst.afw.math as afwMath
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 
-from lsst.images import DifferenceImage, DifferenceImageTemplateInfo, get_legacy_template_mask_planes
+from lsst.images import (
+    DifferenceImage,
+    DifferenceImageTemplateInfo,
+    get_legacy_optional_mask_planes,
+    get_legacy_template_mask_planes,
+)
 from lsst.images.psfs import GaussianPointSpreadFunction
 from lsst.skymap import BaseSkyMap
 from lsst.ip.diffim.dcrModel import DcrModel
@@ -194,6 +199,14 @@ class GetTemplateConfig(
         optional=False,
         default="legacy",
     )
+    raiseOnUndefinedMaskMap = pexConfig.Field(
+        dtype=bool,
+        default=False,
+        doc="Raise if the template has pixels set in a mask plane that"
+        " `lsst.images` does not map? If False, log a warning and drop that"
+        " plane from the output instead."
+        " Only used with output_image_type='future'.",
+    )
 
     def setDefaults(self):
         # Use a smaller cache: per SeparableKernel.computeCache, this should
@@ -312,9 +325,10 @@ class GetTemplateTask(pipeBase.PipelineTask):
         ------
         RuntimeError
             Raised if the template has pixels set in a mask plane that
-            `lsst.images.get_legacy_template_mask_planes` does not map, if
-            ``coadd_refs`` spans more than one skymap, or if no coadd that
-            contributed has a valid PSF shape.
+            `lsst.images.get_legacy_template_mask_planes` does not map and
+            ``config.raiseOnUndefinedMaskMap`` is True, if ``coadd_refs``
+            spans more than one skymap, or if no coadd that contributed has a
+            valid PSF shape.
         """
         legacy_psf = template.getPsf()
         template.setDetector(detector)
@@ -324,11 +338,14 @@ class GetTemplateTask(pipeBase.PipelineTask):
                                f" got {sorted(skymaps)}.")
         butler_info = {(ref.dataId["tract"], ref.dataId["patch"]): (ref.id, ref.run)
                        for ref in coadd_refs}
+        planeMap = get_legacy_template_mask_planes()
+        if not self.config.raiseOnUndefinedMaskMap:
+            self._clearUnmappedMaskPlanes(template.mask, planeMap)
         convertedTemplate = DifferenceImage.from_legacy(
             template,
             exposure_record=exposureRecord,
             unit=astropy.units.nJy,
-            plane_map=get_legacy_template_mask_planes(),
+            plane_map=planeMap,
         )
         del template
         convertedTemplate.templates = DifferenceImageTemplateInfo.from_legacy_psf(
@@ -347,6 +364,29 @@ class GetTemplateTask(pipeBase.PipelineTask):
         self.metadata["templatePsfSigma"] = sigma
         self.log.info("Approximated the template PSF with a Gaussian of sigma %.3f pixels.", sigma)
         return convertedTemplate
+
+    def _clearUnmappedMaskPlanes(self, mask, planeMap):
+        """Clear the pixels of every mask plane that conversion would reject.
+
+        Parameters
+        ----------
+        mask : `lsst.afw.image.Mask`
+            Template mask to modify in place.
+        planeMap : `dict` [`str`, `lsst.images.MaskPlane`]
+            Plane map the template will be converted with. The optional
+            planes of `lsst.images.get_legacy_optional_mask_planes` are kept
+            as well, since conversion adds them when they have pixels set.
+        """
+        keep = planeMap.keys() | get_legacy_optional_mask_planes().keys()
+        for name in mask.getMaskPlaneDict():
+            if name in keep:
+                continue
+            bitmask = mask.getPlaneBitMask(name)
+            nSet = np.count_nonzero(mask.array & bitmask)
+            if nSet:
+                self.log.warning("Dropping mask plane %s from the template: %d pixels are set, but"
+                                 " the template plane map does not include it.", name, nSet)
+                mask.array &= ~bitmask
 
     @staticmethod
     def _templatePsfSigma(templateInfo):
