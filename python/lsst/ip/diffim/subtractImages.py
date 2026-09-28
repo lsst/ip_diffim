@@ -369,6 +369,15 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
         self.fallbackSourceSelector.signalToNoise.minimum = signalToNoiseMinimum
         self.fallbackSourceSelector.signalToNoise.maximum = signalToNoiseMaximum
 
+    def validate(self):
+        super().validate()
+        if self.doSubtractBackground and self.image_type == "future":
+            raise lsst.pex.config.FieldValidationError(
+                AlardLuptonSubtractBaseConfig.doSubtractBackground, self,
+                "The background subtracted when solving the kernel is not recorded on"
+                " image_type='future' outputs; subtract the background in detectAndMeasure instead."
+            )
+
 
 class AlardLuptonSubtractConfig(AlardLuptonSubtractBaseConfig, lsst.pipe.base.PipelineTaskConfig,
                                 pipelineConnections=AlardLuptonSubtractConnections):
