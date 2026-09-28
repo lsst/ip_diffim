@@ -1889,6 +1889,26 @@ class DetectAndMeasureOutputFormatTest(DetectAndMeasureTestBase, lsst.utils.test
                     self.assertEqual(out.templates, templateInfo)
                     self.assertEqual(out.kernel, kernel)
 
+    def test_run_quantum_without_provenance(self):
+        """An input difference image with no kernel or template records
+        raises an error that names what is missing, and writes nothing.
+        """
+        templateInfo = [self._makeTemplateInfo()]
+        kernel = self._makeKernel()
+        for missing, templates, inputKernel in (("PSF matching kernel", templateInfo, None),
+                                                ("template coadd records", None, kernel)):
+            with self.subTest(missing=missing):
+                science, sources, matchedTemplate, difference = self._make_images()
+                task = self._setup_task(image_type="future")
+                butlerQC = _RecordingQuantumContext(self.dataId)
+                refs = _FakeRefs(science=science, matchedTemplate=matchedTemplate,
+                                 difference=self._makeFutureInput(difference, templates, inputKernel),
+                                 kernelSources=sources)
+
+                with self.assertRaisesRegex(lsst.pipe.base.InvalidQuantumError, f"'difference'.*{missing}"):
+                    task.runQuantum(butlerQC, refs, _FakeRefs())
+                self.assertIsNone(butlerQC.put_values)
+
     def test_run_quantum_score_task_provenance(self):
         """Each output takes the kernel of the image it is measured from,
         which for the score task are two different kernels.

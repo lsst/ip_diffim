@@ -35,7 +35,8 @@ import lsst.geom
 from lsst.images import DifferenceImage
 from lsst.images.fields import field_from_legacy_background
 from lsst.ip.diffim.utils import (evaluateMaskFraction, computeDifferenceImageMetrics,
-                                  populate_sattle_visit_cache, record_from_obs_info)
+                                  populate_sattle_visit_cache, record_from_obs_info,
+                                  get_difference_image_provenance)
 from lsst.meas.algorithms import SkyObjectsTask, SourceDetectionTask, SetPrimaryFlagsTask, MaskStreaksTask
 from lsst.meas.algorithms import FindGlintTrailsTask, FindCosmicRaysConfig, findCosmicRays
 from lsst.meas.base import ForcedMeasurementTask, ApplyApCorrTask, DetectorVisitIdGeneratorConfig
@@ -619,19 +620,21 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         matchingKernels = {}
         if self.config.image_type == "future":
             difference = inputs["difference"]
+            dataId = butlerQC.quantum.dataId
             # Read the `TemplateInfo` and the observation metadata from the
             # difference while it is still in the `DifferenceImage` format.
-            templateInfo = difference.templates
-            dataId = butlerQC.quantum.dataId
+            templateInfo = get_difference_image_provenance(difference, "templates", "difference", dataId)
             exposureRecord = record_from_obs_info(difference.obs_info, dataId["instrument"],
                                                   dataId["visit"], dataId.universe)
             # Assign the kernel from the input difference image to the
             # corresponding output image
-            matchingKernels["subtractedMeasuredExposure"] = difference.kernel
+            matchingKernels["subtractedMeasuredExposure"] = get_difference_image_provenance(
+                difference, "kernel", "difference", dataId)
             inputs["difference"] = difference.to_legacy()
             if "scoreExposure" in inputs:
                 scoreExposure = inputs["scoreExposure"]
-                matchingKernels["scoreMeasuredExposure"] = scoreExposure.kernel
+                matchingKernels["scoreMeasuredExposure"] = get_difference_image_provenance(
+                    scoreExposure, "kernel", "scoreExposure", dataId)
                 inputs["scoreExposure"] = scoreExposure.to_legacy()
 
         # Specify the fields that `annotate` and `convert_outputs_to_future`
@@ -690,8 +693,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         matchingKernels : `dict` [`str`, \
                 `lsst.images.convolution_kernels.ConvolutionKernel`], optional
             Kernel used to PSF-match the template, keyed by the name of the
-            output image it is attached to. An image with no entry, or an
-            entry of `None`, gets no kernel.
+            output image it is attached to. If `None`, no kernel is attached.
         templateInfo : `list` [`lsst.images.DifferenceImageTemplateInfo`], \
                 optional
             Records of the coadds that went into the template, each holding
