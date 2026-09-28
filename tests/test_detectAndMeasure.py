@@ -36,6 +36,7 @@ import lsst.afw.math as afwMath
 import lsst.geom
 from lsst.images import Box, DifferenceImage, DifferenceImageTemplateInfo, Polygon
 from lsst.images.convolution_kernels import ImageBasisConvolutionKernel
+from lsst.images.fields import ChebyshevField
 import lsst.images.psfs
 import lsst.images.serialization
 from lsst.ip.diffim import detectAndMeasure, subtractImages
@@ -1638,7 +1639,24 @@ class DetectAndMeasureOutputFormatTest(DetectAndMeasureTestBase, lsst.utils.test
         legacy.setSpatialParameters([[scale, 0.0, 0.0], [0.5, 0.0, 0.0]])
         return ImageBasisConvolutionKernel.from_legacy(legacy)
 
-    def _makeFutureInput(self, exposure, templateInfo=None, kernel=None):
+    @staticmethod
+    def _makePhotometricScaling(exposure):
+        """Return a constant photometric scaling for an input image.
+
+        Parameters
+        ----------
+        exposure : `lsst.afw.image.ExposureF`
+            Image from `_make_images`.
+
+        Returns
+        -------
+        photometricScaling : `lsst.images.fields.ChebyshevField`
+            The scaling.
+        """
+        return ChebyshevField(Box.from_legacy(exposure.getBBox()), np.array([[0.25]]),
+                              unit=astropy.units.nJy/astropy.units.electron)
+
+    def _makeFutureInput(self, exposure, templateInfo=None, kernel=None, photometricScaling=None):
         """Convert a legacy image to a `lsst.images.DifferenceImage`.
 
         Parameters
@@ -1651,6 +1669,8 @@ class DetectAndMeasureOutputFormatTest(DetectAndMeasureTestBase, lsst.utils.test
         kernel : `lsst.images.convolution_kernels.ImageBasisConvolutionKernel`,
             optional
             PSF matching kernel.
+        photometricScaling : `lsst.images.fields.BaseField`, optional
+            Photometric scaling of the science image.
 
         Returns
         -------
@@ -1663,6 +1683,8 @@ class DetectAndMeasureOutputFormatTest(DetectAndMeasureTestBase, lsst.utils.test
             image.templates = templateInfo
         if kernel is not None:
             image.kernel = kernel
+        if photometricScaling is not None:
+            image.photometric_scaling = photometricScaling
         return image
 
     def _make_images(self, withScore=False):
@@ -1738,8 +1760,7 @@ class DetectAndMeasureOutputFormatTest(DetectAndMeasureTestBase, lsst.utils.test
         self.assertEqual(image.bbox.y.stop, legacyBbox.getMaxY() + 1)
         self.assertEqual(image.unit, astropy.units.nJy)
         self.assertIsNotNone(image.detector)
-        # Populating this needs the visit summary PhotoCalib, which this task
-        # does not have as an input, so it is deliberately left unset.
+        # `convert_outputs_to_future` was not given a photometric scaling.
         self.assertIsNone(image.photometric_scaling)
 
     def test_connections(self):
@@ -1871,8 +1892,10 @@ class DetectAndMeasureOutputFormatTest(DetectAndMeasureTestBase, lsst.utils.test
                                         ("future", DifferenceImage)):
             with self.subTest(imageType=imageType):
                 science, sources, matchedTemplate, difference = self._make_images()
+                photometricScaling = self._makePhotometricScaling(difference)
                 if imageType == "future":
-                    difference = self._makeFutureInput(difference, templateInfo, kernel)
+                    difference = self._makeFutureInput(difference, templateInfo, kernel,
+                                                       photometricScaling)
                 task = self._setup_task(doSubtractBackground=True, image_type=imageType)
                 butlerQC = _RecordingQuantumContext(self.dataId)
                 task.runQuantum(butlerQC,
@@ -1888,6 +1911,7 @@ class DetectAndMeasureOutputFormatTest(DetectAndMeasureTestBase, lsst.utils.test
                     # survives, rather than being worked out again.
                     self.assertEqual(out.templates, templateInfo)
                     self.assertEqual(out.kernel, kernel)
+                    self.assertIs(out.photometric_scaling, photometricScaling)
 
     def test_run_quantum_without_provenance(self):
         """An input difference image with no kernel or template records
@@ -1919,13 +1943,14 @@ class DetectAndMeasureOutputFormatTest(DetectAndMeasureTestBase, lsst.utils.test
         differenceKernel = self._makeKernel(scale=1.0)
         scoreKernel = self._makeKernel(scale=3.0)
         self.assertNotEqual(differenceKernel, scoreKernel)
+        photometricScaling = self._makePhotometricScaling(difference)
         task = self._setup_task(image_type="future")
         butlerQC = _RecordingQuantumContext(self.dataId)
 
         task.runQuantum(butlerQC,
                         _FakeRefs(science=science, matchedTemplate=matchedTemplate,
                                   difference=self._makeFutureInput(difference, templateInfo,
-                                                                   differenceKernel),
+                                                                   differenceKernel, photometricScaling),
                                   scoreExposure=self._makeFutureInput(score, templateInfo, scoreKernel),
                                   kernelSources=sources),
                         _FakeRefs())
@@ -1936,6 +1961,10 @@ class DetectAndMeasureOutputFormatTest(DetectAndMeasureTestBase, lsst.utils.test
         self.assertEqual(scoreOut.templates, templateInfo)
         self.assertEqual(out.kernel, differenceKernel)
         self.assertEqual(scoreOut.kernel, scoreKernel)
+        # Both outputs are in the science image's units, so both take the
+        # scaling of the input difference image.
+        self.assertIs(out.photometric_scaling, photometricScaling)
+        self.assertIs(scoreOut.photometric_scaling, photometricScaling)
 
     def test_connections_future_reads_difference_image(self):
         """The inputs whose provenance is copied ask for the type that

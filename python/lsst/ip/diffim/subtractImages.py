@@ -83,7 +83,9 @@ class SubtractInputConnections(lsst.pipe.base.PipelineTaskConnections,
         name="{fakesType}{coaddName}Diff_templateExp"
     )
     science = connectionTypes.Input(
-        doc="Input science exposure to subtract from.",
+        doc="Input science exposure to subtract from."
+        " With image_type='future' this is read as a lsst.images.VisitImage, so that its"
+        " photometric scaling can be passed on to the outputs.",
         dimensions=("instrument", "visit", "detector"),
         storageClass="ExposureF",
         name="{fakesType}calexp"
@@ -110,6 +112,7 @@ class SubtractInputConnections(lsst.pipe.base.PipelineTaskConnections,
             del self.visitSummary
         if config.image_type == "future":
             self.template = dataclasses.replace(self.template, storageClass="DifferenceImage")
+            self.science = dataclasses.replace(self.science, storageClass="VisitImage")
 
 
 class SubtractImageOutputConnections(lsst.pipe.base.PipelineTaskConnections,
@@ -460,6 +463,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         inputs = butlerQC.get(inputRefs)
         templateInfo = None
         exposureRecord = None
+        photometricScaling = None
         if self.config.image_type == "future":
             template = inputs["template"]
             dataId = butlerQC.quantum.dataId
@@ -469,6 +473,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             exposureRecord = record_from_obs_info(template.obs_info, dataId["instrument"],
                                                   dataId["visit"], dataId.universe)
             inputs["template"] = template.to_legacy()
+            photometricScaling = inputs["science"].photometric_scaling
+            inputs["science"] = inputs["science"].to_legacy()
 
         try:
             results = self.run(**inputs)
@@ -478,11 +484,13 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             raise error from e
 
         if self.config.image_type == "future":
-            self.convert_outputs_to_future(results, exposureRecord, templateInfo=templateInfo)
+            self.convert_outputs_to_future(results, exposureRecord, templateInfo=templateInfo,
+                                           photometricScaling=photometricScaling)
 
         butlerQC.put(results, outputRefs)
 
-    def convert_outputs_to_future(self, results, exposureRecord, templateInfo=None):
+    def convert_outputs_to_future(self, results, exposureRecord, templateInfo=None,
+                                  photometricScaling=None):
         """Convert the image outputs to `lsst.images` types.
 
         Each image named in `futureImageOutputs` that is present on
@@ -500,8 +508,9 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         templateInfo : `list` [`lsst.images.DifferenceImageTemplateInfo`], \
                 optional
             Record of the coadds that went into the template, taken from the
-            template this task subtracted. Attached to every converted
-            output unless `None` or empty.
+            template this task subtracted.
+        photometricScaling : `lsst.images.fields.BaseField`, optional
+            Photometric scaling of the science image.
 
         Raises
         ------
@@ -548,6 +557,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                 image.kernel = kernel
             if templateInfo:
                 image.templates = templateInfo
+            if photometricScaling is not None:
+                image.photometric_scaling = photometricScaling
             if background is not None and name == self.futureBackgroundOutput:
                 image.backgrounds.add(
                     "subtracted", background,
