@@ -21,6 +21,7 @@
 import collections
 import dataclasses
 
+import astropy.units
 import numpy as np
 
 import lsst.afw.image as afwImage
@@ -33,8 +34,16 @@ import lsst.afw.math as afwMath
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 
+from lsst.images import (
+    DifferenceImage,
+    DifferenceImageTemplateInfo,
+    get_legacy_optional_mask_planes,
+    get_legacy_template_mask_planes,
+)
+from lsst.images.psfs import GaussianPointSpreadFunction
 from lsst.skymap import BaseSkyMap
 from lsst.ip.diffim.dcrModel import DcrModel
+from lsst.ip.diffim.utils import record_from_obs_info
 from lsst.meas.algorithms import CoaddPsf, CoaddPsfConfig, SubtractBackgroundTask, ScaleVarianceTask
 from lsst.utils.timer import timeMethod
 
@@ -44,6 +53,12 @@ __all__ = [
     "GetDcrTemplateTask",
     "GetDcrTemplateConfig",
 ]
+
+_PSF_STAMP_SIGMAS = 5
+"""Width, in N sigma, of the Gaussian approximation to the CoaddPsf. Used when
+writing the template in `lsst.images.DifferenceImage` format until a new PSF
+representation is written.
+"""
 
 
 class GetTemplateConnections(
@@ -55,6 +70,22 @@ class GetTemplateConnections(
         doc="Bounding box of exposure to determine the geometry of the output template.",
         name="{fakesType}calexp.bbox",
         storageClass="Box2I",
+        dimensions=("instrument", "visit", "detector"),
+        deprecated="Replaced by the `detector` connection. Will be removed after v31.",
+    )
+    detector = pipeBase.connectionTypes.Input(
+        doc="Detector of the exposure that we will construct the template for."
+        " Its bounding box sets the geometry of the output template.",
+        name="{fakesType}calexp.detector",
+        storageClass="Detector",
+        dimensions=("instrument", "visit", "detector"),
+    )
+    obs_info = pipeBase.connectionTypes.Input(
+        doc="Observation metadata of the exposure the template is built for."
+        " Only read with output_image_type='future', which needs this to set"
+        " the obs_info component of a lsst.images.VisitImage.",
+        name="{fakesType}calexp.obs_info",
+        storageClass="ObservationInfo",
         dimensions=("instrument", "visit", "detector"),
     )
     wcs = pipeBase.connectionTypes.Input(
@@ -89,11 +120,17 @@ class GetTemplateConnections(
 
     def __init__(self, *, config=None):
         super().__init__(config=config)
+        # Kept only so that older config files still load.
+        del self.bbox
         if config.requireCoaddAtGraphBuild:
             self.coaddExposures = dataclasses.replace(
                 self.coaddExposures,
                 deferGraphConstraint=False,
             )
+        if config.output_image_type == "future":
+            self.template = dataclasses.replace(self.template, storageClass="DifferenceImage")
+        else:
+            del self.obs_info
 
 
 class GetTemplateConfig(
@@ -154,6 +191,23 @@ class GetTemplateConfig(
         doc="If True, include the coadd dataset existence in the"
         " initial butler query during QuantumGraph generation.",
     )
+    output_image_type = pexConfig.ChoiceField[str](
+        "Which image type to use for the output template.",
+        allowed={
+            "legacy": "Write as a lsst.afw.image.ExposureF.",
+            "future": "Write as a lsst.images.DifferenceImage.",
+        },
+        optional=False,
+        default="legacy",
+    )
+    raiseOnUndefinedMaskMap = pexConfig.Field(
+        dtype=bool,
+        default=False,
+        doc="Raise if the template has pixels set in a mask plane that"
+        " `lsst.images` does not map? If False, log a warning and drop that"
+        " plane from the output instead."
+        " Only used with output_image_type='future'.",
+    )
 
     def setDefaults(self):
         # Use a smaller cache: per SeparableKernel.computeCache, this should
@@ -207,8 +261,10 @@ class GetTemplateTask(pipeBase.PipelineTask):
 
     def runQuantum(self, butlerQC, inputRefs, outputRefs):
         inputs = butlerQC.get(inputRefs)
-        bbox = inputs.pop("bbox")
+        detector = inputs.pop("detector")
+        bbox = detector.getBBox()
         wcs = inputs.pop("wcs")
+        obsInfo = inputs.pop("obs_info", None)
         coaddExposures = inputs.pop("coaddExposures")
         skymap = inputs.pop("skyMap")
 
@@ -225,7 +281,148 @@ class GetTemplateTask(pipeBase.PipelineTask):
             physical_filter=physical_filter,
             visit=outputRefs.template.dataId["visit"],
         )
+        if self.config.output_image_type == "future":
+            dataId = butlerQC.quantum.dataId
+            exposureRecord = record_from_obs_info(obsInfo, dataId["instrument"], dataId["visit"],
+                                                  dataId.universe)
+            outputs.template = self.convert_outputs_to_future(outputs.template,
+                                                              inputRefs.coaddExposures,
+                                                              detector=detector,
+                                                              exposureRecord=exposureRecord)
         butlerQC.put(outputs, outputRefs)
+
+    def convert_outputs_to_future(self, template, coadd_refs, detector, exposureRecord):
+        """Convert a template image to DifferenceImage format.
+
+        This replaces ``template`` with an `lsst.images.DifferenceImage`
+        instance, records the coadds contributed to it, and replaces its
+        CoaddPsf with a Gaussian approximation that has the same second
+        moments.
+
+        Parameters
+        ----------
+        template : `lsst.afw.image.Exposure`
+            Template to convert. Its detector is replaced with ``detector``
+            and its mask is modified in place.
+        coadd_refs : `list` [`lsst.daf.butler.DatasetRef`]
+            References to the coadds that may have gone into the template.
+            May be a superset of the coadds that were used; supplies the
+            dataset id and RUN collection recorded for each coadd that was.
+        detector : `lsst.afw.cameraGeom.Detector`
+            Detector of the science image that the template was built for.
+        exposureRecord : `lsst.daf.butler.DimensionRecord`
+            The ``exposure`` record of the observation the template was built
+            for, which supplies the observation metadata recorded on the
+            output.
+
+        Returns
+        -------
+        convertedTemplate : `lsst.images.DifferenceImage`
+            The converted image.
+
+        Raises
+        ------
+        RuntimeError
+            Raised if the template has pixels set in a mask plane that
+            `lsst.images.get_legacy_template_mask_planes` does not map and
+            ``config.raiseOnUndefinedMaskMap`` is True, if ``coadd_refs``
+            spans more than one skymap, or if no coadd that contributed has a
+            valid PSF shape.
+        """
+        legacy_psf = template.getPsf()
+        template.setDetector(detector)
+        skymaps = {ref.dataId["skymap"] for ref in coadd_refs}
+        if len(skymaps) != 1:
+            raise RuntimeError("Expected the template inputs to come from one skymap;"
+                               f" got {sorted(skymaps)}.")
+        butler_info = {(ref.dataId["tract"], ref.dataId["patch"]): (ref.id, ref.run)
+                       for ref in coadd_refs}
+        planeMap = get_legacy_template_mask_planes()
+        if not self.config.raiseOnUndefinedMaskMap:
+            self._clearUnmappedMaskPlanes(template.mask, planeMap)
+        convertedTemplate = DifferenceImage.from_legacy(
+            template,
+            exposure_record=exposureRecord,
+            unit=astropy.units.nJy,
+            plane_map=planeMap,
+        )
+        del template
+        convertedTemplate.templates = DifferenceImageTemplateInfo.from_legacy_psf(
+            convertedTemplate.sky_projection.pixel_frame,
+            legacy_psf,
+            skymaps.pop(),
+            butler_info,
+            log=self.log,
+        )
+        sigma = self._templatePsfSigma(convertedTemplate.templates)
+        convertedTemplate.psf = GaussianPointSpreadFunction(
+            sigma,
+            bounds=convertedTemplate.bbox,
+            stamp_size=2*int(np.ceil(_PSF_STAMP_SIGMAS*sigma)) + 1,
+        )
+        self.metadata["templatePsfSigma"] = sigma
+        self.log.info("Approximated the template PSF with a Gaussian of sigma %.3f pixels.", sigma)
+        return convertedTemplate
+
+    def _clearUnmappedMaskPlanes(self, mask, planeMap):
+        """Clear the pixels of every mask plane that conversion would reject.
+
+        Parameters
+        ----------
+        mask : `lsst.afw.image.Mask`
+            Template mask to modify in place.
+        planeMap : `dict` [`str`, `lsst.images.MaskPlane`]
+            Plane map the template will be converted with. The optional
+            planes of `lsst.images.get_legacy_optional_mask_planes` are kept
+            as well, since conversion adds them when they have pixels set.
+        """
+        keep = planeMap.keys() | get_legacy_optional_mask_planes().keys()
+        for name in mask.getMaskPlaneDict():
+            if name in keep:
+                continue
+            bitmask = mask.getPlaneBitMask(name)
+            nSet = np.count_nonzero(mask.array & bitmask)
+            if nSet:
+                self.log.warning("Dropping mask plane %s from the template: %d pixels are set, but"
+                                 " the template plane map does not include it.", name, nSet)
+                mask.array &= ~bitmask
+
+    @staticmethod
+    def _templatePsfSigma(templateInfo):
+        """Return the width of the Gaussian that approximates the PSF of a
+        stitched template.
+
+        Parameters
+        ----------
+        templateInfo : `list` [`lsst.images.DifferenceImageTemplateInfo`]
+            Records of the coadds that went into the template, each holding
+            the second moments of that coadd's PSF and the region where it
+            overlapped the science image.
+
+        Returns
+        -------
+        sigma : `float`
+            Square root of the area-weighted mean second moment of the
+            records, in pixels.
+
+        Raises
+        ------
+        RuntimeError
+            Raised if no record has a PSF shape that can be used.
+        """
+        xx = np.array([template.psf_shape_xx for template in templateInfo])
+        yy = np.array([template.psf_shape_yy for template in templateInfo])
+        weights = np.array([template.bounds.area for template in templateInfo])
+        good = np.array([not template.psf_shape_flag for template in templateInfo], dtype=bool)
+        good &= np.isfinite(xx) & np.isfinite(yy) & (weights > 0)
+        if not np.any(good):
+            raise RuntimeError("No coadd that went into the template has a PSF shape to"
+                               " approximate with a Gaussian.")
+        moment = (np.average(xx[good], weights=weights[good])
+                  + np.average(yy[good], weights=weights[good]))/2
+        if moment <= 0:
+            raise RuntimeError(f"Template PSF second moment must be positive; got {moment}.")
+        return float(np.sqrt(moment))
 
     def getExposures(self, coaddExposureHandles, bbox, skymap, wcs):
         """Return a data structure containing the coadds that overlap the
@@ -799,6 +996,12 @@ class GetDcrTemplateConnections(
 class GetDcrTemplateConfig(
     GetTemplateConfig, pipelineConnections=GetDcrTemplateConnections
 ):
+    """Config for GetDcrTemplateTask.
+
+    Only ``output_image_type="legacy"`` is supported: the task always writes
+    an `lsst.afw.image.ExposureF`.
+    """
+
     numSubfilters = pexConfig.Field(
         doc="Number of subfilters in the DcrCoadd.",
         dtype=int,
@@ -830,11 +1033,15 @@ class GetDcrTemplateTask(GetTemplateTask):
 
     def runQuantum(self, butlerQC, inputRefs, outputRefs):
         inputs = butlerQC.get(inputRefs)
-        bbox = inputs.pop("bbox")
+        detector = inputs.pop("detector")
+        bbox = detector.getBBox()
         wcs = inputs.pop("wcs")
         dcrCoaddExposureHandles = inputs.pop("dcrCoadds")
         skymap = inputs.pop("skyMap")
         visitInfo = inputs.pop("visitInfo")
+        # This task never converts its output, so the observation metadata
+        # that the conversion needs is dropped here.
+        inputs.pop("obs_info", None)
 
         # This should not happen with a properly configured execution context.
         assert not inputs, "runQuantum got more inputs than expected"

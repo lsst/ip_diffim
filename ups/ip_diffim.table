@@ -1,5 +1,6 @@
 setupRequired(afw)
 setupRequired(daf_base)
+setupRequired(images)
 setupRequired(log)
 setupRequired(meas_astrom)
 setupRequired(meas_algorithms)

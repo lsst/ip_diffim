@@ -19,9 +19,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import dataclasses
 import numpy as np
 import requests
 import os
+
 
 import lsst.afw.detection as afwDetection
 import lsst.afw.image as afwImage
@@ -29,8 +31,11 @@ import lsst.afw.math as afwMath
 import lsst.afw.table as afwTable
 import lsst.daf.base as dafBase
 import lsst.geom
+from lsst.images import Mask, get_legacy_difference_image_mask_planes
+from lsst.images.fields import field_from_legacy_background
 from lsst.ip.diffim.utils import (evaluateMaskFraction, computeDifferenceImageMetrics,
-                                  populate_sattle_visit_cache)
+                                  populate_sattle_visit_cache,
+                                  get_difference_image_provenance)
 from lsst.meas.algorithms import SkyObjectsTask, SourceDetectionTask, SetPrimaryFlagsTask, MaskStreaksTask
 from lsst.meas.algorithms import FindGlintTrailsTask, FindCosmicRaysConfig, findCosmicRays
 from lsst.meas.base import ForcedMeasurementTask, ApplyApCorrTask, DetectorVisitIdGeneratorConfig
@@ -183,6 +188,10 @@ class DetectAndMeasureConnections(pipeBase.PipelineTaskConnections,
             self.outputs.remove("differenceBackground")
         if not (self.config.writeGlintInfo):
             self.outputs.remove("glintTrailInfo")
+        if self.config.image_type == "future":
+            self.difference = dataclasses.replace(self.difference, storageClass="DifferenceImage")
+            self.subtractedMeasuredExposure = dataclasses.replace(self.subtractedMeasuredExposure,
+                                                                  storageClass="DifferenceImage")
 
 
 class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
@@ -399,6 +408,16 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
             "closest in time to the exposure."
     )
     idGenerator = DetectorVisitIdGeneratorConfig.make_field()
+    image_type = pexConfig.ChoiceField[str](
+        "Image type of the input and measured difference images (and, for"
+        " DetectAndMeasureScoreTask, the input and measured score images).",
+        allowed={
+            "legacy": "Read and write lsst.afw.image.ExposureF.",
+            "future": "Read and write lsst.images.DifferenceImage.",
+        },
+        optional=False,
+        default="legacy",
+    )
 
     def setDefaults(self):
         # Background subtraction
@@ -592,10 +611,28 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         inputs = butlerQC.get(inputRefs)
         idGenerator = self.config.idGenerator.apply(butlerQC.quantum.dataId)
         idFactory = idGenerator.make_table_id_factory()
-        # Specify the fields that `annotate` needs below, to ensure they
-        # exist, even as None.
+
+        # Input image that each output is measured from, keyed by output name.
+        inputImages = {}
+        if self.config.image_type == "future":
+            dataId = butlerQC.quantum.dataId
+            for output, connection in (("subtractedMeasuredExposure", "difference"),
+                                       ("scoreMeasuredExposure", "scoreExposure")):
+                if connection not in inputs:
+                    continue
+                image = inputs[connection]
+                # The output is written back into this image, so it must
+                # already carry the kernel and the template records.
+                get_difference_image_provenance(image, "kernel", connection, dataId)
+                get_difference_image_provenance(image, "templates", connection, dataId)
+                inputImages[output] = image
+                inputs[connection] = image.to_legacy()
+
+        # Specify the fields that `annotate` and `convert_outputs_to_future`
+        # need below, to ensure they exist, even as None.
         measurementResults = pipeBase.Struct(
             subtractedMeasuredExposure=None,
+            scoreMeasuredExposure=None,
             diaSources=None,
             maskedStreaks=None,
             differenceBackground=None,
@@ -603,17 +640,74 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         try:
             self.run(**inputs, idFactory=idFactory, measurementResults=measurementResults)
         except pipeBase.AlgorithmError as e:
+            # Annotate before converting
             error = pipeBase.AnnotatedPartialOutputsError.annotate(
                 e,
                 self,
                 measurementResults.subtractedMeasuredExposure,
+                measurementResults.scoreMeasuredExposure,
                 measurementResults.diaSources,
                 measurementResults.maskedStreaks,
                 log=self.log
             )
+            if self.config.image_type == "future":
+                self.convert_outputs_to_future(measurementResults, inputImages)
             butlerQC.put(measurementResults, outputRefs)
             raise error from e
+        if self.config.image_type == "future":
+            self.convert_outputs_to_future(measurementResults, inputImages)
         butlerQC.put(measurementResults, outputRefs)
+
+    def convert_outputs_to_future(self, results, inputImages):
+        """Write the output images in a result struct back into the
+        `lsst.images` images they were measured from.
+
+        The image, variance, and mask planes of each input image are replaced
+        by those of the corresponding legacy output, and the background
+        subtracted by this task is attached. The kernel, template records,
+        and observation metadata of the input are kept. Outputs that are
+        absent or `None` are skipped.
+
+        Parameters
+        ----------
+        results : `lsst.pipe.base.Struct`
+            Output struct to read and modify in place.
+        inputImages : `dict` [`str`, `lsst.images.DifferenceImage`]
+            Input image each output was measured from, keyed by the name of
+            the output. Each is modified in place.
+
+        Notes
+        -----
+        This uses the default legacy mask plane map of
+        `lsst.images.get_legacy_difference_image_mask_planes` and adds any
+        planes from `~lsst.images.get_legacy_optional_mask_planes` that are set
+        for any pixels in the image.
+        """
+        background = getattr(results, "differenceBackground", None)
+        for name, image in inputImages.items():
+            exposure = getattr(results, name, None)
+            if exposure is None:
+                continue
+            # These are no-ops when the legacy output is a view of the input,
+            # as returned by `~lsst.images.DifferenceImage.to_legacy`.
+            image.image.array[...] = exposure.image.array
+            image.variance.array[...] = exposure.variance.array
+            image.mask = Mask.from_legacy(exposure.mask, get_legacy_difference_image_mask_planes(),
+                                          sky_projection=image.sky_projection)
+            if background is not None and len(background) > 0:
+                # The same background is subtracted from the difference image
+                # and the score image, so it applies to both.
+                image.backgrounds.add(
+                    "subtracted",
+                    field_from_legacy_background(background, bounds=image.bbox, unit=image.unit),
+                    description="Background subtracted from this image before detection.",
+                    is_subtracted=True,
+                )
+            setattr(results, name, image)
+        if background is not None and len(background) == 0:
+            # An empty BackgroundList cannot be converted to a field, and means
+            # that no background was subtracted.
+            self.log.debug("No background model to attach to the output images.")
 
     @timeMethod
     def run(self, science, matchedTemplate, difference, kernelSources=None,
@@ -1482,6 +1576,13 @@ class DetectAndMeasureScoreConnections(DetectAndMeasureConnections):
         storageClass="ExposureF",
         name="{fakesType}{coaddName}Diff_scoreExp",
     )
+
+    def __init__(self, *, config):
+        super().__init__(config=config)
+        if self.config.image_type == "future":
+            self.scoreExposure = dataclasses.replace(self.scoreExposure, storageClass="DifferenceImage")
+            self.scoreMeasuredExposure = dataclasses.replace(self.scoreMeasuredExposure,
+                                                             storageClass="DifferenceImage")
 
 
 class DetectAndMeasureScoreConfig(DetectAndMeasureConfig,
