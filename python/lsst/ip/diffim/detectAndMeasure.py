@@ -24,7 +24,6 @@ import numpy as np
 import requests
 import os
 
-import astropy.units
 
 import lsst.afw.detection as afwDetection
 import lsst.afw.image as afwImage
@@ -32,10 +31,10 @@ import lsst.afw.math as afwMath
 import lsst.afw.table as afwTable
 import lsst.daf.base as dafBase
 import lsst.geom
-from lsst.images import DifferenceImage
+from lsst.images import Mask, get_legacy_difference_image_mask_planes
 from lsst.images.fields import field_from_legacy_background
 from lsst.ip.diffim.utils import (evaluateMaskFraction, computeDifferenceImageMetrics,
-                                  populate_sattle_visit_cache, record_from_obs_info,
+                                  populate_sattle_visit_cache,
                                   get_difference_image_provenance)
 from lsst.meas.algorithms import SkyObjectsTask, SourceDetectionTask, SetPrimaryFlagsTask, MaskStreaksTask
 from lsst.meas.algorithms import FindGlintTrailsTask, FindCosmicRaysConfig, findCosmicRays
@@ -612,32 +611,22 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         inputs = butlerQC.get(inputRefs)
         idGenerator = self.config.idGenerator.apply(butlerQC.quantum.dataId)
         idFactory = idGenerator.make_table_id_factory()
-        # Assign the science image Detector to the output DifferenceImage
-        detector = inputs["science"].getDetector()
 
-        templateInfo = None
-        exposureRecord = None
-        matchingKernels = {}
-        photometricScaling = None
+        # Input image that each output is measured from, keyed by output name.
+        inputImages = {}
         if self.config.image_type == "future":
-            difference = inputs["difference"]
             dataId = butlerQC.quantum.dataId
-            # Read the `TemplateInfo` and the observation metadata from the
-            # difference while it is still in the `DifferenceImage` format.
-            templateInfo = get_difference_image_provenance(difference, "templates", "difference", dataId)
-            exposureRecord = record_from_obs_info(difference.obs_info, dataId["instrument"],
-                                                  dataId["visit"], dataId.universe)
-            # Assign the kernel from the input difference image to the
-            # corresponding output image
-            matchingKernels["subtractedMeasuredExposure"] = get_difference_image_provenance(
-                difference, "kernel", "difference", dataId)
-            photometricScaling = difference.photometric_scaling
-            inputs["difference"] = difference.to_legacy()
-            if "scoreExposure" in inputs:
-                scoreExposure = inputs["scoreExposure"]
-                matchingKernels["scoreMeasuredExposure"] = get_difference_image_provenance(
-                    scoreExposure, "kernel", "scoreExposure", dataId)
-                inputs["scoreExposure"] = scoreExposure.to_legacy()
+            for output, connection in (("subtractedMeasuredExposure", "difference"),
+                                       ("scoreMeasuredExposure", "scoreExposure")):
+                if connection not in inputs:
+                    continue
+                image = inputs[connection]
+                # The output is written back into this image, so it must
+                # already carry the kernel and the template records.
+                get_difference_image_provenance(image, "kernel", connection, dataId)
+                get_difference_image_provenance(image, "templates", connection, dataId)
+                inputImages[output] = image
+                inputs[connection] = image.to_legacy()
 
         # Specify the fields that `annotate` and `convert_outputs_to_future`
         # need below, to ensure they exist, even as None.
@@ -662,50 +651,30 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                 log=self.log
             )
             if self.config.image_type == "future":
-                self.convert_outputs_to_future(measurementResults, exposureRecord,
-                                               detector=detector, matchingKernels=matchingKernels,
-                                               templateInfo=templateInfo,
-                                               photometricScaling=photometricScaling)
+                self.convert_outputs_to_future(measurementResults, inputImages)
             butlerQC.put(measurementResults, outputRefs)
             raise error from e
         if self.config.image_type == "future":
-            self.convert_outputs_to_future(measurementResults, exposureRecord,
-                                           detector=detector, matchingKernels=matchingKernels,
-                                           templateInfo=templateInfo,
-                                           photometricScaling=photometricScaling)
+            self.convert_outputs_to_future(measurementResults, inputImages)
         butlerQC.put(measurementResults, outputRefs)
 
-    def convert_outputs_to_future(self, results, exposureRecord, detector=None, matchingKernels=None,
-                                  templateInfo=None, photometricScaling=None):
-        """Convert the output images in a result struct to `lsst.images` types.
+    def convert_outputs_to_future(self, results, inputImages):
+        """Write the output images in a result struct back into the
+        `lsst.images` images they were measured from.
 
-        This replaces ``results.subtractedMeasuredExposure`` and
-        ``results.scoreMeasuredExposure`` with `lsst.images.DifferenceImage`
-        instances, skipping either one that is absent or `None`.
+        The image, variance, and mask planes of each input image are replaced
+        by those of the corresponding legacy output, and the background
+        subtracted by this task is attached. The kernel, template records,
+        and observation metadata of the input are kept. Outputs that are
+        absent or `None` are skipped.
 
         Parameters
         ----------
         results : `lsst.pipe.base.Struct`
             Output struct to read and modify in place.
-        exposureRecord : `lsst.daf.butler.DimensionRecord`
-            The ``exposure`` record of the observation, which supplies the
-            observation metadata recorded on each converted output.
-        detector : `lsst.afw.cameraGeom.Detector`, optional
-            Detector to set on an output image that has none; all of these
-            images are on the science image's pixel grid, so this should be
-            the science image's detector.
-        matchingKernels : `dict` [`str`, \
-                `lsst.images.convolution_kernels.ConvolutionKernel`], optional
-            Kernel used to PSF-match the template, keyed by the name of the
-            output image it is attached to. If `None`, no kernel is attached.
-        templateInfo : `list` [`lsst.images.DifferenceImageTemplateInfo`], \
-                optional
-            Records of the coadds that went into the template, each holding
-            the second moments of that coadd's PSF and the region where it
-            overlapped the science image. Not attached if `None` or empty.
-        photometricScaling : `lsst.images.fields.BaseField`, optional
-            Photometric scaling of the science image, taken from the input
-            difference image. Not attached if `None`.
+        inputImages : `dict` [`str`, `lsst.images.DifferenceImage`]
+            Input image each output was measured from, keyed by the name of
+            the output. Each is modified in place.
 
         Notes
         -----
@@ -715,23 +684,16 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         for any pixels in the image.
         """
         background = getattr(results, "differenceBackground", None)
-        for name in ("subtractedMeasuredExposure", "scoreMeasuredExposure"):
+        for name, image in inputImages.items():
             exposure = getattr(results, name, None)
             if exposure is None:
                 continue
-            if exposure.getDetector() is None and detector is not None:
-                exposure.setDetector(detector)
-            image = DifferenceImage.from_legacy(
-                exposure,
-                unit=astropy.units.nJy,
-                exposure_record=exposureRecord,
-            )
-            if templateInfo:
-                image.templates = templateInfo
-            if matchingKernels is not None:
-                image.kernel = matchingKernels[name]
-            if photometricScaling is not None:
-                image.photometric_scaling = photometricScaling
+            # These are no-ops when the legacy output is a view of the input,
+            # as returned by `~lsst.images.DifferenceImage.to_legacy`.
+            image.image.array[...] = exposure.image.array
+            image.variance.array[...] = exposure.variance.array
+            image.mask = Mask.from_legacy(exposure.mask, get_legacy_difference_image_mask_planes(),
+                                          sky_projection=image.sky_projection)
             if background is not None and len(background) > 0:
                 # The same background is subtracted from the difference image
                 # and the score image, so it applies to both.

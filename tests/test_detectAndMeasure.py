@@ -34,11 +34,13 @@ import lsst.afw.image as afwImage
 import lsst.afw.table as afwTable
 import lsst.afw.math as afwMath
 import lsst.geom
-from lsst.images import Box, DifferenceImage, DifferenceImageTemplateInfo, Polygon
+from lsst.images import (Box, DifferenceImage, DifferenceImageTemplateInfo, Polygon,
+                         get_legacy_difference_image_mask_planes, get_legacy_optional_mask_planes)
 from lsst.images.convolution_kernels import ImageBasisConvolutionKernel
 from lsst.images.fields import ChebyshevField
 import lsst.images.psfs
 import lsst.images.serialization
+from lsst.images.tests import compare_masked_image_to_legacy
 from lsst.ip.diffim import detectAndMeasure, subtractImages
 from lsst.afw.table import IdFactory
 from lsst.afw.cameraGeom.testUtils import CameraWrapper, DetectorWrapper
@@ -1743,25 +1745,24 @@ class DetectAndMeasureOutputFormatTest(DetectAndMeasureTestBase, lsst.utils.test
         kwargs.setdefault("badSubtractionRatioThreshold", 1.)
         return self._setup_detection(doSkySources=False, **kwargs)
 
-    def _check_converted(self, image, legacyBbox):
+    def _check_converted(self, image, legacy):
         """Check the properties common to every converted output image.
 
         Parameters
         ----------
         image : `lsst.images.DifferenceImage`
             The converted image.
-        legacyBbox : `lsst.geom.Box2I`
-            Bounding box of the legacy exposure it was converted from.
+        legacy : `lsst.afw.image.ExposureF`
+            The legacy output exposure it was converted from.
         """
         self.assertIsInstance(image, DifferenceImage)
-        self.assertEqual(image.bbox.x.start, legacyBbox.getMinX())
-        self.assertEqual(image.bbox.x.stop, legacyBbox.getMaxX() + 1)
-        self.assertEqual(image.bbox.y.start, legacyBbox.getMinY())
-        self.assertEqual(image.bbox.y.stop, legacyBbox.getMaxY() + 1)
         self.assertEqual(image.unit, astropy.units.nJy)
         self.assertIsNotNone(image.detector)
-        # `convert_outputs_to_future` was not given a photometric scaling.
+        # `_makeFutureInput` was not given a photometric scaling.
         self.assertIsNone(image.photometric_scaling)
+        compare_masked_image_to_legacy(image, legacy.maskedImage,
+                                       plane_map=get_legacy_difference_image_mask_planes())
+        self.assertTrue(np.any(image.mask.get("DETECTED")))
 
     def test_connections(self):
         """Check that the output storage classes follow ``image_type``,
@@ -1806,16 +1807,36 @@ class DetectAndMeasureOutputFormatTest(DetectAndMeasureTestBase, lsst.utils.test
         """Convert the outputs of ``DetectAndMeasureTask``."""
         science, sources, matchedTemplate, difference = self._make_images()
         task = self._setup_task(doSubtractBackground=True, image_type="future")
-        output = task.run(science, matchedTemplate, difference, sources)
-        legacyBbox = output.subtractedMeasuredExposure.getBBox()
+        inputImage = self._makeFutureInput(difference)
+        output = task.run(science, matchedTemplate, inputImage.to_legacy(), sources)
+        legacy = output.subtractedMeasuredExposure
         background = output.differenceBackground
-        task.convert_outputs_to_future(output, self.exposureRecord)
+        task.convert_outputs_to_future(output, {"subtractedMeasuredExposure": inputImage})
 
-        self._check_converted(output.subtractedMeasuredExposure, legacyBbox)
-        self.assertIn("subtracted", output.subtractedMeasuredExposure.backgrounds)
+        self.assertIs(output.subtractedMeasuredExposure, inputImage)
+        self._check_converted(inputImage, legacy)
+        self.assertEqual(list(inputImage.backgrounds), ["subtracted"])
         # The separate background dataset is still written in future mode.
         self.assertIs(output.differenceBackground, background)
         self.assertIsInstance(output.differenceBackground, afwMath.BackgroundList)
+
+    def test_convert_outputs_to_future_copied_pixels(self):
+        """The output pixels are copied into the input image when the legacy
+        image that was measured does not share them.
+        """
+        science, sources, matchedTemplate, difference = self._make_images()
+        task = self._setup_task(doSubtractBackground=True, image_type="future")
+        inputImage = self._makeFutureInput(difference)
+        original = inputImage.image.array.copy()
+        output = task.run(science, matchedTemplate, inputImage.to_legacy(copy=True), sources)
+        legacy = output.subtractedMeasuredExposure
+        # Background subtraction changed the pixels of the copy only.
+        self.assertFalse(np.array_equal(legacy.image.array, original))
+        np.testing.assert_array_equal(inputImage.image.array, original)
+
+        task.convert_outputs_to_future(output, {"subtractedMeasuredExposure": inputImage})
+
+        self._check_converted(inputImage, legacy)
 
     def test_convert_outputs_to_future_source_injection(self):
         """Convert a difference image from a pipeline that injects sources.
@@ -1826,33 +1847,39 @@ class DetectAndMeasureOutputFormatTest(DetectAndMeasureTestBase, lsst.utils.test
         planes = ("INJECTED", "INJECTED_CORE", "INJECTED_TEMPLATE", "INJECTED_CORE_TEMPLATE")
         science, sources, matchedTemplate, difference = self._make_images()
         task = self._setup_task(image_type="future")
-        output = task.run(science, matchedTemplate, difference, sources)
-        mask = output.subtractedMeasuredExposure.mask
+        inputImage = self._makeFutureInput(difference)
+        output = task.run(science, matchedTemplate, inputImage.to_legacy(), sources)
+        legacy = output.subtractedMeasuredExposure
         for n, plane in enumerate(planes):
-            mask.addMaskPlane(plane)
-            mask.array[0, n] |= mask.getPlaneBitMask(plane)
+            legacy.mask.addMaskPlane(plane)
+            legacy.mask.array[0, n] |= legacy.mask.getPlaneBitMask(plane)
 
-        task.convert_outputs_to_future(output, self.exposureRecord)
+        task.convert_outputs_to_future(output, {"subtractedMeasuredExposure": inputImage})
 
         image = output.subtractedMeasuredExposure
         self.assertIsInstance(image, DifferenceImage)
-        for plane in planes:
-            with self.subTest(plane=plane):
-                self.assertEqual(np.count_nonzero(image.mask.get(plane)), 1)
+        # Name the optional planes in the map, so that dropping one fails
+        # the comparison instead of skipping it.
+        planeMap = get_legacy_difference_image_mask_planes() | get_legacy_optional_mask_planes()
+        compare_masked_image_to_legacy(image, legacy.maskedImage, plane_map=planeMap)
 
     def test_convert_outputs_to_future_score(self):
         """Convert the outputs of ``DetectAndMeasureScoreTask``."""
         self.detectionTask = detectAndMeasure.DetectAndMeasureScoreTask
         science, sources, matchedTemplate, difference, score = self._make_images(withScore=True)
         task = self._setup_task(doSubtractBackground=True, image_type="future")
-        output = task.run(science, matchedTemplate, difference, score, sources)
-        legacyBboxes = {name: getattr(output, name).getBBox()
-                        for name in ("subtractedMeasuredExposure", "scoreMeasuredExposure")}
-        task.convert_outputs_to_future(output, self.exposureRecord)
+        inputImages = {"subtractedMeasuredExposure": self._makeFutureInput(difference),
+                       "scoreMeasuredExposure": self._makeFutureInput(score)}
+        output = task.run(science, matchedTemplate,
+                          inputImages["subtractedMeasuredExposure"].to_legacy(),
+                          inputImages["scoreMeasuredExposure"].to_legacy(), sources)
+        legacyOutputs = {name: getattr(output, name) for name in inputImages}
+        task.convert_outputs_to_future(output, inputImages)
 
-        for name, legacyBbox in legacyBboxes.items():
+        for name, legacy in legacyOutputs.items():
             with self.subTest(name=name):
-                self._check_converted(getattr(output, name), legacyBbox)
+                self.assertIs(getattr(output, name), inputImages[name])
+                self._check_converted(getattr(output, name), legacy)
                 # The same background is subtracted from both images.
                 self.assertIn("subtracted", getattr(output, name).backgrounds)
 
@@ -1862,11 +1889,12 @@ class DetectAndMeasureOutputFormatTest(DetectAndMeasureTestBase, lsst.utils.test
         """
         science, sources, matchedTemplate, difference = self._make_images()
         task = self._setup_task(doSubtractBackground=False, image_type="future")
-        output = task.run(science, matchedTemplate, difference, sources)
+        inputImage = self._makeFutureInput(difference)
+        output = task.run(science, matchedTemplate, inputImage.to_legacy(), sources)
         self.assertEqual(len(output.differenceBackground), 0)
-        legacyBbox = output.subtractedMeasuredExposure.getBBox()
-        task.convert_outputs_to_future(output, self.exposureRecord)
-        self._check_converted(output.subtractedMeasuredExposure, legacyBbox)
+        legacy = output.subtractedMeasuredExposure
+        task.convert_outputs_to_future(output, {"subtractedMeasuredExposure": inputImage})
+        self._check_converted(output.subtractedMeasuredExposure, legacy)
         self.assertEqual(len(output.subtractedMeasuredExposure.backgrounds), 0)
 
     def test_stray_struct_field_is_ignored(self):
@@ -1951,7 +1979,8 @@ class DetectAndMeasureOutputFormatTest(DetectAndMeasureTestBase, lsst.utils.test
                         _FakeRefs(science=science, matchedTemplate=matchedTemplate,
                                   difference=self._makeFutureInput(difference, templateInfo,
                                                                    differenceKernel, photometricScaling),
-                                  scoreExposure=self._makeFutureInput(score, templateInfo, scoreKernel),
+                                  scoreExposure=self._makeFutureInput(score, templateInfo, scoreKernel,
+                                                                      photometricScaling),
                                   kernelSources=sources),
                         _FakeRefs())
 
@@ -1961,8 +1990,6 @@ class DetectAndMeasureOutputFormatTest(DetectAndMeasureTestBase, lsst.utils.test
         self.assertEqual(scoreOut.templates, templateInfo)
         self.assertEqual(out.kernel, differenceKernel)
         self.assertEqual(scoreOut.kernel, scoreKernel)
-        # Both outputs are in the science image's units, so both take the
-        # scaling of the input difference image.
         self.assertIs(out.photometric_scaling, photometricScaling)
         self.assertIs(scoreOut.photometric_scaling, photometricScaling)
 

@@ -31,7 +31,6 @@ import lsst.afw.math
 import lsst.geom
 from lsst.images import DifferenceImage
 from lsst.images.convolution_kernels import ImageBasisConvolutionKernel
-from lsst.images.fields import ChebyshevField
 from lsst.ip.diffim.utils import (evaluateMeanPsfFwhm, getPsfFwhm,
                                   computeDifferenceImageMetrics, computePSFNoiseEquivalentArea,
                                   checkMask, record_from_obs_info, setSourceFootprints,
@@ -399,11 +398,6 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
     mode (`tuple` [`str`]). Subclasses with different image outputs override
     this."""
 
-    futureBackgroundOutput = "difference"
-    """Name of the image in the results struct that the background is attached
-    to (`str`). Subclasses that subtract it from a different image override
-    this."""
-
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.makeSubtask("decorrelate")
@@ -496,8 +490,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
 
         Each image named in `futureImageOutputs` that is present on
         ``results`` is replaced by an `lsst.images.DifferenceImage`, with the
-        PSF matching kernel attached to it, and the differential background
-        attached to the one named by `futureBackgroundOutput`.
+        PSF matching kernel attached to it.
 
         Parameters
         ----------
@@ -538,9 +531,6 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         except (TypeError, ValueError, AttributeError) as e:
             raise TypeError("The supplied PSF matching kernel cannot be attached to an"
                             f" lsst.images.DifferenceImage: {e}") from e
-        background = None
-        if self.config.doSubtractBackground:
-            background = ChebyshevField.from_legacy_function2(results.backgroundModel, unit=u.nJy)
         for name in self.futureImageOutputs:
             exposure = getattr(results, name, None)
             if exposure is None:
@@ -560,13 +550,6 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                 image.templates = templateInfo
             if photometricScaling is not None:
                 image.photometric_scaling = photometricScaling
-            if background is not None and name == self.futureBackgroundOutput:
-                image.backgrounds.add(
-                    "subtracted", background,
-                    description="Differential background subtracted from this image when solving for"
-                                " the PSF matching kernel.",
-                    is_subtracted=True,
-                )
             setattr(results, name, image)
 
     @timeMethod
@@ -1366,7 +1349,6 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
     # This task just writes the score image instead of the difference image and
     # matchedTemplate
     futureImageOutputs = ("scoreExposure",)
-    futureBackgroundOutput = "scoreExposure"
 
     def run(self, template, science, sources, visitSummary=None):
         """Preconvolve the science image with its own PSF,
