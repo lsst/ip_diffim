@@ -1188,9 +1188,8 @@ def makeTestVisitInfo(visit=12345):
 def makeTestExposureRecord(universe, instrument="testCam", visit=12345):
     """Return an ``exposure`` dimension record for the test images.
 
-    The record stands in for the one a task reads from the butler, and holds
-    the observation metadata that converting an image to an `lsst.images`
-    type needs.
+    The record holds the observation metadata that converting an image to an
+    `lsst.images` type needs.
 
     Parameters
     ----------

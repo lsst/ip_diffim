@@ -48,9 +48,7 @@ import lsst.pipe.base.testUtils
 import lsst.skymap
 import lsst.utils.tests
 
-from utils import makeTestExposureRecord
-
-from utils import generate_data_id
+from utils import generate_data_id, makeTestExposureRecord
 
 # Change this to True, `setup display_ds9`, and open ds9 (or use another afw
 # display backend) to show the tract/patch layouts on the image.
@@ -649,8 +647,9 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
 
     def _runLegacyForFuture(self, raiseOnUndefinedMaskMap=True):
         """Build a template from tract 0 with a task configured for the
-        future output type, and attach the detector that ``runQuantum`` reads
-        from the science image, but do not convert it.
+        future output type, without converting it.
+
+        The task is kept as ``self.futureTask``.
 
         Parameters
         ----------
@@ -660,7 +659,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         Returns
         -------
         result : `lsst.pipe.base.Struct`
-            The legacy output struct, with a detector on the template.
+            The legacy output struct.
         box : `lsst.geom.Box2I`
             The bounding box the template was requested on, before the task
             grew it by the template border.
@@ -808,8 +807,8 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
             mask.array[0, n] |= mask.getPlaneBitMask(plane)
 
     def testConvertOutputsToFutureUnmappedMaskPlaneRaises(self):
-        """By default, a template with pixels set in an unmapped mask plane
-        cannot be converted.
+        """With raiseOnUndefinedMaskMap=True, a template with pixels set in
+        an unmapped mask plane cannot be converted.
         """
         detector = list(lsst.afw.cameraGeom.testUtils.CameraWrapper().camera)[0]
         result, _ = self._runLegacyForFuture()
@@ -838,8 +837,6 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
     def testConvertOutputsToFutureLosesProvenance(self):
         """The coadd inputs that `run` attaches are not carried by
         `lsst.images.DifferenceImage`.
-
-        This pins limitation (2) of ``output_image_type``.
         """
         legacy, _ = self._runLegacyForFuture()
         self.assertTrue(legacy.template.getInfo().hasCoaddInputs())
