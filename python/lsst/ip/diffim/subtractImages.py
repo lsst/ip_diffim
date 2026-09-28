@@ -34,7 +34,8 @@ from lsst.images.convolution_kernels import ImageBasisConvolutionKernel
 from lsst.images.fields import ChebyshevField
 from lsst.ip.diffim.utils import (evaluateMeanPsfFwhm, getPsfFwhm,
                                   computeDifferenceImageMetrics, computePSFNoiseEquivalentArea,
-                                  checkMask, record_from_obs_info, setSourceFootprints)
+                                  checkMask, record_from_obs_info, setSourceFootprints,
+                                  get_difference_image_provenance)
 from lsst.meas.algorithms import ScaleVarianceTask, ScienceSourceSelectorTask
 import lsst.pex.config
 import lsst.pipe.base
@@ -461,10 +462,10 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         exposureRecord = None
         if self.config.image_type == "future":
             template = inputs["template"]
+            dataId = butlerQC.quantum.dataId
             # Read the `TemplateInfo` and the observation metadata from the
             # template while it is still in the `DifferenceImage` format.
-            templateInfo = template.templates
-            dataId = butlerQC.quantum.dataId
+            templateInfo = get_difference_image_provenance(template, "templates", "template", dataId)
             exposureRecord = record_from_obs_info(template.obs_info, dataId["instrument"],
                                                   dataId["visit"], dataId.universe)
             inputs["template"] = template.to_legacy()

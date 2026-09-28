@@ -24,7 +24,7 @@
 
 __all__ = ["evaluateMeanPsfFwhm", "getPsfFwhm", "getKernelCenterDisplacement",
            "computeDifferenceImageMetrics", "checkMask", "setSourceFootprints",
-           "record_from_obs_info",
+           "record_from_obs_info", "get_difference_image_provenance",
            ]
 
 import itertools
@@ -108,6 +108,44 @@ def record_from_obs_info(obs_info, instrument, visit, universe):
         zenith_angle=zenithAngle,
         timespan=Timespan(begin=obs_info.datetime_begin, end=obs_info.datetime_end),
     )
+
+
+def get_difference_image_provenance(image, attribute, connection, dataId):
+    """Get the PSF matching kernel or the template records of an input
+    difference image.
+
+    Parameters
+    ----------
+    image : `lsst.images.DifferenceImage`
+        Input image read by a task in future mode.
+    attribute : {"kernel", "templates"}
+        Name of the attribute to get.
+    connection : `str`
+        Name of the input connection the image was read from.
+    dataId : `lsst.daf.butler.DataCoordinate`
+        Data ID of the quantum, for the error message.
+
+    Returns
+    -------
+    value : `lsst.images.convolution_kernels.ConvolutionKernel` or \
+            `list` [`lsst.images.DifferenceImageTemplateInfo`]
+        Value of the attribute.
+
+    Raises
+    ------
+    lsst.pipe.base.InvalidQuantumError
+        Raised if the image does not have the attribute, which happens when
+        the input was written as a legacy Exposure and converted on read.
+    """
+    try:
+        return getattr(image, attribute)
+    except AttributeError as e:
+        what = "PSF matching kernel" if attribute == "kernel" else "template coadd records"
+        raise lsst.pipe.base.InvalidQuantumError(
+            f"Input {connection!r} for {dataId} has no {what}, which is required for image_type='future'."
+            " This is likely due to reading a legacy Exposure, which lacks this component. To fix,"
+            " reprocess this image starting from `getTemplate`."
+        ) from e
 
 
 def getKernelCenterDisplacement(kernel, x, y, image=None):

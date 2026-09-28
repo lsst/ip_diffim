@@ -35,7 +35,7 @@ from lsst.daf.butler import DataCoordinate, DimensionUniverse
 from lsst.images import Box, DifferenceImage, DifferenceImageTemplateInfo, Polygon
 from lsst.ip.diffim import subtractImages, InsufficientKernelSourcesError
 from lsst.pex.config import FieldValidationError
-from lsst.pipe.base import NoWorkFound
+from lsst.pipe.base import InvalidQuantumError, NoWorkFound
 import lsst.utils.tests
 import numpy as np
 from lsst.ip.diffim.utils import (computeRobustStatistics, computePSFNoiseEquivalentArea,
@@ -1872,6 +1872,20 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
                 if imageType == "future":
                     self.assertEqual(butlerQC.put_values.difference.templates, templateInfo)
                     self.assertEqual(butlerQC.put_values.matchedTemplate.templates, templateInfo)
+
+    def test_run_quantum_template_without_provenance(self):
+        """A template with no record of its coadds raises an error that
+        names what is missing, and writes nothing.
+        """
+        science, template, sources = self._make_images()
+        task = self._setup_subtraction(subtractImages.AlardLuptonSubtractTask, image_type="future")
+        butlerQC = _RecordingQuantumContext(self.dataId)
+        refs = _FakeRefs(template=self._make_future_template(template), science=science.clone(),
+                         sources=sources)
+
+        with self.assertRaisesRegex(InvalidQuantumError, "'template'.*template coadd records"):
+            task.runQuantum(butlerQC, refs, _FakeRefs())
+        self.assertIsNone(butlerQC.put_values)
 
     def test_run_quantum_simplified_puts_future_types(self):
         """``runQuantum`` converts the outputs of `SimplifiedSubtractTask`,
