@@ -1504,8 +1504,8 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
         """
         self.assertIsInstance(image, DifferenceImage)
         self.assertEqual(image.unit, u.nJy)
-        # `makeTestImage` does not attach a VisitInfo, so the data id supplied
-        # to the conversion is the only source of these.
+        # The instrument and visit come from the exposure record passed to
+        # the conversion.
         frame = image.sky_projection.pixel_frame
         self.assertEqual(frame.instrument, self.dataId["instrument"])
         self.assertEqual(frame.visit, self.dataId["visit"])
@@ -1672,7 +1672,8 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
         ----------
         template : `lsst.afw.image.ExposureF`
             Template from `_make_images`, which has no detector.
-        templateInfo : `list` [`lsst.images.DifferenceImageTemplateInfo`], optional
+        templateInfo : `list` [`lsst.images.DifferenceImageTemplateInfo`],
+            optional
             Record of the coadds that went into it, left off if `None`.
 
         Returns

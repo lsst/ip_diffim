@@ -409,11 +409,11 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
     )
     idGenerator = DetectorVisitIdGeneratorConfig.make_field()
     image_type = pexConfig.ChoiceField[str](
-        "Which image type to use for the measured difference image (and, for"
-        " DetectAndMeasureScoreTask, the measured score image).",
+        "Image type of the input and measured difference images (and, for"
+        " DetectAndMeasureScoreTask, the input and measured score images).",
         allowed={
-            "legacy": "Write as a lsst.afw.image.ExposureF.",
-            "future": "Write as a lsst.images.DifferenceImage.",
+            "legacy": "Read and write lsst.afw.image.ExposureF.",
+            "future": "Read and write lsst.images.DifferenceImage.",
         },
         optional=False,
         default="legacy",
@@ -687,12 +687,16 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             Detector to set on an output image that has none; all of these
             images are on the science image's pixel grid, so this should be
             the science image's detector.
-        matchingKernels : `lsst.afw.math.Kernel`
-            Kernel used to PSF-match the subtracted template image.
-        templateInfo : `list` [`lsst.images.DifferenceImageTemplateInfo`]
+        matchingKernels : `dict` [`str`, \
+                `lsst.images.convolution_kernels.ConvolutionKernel`], optional
+            Kernel used to PSF-match the template, keyed by the name of the
+            output image it is attached to. An image with no entry, or an
+            entry of `None`, gets no kernel.
+        templateInfo : `list` [`lsst.images.DifferenceImageTemplateInfo`], \
+                optional
             Records of the coadds that went into the template, each holding
             the second moments of that coadd's PSF and the region where it
-            overlapped the science image.
+            overlapped the science image. Not attached if `None` or empty.
 
         Notes
         -----

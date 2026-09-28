@@ -82,7 +82,8 @@ class GetTemplateConnections(
     )
     obs_info = pipeBase.connectionTypes.Input(
         doc="Observation metadata of the exposure the template is built for."
-        " Only read with output_image_type='future'.",
+        " Only read with output_image_type='future', which needs this to set"
+        " the obs_info component of a lsst.images.VisitImage.",
         name="{fakesType}calexp.obs_info",
         storageClass="ObservationInfo",
         dimensions=("instrument", "visit", "detector"),
@@ -301,15 +302,13 @@ class GetTemplateTask(pipeBase.PipelineTask):
         Parameters
         ----------
         template : `lsst.afw.image.Exposure`
-            Output struct to read and modify in place. Its ``template`` must
-            have a detector with per-amplifier raw geometry and a field angle
-            transform, which is why `runQuantum` sets the science image's
-            detector on it first.
+            Template to convert. Its detector is replaced with ``detector``
+            and its mask is modified in place.
         coadd_refs : `list` [`lsst.daf.butler.DatasetRef`]
             References to the coadds that may have gone into the template.
             May be a superset of the coadds that were used; supplies the
             dataset id and RUN collection recorded for each coadd that was.
-        detector : `lsst.afw.image.Detector`
+        detector : `lsst.afw.cameraGeom.Detector`
             Detector of the science image that the template was built for.
         exposureRecord : `lsst.daf.butler.DimensionRecord`
             The ``exposure`` record of the observation the template was built
@@ -997,6 +996,12 @@ class GetDcrTemplateConnections(
 class GetDcrTemplateConfig(
     GetTemplateConfig, pipelineConnections=GetDcrTemplateConnections
 ):
+    """Config for GetDcrTemplateTask.
+
+    Only ``output_image_type="legacy"`` is supported: the task always writes
+    an `lsst.afw.image.ExposureF`.
+    """
+
     numSubfilters = pexConfig.Field(
         doc="Number of subfilters in the DcrCoadd.",
         dtype=int,

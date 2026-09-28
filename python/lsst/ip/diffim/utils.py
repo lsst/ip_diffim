@@ -57,11 +57,10 @@ def record_from_obs_info(obs_info, instrument, visit, universe):
         Observation info of an image that the image to be converted is
         derived from.
     instrument : `str`
-        Name of the instrument, from the pixel frame of the image
-        ``obs_info`` came from.
+        Name of the instrument, usually from the quantum data ID.
     visit : `int`
-        Id of the visit, from the pixel frame of the image ``obs_info``
-        came from.
+        Id of the visit, usually from the quantum data ID. It is also used
+        as the id of the exposure.
     universe : `lsst.daf.butler.DimensionUniverse`
         Dimension universe that defines the record's schema, usually
         ``butlerQC.quantum.dataId.universe``.
@@ -69,7 +68,9 @@ def record_from_obs_info(obs_info, instrument, visit, universe):
     Returns
     -------
     record : `lsst.daf.butler.DimensionRecord`
-        The ``exposure`` record of the observation.
+        An ``exposure`` record holding the fields that `lsst.images` reads
+        when it converts a legacy image. Fields it does not read, such as
+        ``dark_time`` and ``target_name``, are `None`.
 
     Raises
     ------
@@ -83,9 +84,6 @@ def record_from_obs_info(obs_info, instrument, visit, universe):
     observation info does not carry them in the form the conversion needs:
     its ``instrument`` is read from the legacy FITS header rather than from
     the record, and its ``exposure_id`` is the id that the visit info held.
-    Taking both from the pixel frame of the image that supplied
-    ``obs_info`` puts the converted image on the same instrument and visit
-    as the image it came from.
     """
     if obs_info is None:
         raise ValueError("Cannot rebuild an exposure record without an observation info.")

@@ -1645,9 +1645,11 @@ class DetectAndMeasureOutputFormatTest(DetectAndMeasureTestBase, lsst.utils.test
         ----------
         exposure : `lsst.afw.image.ExposureF`
             Image from `_make_images`.
-        templateInfo : `list` [`lsst.images.DifferenceImageTemplateInfo`], optional
+        templateInfo : `list` [`lsst.images.DifferenceImageTemplateInfo`],
+            optional
             Record of the coadds that went into the template.
-        kernel : `lsst.images.convolution_kernels.ImageBasisConvolutionKernel`, optional
+        kernel : `lsst.images.convolution_kernels.ImageBasisConvolutionKernel`,
+            optional
             PSF matching kernel.
 
         Returns
@@ -1771,8 +1773,7 @@ class DetectAndMeasureOutputFormatTest(DetectAndMeasureTestBase, lsst.utils.test
         self.assertIsInstance(output.subtractedMeasuredExposure, afwImage.ExposureF)
 
     def test_legacy_mode_does_not_convert(self):
-        """Legacy mode is unchanged, with no conversion..
-        """
+        """Legacy mode leaves the outputs unconverted."""
         science, sources, matchedTemplate, difference = self._make_images()
         task = self._setup_task(doSubtractBackground=True, image_type="legacy")
         output = task.run(science, matchedTemplate, difference, sources)

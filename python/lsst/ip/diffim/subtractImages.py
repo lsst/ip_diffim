@@ -324,11 +324,11 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
         " encountered while calculating the matching kernel."
     )
     image_type = lsst.pex.config.ChoiceField[str](
-        doc="Which image type to use for the image outputs of this task "
-        "(difference and matchedTemplate, or scoreExposure).",
+        doc="Image type of the input template and the image outputs of this"
+        " task (difference and matchedTemplate, or scoreExposure).",
         allowed={
-            "legacy": "Write as a lsst.afw.image.ExposureF.",
-            "future": "Write as a lsst.images.DifferenceImage.",
+            "legacy": "Read and write lsst.afw.image.ExposureF.",
+            "future": "Read and write lsst.images.DifferenceImage.",
         },
         optional=False,
         default="legacy",
@@ -390,14 +390,14 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
     `True`."""
 
     futureImageOutputs = ("difference", "matchedTemplate")
-    """Names of the images in the results struct that will be converted, in the
-    same order as the output connections that carry them(`tuple` [`str`]).
-    Subclasses with different image outputs override this."""
+    """Names of the images in the results struct that are converted in future
+    mode (`tuple` [`str`]). Subclasses with different image outputs override
+    this."""
 
     futureBackgroundOutput = "difference"
-    """Name of the difference image in the results struct that the background
-    should be attached to (`str`). Subclasses that subtract it from
-    a different image override this."""
+    """Name of the image in the results struct that the background is attached
+    to (`str`). Subclasses that subtract it from a different image override
+    this."""
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -496,11 +496,11 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         exposureRecord : `lsst.daf.butler.DimensionRecord`
             The ``exposure`` record of the observation, which supplies the
             observation metadata recorded on each converted output.
-        templates : `list` [`lsst.images.DifferenceImageTemplateInfo`],
-            optional (for unit tests)
+        templateInfo : `list` [`lsst.images.DifferenceImageTemplateInfo`], \
+                optional
             Record of the coadds that went into the template, taken from the
             template this task subtracted. Attached to every converted
-            output.
+            output unless `None` or empty.
 
         Raises
         ------
@@ -510,8 +510,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         RuntimeError
             Raised if an output has pixels set in a mask plane that
             `lsst.images.get_legacy_difference_image_mask_planes` does not
-            map, or if an output has no detector and there is no science
-            image detector to take one from.
+            map.
 
         Notes
         -----
