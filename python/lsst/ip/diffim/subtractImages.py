@@ -244,6 +244,7 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
         "It is generally better to instead subtract the background in detectAndMeasure.",
         dtype=bool,
         default=False,
+        deprecated="Subtract the background in detectAndMeasure instead. Will be removed after v31.",
     )
     doApplyExternalCalibrations = lsst.pex.config.Field(
         doc=(

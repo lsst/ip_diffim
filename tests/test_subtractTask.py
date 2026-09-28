@@ -70,7 +70,6 @@ class AlardLuptonSubtractTestBase:
             The configured Task to use for detection and measurement.
         """
         config = self.subtractTask.ConfigClass()
-        config.doSubtractBackground = False
         config.restrictKernelEdgeSources = False
         config.sourceSelector.signalToNoise.fluxField = fluxField
         config.sourceSelector.signalToNoise.errField = errField

@@ -40,7 +40,6 @@ class ComputeSpatiallySampledMetricsTest(lsst.utils.tests.TestCase):
         template, _ = makeTestImage(psfSize=2.0, noiseLevel=noiseLevel, noiseSeed=7,
                                     templateBorderSize=20, doApplyCalibration=True)
         config = lsst.ip.diffim.AlardLuptonSubtractTask.ConfigClass()
-        config.doSubtractBackground = False
         config.sourceSelector.signalToNoise.fluxField = "truth_instFlux"
         config.sourceSelector.signalToNoise.errField = "truth_instFluxErr"
         subtraction = lsst.ip.diffim.AlardLuptonSubtractTask(config=config).run(template, science, sources)
