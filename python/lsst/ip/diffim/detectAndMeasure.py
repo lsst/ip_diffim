@@ -618,6 +618,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         templateInfo = None
         exposureRecord = None
         matchingKernels = {}
+        photometricScaling = None
         if self.config.image_type == "future":
             difference = inputs["difference"]
             dataId = butlerQC.quantum.dataId
@@ -630,6 +631,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             # corresponding output image
             matchingKernels["subtractedMeasuredExposure"] = get_difference_image_provenance(
                 difference, "kernel", "difference", dataId)
+            photometricScaling = difference.photometric_scaling
             inputs["difference"] = difference.to_legacy()
             if "scoreExposure" in inputs:
                 scoreExposure = inputs["scoreExposure"]
@@ -662,17 +664,19 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             if self.config.image_type == "future":
                 self.convert_outputs_to_future(measurementResults, exposureRecord,
                                                detector=detector, matchingKernels=matchingKernels,
-                                               templateInfo=templateInfo)
+                                               templateInfo=templateInfo,
+                                               photometricScaling=photometricScaling)
             butlerQC.put(measurementResults, outputRefs)
             raise error from e
         if self.config.image_type == "future":
             self.convert_outputs_to_future(measurementResults, exposureRecord,
                                            detector=detector, matchingKernels=matchingKernels,
-                                           templateInfo=templateInfo)
+                                           templateInfo=templateInfo,
+                                           photometricScaling=photometricScaling)
         butlerQC.put(measurementResults, outputRefs)
 
     def convert_outputs_to_future(self, results, exposureRecord, detector=None, matchingKernels=None,
-                                  templateInfo=None):
+                                  templateInfo=None, photometricScaling=None):
         """Convert the output images in a result struct to `lsst.images` types.
 
         This replaces ``results.subtractedMeasuredExposure`` and
@@ -699,6 +703,9 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             Records of the coadds that went into the template, each holding
             the second moments of that coadd's PSF and the region where it
             overlapped the science image. Not attached if `None` or empty.
+        photometricScaling : `lsst.images.fields.BaseField`, optional
+            Photometric scaling of the science image, taken from the input
+            difference image. Not attached if `None`.
 
         Notes
         -----
@@ -723,6 +730,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                 image.templates = templateInfo
             if matchingKernels is not None:
                 image.kernel = matchingKernels[name]
+            if photometricScaling is not None:
+                image.photometric_scaling = photometricScaling
             if background is not None and len(background) > 0:
                 # The same background is subtracted from the difference image
                 # and the score image, so it applies to both.

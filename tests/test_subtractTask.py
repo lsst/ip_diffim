@@ -32,7 +32,8 @@ import lsst.afw.table as afwTable
 import lsst.geom
 import lsst.meas.algorithms as measAlg
 from lsst.daf.butler import DataCoordinate, DimensionUniverse
-from lsst.images import Box, DifferenceImage, DifferenceImageTemplateInfo, Polygon
+from lsst.images import Box, DifferenceImage, DifferenceImageTemplateInfo, Polygon, VisitImage
+from lsst.images.fields import ChebyshevField
 from lsst.ip.diffim import subtractImages, InsufficientKernelSourcesError
 from lsst.pex.config import FieldValidationError
 from lsst.pipe.base import InvalidQuantumError, NoWorkFound
@@ -1526,7 +1527,7 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
             exposure.info.setVisitInfo(makeTestVisitInfo(self.dataId["visit"]))
         return science, template, sources
 
-    def _check_converted(self, image, kernelExpected=True):
+    def _check_converted(self, image, kernelExpected=True, photometricScaling=None):
         """Check that one converted image is a fully-formed DifferenceImage.
 
         Parameters
@@ -1535,6 +1536,9 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
             The converted output to check.
         kernelExpected : `bool`, optional
             Should the PSF matching kernel be attached?
+        photometricScaling : `lsst.images.fields.BaseField`, optional
+            Photometric scaling the image should carry, or `None` if it should
+            have none.
         """
         self.assertIsInstance(image, DifferenceImage)
         self.assertEqual(image.unit, u.nJy)
@@ -1550,8 +1554,10 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
             # An unset kernel raises, rather than returning None.
             with self.assertRaises(AttributeError):
                 image.kernel
-        # Populating this needs the visitSummary PhotoCalib; it is deferred.
-        self.assertIsNone(image.photometric_scaling)
+        if photometricScaling is None:
+            self.assertIsNone(image.photometric_scaling)
+        else:
+            self.assertIs(image.photometric_scaling, photometricScaling)
 
     def test_connections_legacy(self):
         """Test that the default configuration leaves the output connections
@@ -1572,6 +1578,7 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
                 for name in connections.outputs:
                     if name in ("difference", "matchedTemplate", "scoreExposure"):
                         self.assertEqual(getattr(connections, name).storageClass, "ExposureF")
+                self.assertEqual(connections.science.storageClass, "ExposureF")
 
     def test_connections_future(self):
         """Test that ``image_type="future"`` swaps the storage class of
@@ -1594,6 +1601,9 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
                 connections = connectionsClass(config=config)
                 for name in expected:
                     self.assertEqual(getattr(connections, name).storageClass, "DifferenceImage")
+                # The science image is read in the new type to get its
+                # photometric scaling.
+                self.assertEqual(connections.science.storageClass, "VisitImage")
                 # The kernel has no converter to or from the new types, so it
                 # must remain a separate output in both modes.
                 if "psfMatchingKernel" in connections.outputs:
@@ -1665,6 +1675,24 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
         self._check_converted(results.difference)
         self._check_converted(results.matchedTemplate)
 
+    def test_convert_outputs_to_future_photometric_scaling(self):
+        """Test that every converted output carries the photometric scaling
+        of the science image.
+        """
+        science, template, sources = self._make_images()
+        photometricScaling = self._makePhotometricScaling(science)
+        for taskClass, names in ((subtractImages.AlardLuptonSubtractTask, ("difference", "matchedTemplate")),
+                                 (subtractImages.AlardLuptonPreconvolveSubtractTask, ("scoreExposure",))):
+            with self.subTest(taskClass=taskClass.__name__):
+                task = self._setup_subtraction(taskClass, image_type="future")
+                results = task.run(template.clone(), science.clone(), sources)
+
+                task.convert_outputs_to_future(results, self.exposureRecord,
+                                               photometricScaling=photometricScaling)
+
+                for name in names:
+                    self._check_converted(getattr(results, name), photometricScaling=photometricScaling)
+
     def test_convert_outputs_to_future_missing_output(self):
         """Test that conversion skips outputs that are absent from the result
         struct, instead of failing.
@@ -1698,6 +1726,45 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
             skymap="skymap", tract=tract, patch=patch, dataset_id=uuid.uuid4(),
             dataset_run="a/template/run", bounds=Polygon.from_box(Box.factory[0:50, 0:50]),
             psf_shape_xx=4.0, psf_shape_yy=4.0, psf_shape_xy=0.0, psf_shape_flag=False)
+
+    @staticmethod
+    def _makePhotometricScaling(science):
+        """Return a photometric scaling that is easy to tell apart from the
+        one converted from the science image's own calibration.
+
+        Parameters
+        ----------
+        science : `lsst.afw.image.ExposureF`
+            Science image from `_make_images`.
+
+        Returns
+        -------
+        photometricScaling : `lsst.images.fields.ChebyshevField`
+            A constant scaling over the science image.
+        """
+        return ChebyshevField(Box.from_legacy(science.getBBox()), np.array([[0.25]]),
+                              unit=u.nJy/u.electron)
+
+    def _make_future_science(self, science, photometricScaling=None):
+        """Convert a legacy science image to the type the ``future`` mode
+        reads.
+
+        Parameters
+        ----------
+        science : `lsst.afw.image.ExposureF`
+            Science image from `_make_images`.
+        photometricScaling : `lsst.images.fields.BaseField`, optional
+            Photometric scaling to attach in place of the converted one.
+
+        Returns
+        -------
+        science : `lsst.images.VisitImage`
+            The converted science image.
+        """
+        image = VisitImage.from_legacy(science.clone(), unit=u.nJy, exposure_record=self.exposureRecord)
+        if photometricScaling is not None:
+            image.photometric_scaling = photometricScaling
+        return image
 
     def _make_future_template(self, template, templateInfo=None):
         """Convert a legacy template to the type the ``future`` mode reads.
@@ -1850,6 +1917,7 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
         """
         science, template, sources = self._make_images()
         templateInfo = [self._makeTemplateInfo()]
+        photometricScaling = self._makePhotometricScaling(science)
         for imageType, expectedType in (("legacy", afwImage.ExposureF),
                                         ("future", DifferenceImage)):
             with self.subTest(imageType=imageType):
@@ -1857,11 +1925,13 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
                                                image_type=imageType)
                 if imageType == "future":
                     inputTemplate = self._make_future_template(template, templateInfo)
+                    inputScience = self._make_future_science(science, photometricScaling)
                 else:
                     inputTemplate = template.clone()
+                    inputScience = science.clone()
                 butlerQC = _RecordingQuantumContext(self.dataId)
                 task.runQuantum(butlerQC,
-                                _FakeRefs(template=inputTemplate, science=science.clone(),
+                                _FakeRefs(template=inputTemplate, science=inputScience,
                                           sources=sources),
                                 _FakeRefs())
                 self.assertIsInstance(butlerQC.put_values.difference, expectedType)
@@ -1870,8 +1940,10 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
                 self.assertIsInstance(butlerQC.put_values.psfMatchingKernel,
                                       afwMath.LinearCombinationKernel)
                 if imageType == "future":
-                    self.assertEqual(butlerQC.put_values.difference.templates, templateInfo)
-                    self.assertEqual(butlerQC.put_values.matchedTemplate.templates, templateInfo)
+                    for name in ("difference", "matchedTemplate"):
+                        image = getattr(butlerQC.put_values, name)
+                        self.assertEqual(image.templates, templateInfo)
+                        self.assertIs(image.photometric_scaling, photometricScaling)
 
     def test_run_quantum_template_without_provenance(self):
         """A template with no record of its coadds raises an error that
@@ -1880,8 +1952,8 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
         science, template, sources = self._make_images()
         task = self._setup_subtraction(subtractImages.AlardLuptonSubtractTask, image_type="future")
         butlerQC = _RecordingQuantumContext(self.dataId)
-        refs = _FakeRefs(template=self._make_future_template(template), science=science.clone(),
-                         sources=sources)
+        refs = _FakeRefs(template=self._make_future_template(template),
+                         science=self._make_future_science(science), sources=sources)
 
         with self.assertRaisesRegex(InvalidQuantumError, "'template'.*template coadd records"):
             task.runQuantum(butlerQC, refs, _FakeRefs())
@@ -1893,6 +1965,7 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
         """
         science, template, sources = self._make_images()
         templateInfo = [self._makeTemplateInfo()]
+        photometricScaling = self._makePhotometricScaling(science)
         alTask = self._setup_subtraction(subtractImages.AlardLuptonSubtractTask)
         alResults = alTask.run(template.clone(), science.clone(), sources)
         for useExistingKernel in (True, False):
@@ -1901,15 +1974,17 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
                                                useExistingKernel=useExistingKernel,
                                                image_type="future")
                 refs = {"template": self._make_future_template(template, templateInfo),
-                        "science": science.clone()}
+                        "science": self._make_future_science(science, photometricScaling)}
                 if useExistingKernel:
                     refs["inputPsfMatchingKernel"] = alResults.psfMatchingKernel
                 butlerQC = _RecordingQuantumContext(self.dataId)
 
                 task.runQuantum(butlerQC, _FakeRefs(**refs), _FakeRefs())
 
-                self._check_converted(butlerQC.put_values.difference)
-                self._check_converted(butlerQC.put_values.matchedTemplate)
+                self._check_converted(butlerQC.put_values.difference,
+                                      photometricScaling=photometricScaling)
+                self._check_converted(butlerQC.put_values.matchedTemplate,
+                                      photometricScaling=photometricScaling)
                 self.assertEqual(butlerQC.put_values.difference.templates, templateInfo)
 
 
