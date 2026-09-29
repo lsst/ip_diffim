@@ -1437,14 +1437,15 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                 Peak value of the fit line profile.
         """
         maskedImage = difference.maskedImage
+        streakMaskedImage = maskedImage.clone()
+        # Clear the DETECTED mask plane before streak detection
+        streakMaskedImage.mask.clearMaskPlane(streakMaskedImage.mask.getMaskPlane("DETECTED"))
         # Bin the diffim to enhance low surface brightness streaks
-        binnedMaskedImage = afwMath.binImage(maskedImage,
+        binnedMaskedImage = afwMath.binImage(streakMaskedImage,
                                              self.config.streakBinFactor,
                                              self.config.streakBinFactor)
         binnedExposure = afwImage.ExposureF(binnedMaskedImage.getBBox())
         binnedExposure.setMaskedImage(binnedMaskedImage)
-        # Clear the DETECTED mask plane before streak detection
-        binnedExposure.mask &= ~binnedExposure.mask.getPlaneBitMask('DETECTED')
         # Rerun detection to set the DETECTED mask plane on binnedExposure
         sigma = difference.psf.computeShape(difference.psf.getAveragePosition()).getDeterminantRadius()
         _table = afwTable.SourceTable.make(afwTable.SourceTable.makeMinimalSchema())
@@ -1455,7 +1456,6 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                                                                    axis=0).repeat(self.config.streakBinFactor,
                                                                                   axis=1)
         # Create new version of a diffim with DETECTED based on binnedExposure
-        streakMaskedImage = maskedImage.clone()
         ysize, xsize = rescaledDetectedMaskPlane.shape
         streakMaskedImage.mask.array[:ysize, :xsize] |= rescaledDetectedMaskPlane
         # Detect streaks on this new version of the diffim
