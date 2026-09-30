@@ -28,7 +28,7 @@ import lsst.afw.image
 import lsst.afw.math
 import lsst.geom
 from lsst.ip.diffim.utils import (evaluateMeanPsfFwhm, getPsfFwhm,
-                                  computeDifferenceImageMetrics,
+                                  computeDifferenceImageMetrics, computePSFNoiseEquivalentArea,
                                   checkMask, setSourceFootprints)
 from lsst.meas.algorithms import ScaleVarianceTask, ScienceSourceSelectorTask
 import lsst.pex.config
@@ -796,30 +796,32 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         return correctedExposure
 
     def _calculateMagLim(self, exposure, nsigma=5.0, fallbackPsfSize=None):
-        """Calculate an exposure's limiting magnitude.
+        """Calculate the point-source limiting magnitude of an exposure.
 
-        This method uses the photometric zeropoint together with the
-        PSF size from the average position of the exposure.
+        The limit is the flux of a point source detected at ``nsigma`` in
+        the median pixel noise, integrated over the effective area of the
+        PSF, so it does not depend on the units of the pixels.
 
         Parameters
         ----------
         exposure : `lsst.afw.image.Exposure`
-            The target exposure to calculate the limiting magnitude for.
+            The exposure to calculate the limiting magnitude for.
         nsigma : `float`, optional
             The detection threshold in sigma.
         fallbackPsfSize : `float`, optional
-            PSF FWHM to use in the event the exposure PSF cannot be retrieved.
+            PSF FWHM in pixels to use if the exposure PSF cannot be
+            evaluated.
 
         Returns
         -------
-        maglim : `astropy.units.Quantity`
-            The limiting magnitude of the exposure, or np.nan.
+        maglim : `float`
+            The limiting AB magnitude, or `numpy.nan` if the exposure has no
+            photometric calibration, no usable pixels, or no PSF.
         """
         if exposure.photoCalib is None:
             return np.nan
         try:
-            psf = exposure.getPsf()
-            psf_shape = psf.computeShape(psf.getAveragePosition())
+            psfArea = computePSFNoiseEquivalentArea(exposure.getPsf())
         except (lsst.pex.exceptions.InvalidParameterError,
                 afwDetection.InvalidPsfError,
                 lsst.pex.exceptions.RangeError):
@@ -827,13 +829,16 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
                 self.log.info("Unable to evaluate PSF, setting maglim to nan")
                 return np.nan
             self.log.info("Unable to evaluate PSF, using fallback FWHM %f", fallbackPsfSize)
-            psf_area = np.pi*(fallbackPsfSize/2)**2
-        else:
-            # Get a more accurate area than `psf_shape.getArea()` via moments
-            psf_area = np.pi*np.sqrt(psf_shape.getIxx()*psf_shape.getIyy())
-
-        zeropoint = exposure.photoCalib.instFluxToMagnitude(1)
-        return zeropoint - 2.5*np.log10(nsigma*np.sqrt(psf_area))
+            # Effective area of a Gaussian PSF with this FWHM.
+            psfArea = 4*np.pi*(fallbackPsfSize/np.sqrt(8*np.log(2)))**2
+        mask = exposure.mask
+        good = (mask.array & mask.getPlaneBitMask(["NO_DATA", "BAD", "SAT", "EDGE"])) == 0
+        variance = exposure.variance.array[good]
+        variance = variance[np.isfinite(variance) & (variance > 0)]
+        if variance.size == 0:
+            return np.nan
+        fluxLim = nsigma*np.sqrt(np.median(variance)*psfArea)
+        return exposure.photoCalib.instFluxToMagnitude(fluxLim)
 
     @staticmethod
     def _validateExposures(template, science):
