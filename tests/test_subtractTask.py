@@ -23,6 +23,8 @@ import unittest
 
 from astropy import units as u
 
+import lsst.afw.detection as afwDetection
+import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.afw.table as afwTable
 import lsst.geom
@@ -912,6 +914,41 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
         self.assertEqual(np.sum(inj_masked.astype(int)-science_fake_masked.astype(int)), 0)
         self.assertEqual(np.sum(injTmplt_masked.astype(int)-template_fake_masked.astype(int)), 0)
 
+    def test_calculateMagLim(self):
+        """Test that the limiting magnitude matches the analytic value for a
+        Gaussian PSF and flat noise, and does not depend on the pixel units
+        or on masked pixels.
+        """
+        sigma = 1.5
+        psfSigma = 2.0
+        calibration = 3.0
+        bbox = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Extent2I(200, 200))
+        exposure = afwImage.ExposureF(bbox)
+        exposure.variance.array[:, :] = sigma**2
+        exposure.setPsf(afwDetection.GaussianPsf(41, 41, psfSigma))
+        exposure.setPhotoCalib(afwImage.PhotoCalib(calibration))
+        task = self._setup_subtraction()
+
+        maglim = task._calculateMagLim(exposure)
+        fluxLim = 5*sigma*np.sqrt(4*np.pi*psfSigma**2)
+        self.assertFloatsAlmostEqual(maglim, afwImage.PhotoCalib(calibration).instFluxToMagnitude(fluxLim),
+                                     atol=1e-3)
+
+        # Pixels in other units, with a matching calibration.
+        scaled = exposure.clone()
+        scaled.maskedImage *= 10.0
+        scaled.setPhotoCalib(afwImage.PhotoCalib(calibration/10.0))
+        self.assertFloatsAlmostEqual(task._calculateMagLim(scaled), maglim, atol=1e-6)
+
+        # Masked pixels do not count toward the noise.
+        masked = exposure.clone()
+        masked.variance.array[:, :100] = 1e6
+        masked.mask.array[:, :100] |= masked.mask.getPlaneBitMask("NO_DATA")
+        self.assertFloatsAlmostEqual(task._calculateMagLim(masked), maglim, atol=1e-6)
+
+        masked.mask.array[:, :] |= masked.mask.getPlaneBitMask("NO_DATA")
+        self.assertTrue(np.isnan(task._calculateMagLim(masked)))
+
     def test_metadata_metrics(self):
         """Verify fields are added to metadata when subtraction is run, and
         that the difference image limiting magnitude is calculated correctly,
@@ -943,21 +980,20 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
         subtractTask_bad = self._setup_subtraction()
         _ = subtractTask_bad.run(template_bad.clone(), science.clone(), sources)
 
-        # Test that the diffim limiting magnitudes are computed correctly
-        maglim_science = subtractTask_good._calculateMagLim(science)
-        fluxlim_science = (maglim_science*u.ABmag).to_value(u.nJy)
-        maglim_template_good = subtractTask_good._calculateMagLim(template_good)
-        fluxlim_template_good = (maglim_template_good*u.ABmag).to_value(u.nJy)
-        maglim_template_bad = subtractTask_bad._calculateMagLim(template_bad)
-        fluxlim_template_bad = (maglim_template_bad*u.ABmag).to_value(u.nJy)
+        # Test that the diffim limiting magnitude combines the science and
+        # template limits in flux. The limits depend on the variance and mask
+        # planes, which `run` modifies, so take them from the metadata.
+        def combineMagLims(metadata):
+            fluxlim_science = (metadata['scienceLimitingMagnitude']*u.ABmag).to_value(u.nJy)
+            fluxlim_template = (metadata['templateLimitingMagnitude']*u.ABmag).to_value(u.nJy)
+            return (np.hypot(fluxlim_science, fluxlim_template)*u.nJy).to(u.ABmag).value
 
-        maglim_good = (np.sqrt(fluxlim_science**2 + fluxlim_template_good**2)*u.nJy).to(u.ABmag).value
-        maglim_bad = (np.sqrt(fluxlim_science**2 + fluxlim_template_bad**2)*u.nJy).to(u.ABmag).value
-
-        self.assertFloatsAlmostEqual(subtractTask_good.metadata['diffimLimitingMagnitude'],
-                                     maglim_good, atol=1e-6)
-        self.assertFloatsAlmostEqual(subtractTask_bad.metadata['diffimLimitingMagnitude'],
-                                     maglim_bad, atol=1e-6)
+        for task in (subtractTask_good, subtractTask_bad):
+            self.assertFloatsAlmostEqual(task.metadata['diffimLimitingMagnitude'],
+                                         combineMagLims(task.metadata), atol=1e-6)
+        # The template with the wider PSF is shallower.
+        self.assertLess(subtractTask_bad.metadata['templateLimitingMagnitude'],
+                        subtractTask_good.metadata['templateLimitingMagnitude'])
 
         # Create a template with a PSF that is not defined at the image center.
         # First, make an exposure catalog so we can force the template to have
@@ -984,12 +1020,11 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
         # limiting magnitude.
         maglim_template_offimage = subtractTask_offimage._calculateMagLim(template_offimage)
         self.assertTrue(np.isnan(maglim_template_offimage))
-        # Test that given the provided fallbackPsfSize, the diffim limiting
-        # magnitude is calculated correctly.
-        maglim_template_offimage = 28.182284789714952
-        fluxlim_template_offimage = (maglim_template_offimage*u.ABmag).to_value(u.nJy)
-        maglim_offimage = (np.sqrt(fluxlim_science**2 + fluxlim_template_offimage**2)*u.nJy).to(u.ABmag).value
-        self.assertEqual(subtractTask_offimage.metadata['diffimLimitingMagnitude'], maglim_offimage)
+        # Test that the task falls back to the provided fallbackPsfSize, so
+        # the template and diffim limiting magnitudes are finite.
+        self.assertTrue(np.isfinite(subtractTask_offimage.metadata['templateLimitingMagnitude']))
+        self.assertFloatsAlmostEqual(subtractTask_offimage.metadata['diffimLimitingMagnitude'],
+                                     combineMagLims(subtractTask_offimage.metadata), atol=1e-6)
 
         # Test that several other expected metadata metrics exist
         self.assertIn('scienceLimitingMagnitude', subtractTask_good.metadata)
