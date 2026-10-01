@@ -191,7 +191,8 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         for tract in self.patches:
             self.assertNotEqual(template.wcs, self.patches[tract][0].get().wcs)
         self.assertEqual(template.wcs, self.exposure.wcs)
-        self.assertEqual(template.photoCalib, self.exposure.photoCalib)
+        # The template pixels are calibrated to nJy.
+        self.assertEqual(template.photoCalib, lsst.afw.image.PhotoCalib(1.0))
         self.assertEqual(template.getXY0(), expectedBox.getMin())
         self.assertEqual(template.filter.bandLabel, "a")
         self.assertEqual(template.filter.physicalLabel, "a_test")
@@ -201,11 +202,13 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
 
     def _checkPixels(self, template, config, box):
         """Check that the pixel values in the template are close to the
-        original image.
+        original image, calibrated to nJy.
         """
         # All pixels should have real values!
         expectedBox = lsst.geom.Box2I(box)
         expectedBox.grow(config.templateBorderSize)
+        calibration = self.exposure.photoCalib.getCalibrationMean()
+        expected = self.exposure.photoCalib.calibrateImage(self.exposure[expectedBox].maskedImage)
 
         if debug:
             _showTemplate(expectedBox, template)
@@ -215,8 +218,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         # Because of the scale changes, there will be some ringing in the
         # difference between the template and the original image; pick
         # tolerances large enough to account for that.
-        self.assertImagesAlmostEqual(template.image, self.exposure[expectedBox].image,
-                                     rtol=.1, atol=4)
+        self.assertImagesAlmostEqual(template.image, expected.image, rtol=.1, atol=4*calibration)
         # Variance plane ==4 in the original image (realize() takes a noise
         # sigma). Warping sets the level from the pixel areas and the two
         # warping kernels, which `_correctVariance` corrects up to the
@@ -226,8 +228,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         # tightly and allow for the ripple around it.
         variance = template.variance.array[np.isfinite(template.variance.array)]
         median = np.median(variance)
-        self.assertFloatsAlmostEqual(median,
-                                     np.median(self.exposure[expectedBox].variance.array),
+        self.assertFloatsAlmostEqual(median, np.median(expected.variance.array),
                                      rtol=0.35, msg="variance level differs")
         self.assertLess(np.percentile(variance, 99)/median, 1.6, msg="variance ripple too large")
         self.assertGreater(np.percentile(variance, 1)/median, 0.6, msg="variance ripple too large")
@@ -285,6 +286,41 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         # All 4 patches from all 4 tracts are included in this template
         self._checkMetadata(result.template, task.config, box, self.exposure.wcs, 9)
         self._checkPixels(result.template, task.config, box)
+
+    def testRunCalibratesToNanojansky(self):
+        """Test that the template is in nJy whatever the calibration of the
+        coadds, and that coadds already in nJy are not rescaled.
+        """
+        box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
+        calibration = self.exposure.photoCalib.getCalibrationMean()
+        self.assertNotEqual(calibration, 1.0)
+        task = lsst.ip.diffim.GetTemplateTask()
+        templates = {}
+        for photoCalib in (self.exposure.photoCalib, lsst.afw.image.PhotoCalib(1.0)):
+            self._remakePatches(photoCalib)
+            # Task modifies the input bbox, so pass a copy.
+            result = task.run(coaddExposureHandles={0: self.patches[0]},
+                              bbox=lsst.geom.Box2I(box),
+                              wcs=self.exposure.wcs,
+                              dataIds={0: self.dataIds[0]},
+                              physical_filter="a_test")
+            self.assertEqual(result.template.photoCalib, lsst.afw.image.PhotoCalib(1.0))
+            templates[photoCalib.getCalibrationMean()] = result.template
+
+        self.assertFloatsAlmostEqual(templates[calibration].image.array,
+                                     calibration*templates[1.0].image.array, rtol=1e-6)
+        self.assertFloatsAlmostEqual(templates[calibration].variance.array,
+                                     calibration**2*templates[1.0].variance.array, rtol=1e-6)
+
+    def _remakePatches(self, photoCalib):
+        """Rebuild the coadd patches from the main exposure with a different
+        photometric calibration.
+        """
+        self.exposure.setPhotoCalib(photoCalib)
+        self.patches.clear()
+        self.dataIds.clear()
+        for tract_id in range(4):
+            self._makePatches(self.skymap.generateTract(tract_id))
 
     def testRunNoTemplate(self):
         """A bounding box that doesn't overlap the patches will raise.
