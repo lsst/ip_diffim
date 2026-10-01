@@ -171,12 +171,6 @@ class DetectAndMeasureConnections(pipeBase.PipelineTaskConnections,
         dimensions=("instrument", "visit", "detector"),
         name="{fakesType}{coaddName}Diff_streaks",
     )
-    streakMaskedImage = pipeBase.connectionTypes.Output(
-        doc="Temporary difference image with binned detection mask plane filled in.",
-        dimensions=("instrument", "visit", "detector"),
-        storageClass="MaskedImageF",
-        name="difference_temporary",
-    )
     glintTrailInfo = pipeBase.connectionTypes.Output(
         doc='Dict of fit parameters for glint trails in the catalog.',
         storageClass="ArrowNumpyDict",
@@ -660,7 +654,6 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                 measurementResults.scoreMeasuredExposure,
                 measurementResults.diaSources,
                 measurementResults.maskedStreaks,
-                measurementResults.streakMaskedImage,
                 log=self.log
             )
             if self.config.image_type == "future":
@@ -1029,7 +1022,6 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
         if self.config.doMaskStreaks and self.config.writeStreakInfo:
             measurementResults.maskedStreaks = streakInfo.maskedStreaks
-            measurementResults.streakMaskedImage = streakInfo.streakMaskedImage
 
         if kernelSources is not None:
             self.calculateMetrics(science, difference, diaSources, kernelSources)
@@ -1557,11 +1549,10 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                                                                    axis=0).repeat(self.config.streakBinFactor,
                                                                                   axis=1)
         # Create new version of a diffim with DETECTED based on binnedExposure
-        streakMaskedImaged = maskedImage.clone()
+        streakMaskedImage = maskedImage.clone()
         ysize, xsize = rescaledDetectedMaskPlane.shape
         streakMaskedImage.mask.array[:ysize, :xsize] |= rescaledDetectedMaskPlane
         # Detect streaks on this new version of the diffim
-        temporaryMaskedImage = streakMaskedImage.clone()
         streaks = self.maskStreaks.run(streakMaskedImage)
         streakMaskPlane = streakMaskedImage.mask.array & streakMaskedImage.mask.getPlaneBitMask('STREAK')
         # Apply the new STREAK mask to the original diffim
@@ -1578,7 +1569,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         else:
             streakInfo = {'rho': np.array([]), 'theta': np.array([]), 'sigma': np.array([]),
                           'reducedChi2': np.array([]), 'modelMaximum': np.array([])}
-        return pipeBase.Struct(maskedStreaks=streakInfo, streakMaskedImage=temporaryMaskedImage)
+        return pipeBase.Struct(maskedStreaks=streakInfo)
 
 
 class DetectAndMeasureScoreConnections(DetectAndMeasureConnections):
