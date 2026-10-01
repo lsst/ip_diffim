@@ -353,8 +353,8 @@ class GetTemplateTask(pipeBase.PipelineTask):
            A struct with attributes:
 
            ``template``
-               A template coadd exposure assembled out of patches
-               (`lsst.afw.image.ExposureF`).
+               A template coadd exposure assembled out of patches, with
+               pixels in nJy (`lsst.afw.image.ExposureF`).
 
         Raises
         ------
@@ -450,6 +450,10 @@ class GetTemplateTask(pipeBase.PipelineTask):
         if visit is not None:
             template.getInfo().setVisitInfo(VisitInfo(id=visit))
         template.setFilter(afwImage.FilterLabel(band, physical_filter))
+        identity = afwImage.PhotoCalib(1.0)
+        if photoCalib is not None and photoCalib != identity:
+            template.maskedImage = photoCalib.calibrateImage(template.maskedImage)
+            photoCalib = identity
         template.setPhotoCalib(photoCalib)
         template.setPsf(self._makePsf(template, catalog, wcs))
 
