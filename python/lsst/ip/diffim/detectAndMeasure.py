@@ -599,7 +599,6 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             diaSources=None,
             maskedStreaks=None,
             differenceBackground=None,
-            streakMaskedImage=None,
         )
         try:
             self.run(**inputs, idFactory=idFactory, measurementResults=measurementResults)
