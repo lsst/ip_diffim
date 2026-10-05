@@ -21,6 +21,7 @@
 import collections
 import dataclasses
 
+import astropy.units
 from astropy.stats import gaussian_sigma_to_fwhm
 import numpy as np
 
@@ -36,6 +37,7 @@ import lsst.pex.config as pexConfig
 import lsst.pex.exceptions
 import lsst.pipe.base as pipeBase
 
+from lsst.images import DifferenceImage, DifferenceImageTemplateInfo, get_legacy_template_mask_planes
 from lsst.skymap import BaseSkyMap
 from lsst.ip.diffim.dcrModel import DcrModel
 from lsst.ip.diffim.utils import evaluateMeanPsfFwhm, getPsfFwhm
@@ -111,6 +113,8 @@ class GetTemplateConnections(
                 self.coaddExposures,
                 deferGraphConstraint=False,
             )
+        if config.output_image_type == "future":
+            self.template = dataclasses.replace(self.template, storageClass="DifferenceImage")
 
 
 class GetTemplateConfig(
@@ -181,6 +185,15 @@ class GetTemplateConfig(
         default=False,
         doc="If True, include the coadd dataset existence in the"
         " initial butler query during QuantumGraph generation.",
+    )
+    output_image_type = pexConfig.ChoiceField[str](
+        "Which image type to use for the output template.",
+        allowed={
+            "legacy": "Write as a lsst.afw.image.ExposureF.",
+            "future": "Write as a lsst.images.DifferenceImage.",
+        },
+        optional=False,
+        default="legacy",
     )
 
     def setDefaults(self):
@@ -254,7 +267,76 @@ class GetTemplateTask(pipeBase.PipelineTask):
             physical_filter=physical_filter,
             visit=outputRefs.template.dataId["visit"],
         )
+        if self.config.output_image_type == "future":
+            outputs.template = self.convert_outputs_to_future(outputs.template,
+                                                              butlerQC.quantum.dataId,
+                                                              inputRefs.coaddExposures,
+                                                              detector=detector)
         butlerQC.put(outputs, outputRefs)
+
+    def convert_outputs_to_future(self, template, data_id, coadd_refs, detector):
+        """Convert a template image to DifferenceImage format.
+
+        This replaces ``template`` with an `lsst.images.DifferenceImage`
+        instance and records the coadds contributed to it. The Gaussian PSF
+        set by `run` is converted to an
+        `lsst.images.psfs.GaussianPointSpreadFunction`.
+
+        Parameters
+        ----------
+        template : `lsst.afw.image.Exposure`
+            Output struct to read and modify in place. Its ``template`` must
+            have a detector with per-amplifier raw geometry and a field angle
+            transform, which is why `runQuantum` sets the science image's
+            detector on it first.
+        data_id : `lsst.daf.butler.DataCoordinate`
+            Data ID of the science image the template was built for; supplies
+            the instrument name and visit id recorded on the output.
+        coadd_refs : `list` [`lsst.daf.butler.DatasetRef`]
+            References to the coadds that may have gone into the template.
+            May be a superset of the coadds that were used; supplies the
+            dataset id and RUN collection recorded for each coadd that was.
+        detector : `lsst.afw.image.Detector`
+            Detector of the science image that the template was built for.
+
+        Returns
+        -------
+        convertedTemplate : `lsst.images.DifferenceImage`
+            The converted image.
+
+        Raises
+        ------
+        RuntimeError
+            Raised if the template has pixels set in a mask plane that
+            `lsst.images.get_legacy_template_mask_planes` does not map, or if
+            ``coadd_refs`` spans more than one skymap.
+        """
+        # The template PSF is a Gaussian, so rebuild the CoaddPsf from the
+        # template inputs to record which coadds contributed.
+        coaddPsf = self._makePsf(template, template.getInfo().getCoaddInputs().ccds, template.getWcs())
+        template.setDetector(detector)
+        skymaps = {ref.dataId["skymap"] for ref in coadd_refs}
+        if len(skymaps) != 1:
+            raise RuntimeError("Expected the template inputs to come from one skymap;"
+                               f" got {sorted(skymaps)}.")
+        butler_info = {(ref.dataId["tract"], ref.dataId["patch"]): (ref.id, ref.run)
+                       for ref in coadd_refs}
+        convertedTemplate = DifferenceImage.from_legacy(
+            template,
+            unit=astropy.units.nJy,
+            plane_map=get_legacy_template_mask_planes(),
+            instrument=data_id["instrument"],
+            visit=data_id["visit"],
+        )
+        del template
+        convertedTemplate.templates = DifferenceImageTemplateInfo.from_legacy_psf(
+            convertedTemplate.sky_projection.pixel_frame,
+            coaddPsf,
+            skymaps.pop(),
+            butler_info,
+            log=self.log,
+        )
+        return convertedTemplate
 
     def getExposures(self, coaddExposureHandles, bbox, skymap, wcs):
         """Return a data structure containing the coadds that overlap the

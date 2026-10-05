@@ -24,21 +24,26 @@ import itertools
 import unittest
 import unittest.mock
 
+import astropy.units as u
 from astropy.stats import gaussian_sigma_to_fwhm
 import numpy as np
 
+import lsst.afw.cameraGeom.testUtils
 import lsst.afw.detection
 import lsst.afw.geom
 import lsst.afw.image
 import lsst.afw.math
 import lsst.afw.table
-from lsst.daf.butler import DataCoordinate, DimensionUniverse
+from lsst.daf.butler import DataCoordinate, DatasetRef, DatasetType, DimensionUniverse
 import lsst.geom
+import lsst.images
+import lsst.images.psfs
 import lsst.ip.diffim
 import lsst.meas.algorithms
 import lsst.meas.base.tests
 import lsst.pex.exceptions
 import lsst.pipe.base as pipeBase
+import lsst.pipe.base.testUtils
 import lsst.skymap
 import lsst.utils.tests
 
@@ -77,6 +82,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         self.skymap = self._makeSkymap()
         self.patches = collections.defaultdict(list)
         self.dataIds = collections.defaultdict(list)
+        self.coaddRefs = {}
         self.exposure = self._makeExposure()
         self.varianceBox = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
 
@@ -637,6 +643,213 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         self.assertFloatsAlmostEqual(taskLow.metadata["scaleTemplateVarianceFactor"],
                                      factor*scaleFactor, rtol=1e-5)
         self.assertImagesAlmostEqual(templateLow.variance, templateOn.variance, rtol=1e-5)
+
+    def _runLegacyForFuture(self):
+        """Build a template from tract 0 with a task configured for the
+        future output type, and attach the detector that ``runQuantum`` reads
+        from the science image, but do not convert it.
+
+        Returns
+        -------
+        result : `lsst.pipe.base.Struct`
+            The legacy output struct, with a detector on the template.
+        box : `lsst.geom.Box2I`
+            The bounding box the template was requested on, before the task
+            grew it by the template border.
+        """
+        config = lsst.ip.diffim.GetTemplateTask.ConfigClass()
+        config.output_image_type = "future"
+        task = lsst.ip.diffim.GetTemplateTask(config=config)
+        self.visit = 9876
+        box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
+        # Task modifies the input bbox, so pass a copy.
+        result = task.run(coaddExposureHandles={0: self.patches[0]},
+                          bbox=lsst.geom.Box2I(box),
+                          wcs=self.exposure.wcs,
+                          dataIds={0: self.dataIds[0]},
+                          physical_filter="a_test",
+                          visit=self.visit)
+        # run() always produces legacy types, whatever output_image_type is.
+        self.assertIsInstance(result.template, lsst.afw.image.ExposureF)
+        self.futureTask = task
+        return result, box
+
+    def _runFuture(self):
+        """Build a template and convert it, the way ``runQuantum`` does.
+
+        Returns
+        -------
+        result : `lsst.pipe.base.Struct`
+            The converted output struct.
+        box : `lsst.geom.Box2I`
+            The bounding box the template was requested on, before the task
+            grew it by the template border.
+        """
+        # lsst.images needs per-amplifier raw geometry and a field angle
+        # transform, which the trivial test detectors do not have.
+        detector = list(lsst.afw.cameraGeom.testUtils.CameraWrapper().camera)[0]
+        result, box = self._runLegacyForFuture()
+        result.template = self.futureTask.convert_outputs_to_future(
+            result.template, {"instrument": "testCam", "visit": self.visit}, self._coaddRefs(0),
+            detector=detector)
+        return result, box, detector
+
+    def _coaddRefs(self, tract):
+        """Return butler references for the coadds of one tract, like the
+        ones ``runQuantum`` passes on from its ``coaddExposures`` input.
+
+        Parameters
+        ----------
+        tract : `int`
+            Id of the tract whose coadds to make references for.
+
+        Returns
+        -------
+        refs : `list` [`lsst.daf.butler.DatasetRef`]
+            One reference per patch of that tract. The same references are
+            returned on every call, because each new one would get a new
+            dataset id.
+        """
+        if tract not in self.coaddRefs:
+            datasetType = DatasetType("template_coadd", ("tract", "patch", "band", "skymap"),
+                                      "ExposureF", universe=DimensionUniverse())
+            self.coaddRefs[tract] = [DatasetRef(datasetType, dataId, run="test_run")
+                                     for dataId in self.dataIds[tract]]
+        return self.coaddRefs[tract]
+
+    def testConvertOutputsToFuture(self):
+        """Test that the output template is converted to a DifferenceImage
+        that keeps the pixel geometry and the detector it was built on.
+        """
+        result, box, detector = self._runFuture()
+
+        self.assertIsInstance(result.template, lsst.images.DifferenceImage)
+        self.assertEqual(result.template.unit, u.nJy)
+        self.assertIsNotNone(result.template.detector)
+        self.assertEqual(result.template.detector.name, detector.getName())
+        # The template is grown by the border, so it is larger than both the
+        # requested box and the detector.
+        expectedBox = lsst.geom.Box2I(box)
+        expectedBox.grow(lsst.ip.diffim.GetTemplateTask.ConfigClass().templateBorderSize)
+        self.assertEqual(result.template.bbox.to_legacy(), expectedBox)
+        self.assertEqual(result.template.obs_info.visit_id, self.visit)
+
+    def testConvertOutputsToFutureCoaddMaskPlanes(self):
+        """Test that the coadd mask planes a warped template carries are
+        converted, and come back when the image is converted to legacy.
+
+        The template is converted with the template plane map, so the coadd
+        planes are named there; the source injection planes are optional, and
+        are added because this template has pixels set in them.
+        """
+        detector = list(lsst.afw.cameraGeom.testUtils.CameraWrapper().camera)[0]
+        planes = ("CLIPPED", "REJECTED", "INEXACT_PSF", "SENSOR_EDGE", "HIGH_VARIANCE",
+                  "INJECTED", "INJECTED_CORE")
+        result, _ = self._runLegacyForFuture()
+        mask = result.template.mask
+        for n, plane in enumerate(planes):
+            mask.addMaskPlane(plane)
+            mask.array[0, n] |= mask.getPlaneBitMask(plane)
+
+        result.template = self.futureTask.convert_outputs_to_future(
+            result.template, {"instrument": "testCam", "visit": self.visit}, self._coaddRefs(0),
+            detector=detector)
+
+        template = result.template
+        self.assertIsInstance(template, lsst.images.DifferenceImage)
+        for n, plane in enumerate(planes):
+            with self.subTest(plane=plane):
+                self.assertIn(plane, template.mask.schema.names)
+                self.assertEqual(np.count_nonzero(template.mask.get(plane)), 1)
+        # The butler converts a DifferenceImage to an ExposureF with the
+        # difference image plane map, which does not name the coadd planes;
+        # they keep their own names instead of being dropped.
+        legacy = template.to_legacy()
+        for n, plane in enumerate(planes):
+            with self.subTest(plane=plane):
+                self.assertIn(plane, legacy.mask.getMaskPlaneDict())
+                self.assertEqual(
+                    np.count_nonzero(legacy.mask.array & legacy.mask.getPlaneBitMask(plane)), 1)
+
+    def testConvertOutputsToFutureTemplates(self):
+        """The coadds that went into the template are recorded on the
+        converted image.
+        """
+        result, _, _ = self._runFuture()
+        refs = {(ref.dataId["tract"], ref.dataId["patch"]): ref for ref in self._coaddRefs(0)}
+
+        templates = result.template.templates
+        self.assertGreater(len(templates), 0)
+        for template in templates:
+            with self.subTest(tract=template.tract, patch=template.patch):
+                ref = refs[template.tract, template.patch]
+                self.assertEqual(template.skymap, "skymap")
+                self.assertEqual(template.dataset_id, ref.id)
+                self.assertEqual(template.dataset_run, ref.run)
+                self.assertFalse(template.psf_shape_flag)
+                self.assertGreater(template.psf_shape_xx, 0)
+                self.assertGreater(template.bounds.area, 0)
+
+    def testConvertOutputsToFuturePsf(self):
+        """The Gaussian PSF set by `run` is kept, defined over the detector.
+        """
+        result, _ = self._runLegacyForFuture()
+        detector = list(lsst.afw.cameraGeom.testUtils.CameraWrapper().camera)[0]
+        legacyPsf = result.template.getPsf()
+
+        result.template = self.futureTask.convert_outputs_to_future(
+            result.template, {"instrument": "testCam", "visit": self.visit}, self._coaddRefs(0),
+            detector=detector)
+
+        psf = result.template.psf
+        self.assertIsInstance(psf, lsst.images.psfs.GaussianPointSpreadFunction)
+        self.assertFloatsAlmostEqual(psf.sigma, legacyPsf.getSigma())
+        self.assertEqual(psf.bounds.to_legacy(), detector.getBBox())
+        self.assertEqual(psf.kernel_bbox.to_legacy().getDimensions(), legacyPsf.getDimensions())
+
+    def testConvertOutputsToFuturePsfToLegacy(self):
+        """The Gaussian survives conversion back to an Exposure, which is how
+        a task that has not been converted reads the template.
+        """
+        result, _, _ = self._runFuture()
+
+        psf = result.template.to_legacy().getPsf()
+        self.assertIsInstance(psf, lsst.afw.detection.GaussianPsf)
+        self.assertFloatsAlmostEqual(psf.getSigma(), result.template.psf.sigma)
+
+
+class GetTemplateConnectionsTestCase(lsst.utils.tests.TestCase):
+    """Test the connections that ``output_image_type`` switches on.
+
+    These only need the config classes, not a built template.
+    """
+
+    def testOutputImageType(self):
+        """Test that the future output type changes the template storage
+        class, and leaves the input connections alone.
+        """
+        Connections = lsst.ip.diffim.GetTemplateTask.ConfigClass.ConnectionsClass
+        config = lsst.ip.diffim.GetTemplateTask.ConfigClass()
+
+        connections = Connections(config=config)
+        self.assertEqual(connections.template.storageClass, "ExposureF")
+
+        config.output_image_type = "future"
+        connections = Connections(config=config)
+        self.assertEqual(connections.template.storageClass, "DifferenceImage")
+        # The dataset name is unchanged; only its storage class differs.
+        self.assertEqual(connections.template.name, "goodSeeingDiff_templateExp")
+        # The detector the conversion needs comes from the science image, so
+        # the future mode adds no input of its own.
+        self.assertEqual(connections.detector.name, "calexp.detector")
+        self.assertEqual(connections.detector.storageClass, "Detector")
+
+    def testLintConnections(self):
+        """Check that the connections are self-consistent in both modes.
+        """
+        for task in (lsst.ip.diffim.GetTemplateTask, lsst.ip.diffim.GetDcrTemplateTask):
+            with self.subTest(task=task.__name__):
+                lsst.pipe.base.testUtils.lintConnections(task.ConfigClass.ConnectionsClass)
 
 
 def setup_module(module):
