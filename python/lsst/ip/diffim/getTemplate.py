@@ -21,8 +21,10 @@
 import collections
 import dataclasses
 
+from astropy.stats import gaussian_sigma_to_fwhm
 import numpy as np
 
+import lsst.afw.detection as afwDetection
 import lsst.afw.image as afwImage
 import lsst.geom as geom
 import lsst.afw.geom as afwGeom
@@ -31,10 +33,12 @@ import lsst.afw.table as afwTable
 from lsst.afw.math._warper import computeWarpedBBox
 import lsst.afw.math as afwMath
 import lsst.pex.config as pexConfig
+import lsst.pex.exceptions
 import lsst.pipe.base as pipeBase
 
 from lsst.skymap import BaseSkyMap
 from lsst.ip.diffim.dcrModel import DcrModel
+from lsst.ip.diffim.utils import evaluateMeanPsfFwhm, getPsfFwhm
 from lsst.meas.algorithms import CoaddPsf, CoaddPsfConfig, SubtractBackgroundTask, ScaleVarianceTask
 from lsst.utils.timer import timeMethod
 
@@ -44,6 +48,9 @@ __all__ = [
     "GetDcrTemplateTask",
     "GetDcrTemplateConfig",
 ]
+
+_PSF_STAMP_SIGMAS = 5
+"""Width, in N sigma, of the Gaussian approximation to the CoaddPsf."""
 
 
 class GetTemplateConnections(
@@ -121,6 +128,17 @@ class GetTemplateConfig(
     coaddPsf = pexConfig.ConfigField(
         doc="Configuration for CoaddPsf",
         dtype=CoaddPsfConfig,
+    )
+    fwhmExposureGrid = pexConfig.Field(
+        doc="Grid size to compute the average PSF FWHM in an exposure",
+        dtype=int,
+        default=10,
+    )
+    fwhmExposureBuffer = pexConfig.Field(
+        doc="Fractional buffer margin to be left out of all sides of the image during construction"
+            " of grid to compute average PSF FWHM in an exposure",
+        dtype=float,
+        default=0.05,
     )
     varianceBackground = pexConfig.ConfigurableField(
         target=SubtractBackgroundTask,
@@ -322,8 +340,8 @@ class GetTemplateTask(pipeBase.PipelineTask):
         average, and the variance planes are combined with the same weights,
         not added in quadrature; the overlap regions are not statistically
         independent, because they're derived from the same original data.
-        The PSF on the template is created by combining the CoaddPsf on each
-        template image into a meta-CoaddPsf.
+        The PSF of the template is a Gaussian with the same width as the
+        CoaddPsf evaluated at the center of the detector.
 
         Parameters
         ----------
@@ -354,7 +372,8 @@ class GetTemplateTask(pipeBase.PipelineTask):
 
            ``template``
                A template coadd exposure assembled out of patches, with
-               pixels in nJy (`lsst.afw.image.ExposureF`).
+               pixels in nJy. Its PSF is a Gaussian approximation to the
+               CoaddPsf of its inputs (`lsst.afw.image.ExposureF`).
 
         Raises
         ------
@@ -456,6 +475,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
             photoCalib = identity
         template.setPhotoCalib(photoCalib)
         template.setPsf(self._makePsf(template, catalog, wcs))
+        template.setPsf(self._makeGaussianPsf(template))
 
         # Record the input coadd patches as the template's coadd inputs.
         coaddInputs = afwImage.CoaddInputs(afwTable.ExposureTable.makeMinimalSchema(), self.schema)
@@ -773,6 +793,47 @@ class GetTemplateTask(pipeBase.PipelineTask):
             catalog, wcs, centerCoord, ctrl.warpingKernelName, ctrl.cacheSize
         )
         return coaddPsf
+
+    def _makeGaussianPsf(self, template):
+        """Return a Gaussian PSF with the width of the template CoaddPsf.
+
+        Parameters
+        ----------
+        template : `lsst.afw.image.Exposure`
+            Template with the CoaddPsf to approximate. The width is measured
+            at the average position of the PSF, or averaged over a grid of
+            positions if the PSF cannot be evaluated there.
+
+        Returns
+        -------
+        psf : `lsst.afw.detection.GaussianPsf`
+            Gaussian with the width of the template PSF.
+
+        Raises
+        ------
+        ValueError
+            Raised if the PSF cannot be evaluated at any grid position.
+        """
+        # The CoaddPsf is not defined where the template has no inputs, which
+        # can include its average position.
+        try:
+            fwhm = getPsfFwhm(template.psf)
+        except lsst.pex.exceptions.Exception:
+            # Catch a broad range of exceptions, since some are C++ only
+            # Catching:
+            #  - lsst::geom::SingularTransformException
+            #  - lsst.pex.exceptions.InvalidParameterError
+            #  - lsst.pex.exceptions.RangeError
+            self.log.info("Unable to evaluate PSF at the average position. "
+                          "Evaluating PSF on a grid of points.")
+            fwhm = evaluateMeanPsfFwhm(template,
+                                       fwhmExposureBuffer=self.config.fwhmExposureBuffer,
+                                       fwhmExposureGrid=self.config.fwhmExposureGrid)
+        sigma = fwhm/gaussian_sigma_to_fwhm
+        size = 2*int(np.ceil(_PSF_STAMP_SIGMAS*sigma)) + 1
+        self.metadata["templatePsfSigma"] = float(sigma)
+        self.log.info("Approximated the template PSF with a Gaussian of sigma %.3f pixels.", sigma)
+        return afwDetection.GaussianPsf(size, size, sigma)
 
 
 class GetDcrTemplateConnections(
