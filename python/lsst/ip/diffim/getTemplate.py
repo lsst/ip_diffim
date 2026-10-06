@@ -130,7 +130,7 @@ class GetTemplateConfig(
         dtype=CoaddPsfConfig,
     )
     fwhmExposureGrid = pexConfig.Field(
-        doc="Grid size to compute the average PSF FWHM in an exposure",
+        doc="Grid size to compute the average PSF FWHM in an exposure (pixels)",
         dtype=int,
         default=10,
     )

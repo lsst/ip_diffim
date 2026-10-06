@@ -154,7 +154,7 @@ def evaluateMeanPsfFwhm(exposure: afwImage.Exposure,
         during the construction of the grid to compute mean PSF FWHM in an
         exposure.
     fwhmExposureGrid : `int`
-        Grid size to compute the mean FWHM in an exposure.
+        Grid size to compute the average PSF FWHM in an exposure (pixels).
 
     Returns
     -------

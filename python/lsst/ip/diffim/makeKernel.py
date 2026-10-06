@@ -60,7 +60,7 @@ class MakeKernelConfig(PsfMatchConfig):
         doc="Initial measurements used to feed stars to kernel fitting",
     )
     fwhmExposureGrid = lsst.pex.config.Field(
-        doc="Grid size to compute the average PSF FWHM in an exposure",
+        doc="Grid size to compute the average PSF FWHM in an exposure (pixels)",
         dtype=int,
         default=10,
     )
