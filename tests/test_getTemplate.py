@@ -22,9 +22,12 @@
 import collections
 import itertools
 import unittest
+import unittest.mock
 
+from astropy.stats import gaussian_sigma_to_fwhm
 import numpy as np
 
+import lsst.afw.detection
 import lsst.afw.geom
 import lsst.afw.image
 import lsst.afw.math
@@ -34,6 +37,7 @@ import lsst.geom
 import lsst.ip.diffim
 import lsst.meas.algorithms
 import lsst.meas.base.tests
+import lsst.pex.exceptions
 import lsst.pipe.base as pipeBase
 import lsst.skymap
 import lsst.utils.tests
@@ -196,9 +200,23 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         self.assertEqual(template.getXY0(), expectedBox.getMin())
         self.assertEqual(template.filter.bandLabel, "a")
         self.assertEqual(template.filter.physicalLabel, "a_test")
-        self.assertEqual(template.psf.getComponentCount(), nPsfs)
+        # The template PSF is a Gaussian with the width of the CoaddPsf of
+        # its inputs.
+        self.assertIsInstance(template.psf, lsst.afw.detection.GaussianPsf)
+        coaddPsf = self._makeCoaddPsf(template, config)
+        self.assertEqual(coaddPsf.getComponentCount(), nPsfs)
+        position = coaddPsf.getAveragePosition()
+        self.assertFloatsAlmostEqual(template.psf.getSigma(),
+                                     coaddPsf.computeShape(position).getTraceRadius())
         self.assertTrue(template.getInfo().hasCoaddInputs())
         self.assertEqual(len(template.getInfo().getCoaddInputs().ccds), nPsfs)
+
+    def _makeCoaddPsf(self, template, config):
+        """Return the CoaddPsf that ``run`` approximated with a Gaussian,
+        rebuilt from the coadd inputs recorded on the template.
+        """
+        task = lsst.ip.diffim.GetTemplateTask(config=config)
+        return task._makePsf(template, template.getInfo().getCoaddInputs().ccds, template.wcs)
 
     def _checkPixels(self, template, config, box):
         """Check that the pixel values in the template are close to the
@@ -321,6 +339,35 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         self.dataIds.clear()
         for tract_id in range(4):
             self._makePatches(self.skymap.generateTract(tract_id))
+
+    def testGaussianPsfGridFallback(self):
+        """If the CoaddPsf cannot be evaluated at its average position, the
+        Gaussian width is averaged over a grid of positions instead.
+        """
+        box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
+        task = lsst.ip.diffim.GetTemplateTask()
+        result = task.run(coaddExposureHandles={0: self.patches[0]},
+                          bbox=lsst.geom.Box2I(box),
+                          wcs=self.exposure.wcs,
+                          dataIds={0: self.dataIds[0]},
+                          physical_filter="a_test")
+        template = result.template
+        template.setPsf(self._makeCoaddPsf(template, task.config))
+        expected = lsst.ip.diffim.utils.evaluateMeanPsfFwhm(
+            template,
+            fwhmExposureBuffer=task.config.fwhmExposureBuffer,
+            fwhmExposureGrid=task.config.fwhmExposureGrid,
+        )/gaussian_sigma_to_fwhm
+
+        error = lsst.pex.exceptions.InvalidParameterError("No inputs at the average position.")
+        with unittest.mock.patch("lsst.ip.diffim.getTemplate.getPsfFwhm", side_effect=error):
+            with self.assertLogs(task.log.name, level="INFO") as cm:
+                psf = task._makeGaussianPsf(template)
+
+        self.assertIn("grid of points", "\n".join(cm.output))
+        self.assertIsInstance(psf, lsst.afw.detection.GaussianPsf)
+        self.assertFloatsAlmostEqual(psf.getSigma(), expected)
+        self.assertFloatsAlmostEqual(task.metadata["templatePsfSigma"], expected)
 
     def testRunNoTemplate(self):
         """A bounding box that doesn't overlap the patches will raise.
