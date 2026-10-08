@@ -148,6 +148,8 @@ class SubtractImageOutputConnections(lsst.pipe.base.PipelineTaskConnections,
             self.difference = dataclasses.replace(self.difference, storageClass="DifferenceImage")
             self.matchedTemplate = dataclasses.replace(self.matchedTemplate,
                                                        storageClass="DifferenceImage")
+            self.psfMatchingKernel = dataclasses.replace(self.psfMatchingKernel,
+                                                         storageClass="ConvolutionKernel")
 
 
 class SubtractScoreOutputConnections(lsst.pipe.base.PipelineTaskConnections,
@@ -176,6 +178,8 @@ class SubtractScoreOutputConnections(lsst.pipe.base.PipelineTaskConnections,
         super().__init__(config=config)
         if config.image_type == "future":
             self.scoreExposure = dataclasses.replace(self.scoreExposure, storageClass="DifferenceImage")
+            self.psfMatchingKernel = dataclasses.replace(self.psfMatchingKernel,
+                                                         storageClass="ConvolutionKernel")
 
 
 class AlardLuptonSubtractConnections(SubtractInputConnections, SubtractImageOutputConnections):
@@ -196,6 +200,9 @@ class SimplifiedSubtractConnections(SubtractInputConnections, SubtractImageOutpu
         if config.useExistingKernel:
             del self.psfMatchingKernel
             del self.kernelSources
+            if config.image_type == "future":
+                self.inputPsfMatchingKernel = dataclasses.replace(self.inputPsfMatchingKernel,
+                                                                  storageClass="ConvolutionKernel")
         else:
             del self.inputPsfMatchingKernel
 
@@ -328,11 +335,14 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
         " encountered while calculating the matching kernel."
     )
     image_type = lsst.pex.config.ChoiceField[str](
-        doc="Image type of the input template and the image outputs of this"
-        " task (difference and matchedTemplate, or scoreExposure).",
+        doc="Image type of the input template, the image outputs of this"
+        " task (difference and matchedTemplate, or scoreExposure), and the PSF"
+        " matching kernel.",
         allowed={
-            "legacy": "Read and write lsst.afw.image.ExposureF.",
-            "future": "Read and write lsst.images.DifferenceImage.",
+            "legacy": "Read and write lsst.afw.image.ExposureF and"
+                      " lsst.afw.math.Kernel.",
+            "future": "Read and write lsst.images.DifferenceImage and"
+                      " lsst.images.convolution_kernels.ConvolutionKernel.",
         },
         optional=False,
         default="legacy",
@@ -479,6 +489,8 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             inputs["template"] = template.to_legacy()
             photometricScaling = inputs["science"].photometric_scaling
             inputs["science"] = inputs["science"].to_legacy()
+            if "inputPsfMatchingKernel" in inputs:
+                inputs["inputPsfMatchingKernel"] = inputs["inputPsfMatchingKernel"].to_legacy()
 
         try:
             results = self.run(**inputs)
@@ -499,7 +511,9 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
 
         Each image named in `futureImageOutputs` that is present on
         ``results`` is replaced by an `lsst.images.DifferenceImage`, with the
-        PSF matching kernel attached to it.
+        PSF matching kernel attached to it. ``psfMatchingKernel`` is replaced
+        by the same kernel as an
+        `lsst.images.convolution_kernels.ImageBasisConvolutionKernel`.
 
         Parameters
         ----------
@@ -560,6 +574,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
             if photometricScaling is not None:
                 image.photometric_scaling = photometricScaling
             setattr(results, name, image)
+        results.psfMatchingKernel = kernel
 
     @timeMethod
     def run(self, template, science, sources, visitSummary=None):

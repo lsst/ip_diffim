@@ -32,8 +32,11 @@ import lsst.afw.table as afwTable
 import lsst.geom
 import lsst.meas.algorithms as measAlg
 from lsst.daf.butler import DataCoordinate, DimensionUniverse
-from lsst.images import Box, DifferenceImage, DifferenceImageTemplateInfo, Polygon, VisitImage
+from lsst.images import (Box, DifferenceImage, DifferenceImageTemplateInfo, Polygon, VisitImage,
+                         get_legacy_difference_image_mask_planes)
+from lsst.images.convolution_kernels import ImageBasisConvolutionKernel
 from lsst.images.fields import ChebyshevField
+from lsst.images.tests import compare_masked_image_to_legacy
 from lsst.ip.diffim import subtractImages, InsufficientKernelSourcesError
 from lsst.pex.config import FieldValidationError
 from lsst.pipe.base import InvalidQuantumError, NoWorkFound
@@ -1526,6 +1529,28 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
             exposure.info.setVisitInfo(makeTestVisitInfo(self.dataId["visit"]))
         return science, template, sources
 
+    def _check_converted_kernel(self, kernel, legacyKernel, bbox):
+        """Check that a converted kernel evaluates the same as the legacy
+        kernel it came from.
+
+        Parameters
+        ----------
+        kernel : `lsst.images.convolution_kernels.ImageBasisConvolutionKernel`
+            The converted kernel to check.
+        legacyKernel : `lsst.afw.math.LinearCombinationKernel`
+            The kernel before conversion.
+        bbox : `lsst.geom.Box2I`
+            Region of the image the kernel was fit on.
+        """
+        self.assertIsInstance(kernel, ImageBasisConvolutionKernel)
+        roundTrip = kernel.to_legacy()
+        for point in (bbox.getMin(), bbox.getCenter(), bbox.getMax()):
+            expected = afwImage.ImageD(legacyKernel.getDimensions())
+            legacyKernel.computeImage(expected, False, point.x, point.y)
+            actual = afwImage.ImageD(roundTrip.getDimensions())
+            roundTrip.computeImage(actual, False, point.x, point.y)
+            np.testing.assert_allclose(actual.array, expected.array, rtol=0, atol=1e-12)
+
     def _check_converted(self, image, kernelExpected=True, photometricScaling=None):
         """Check that one converted image is a fully-formed DifferenceImage.
 
@@ -1578,10 +1603,13 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
                     if name in ("difference", "matchedTemplate", "scoreExposure"):
                         self.assertEqual(getattr(connections, name).storageClass, "ExposureF")
                 self.assertEqual(connections.science.storageClass, "ExposureF")
+                for name in ("psfMatchingKernel", "inputPsfMatchingKernel"):
+                    if name in connections.outputs or name in connections.inputs:
+                        self.assertEqual(getattr(connections, name).storageClass, "MatchingKernel")
 
     def test_connections_future(self):
         """Test that ``image_type="future"`` swaps the storage class of
-        every image output, and only those.
+        every image and kernel output.
         """
         for configClass, connectionsClass, expected in (
             (subtractImages.AlardLuptonSubtractConfig,
@@ -1603,10 +1631,8 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
                 # The science image is read in the new type to get its
                 # photometric scaling.
                 self.assertEqual(connections.science.storageClass, "VisitImage")
-                # The kernel has no converter to or from the new types, so it
-                # must remain a separate output in both modes.
                 if "psfMatchingKernel" in connections.outputs:
-                    self.assertEqual(connections.psfMatchingKernel.storageClass, "MatchingKernel")
+                    self.assertEqual(connections.psfMatchingKernel.storageClass, "ConvolutionKernel")
 
     def test_connections_future_simplified_existing_kernel(self):
         """Test the storage class swap for the connection variant that
@@ -1618,7 +1644,7 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
         connections = subtractImages.SimplifiedSubtractConnections(config=config)
         self.assertEqual(connections.difference.storageClass, "DifferenceImage")
         self.assertEqual(connections.matchedTemplate.storageClass, "DifferenceImage")
-        self.assertEqual(connections.inputPsfMatchingKernel.storageClass, "MatchingKernel")
+        self.assertEqual(connections.inputPsfMatchingKernel.storageClass, "ConvolutionKernel")
         self.assertNotIn("psfMatchingKernel", connections.outputs)
 
     def test_convert_outputs_to_future(self):
@@ -1630,16 +1656,18 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
         results = task.run(template, science, sources)
         # The template has no detector, so neither does the matched template.
         self.assertIsNone(results.matchedTemplate.getDetector())
-        legacyDifference = results.difference.image.array.copy()
+        legacy = {name: getattr(results, name).clone() for name in ("difference", "matchedTemplate")}
+        legacyKernel = results.psfMatchingKernel
 
         task.convert_outputs_to_future(results, self.exposureRecord)
 
-        self._check_converted(results.difference)
-        self._check_converted(results.matchedTemplate)
+        for name, exposure in legacy.items():
+            with self.subTest(name=name):
+                self._check_converted(getattr(results, name))
+                compare_masked_image_to_legacy(getattr(results, name), exposure.maskedImage,
+                                               plane_map=get_legacy_difference_image_mask_planes())
         self.assertEqual(results.difference.bbox.to_legacy(), science.getBBox())
-        np.testing.assert_array_equal(results.difference.image.array, legacyDifference)
-        # The kernel outputs are untouched.
-        self.assertIsInstance(results.psfMatchingKernel, afwMath.LinearCombinationKernel)
+        self._check_converted_kernel(results.psfMatchingKernel, legacyKernel, science.getBBox())
         self.assertIsInstance(results.kernelSources, afwTable.SourceCatalog)
 
     def test_convert_outputs_to_future_score(self):
@@ -1650,11 +1678,12 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
         task = self._setup_subtraction(subtractImages.AlardLuptonPreconvolveSubtractTask,
                                        image_type="future")
         results = task.run(template, science, sources)
+        legacyKernel = results.psfMatchingKernel
 
         task.convert_outputs_to_future(results, self.exposureRecord)
 
         self._check_converted(results.scoreExposure)
-        self.assertIsInstance(results.psfMatchingKernel, afwMath.LinearCombinationKernel)
+        self._check_converted_kernel(results.psfMatchingKernel, legacyKernel, science.getBBox())
 
     def test_convert_outputs_to_future_simplified(self):
         """Test converting the outputs of `SimplifiedSubtractTask` running
@@ -1845,7 +1874,8 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
                 self.assertIsInstance(butlerQC.put_values.matchedTemplate, expectedType)
                 # The kernel is a separate output in both modes.
                 self.assertIsInstance(butlerQC.put_values.psfMatchingKernel,
-                                      afwMath.LinearCombinationKernel)
+                                      ImageBasisConvolutionKernel if imageType == "future"
+                                      else afwMath.LinearCombinationKernel)
                 if imageType == "future":
                     for name in ("difference", "matchedTemplate"):
                         image = getattr(butlerQC.put_values, name)
@@ -1883,7 +1913,9 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
                 refs = {"template": self._make_future_template(template, templateInfo),
                         "science": self._make_future_science(science, photometricScaling)}
                 if useExistingKernel:
-                    refs["inputPsfMatchingKernel"] = alResults.psfMatchingKernel
+                    refs["inputPsfMatchingKernel"] = ImageBasisConvolutionKernel.from_legacy(
+                        alResults.psfMatchingKernel
+                    )
                 butlerQC = _RecordingQuantumContext(self.dataId)
 
                 task.runQuantum(butlerQC, _FakeRefs(**refs), _FakeRefs())
@@ -1893,6 +1925,11 @@ class OutputImageTypeTest(lsst.utils.tests.TestCase):
                 self._check_converted(butlerQC.put_values.matchedTemplate,
                                       photometricScaling=photometricScaling)
                 self.assertEqual(butlerQC.put_values.difference.templates, templateInfo)
+                self.assertIsInstance(butlerQC.put_values.psfMatchingKernel, ImageBasisConvolutionKernel)
+                if useExistingKernel:
+                    # The input kernel is the one the subtraction used.
+                    self._check_converted_kernel(butlerQC.put_values.difference.kernel,
+                                                 alResults.psfMatchingKernel, science.getBBox())
 
 
 class _FakeRefs:

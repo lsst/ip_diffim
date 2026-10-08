@@ -19,6 +19,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import dataclasses
+
 import numpy as np
 import scipy.signal
 
@@ -81,6 +83,12 @@ class SpatiallySampledMetricsConnections(pipeBase.PipelineTaskConnections,
         name="{fakesType}{coaddName}Diff_spatiallySampledMetrics",
     )
 
+    def __init__(self, *, config=None):
+        super().__init__(config=config)
+        if config.image_type == "future":
+            self.psfMatchingKernel = dataclasses.replace(self.psfMatchingKernel,
+                                                         storageClass="ConvolutionKernel")
+
 
 class SpatiallySampledMetricsConfig(pipeBase.PipelineTaskConfig,
                                     pipelineConnections=SpatiallySampledMetricsConnections):
@@ -99,6 +107,16 @@ class SpatiallySampledMetricsConfig(pipeBase.PipelineTaskConfig,
     metricSources = pexConfig.ConfigurableField(
         target=SkyObjectsTask,
         doc="Generate QA metric sources",
+    )
+    image_type = pexConfig.ChoiceField[str](
+        doc="Type of the input PSF matching kernel. The input images are read"
+        " as lsst.afw.image.ExposureF either way.",
+        allowed={
+            "legacy": "Read lsst.afw.math.Kernel.",
+            "future": "Read lsst.images.convolution_kernels.ConvolutionKernel.",
+        },
+        optional=False,
+        default="legacy",
     )
 
     def setDefaults(self):
@@ -215,6 +233,13 @@ class SpatiallySampledMetricsTask(lsst.pipe.base.PipelineTask):
             "L2 norm of (K-convolved template PSF - science PSF),"
             " relative to the science PSF L2 norm. Larger values indicate worse"
             " PSF matching. Assumes the kernel was solved to convolve the template.")
+
+    def runQuantum(self, butlerQC, inputRefs, outputRefs):
+        inputs = butlerQC.get(inputRefs)
+        if self.config.image_type == "future":
+            inputs["psfMatchingKernel"] = inputs["psfMatchingKernel"].to_legacy()
+        outputs = self.run(**inputs)
+        butlerQC.put(outputs, outputRefs)
 
     @timeMethod
     def run(self, science, template, difference, diaSources, psfMatchingKernel):

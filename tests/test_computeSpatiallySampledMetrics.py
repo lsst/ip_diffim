@@ -19,6 +19,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import types
 import unittest
 
 import numpy as np
@@ -27,6 +28,7 @@ import lsst.afw.image
 import lsst.afw.table
 import lsst.ip.diffim
 import lsst.utils.tests
+from lsst.images.convolution_kernels import ImageBasisConvolutionKernel
 
 from utils import makeTestImage
 
@@ -88,6 +90,54 @@ class ComputeSpatiallySampledMetricsTest(lsst.utils.tests.TestCase):
         self.assertGreater(len(metrics), 0)
         self.assertTrue(np.all(metrics[f"{missing.lower()}_mask_fraction"] == 0))
         self.assertTrue(np.all(np.isfinite(metrics[f"{present.lower()}_mask_fraction"])))
+
+    def testConnections(self):
+        """``image_type`` sets the storage class of the kernel input only."""
+        for imageType, kernelStorageClass in (("legacy", "MatchingKernel"),
+                                              ("future", "ConvolutionKernel")):
+            with self.subTest(imageType=imageType):
+                config = lsst.ip.diffim.SpatiallySampledMetricsTask.ConfigClass()
+                config.image_type = imageType
+                connections = config.ConnectionsClass(config=config)
+                self.assertEqual(connections.psfMatchingKernel.storageClass, kernelStorageClass)
+                for name in ("science", "template", "difference"):
+                    self.assertEqual(getattr(connections, name).storageClass, "ExposureF")
+
+    def testRunQuantumFuture(self):
+        """``runQuantum`` converts a future kernel back to the legacy type,
+        giving the same metrics as a legacy run.
+        """
+        inputs = {"science": self.science, "template": self.template, "difference": self.difference,
+                  "diaSources": self.diaSources}
+        metrics = {}
+        for imageType, kernel in (
+            ("legacy", self.psfMatchingKernel),
+            ("future", ImageBasisConvolutionKernel.from_legacy(self.psfMatchingKernel)),
+        ):
+            config = lsst.ip.diffim.SpatiallySampledMetricsTask.ConfigClass()
+            config.image_type = imageType
+            task = lsst.ip.diffim.SpatiallySampledMetricsTask(config=config)
+            butlerQC = _RecordingQuantumContext()
+            task.runQuantum(butlerQC, types.SimpleNamespace(**inputs, psfMatchingKernel=kernel), None)
+            metrics[imageType] = butlerQC.put_values.spatiallySampledMetrics
+
+        self.assertGreater(len(metrics["legacy"]), 0)
+        for name in ("psfMatchingKernel_sum", "psfMatchingKernel_dx", "psfMatchingKernel_dy",
+                     "psfMatchingKernel_residualNorm"):
+            np.testing.assert_allclose(metrics["future"][name], metrics["legacy"][name],
+                                       rtol=1e-6, err_msg=name)
+
+
+class _RecordingQuantumContext:
+    """Minimal `~lsst.pipe.base.QuantumContext` that records what was put."""
+    def __init__(self):
+        self.put_values = None
+
+    def get(self, refs):
+        return dict(refs.__dict__)
+
+    def put(self, values, refs):
+        self.put_values = values
 
 
 def setup_module(module):
