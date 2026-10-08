@@ -267,9 +267,8 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
         task = lsst.ip.diffim.GetTemplateTask()
         # Restrict to tract 0, since the box fits in just that tract.
-        # Task modifies the input bbox, so pass a copy.
         result = task.run(coaddExposureHandles={0: self.patches[0]},
-                          bbox=lsst.geom.Box2I(box),
+                          bbox=box,
                           wcs=self.exposure.wcs,
                           dataIds={0: self.dataIds[0]},
                           physical_filter="a_test")
@@ -285,9 +284,8 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         """
         box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
         task = lsst.ip.diffim.GetTemplateTask()
-        # Task modifies the input bbox, so pass a copy.
         result = task.run(coaddExposureHandles=self.patches,
-                          bbox=lsst.geom.Box2I(box),
+                          bbox=box,
                           wcs=self.exposure.wcs,
                           dataIds=self.dataIds,
                           physical_filter="a_test")
@@ -301,9 +299,8 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         """
         box = lsst.geom.Box2I(lsst.geom.Point2I(200, 200), lsst.geom.Point2I(600, 600))
         task = lsst.ip.diffim.GetTemplateTask()
-        # Task modifies the input bbox, so pass a copy.
         result = task.run(coaddExposureHandles=self.patches,
-                          bbox=lsst.geom.Box2I(box),
+                          bbox=box,
                           wcs=self.exposure.wcs,
                           dataIds=self.dataIds,
                           physical_filter="a_test")
@@ -323,9 +320,8 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         templates = {}
         for photoCalib in (self.exposure.photoCalib, lsst.afw.image.PhotoCalib(1.0)):
             self._remakePatches(photoCalib)
-            # Task modifies the input bbox, so pass a copy.
             result = task.run(coaddExposureHandles={0: self.patches[0]},
-                              bbox=lsst.geom.Box2I(box),
+                              bbox=box,
                               wcs=self.exposure.wcs,
                               dataIds={0: self.dataIds[0]},
                               physical_filter="a_test")
@@ -354,7 +350,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
         task = lsst.ip.diffim.GetTemplateTask()
         result = task.run(coaddExposureHandles={0: self.patches[0]},
-                          bbox=lsst.geom.Box2I(box),
+                          bbox=box,
                           wcs=self.exposure.wcs,
                           dataIds={0: self.dataIds[0]},
                           physical_filter="a_test")
@@ -383,7 +379,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         task = lsst.ip.diffim.GetTemplateTask()
         with self.assertRaisesRegex(lsst.pipe.base.NoWorkFound, "No patches found"):
             task.run(coaddExposureHandles=self.patches,
-                     bbox=lsst.geom.Box2I(box),
+                     bbox=box,
                      wcs=self.exposure.wcs,
                      dataIds=self.dataIds,
                      physical_filter="a_test")
@@ -398,9 +394,8 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         self.patches[0].pop(1)
         box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
         task = lsst.ip.diffim.GetTemplateTask()
-        # Task modifies the input bbox, so pass a copy.
         result = task.run(coaddExposureHandles=self.patches,
-                          bbox=lsst.geom.Box2I(box),
+                          bbox=box,
                           wcs=self.exposure.wcs,
                           dataIds=self.dataIds,
                           physical_filter="a_test")
@@ -431,7 +426,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         box = lsst.geom.Box2I(lsst.geom.Point2I(200, 200), lsst.geom.Point2I(600, 600))
         task = lsst.ip.diffim.GetTemplateTask()
         result = task.run(coaddExposureHandles=self.patches,
-                          bbox=lsst.geom.Box2I(box),
+                          bbox=box,
                           wcs=self.exposure.wcs,
                           dataIds=self.dataIds,
                           physical_filter="a_test")
@@ -600,9 +595,8 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
             config = lsst.ip.diffim.GetTemplateTask.ConfigClass()
             config.doScaleVariance = doScaleVariance
             task = lsst.ip.diffim.GetTemplateTask(config=config)
-            # Task modifies the input bbox, so pass a copy.
             result = task.run(coaddExposureHandles={0: self._scaleInputVariance(0, varianceScale)},
-                              bbox=lsst.geom.Box2I(box),
+                              bbox=box,
                               wcs=self.exposure.wcs,
                               dataIds={0: self.dataIds[0]},
                               physical_filter="a_test")
@@ -670,9 +664,8 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         task = lsst.ip.diffim.GetTemplateTask(config=config)
         self.visit = 9876
         box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
-        # Task modifies the input bbox, so pass a copy.
         result = task.run(coaddExposureHandles={0: self.patches[0]},
-                          bbox=lsst.geom.Box2I(box),
+                          bbox=box,
                           wcs=self.exposure.wcs,
                           dataIds={0: self.dataIds[0]},
                           physical_filter="a_test",

@@ -495,9 +495,9 @@ class GetTemplateTask(pipeBase.PipelineTask):
                            `lsst.afw.image.Exposure`]]
             Coadds to be mosaicked, indexed on tract id.
         bbox : `lsst.geom.Box2I`
-            Template Bounding box of the detector geometry onto which to
-            resample the ``coaddExposureHandles``. Modified in-place to include the
-            template border.
+            Input Bounding box of the detector geometry onto which to
+            resample the ``coaddExposureHandles``. The output template bbox
+            will be grown by ``templateBorderSize``.
         wcs : `lsst.afw.geom.SkyWcs`
             Template WCS onto which to resample the ``coaddExposureHandles``.
         dataIds : `dict` [`int`, `list` [`lsst.daf.butler.DataCoordinate`]]
@@ -527,6 +527,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
         """
         band, photoCalib = self._checkInputs(dataIds, coaddExposureHandles)
 
+        bbox = geom.Box2I(bbox)
         bbox.grow(self.config.templateBorderSize)
 
         warped = {}
