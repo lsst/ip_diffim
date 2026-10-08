@@ -876,16 +876,19 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             background=background,
             clearMask=True,
         )
-        # Use the temporary detection mask for the final background subtraction.
-        # The detection mask planes will be cleared before the final detection
-        # step, so it is OK if they get set for differenceExposure.
-        detectedBit = differenceExposure.mask.getPlaneBitMask(["DETECTED"])
+        # Use the temporary detection mask for the final background subtraction,
+        # then restore the original mask. The score image variant never
+        # clears the detection planes of the difference image.
+        mask = differenceExposure.mask
+        originalMask = mask.array.copy()
+        detectedBit = mask.getPlaneBitMask(["DETECTED"])
         detectedPix = detectionExposure.mask.array & detectedBit > 0
-        detectedNegativeBit = differenceExposure.mask.getPlaneBitMask(["DETECTED_NEGATIVE"])
+        detectedNegativeBit = mask.getPlaneBitMask(["DETECTED_NEGATIVE"])
         detectedNegativePix = detectionExposure.mask.array & detectedNegativeBit > 0
-        differenceExposure.mask.array[detectedPix] |= detectedBit
-        differenceExposure.mask.array[detectedNegativePix] |= detectedNegativeBit
+        mask.array[detectedPix] |= detectedBit
+        mask.array[detectedNegativePix] |= detectedNegativeBit
         background = self.subtractFinalBackground.run(differenceExposure).background
+        mask.array[...] = originalMask
         if scoreExposure is not None:
             # The preconvolution kernel is normalized to 1, so the same
             # background level applies to the difference and score images.

@@ -1319,6 +1319,36 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         _run_and_check_detections(positive=True)
         _run_and_check_detections(positive=False)
 
+    def test_background_detection_mask_not_kept(self):
+        """The detection masks of the difference image should match those of
+        the score image, without the detections used to fit the background.
+        """
+        kwargs = {"seed": 1, "psfSize": 2.4, "fluxLevel": 500, "kernelSize": 31,
+                  "templateBorderSize": 15}
+        science, sources = makeTestImage(noiseLevel=1., noiseSeed=6, **kwargs)
+        matchedTemplate, _ = makeTestImage(noiseLevel=0.25, noiseSeed=7, **kwargs)
+        difference = science.clone()
+        # Small-scale structure that the first-pass background fit removes
+        # but the final fit does not, so the two passes detect different
+        # pixels.
+        difference.image.array += 0.3*np.sin(np.arange(difference.getWidth())/20.)
+        subtractTask = subtractImages.AlardLuptonPreconvolveSubtractTask()
+        score = subtractTask._convolveExposure(difference, science.psf.getKernel(),
+                                               subtractTask.convolutionControl)
+        detectionTask = self._setup_detection(doSubtractBackground=True, doSkySources=False,
+                                              badSubtractionRatioThreshold=1.)
+
+        output = detectionTask.run(science, matchedTemplate, difference, score, sources)
+
+        differenceMask = output.subtractedMeasuredExposure.mask
+        scoreMask = output.scoreMeasuredExposure.mask
+        for plane in ("DETECTED", "DETECTED_NEGATIVE"):
+            with self.subTest(plane=plane):
+                differencePix = differenceMask.array & differenceMask.getPlaneBitMask(plane) > 0
+                scorePix = scoreMask.array & scoreMask.getPlaneBitMask(plane) > 0
+                self.assertGreater(scorePix.sum(), 0)
+                np.testing.assert_array_equal(differencePix, scorePix)
+
     def test_mask_cosmic_rays(self):
         """Cosmic rays detected on the difference image should propagate
         to the mask of the returned (measured) exposure. This version creates
