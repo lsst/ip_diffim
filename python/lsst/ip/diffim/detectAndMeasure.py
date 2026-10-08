@@ -184,7 +184,9 @@ class DetectAndMeasureConnections(pipeBase.PipelineTaskConnections,
             self.inputs.remove("kernelSources")
         if not (self.config.writeStreakInfo and self.config.doMaskStreaks):
             self.outputs.remove("maskedStreaks")
-        if not (self.config.doSubtractBackground and self.config.doWriteBackground):
+        # In future mode the background is recorded on the output images.
+        if (self.config.image_type == "future"
+                or not (self.config.doSubtractBackground and self.config.doWriteBackground)):
             self.outputs.remove("differenceBackground")
         if not (self.config.writeGlintInfo):
             self.outputs.remove("glintTrailInfo")
@@ -221,8 +223,11 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
     )
     doWriteBackground = pexConfig.Field(
         dtype=bool,
-        doc="Persist the fitted background model?",
+        doc="Persist the fitted background model? Ignored when"
+        " image_type='future', which records it on the output images.",
         default=False,
+        deprecated="Use image_type='future', which records the background on the output images."
+        " Will be removed after v31.",
     )
     doCalculateResidualMetics = pexConfig.Field(
         dtype=bool,

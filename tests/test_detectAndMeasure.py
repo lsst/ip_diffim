@@ -1796,7 +1796,7 @@ class DetectAndMeasureOutputFormatTest(DetectAndMeasureTestBase, lsst.utils.test
 
     def test_connections(self):
         """Check that the output storage classes follow ``image_type``,
-        and that the background output is kept in both modes.
+        and that the background is a separate output only in legacy mode.
         """
         for configClass, connectionsClass in (
             (detectAndMeasure.DetectAndMeasureConfig, detectAndMeasure.DetectAndMeasureConnections),
@@ -1808,14 +1808,18 @@ class DetectAndMeasureOutputFormatTest(DetectAndMeasureTestBase, lsst.utils.test
                     config = configClass()
                     config.image_type = imageType
                     config.doSubtractBackground = True
-                    config.doWriteBackground = True
+                    with self.assertWarns(FutureWarning):
+                        config.doWriteBackground = True
                     connections = connectionsClass(config=config)
                     self.assertEqual(connections.subtractedMeasuredExposure.storageClass, storageClass)
                     if connectionsClass is detectAndMeasure.DetectAndMeasureScoreConnections:
                         self.assertEqual(connections.scoreMeasuredExposure.storageClass, storageClass)
-                    # The background is a separate dataset in both modes.
-                    self.assertIn("differenceBackground", connections.outputs)
-                    self.assertEqual(connections.differenceBackground.storageClass, "Background")
+                    if imageType == "legacy":
+                        self.assertIn("differenceBackground", connections.outputs)
+                        self.assertEqual(connections.differenceBackground.storageClass, "Background")
+                    else:
+                        # The background is recorded on the output images.
+                        self.assertNotIn("differenceBackground", connections.outputs)
 
     def test_run_returns_legacy_types(self):
         """``run`` always returns legacy types, even in future mode."""
@@ -1962,8 +1966,11 @@ class DetectAndMeasureOutputFormatTest(DetectAndMeasureTestBase, lsst.utils.test
                                 _FakeRefs())
                 out = butlerQC.put_values.subtractedMeasuredExposure
                 self.assertIsInstance(out, expectedType)
-                # The background is a separate dataset in both modes.
-                self.assertIsInstance(butlerQC.put_values.differenceBackground, afwMath.BackgroundList)
+                if imageType == "legacy":
+                    self.assertIsInstance(butlerQC.put_values.differenceBackground,
+                                          afwMath.BackgroundList)
+                else:
+                    self.assertIsNotNone(out.backgrounds.subtracted)
                 if imageType == "future":
                     # The provenance of the image this was measured from
                     # survives, rather than being worked out again.
