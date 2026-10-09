@@ -19,6 +19,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import dataclasses
+
 from astropy import units as u
 from astropy.stats import gaussian_fwhm_to_sigma
 import numpy as np
@@ -27,9 +29,12 @@ import lsst.afw.detection as afwDetection
 import lsst.afw.image
 import lsst.afw.math
 import lsst.geom
+from lsst.images import DifferenceImage
+from lsst.images.convolution_kernels import ImageBasisConvolutionKernel
 from lsst.ip.diffim.utils import (evaluateMeanPsfFwhm, getPsfFwhm,
                                   computeDifferenceImageMetrics, computePSFNoiseEquivalentArea,
-                                  checkMask, setSourceFootprints)
+                                  checkMask, record_from_obs_info, setSourceFootprints,
+                                  get_difference_image_provenance)
 from lsst.meas.algorithms import ScaleVarianceTask, ScienceSourceSelectorTask
 import lsst.pex.config
 import lsst.pipe.base
@@ -69,13 +74,17 @@ class SubtractInputConnections(lsst.pipe.base.PipelineTaskConnections,
                                dimensions=_dimensions,
                                defaultTemplates=_defaultTemplates):
     template = connectionTypes.Input(
-        doc="Input warped template to subtract.",
+        doc="Input warped template to subtract."
+        " With image_type='future' this is read as a lsst.images.DifferenceImage, so that the"
+        " record of the coadds that went into it can be passed on to the outputs.",
         dimensions=("instrument", "visit", "detector"),
         storageClass="ExposureF",
         name="{fakesType}{coaddName}Diff_templateExp"
     )
     science = connectionTypes.Input(
-        doc="Input science exposure to subtract from.",
+        doc="Input science exposure to subtract from."
+        " With image_type='future' this is read as a lsst.images.VisitImage, so that its"
+        " photometric scaling can be passed on to the outputs.",
         dimensions=("instrument", "visit", "detector"),
         storageClass="ExposureF",
         name="{fakesType}calexp"
@@ -100,6 +109,9 @@ class SubtractInputConnections(lsst.pipe.base.PipelineTaskConnections,
         super().__init__(config=config)
         if not config.doApplyExternalCalibrations:
             del self.visitSummary
+        if config.image_type == "future":
+            self.template = dataclasses.replace(self.template, storageClass="DifferenceImage")
+            self.science = dataclasses.replace(self.science, storageClass="VisitImage")
 
 
 class SubtractImageOutputConnections(lsst.pipe.base.PipelineTaskConnections,
@@ -130,6 +142,15 @@ class SubtractImageOutputConnections(lsst.pipe.base.PipelineTaskConnections,
         name="{fakesType}{coaddName}Diff_psfMatchSources"
     )
 
+    def __init__(self, *, config=None):
+        super().__init__(config=config)
+        if config.image_type == "future":
+            self.difference = dataclasses.replace(self.difference, storageClass="DifferenceImage")
+            self.matchedTemplate = dataclasses.replace(self.matchedTemplate,
+                                                       storageClass="DifferenceImage")
+            self.psfMatchingKernel = dataclasses.replace(self.psfMatchingKernel,
+                                                         storageClass="ConvolutionKernel")
+
 
 class SubtractScoreOutputConnections(lsst.pipe.base.PipelineTaskConnections,
                                      dimensions=_dimensions,
@@ -153,6 +174,13 @@ class SubtractScoreOutputConnections(lsst.pipe.base.PipelineTaskConnections,
         name="{fakesType}{coaddName}Diff_psfScoreMatchSources"
     )
 
+    def __init__(self, *, config=None):
+        super().__init__(config=config)
+        if config.image_type == "future":
+            self.scoreExposure = dataclasses.replace(self.scoreExposure, storageClass="DifferenceImage")
+            self.psfMatchingKernel = dataclasses.replace(self.psfMatchingKernel,
+                                                         storageClass="ConvolutionKernel")
+
 
 class AlardLuptonSubtractConnections(SubtractInputConnections, SubtractImageOutputConnections):
     pass
@@ -172,6 +200,9 @@ class SimplifiedSubtractConnections(SubtractInputConnections, SubtractImageOutpu
         if config.useExistingKernel:
             del self.psfMatchingKernel
             del self.kernelSources
+            if config.image_type == "future":
+                self.inputPsfMatchingKernel = dataclasses.replace(self.inputPsfMatchingKernel,
+                                                                  storageClass="ConvolutionKernel")
         else:
             del self.inputPsfMatchingKernel
 
@@ -219,6 +250,7 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
         "It is generally better to instead subtract the background in detectAndMeasure.",
         dtype=bool,
         default=False,
+        deprecated="Subtract the background in detectAndMeasure instead. Will be removed after v31.",
     )
     doApplyExternalCalibrations = lsst.pex.config.Field(
         doc=(
@@ -302,6 +334,19 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
         doc="Re-run source detection for kernel candidates if an error is"
         " encountered while calculating the matching kernel."
     )
+    image_type = lsst.pex.config.ChoiceField[str](
+        doc="Image type of the input template, the image outputs of this"
+        " task (difference and matchedTemplate, or scoreExposure), and the PSF"
+        " matching kernel.",
+        allowed={
+            "legacy": "Read and write lsst.afw.image.ExposureF and"
+                      " lsst.afw.math.Kernel.",
+            "future": "Read and write lsst.images.DifferenceImage and"
+                      " lsst.images.convolution_kernels.ConvolutionKernel.",
+        },
+        optional=False,
+        default="legacy",
+    )
 
     def setDefaults(self):
         self.makeKernel.kernel.name = "AL"
@@ -334,6 +379,15 @@ class AlardLuptonSubtractBaseConfig(lsst.pex.config.Config):
         self.fallbackSourceSelector.signalToNoise.minimum = signalToNoiseMinimum
         self.fallbackSourceSelector.signalToNoise.maximum = signalToNoiseMaximum
 
+    def validate(self):
+        super().validate()
+        if self.doSubtractBackground and self.image_type == "future":
+            raise lsst.pex.config.FieldValidationError(
+                AlardLuptonSubtractBaseConfig.doSubtractBackground, self,
+                "The background subtracted when solving the kernel is not recorded on"
+                " image_type='future' outputs; subtract the background in detectAndMeasure instead."
+            )
+
 
 class AlardLuptonSubtractConfig(AlardLuptonSubtractBaseConfig, lsst.pipe.base.PipelineTaskConfig,
                                 pipelineConnections=AlardLuptonSubtractConnections):
@@ -357,6 +411,11 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
     """Whether this task preconvolves the science image with its own PSF
     before kernel-matching. Subclasses that preconvolve override this to
     `True`."""
+
+    futureImageOutputs = ("difference", "matchedTemplate")
+    """Names of the images in the results struct that are converted in future
+    mode (`tuple` [`str`]). Subclasses with different image outputs override
+    this."""
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -416,15 +475,106 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
 
     def runQuantum(self, butlerQC, inputRefs, outputRefs):
         inputs = butlerQC.get(inputRefs)
+        templateInfo = None
+        exposureRecord = None
+        photometricScaling = None
+        if self.config.image_type == "future":
+            template = inputs["template"]
+            dataId = butlerQC.quantum.dataId
+            # Read the `TemplateInfo` and the observation metadata from the
+            # template while it is still in the `DifferenceImage` format.
+            templateInfo = get_difference_image_provenance(template, "templates", "template", dataId)
+            exposureRecord = record_from_obs_info(template.obs_info, dataId["instrument"],
+                                                  dataId["visit"], dataId.universe)
+            inputs["template"] = template.to_legacy()
+            photometricScaling = inputs["science"].photometric_scaling
+            inputs["science"] = inputs["science"].to_legacy()
+            if "inputPsfMatchingKernel" in inputs:
+                inputs["inputPsfMatchingKernel"] = inputs["inputPsfMatchingKernel"].to_legacy()
 
         try:
             results = self.run(**inputs)
         except lsst.pipe.base.AlgorithmError as e:
             error = lsst.pipe.base.AnnotatedPartialOutputsError.annotate(e, self, log=self.log)
-            # No partial outputs for butler to put
+            # No partial outputs for butler to put, so nothing to convert.
             raise error from e
 
+        if self.config.image_type == "future":
+            self.convert_outputs_to_future(results, exposureRecord, templateInfo=templateInfo,
+                                           photometricScaling=photometricScaling)
+
         butlerQC.put(results, outputRefs)
+
+    def convert_outputs_to_future(self, results, exposureRecord, templateInfo=None,
+                                  photometricScaling=None):
+        """Convert the image outputs to `lsst.images` types.
+
+        Each image named in `futureImageOutputs` that is present on
+        ``results`` is replaced by an `lsst.images.DifferenceImage`, with the
+        PSF matching kernel attached to it. ``psfMatchingKernel`` is replaced
+        by the same kernel as an
+        `lsst.images.convolution_kernels.ImageBasisConvolutionKernel`.
+
+        Parameters
+        ----------
+        results : `lsst.pipe.base.Struct`
+            Output struct to read and modify in place.
+        exposureRecord : `lsst.daf.butler.DimensionRecord`
+            The ``exposure`` record of the observation, which supplies the
+            observation metadata recorded on each converted output.
+        templateInfo : `list` [`lsst.images.DifferenceImageTemplateInfo`], \
+                optional
+            Record of the coadds that went into the template, taken from the
+            template this task subtracted.
+        photometricScaling : `lsst.images.fields.BaseField`, optional
+            Photometric scaling of the science image.
+
+        Raises
+        ------
+        TypeError
+            Raised if the PSF matching kernel cannot be stored on an
+            `lsst.images.DifferenceImage`.
+        RuntimeError
+            Raised if an output has pixels set in a mask plane that
+            `lsst.images.get_legacy_difference_image_mask_planes` does not
+            map.
+
+        Notes
+        -----
+        This uses the default legacy mask plane map of
+        `lsst.images.get_legacy_difference_image_mask_planes` and adds any
+        planes from `~lsst.images.get_legacy_optional_mask_planes` that are set
+        for any pixels in the image.
+        """
+        # The science image and every output built from it share the science
+        # pixel grid, so its detector applies to all of them.
+        science = results.matchedScience
+        try:
+            kernel = ImageBasisConvolutionKernel.from_legacy(results.psfMatchingKernel)
+        except (TypeError, ValueError, AttributeError) as e:
+            raise TypeError("The supplied PSF matching kernel cannot be attached to an"
+                            f" lsst.images.DifferenceImage: {e}") from e
+        for name in self.futureImageOutputs:
+            exposure = getattr(results, name, None)
+            if exposure is None:
+                continue
+            if exposure.getDetector() is None:
+                # Fall back on the science detector for images without a
+                # detector of their own (e.g. matchedTemplate)
+                exposure.setDetector(science.getDetector())
+            image = DifferenceImage.from_legacy(
+                exposure,
+                unit=u.nJy,
+                exposure_record=exposureRecord,
+            )
+            if kernel is not None:
+                image.kernel = kernel
+            if templateInfo:
+                image.templates = templateInfo
+            if photometricScaling is not None:
+                image.photometric_scaling = photometricScaling
+            setattr(results, name, image)
+        results.psfMatchingKernel = kernel
 
     @timeMethod
     def run(self, template, science, sources, visitSummary=None):
@@ -1137,10 +1287,15 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         # the `renameTemplateMask` config will be copied to new planes with
         # "_TEMPLATE" appended to their names, and the original mask plane will
         # be cleared.
-        clearMaskPlanes = [mp for mp in template.mask.getMaskPlaneDict().keys()
-                           if mp not in self.config.preserveTemplateMask]
         renameMaskPlanes = [mp for mp in self.config.renameTemplateMask
                             if mp in template.mask.getMaskPlaneDict().keys()]
+        # afw's mask planes are global, so if the "*_TEMPLATE" mask planes were
+        # defined anywhere previously they would now also be cleared unless we
+        # exclude them.
+        renamedMaskPlanes = {maskPlane + "_TEMPLATE" for maskPlane in renameMaskPlanes}
+        clearMaskPlanes = [mp for mp in template.mask.getMaskPlaneDict().keys()
+                           if mp not in self.config.preserveTemplateMask
+                           and mp not in renamedMaskPlanes]
 
         # propagate the mask plane related to Fake source injection
         # NOTE: the fake source injection sets FAKE plane, but it should be INJECTED
@@ -1215,6 +1370,9 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
     ConfigClass = AlardLuptonPreconvolveSubtractConfig
     _DefaultName = "alardLuptonPreconvolveSubtract"
     usePreconvolution = True
+    # This task just writes the score image instead of the difference image and
+    # matchedTemplate
+    futureImageOutputs = ("scoreExposure",)
 
     def run(self, template, science, sources, visitSummary=None):
         """Preconvolve the science image with its own PSF,

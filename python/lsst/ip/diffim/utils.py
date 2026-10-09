@@ -24,6 +24,7 @@
 
 __all__ = ["evaluateMeanPsfFwhm", "getPsfFwhm", "getKernelCenterDisplacement",
            "computeDifferenceImageMetrics", "checkMask", "setSourceFootprints",
+           "record_from_obs_info", "get_difference_image_provenance",
            ]
 
 import itertools
@@ -31,11 +32,13 @@ import os
 import requests
 
 from astropy.stats import gaussian_sigma_to_fwhm
+import astropy.units as u
 import numpy as np
 
 import lsst.afw.detection as afwDetection
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
+from lsst.daf.butler import Timespan
 import lsst.geom as geom
 from lsst.pex.exceptions import InvalidParameterError, RangeError
 import lsst.pipe.base
@@ -43,6 +46,106 @@ from lsst.utils.logging import getLogger
 
 
 _LOG = getLogger(__name__)
+
+
+def record_from_obs_info(obs_info, instrument, visit, universe):
+    """Build an ``exposure`` dimension record from an observation info.
+
+    Parameters
+    ----------
+    obs_info : `astro_metadata_translator.ObservationInfo`
+        Observation info of an image that the image to be converted is
+        derived from.
+    instrument : `str`
+        Name of the instrument, usually from the quantum data ID.
+    visit : `int`
+        Id of the visit, usually from the quantum data ID. It is also used
+        as the id of the exposure.
+    universe : `lsst.daf.butler.DimensionUniverse`
+        Dimension universe that defines the record's schema, usually
+        ``butlerQC.quantum.dataId.universe``.
+
+    Returns
+    -------
+    record : `lsst.daf.butler.DimensionRecord`
+        An ``exposure`` record holding the fields that `lsst.images` reads
+        when it converts a legacy image. Fields it does not read, such as
+        ``dark_time`` and ``target_name``, are `None`.
+
+    Raises
+    ------
+    ValueError
+        Raised if ``obs_info`` is `None`, which means the image it came from
+        was not in an `lsst.images` format.
+
+    Notes
+    -----
+    The instrument and the visit are passed separately because an
+    observation info does not carry them in the form the conversion needs:
+    its ``instrument`` is read from the legacy FITS header rather than from
+    the record, and its ``exposure_id`` is the id that the visit info held.
+    """
+    if obs_info is None:
+        raise ValueError("Cannot rebuild an exposure record without an observation info.")
+    azimuth = zenithAngle = None
+    if obs_info.altaz_begin is not None:
+        azimuth = obs_info.altaz_begin.az.deg
+        zenithAngle = 90.0 - obs_info.altaz_begin.alt.deg
+    exposureTime = obs_info.exposure_time_requested
+    return universe["exposure"].RecordClass(
+        instrument=instrument,
+        id=visit,
+        obs_id=obs_info.observation_id,
+        group=obs_info.exposure_group,
+        day_obs=obs_info.observing_day,
+        physical_filter=obs_info.physical_filter,
+        exposure_time=None if exposureTime is None else exposureTime.to_value(u.s),
+        seq_num=obs_info.observation_counter,
+        seq_start=obs_info.group_counter_start,
+        seq_end=obs_info.group_counter_end,
+        can_see_sky=obs_info.can_see_sky,
+        azimuth=azimuth,
+        zenith_angle=zenithAngle,
+        timespan=Timespan(begin=obs_info.datetime_begin, end=obs_info.datetime_end),
+    )
+
+
+def get_difference_image_provenance(image, attribute, connection, dataId):
+    """Get the PSF matching kernel or the template records of an input
+    difference image.
+
+    Parameters
+    ----------
+    image : `lsst.images.DifferenceImage`
+        Input image read by a task in future mode.
+    attribute : {"kernel", "templates"}
+        Name of the attribute to get.
+    connection : `str`
+        Name of the input connection the image was read from.
+    dataId : `lsst.daf.butler.DataCoordinate`
+        Data ID of the quantum, for the error message.
+
+    Returns
+    -------
+    value : `lsst.images.convolution_kernels.ConvolutionKernel` or \
+            `list` [`lsst.images.DifferenceImageTemplateInfo`]
+        Value of the attribute.
+
+    Raises
+    ------
+    lsst.pipe.base.InvalidQuantumError
+        Raised if the image does not have the attribute, which happens when
+        the input was written as a legacy Exposure and converted on read.
+    """
+    try:
+        return getattr(image, attribute)
+    except AttributeError as e:
+        what = "PSF matching kernel" if attribute == "kernel" else "template coadd records"
+        raise lsst.pipe.base.InvalidQuantumError(
+            f"Input {connection!r} for {dataId} has no {what}, which is required for image_type='future'."
+            " This is likely due to reading a legacy Exposure, which lacks this component. To fix,"
+            " reprocess this image starting from `getTemplate`."
+        ) from e
 
 
 def getKernelCenterDisplacement(kernel, x, y, image=None):
