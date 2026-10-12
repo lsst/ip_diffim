@@ -36,7 +36,7 @@ Use a local version of the AP pipeline configuration to run the pipeline by reus
       rewarpTemplate:
         class: lsst.ip.diffim.getTemplate.GetTemplateTask
         config:
-          connections.bbox: preliminary_visit_image.bbox
+          connections.detector: preliminary_visit_image.detector
           connections.wcs: preliminary_visit_image.wcs
           connections.coaddExposures: template_coadd
           connections.template: template_detector
@@ -77,7 +77,7 @@ Alternatively, the pipeline can compute the PSF matching kernel internally by pe
       rewarpTemplate:
         class: lsst.ip.diffim.getTemplate.GetTemplateTask
         config:
-          connections.bbox: preliminary_visit_image.bbox
+          connections.detector: preliminary_visit_image.detector
           connections.wcs: preliminary_visit_image.wcs
           connections.coaddExposures: template_coadd
           connections.template: template_detector
