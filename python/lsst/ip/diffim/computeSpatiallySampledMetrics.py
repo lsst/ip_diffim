@@ -86,6 +86,9 @@ class SpatiallySampledMetricsConnections(pipeBase.PipelineTaskConnections,
     def __init__(self, *, config=None):
         super().__init__(config=config)
         if config.image_type == "future":
+            self.science = dataclasses.replace(self.science, storageClass="VisitImage")
+            self.template = dataclasses.replace(self.template, storageClass="DifferenceImage")
+            self.difference = dataclasses.replace(self.difference, storageClass="DifferenceImage")
             self.psfMatchingKernel = dataclasses.replace(self.psfMatchingKernel,
                                                          storageClass="ConvolutionKernel")
 
@@ -109,11 +112,13 @@ class SpatiallySampledMetricsConfig(pipeBase.PipelineTaskConfig,
         doc="Generate QA metric sources",
     )
     image_type = pexConfig.ChoiceField[str](
-        doc="Type of the input PSF matching kernel. The input images are read"
-        " as lsst.afw.image.ExposureF either way.",
+        doc="Type of the input images and PSF matching kernel. run() takes the"
+        " legacy types either way.",
         allowed={
-            "legacy": "Read lsst.afw.math.Kernel.",
-            "future": "Read lsst.images.convolution_kernels.ConvolutionKernel.",
+            "legacy": "Read lsst.afw.image.ExposureF and lsst.afw.math.Kernel.",
+            "future": "Read lsst.images.VisitImage for the science image,"
+                      " lsst.images.DifferenceImage for the template and difference"
+                      " image, and lsst.images.convolution_kernels.ConvolutionKernel.",
         },
         optional=False,
         default="legacy",
@@ -237,6 +242,9 @@ class SpatiallySampledMetricsTask(lsst.pipe.base.PipelineTask):
     def runQuantum(self, butlerQC, inputRefs, outputRefs):
         inputs = butlerQC.get(inputRefs)
         if self.config.image_type == "future":
+            inputs["science"] = inputs["science"].to_legacy()
+            inputs["template"] = inputs["template"].to_legacy()
+            inputs["difference"] = inputs["difference"].to_legacy()
             inputs["psfMatchingKernel"] = inputs["psfMatchingKernel"].to_legacy()
         outputs = self.run(**inputs)
         butlerQC.put(outputs, outputRefs)

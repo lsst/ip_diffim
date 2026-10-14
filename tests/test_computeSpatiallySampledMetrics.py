@@ -22,15 +22,19 @@
 import types
 import unittest
 
+import astropy.units as u
 import numpy as np
 
+import lsst.afw.cameraGeom.testUtils
 import lsst.afw.image
 import lsst.afw.table
+from lsst.daf.butler import DimensionUniverse
 import lsst.ip.diffim
 import lsst.utils.tests
+from lsst.images import DifferenceImage, VisitImage
 from lsst.images.convolution_kernels import ImageBasisConvolutionKernel
 
-from utils import makeTestImage
+from utils import makeTestExposureRecord, makeTestImage, makeTestVisitInfo
 
 
 class ComputeSpatiallySampledMetricsTest(lsst.utils.tests.TestCase):
@@ -92,40 +96,64 @@ class ComputeSpatiallySampledMetricsTest(lsst.utils.tests.TestCase):
         self.assertTrue(np.all(np.isfinite(metrics[f"{present.lower()}_mask_fraction"])))
 
     def testConnections(self):
-        """``image_type`` sets the storage class of the kernel input only."""
-        for imageType, kernelStorageClass in (("legacy", "MatchingKernel"),
-                                              ("future", "ConvolutionKernel")):
+        """``image_type`` sets the storage class of the image and kernel
+        inputs.
+        """
+        expected = {
+            "legacy": {"science": "ExposureF", "template": "ExposureF", "difference": "ExposureF",
+                       "psfMatchingKernel": "MatchingKernel"},
+            "future": {"science": "VisitImage", "template": "DifferenceImage",
+                       "difference": "DifferenceImage", "psfMatchingKernel": "ConvolutionKernel"},
+        }
+        for imageType, storageClasses in expected.items():
             with self.subTest(imageType=imageType):
                 config = lsst.ip.diffim.SpatiallySampledMetricsTask.ConfigClass()
                 config.image_type = imageType
                 connections = config.ConnectionsClass(config=config)
-                self.assertEqual(connections.psfMatchingKernel.storageClass, kernelStorageClass)
-                for name in ("science", "template", "difference"):
-                    self.assertEqual(getattr(connections, name).storageClass, "ExposureF")
+                for name, storageClass in storageClasses.items():
+                    self.assertEqual(getattr(connections, name).storageClass, storageClass)
+
+    def _makeFutureInputs(self):
+        """Convert the images and kernel made in `setUp` to the types the
+        ``future`` mode reads.
+
+        Returns
+        -------
+        inputs : `dict` [`str`, `object`]
+            The converted inputs, keyed by connection name.
+        """
+        detector = list(lsst.afw.cameraGeom.testUtils.CameraWrapper().camera)[0]
+        visit = 12345
+        exposureRecord = makeTestExposureRecord(DimensionUniverse(), visit=visit)
+        inputs = {}
+        for name, imageType in (("science", VisitImage), ("template", DifferenceImage),
+                                ("difference", DifferenceImage)):
+            exposure = getattr(self, name).clone()
+            exposure.setDetector(detector)
+            exposure.info.setVisitInfo(makeTestVisitInfo(visit))
+            inputs[name] = imageType.from_legacy(exposure, unit=u.nJy, exposure_record=exposureRecord)
+        inputs["psfMatchingKernel"] = ImageBasisConvolutionKernel.from_legacy(self.psfMatchingKernel)
+        return inputs
 
     def testRunQuantumFuture(self):
-        """``runQuantum`` converts a future kernel back to the legacy type,
+        """``runQuantum`` converts the future inputs back to the legacy types,
         giving the same metrics as a legacy run.
         """
-        inputs = {"science": self.science, "template": self.template, "difference": self.difference,
-                  "diaSources": self.diaSources}
+        legacyInputs = {"science": self.science, "template": self.template, "difference": self.difference,
+                        "psfMatchingKernel": self.psfMatchingKernel}
         metrics = {}
-        for imageType, kernel in (
-            ("legacy", self.psfMatchingKernel),
-            ("future", ImageBasisConvolutionKernel.from_legacy(self.psfMatchingKernel)),
-        ):
+        for imageType, inputs in (("legacy", legacyInputs), ("future", self._makeFutureInputs())):
             config = lsst.ip.diffim.SpatiallySampledMetricsTask.ConfigClass()
             config.image_type = imageType
             task = lsst.ip.diffim.SpatiallySampledMetricsTask(config=config)
             butlerQC = _RecordingQuantumContext()
-            task.runQuantum(butlerQC, types.SimpleNamespace(**inputs, psfMatchingKernel=kernel), None)
+            task.runQuantum(butlerQC, types.SimpleNamespace(**inputs, diaSources=self.diaSources), None)
             metrics[imageType] = butlerQC.put_values.spatiallySampledMetrics
 
         self.assertGreater(len(metrics["legacy"]), 0)
-        for name in ("psfMatchingKernel_sum", "psfMatchingKernel_dx", "psfMatchingKernel_dy",
-                     "psfMatchingKernel_residualNorm"):
-            np.testing.assert_allclose(metrics["future"][name], metrics["legacy"][name],
-                                       rtol=1e-6, err_msg=name)
+        self.assertEqual(metrics["future"].colnames, metrics["legacy"].colnames)
+        for name in metrics["legacy"].colnames:
+            np.testing.assert_array_equal(metrics["future"][name], metrics["legacy"][name], err_msg=name)
 
 
 class _RecordingQuantumContext:
