@@ -437,16 +437,16 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         # in the template are closer to the original anymore.
         self.assertTrue(np.isfinite(result.template.image.array).all())
 
-    def _runCorrection(self, doCorrectVariancePlateScale=False, doScaleVariance=False,
-                       handles=None, instrument=None):
-        """Run the task on tract 0 with the named variance corrections.
+    def _runCorrection(self, handles=None, instrument="SciCam"):
+        """Run the task on tract 0, with a science image from ``instrument``
+        and variance scaling turned off.
 
-        Everything defaults to off, so each test turns on exactly what it is
-        exercising.
+        The plate scale correction is applied only when ``instrument`` is not
+        the instrument of the template coadds, which is ``"TestCam"`` unless
+        ``handles`` says otherwise.
         """
         config = lsst.ip.diffim.GetTemplateTask.ConfigClass()
-        config.doCorrectVariancePlateScale = doCorrectVariancePlateScale
-        config.doScaleVariance = doScaleVariance
+        config.doScaleVariance = False
         task = lsst.ip.diffim.GetTemplateTask(config=config)
         result = task.run(coaddExposureHandles={0: handles or self.patches[0]},
                           bbox=lsst.geom.Box2I(self.varianceBox),
@@ -513,11 +513,15 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         """The plate scale correction is the total pixel area change from the
         images the coadds were built from to the science image.
         """
-        _, off = self._runCorrection()
+        # The science image and the coadds are from the same instrument, so
+        # the factor is 1 without reading any coadd inputs.
+        task, off = self._runCorrection(instrument="TestCam")
+        self.assertEqual(task.metadata["variancePlateScaleFactor"], 1.0)
+        self.assertNotIn("templateVarianceCorrectionFactor", task.metadata)
 
         # The fixture's records are the science image itself, so there is no
-        # net change in pixel area: the same-instrument case.
-        task, on = self._runCorrection(doCorrectVariancePlateScale=True)
+        # net change in pixel area even when the instruments differ.
+        task, on = self._runCorrection()
         self.assertFloatsAlmostEqual(task.metadata["variancePlateScaleFactor"], 1.0, rtol=1e-6)
 
         # Coarser original pixels than science pixels, the DECam-template
@@ -526,8 +530,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
             with self.subTest(scaleFactor=scaleFactor):
                 handles = self._patchHandles(
                     0, [(self._makeScaledWcs(scaleFactor), self.exposure.getBBox())])
-                task, on = self._runCorrection(doCorrectVariancePlateScale=True,
-                                               handles=handles)
+                task, on = self._runCorrection(handles=handles)
                 factor = task.metadata["variancePlateScaleFactor"]
                 self.assertFloatsAlmostEqual(factor, scaleFactor**2, rtol=1e-6)
                 self.assertFloatsAlmostEqual(on.variance.array, off.variance.array*factor,
@@ -544,7 +547,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
             0, [(None, self.exposure.getBBox()),
                 (self._makeScaledWcs(2.0), self.exposure.getBBox()),
                 (self.exposure.wcs, self.exposure.getBBox())])
-        task, _ = self._runCorrection(doCorrectVariancePlateScale=True, handles=handles)
+        task, _ = self._runCorrection(handles=handles)
 
         # The first record with a WCS: the one without is skipped, and the
         # last (which would give 1.0) is never reached.
@@ -557,34 +560,31 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         bbox = self.exposure.getBBox()
         handles = (self._patchHandles(0, [(self._makeScaledWcs(2.0), bbox)], instrument="OtherCam")[:1]
                    + self._patchHandles(0, [(self._makeScaledWcs(1.315), bbox)])[1:])
-        task, _ = self._runCorrection(doCorrectVariancePlateScale=True, handles=handles,
-                                      instrument="TestCam")
+        task, _ = self._runCorrection(handles=handles)
         self.assertFloatsAlmostEqual(task.metadata["variancePlateScaleFactor"], 1.315**2, rtol=1e-6)
 
     def testCorrectVariancePlateScaleNextTract(self):
         """If the first coadd kept in a tract cannot give the plate scale, the
         first coadd kept in the next tract is used.
         """
-        config = lsst.ip.diffim.GetTemplateTask.ConfigClass()
-        config.doCorrectVariancePlateScale = True
-        task = lsst.ip.diffim.GetTemplateTask(config=config)
+        task = lsst.ip.diffim.GetTemplateTask()
         handles = {0: self._patchHandles(0, []),
                    1: self._patchHandles(1, [(self._makeScaledWcs(1.315), self.exposure.getBBox())])}
         task.run(coaddExposureHandles=handles,
                  bbox=lsst.geom.Box2I(self.varianceBox),
                  wcs=self.exposure.wcs,
                  dataIds={0: self.dataIds[0], 1: self.dataIds[1]},
-                 physical_filter="a_test")
+                 physical_filter="a_test",
+                 instrument="SciCam")
         self.assertFloatsAlmostEqual(task.metadata["variancePlateScaleFactor"], 1.315**2, rtol=1e-6)
 
     def testCorrectVariancePlateScaleNeedsCoaddInputs(self):
         """Without usable coadd inputs the plate scale cannot be
-        reconstructed, and the task must say so rather than silently applying
-        only part of the correction.
+        reconstructed, so the template cannot be built.
         """
         handles = self._patchHandles(0, [])
-        with self.assertRaisesRegex(RuntimeError, "doCorrectVariancePlateScale"):
-            self._runCorrection(doCorrectVariancePlateScale=True, handles=handles)
+        with self.assertRaisesRegex(RuntimeError, "cannot be corrected for the change in pixel area"):
+            self._runCorrection(handles=handles)
 
     def _runTract0(self, handles):
         """Build a template from the given tract 0 patch handles.

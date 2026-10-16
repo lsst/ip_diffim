@@ -149,16 +149,6 @@ class GetTemplateConfig(
         dtype=afwMath.Warper.ConfigClass,
         doc="warper configuration",
     )
-    doCorrectVariancePlateScale = pexConfig.Field(
-        dtype=bool,
-        default=False,
-        doc="Correct the template variance for the total change in pixel"
-        " area between the images the coadds were built from and the science"
-        " image? This matters when the two have different plate scales, such"
-        " as DECam templates used for Rubin science images. The coadd pixel"
-        " grid cancels out of the total, so the skymap does not enter. It is a"
-        " single scalar factor, applied to the final template variance plane.",
-    )
     coaddPsf = pexConfig.ConfigField(
         doc="Configuration for CoaddPsf",
         dtype=CoaddPsfConfig,
@@ -549,6 +539,10 @@ class GetTemplateTask(pipeBase.PipelineTask):
         ------
         NoWorkFound
             If no coadds are found with sufficient un-masked pixels.
+        RuntimeError
+            If the template is not known to be from the science image's
+            instrument and no coadd records the plate scale of its input
+            images, so the template variance cannot be corrected.
         """
         band, photoCalib, templateInstrument = self._checkInputs(dataIds, coaddExposureHandles, instrument)
 
@@ -557,22 +551,21 @@ class GetTemplateTask(pipeBase.PipelineTask):
 
         warped = {}
         catalogs = []
-        plateScaleFactor = None
+        plateScaleFactor = 1.0 if instrument == templateInstrument else None
 
         for tract in coaddExposureHandles:
             maskedImages, catalog, totalBox, coaddInputs = self._makeExposureCatalog(
                 coaddExposureHandles[tract], dataIds[tract], templateInstrument
             )
-            # Determine the ratio of the original pixel area to the pixel area
-            # of the science image, if configured. This will only be different
-            # from 1 if the coadd was from a different instrument. One coadd
-            # stands for all of them; if the first coadd kept in this tract
-            # cannot give the ratio, the next tract is tried.
-            if self.config.doCorrectVariancePlateScale and plateScaleFactor is None:
-                plateScaleFactor = self._plateScaleFactor(coaddInputs, wcs, bbox)
             if len(catalog) == 0:
-                # Every coadd in this tract was from another instrument.
+                # Every coadd in this tract was dropped for its instrument.
                 continue
+            # Determine the ratio of the original pixel area to the pixel area
+            # of the science image. This will only be different from 1 if the
+            # coadd was from a different instrument. A single correction factor
+            # is calculated from the first usable coadd and applied to all.
+            if plateScaleFactor is None:
+                plateScaleFactor = self._plateScaleFactor(coaddInputs, wcs, bbox)
             warpedBox = computeWarpedBBox(catalog[0].wcs, bbox, wcs)
             warpedBox.grow(5)  # to ensure we catch all relevant input pixels
             # Combine images from individual patches together.
@@ -657,8 +650,8 @@ class GetTemplateTask(pipeBase.PipelineTask):
     def _correctVariance(self, template, plateScaleFactor):
         """Correct the template variance plane for the effects of warping.
 
-        Compute a multiplicative correction factor for the template variance
-        if the plate scale of the coadd's constituent images is different than
+        Apply a multiplicative correction factor to the template variance if
+        the plate scale of the coadd's constituent images is different than
         the science image the template is being constructed for. This should
         only be necessary if the coadd images were from a different instrument
         than the science image. If the plate scale of the science instrument is
@@ -676,30 +669,21 @@ class GetTemplateTask(pipeBase.PipelineTask):
         Raises
         ------
         RuntimeError
-            Raised if ``doCorrectVariancePlateScale`` is set but the factor
-            could not be reconstructed from the coadd inputs.
+            Raised if ``plateScaleFactor`` is `None`.
         """
-        scale = 1.0
-        if self.config.doCorrectVariancePlateScale:
-            if plateScaleFactor is None:
-                raise RuntimeError(
-                    "doCorrectVariancePlateScale is set but no usable coaddInputs were found."
-                )
-            scale *= plateScaleFactor
-            self.metadata["variancePlateScaleFactor"] = plateScaleFactor
-            self.log.info(
-                "Applying a plate scale variance factor of %.4f, reconstructed from the"
-                " coadd inputs.",
-                plateScaleFactor,
+        if plateScaleFactor is None:
+            raise RuntimeError(
+                "Could not determine the plate scale of the images the template coadds were made from,"
+                " so the template variance cannot be corrected for the change in pixel area."
             )
-
-        if scale == 1.0:
+        self.metadata["variancePlateScaleFactor"] = plateScaleFactor
+        if plateScaleFactor == 1.0:
             return
-        template.variance.array *= scale
-        self.metadata["templateVarianceCorrectionFactor"] = scale
+        template.variance.array *= plateScaleFactor
+        self.metadata["templateVarianceCorrectionFactor"] = plateScaleFactor
         self.log.info(
-            "Corrected the template variance plane for warping by a factor of %.4f.",
-            scale,
+            "Corrected the template variance plane for the change in pixel area by a factor of %.4f.",
+            plateScaleFactor,
         )
 
     def _plateScaleFactor(self, coaddInputs, wcs, bbox):
