@@ -59,6 +59,11 @@ __all__ = [
 _PSF_STAMP_SIGMAS = 5
 """Width, in N sigma, of the Gaussian approximation to the CoaddPsf."""
 
+_UNKNOWN_INSTRUMENT = "UNKNOWN"
+"""Instrument recorded for a coadd or template made from observations of an
+unknown instrument.
+"""
+
 
 class GetTemplateConnections(
     pipeBase.PipelineTaskConnections,
@@ -267,6 +272,12 @@ class GetTemplateTask(pipeBase.PipelineTask):
             type=float,
             doc="Weight for each exposure, used to make the CoaddPsf; should always be 1.",
         )
+        self.schema.addField(
+            "instrument",
+            type=str,
+            size=64,
+            doc="Instrument whose observations were coadded to make the template, or UNKNOWN.",
+        )
         self.makeSubtask("varianceBackground")
 
     def runQuantum(self, butlerQC, inputRefs, outputRefs):
@@ -290,6 +301,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
             dataIds=results.dataIds,
             physical_filter=physical_filter,
             visit=outputRefs.template.dataId["visit"],
+            instrument=butlerQC.quantum.dataId["instrument"],
         )
         if self.config.output_image_type == "future":
             dataId = butlerQC.quantum.dataId
@@ -305,9 +317,9 @@ class GetTemplateTask(pipeBase.PipelineTask):
         """Convert a template image to DifferenceImage format.
 
         This replaces ``template`` with an `lsst.images.DifferenceImage`
-        instance and records the coadds contributed to it. The Gaussian PSF
-        set by `run` is converted to an
-        `lsst.images.psfs.GaussianPointSpreadFunction`.
+        instance and records the coadds contributed to it, along with the
+        instrument they were made from. The Gaussian PSF set by `run` is
+        converted to an `lsst.images.psfs.GaussianPointSpreadFunction`.
 
         Parameters
         ----------
@@ -340,7 +352,10 @@ class GetTemplateTask(pipeBase.PipelineTask):
         """
         # The template PSF is a Gaussian, so rebuild the CoaddPsf from the
         # template inputs to record which coadds contributed.
-        coaddPsf = self._makePsf(template, template.getInfo().getCoaddInputs().ccds, template.getWcs())
+        catalog = template.getInfo().getCoaddInputs().ccds
+        coaddPsf = self._makePsf(template, catalog, template.getWcs())
+        # `run` records the template's instrument on every input.
+        instrument = catalog[0]["instrument"]
         template.setDetector(detector)
         skymaps = {ref.dataId["skymap"] for ref in coadd_refs}
         if len(skymaps) != 1:
@@ -364,6 +379,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
             skymaps.pop(),
             butler_info,
             log=self.log,
+            instrument=instrument,
         )
         return convertedTemplate
 
@@ -477,7 +493,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
         return pipeBase.Struct(coaddExposures=coaddExposures, dataIds=dataIds)
 
     @timeMethod
-    def run(self, *, coaddExposureHandles, bbox, wcs, dataIds, physical_filter, visit=None):
+    def run(self, *, coaddExposureHandles, bbox, wcs, dataIds, physical_filter, visit=None, instrument=None):
         """Warp coadds from multiple tracts and patches to form a template to
         subtract from a science image.
 
@@ -487,6 +503,12 @@ class GetTemplateTask(pipeBase.PipelineTask):
         independent, because they're derived from the same original data.
         The PSF of the template is a Gaussian with the same width as the
         CoaddPsf evaluated at the center of the detector.
+
+        The template is built from coadds of one instrument: the science
+        image's ``instrument`` if any coadd was made from it, and otherwise the
+        one that most of the coadds were made from. Coadds made from another
+        instrument are dropped, and so are coadds that record no instrument
+        unless none of the coadds records one.
 
         Parameters
         ----------
@@ -509,6 +531,9 @@ class GetTemplateTask(pipeBase.PipelineTask):
             If supplied, over-write the visit ID in the template's visitInfo
             so that downstream source injection tasks can link the template and
             science image for the visit.
+        instrument : `str`, optional
+            Instrument of the science image. Coadds made from it are used in
+            preference to coadds from any other instrument.
 
         Returns
         -------
@@ -525,29 +550,29 @@ class GetTemplateTask(pipeBase.PipelineTask):
         NoWorkFound
             If no coadds are found with sufficient un-masked pixels.
         """
-        band, photoCalib = self._checkInputs(dataIds, coaddExposureHandles)
+        band, photoCalib, templateInstrument = self._checkInputs(dataIds, coaddExposureHandles, instrument)
 
         bbox = geom.Box2I(bbox)
         bbox.grow(self.config.templateBorderSize)
 
         warped = {}
         catalogs = []
-        # Determine the ratio of the original pixel area to the pixel area of
-        # the science image, if configured. This will only be different from 1
-        # if the coadd was from a different instrument. The ratio can be
-        # determined once from the components of one coadd exposure, so that no
-        # pixels have to be read yet. Coadds comprising images from multiple
-        # different instruments are not supported.
         plateScaleFactor = None
-        if self.config.doCorrectVariancePlateScale and coaddExposureHandles:
-            plateScaleFactor = self._plateScaleFactor(
-                next(iter(coaddExposureHandles.values()))[0], wcs, bbox
-            )
 
         for tract in coaddExposureHandles:
-            maskedImages, catalog, totalBox = self._makeExposureCatalog(
-                coaddExposureHandles[tract], dataIds[tract]
+            maskedImages, catalog, totalBox, coaddInputs = self._makeExposureCatalog(
+                coaddExposureHandles[tract], dataIds[tract], templateInstrument
             )
+            # Determine the ratio of the original pixel area to the pixel area
+            # of the science image, if configured. This will only be different
+            # from 1 if the coadd was from a different instrument. One coadd
+            # stands for all of them; if the first coadd kept in this tract
+            # cannot give the ratio, the next tract is tried.
+            if self.config.doCorrectVariancePlateScale and plateScaleFactor is None:
+                plateScaleFactor = self._plateScaleFactor(coaddInputs, wcs, bbox)
+            if len(catalog) == 0:
+                # Every coadd in this tract was from another instrument.
+                continue
             warpedBox = computeWarpedBBox(catalog[0].wcs, bbox, wcs)
             warpedBox.grow(5)  # to ensure we catch all relevant input pixels
             # Combine images from individual patches together.
@@ -677,16 +702,14 @@ class GetTemplateTask(pipeBase.PipelineTask):
             scale,
         )
 
-    def _plateScaleFactor(self, coaddHandle, wcs, bbox):
+    def _plateScaleFactor(self, coaddInputs, wcs, bbox):
         """Compute the variance correction for the total change in pixel area
         between the coadd's constituent images and the science image.
 
         Parameters
         ----------
-        coaddHandle : `lsst.daf.butler.DeferredDatasetHandle` of \
-                      `lsst.afw.image.Exposure`
-            Handle to one of the input coadd patches. Only its ``coaddInputs``
-            component is read; the pixels are left alone.
+        coaddInputs : `lsst.afw.image.CoaddInputs` or `None`
+            Input records of one of the coadd patches.
         wcs : `lsst.afw.geom.SkyWcs`
             WCS of the science image the template is being built for.
         bbox : `lsst.geom.Box2I`
@@ -700,7 +723,6 @@ class GetTemplateTask(pipeBase.PipelineTask):
             from the coadd's instrument to the science instrument, or `None` if
             this patch carries no input record from which it could be computed.
         """
-        coaddInputs = coaddHandle.get(component="coaddInputs")
         if coaddInputs is None:
             return None
         scienceScale = wcs.getPixelScale(geom.Box2D(bbox).getCenter()).asArcseconds()
@@ -744,9 +766,10 @@ class GetTemplateTask(pipeBase.PipelineTask):
             template.mask.array[highVariancePix] |= 2**highVarianceMaskPlaneBit
 
     @staticmethod
-    def _checkInputs(dataIds, coaddExposures):
+    def _checkInputs(dataIds, coaddExposures, scienceInstrument=None):
         """Check that the all the dataIds are from the same band and that
-        the exposures all have the same photometric calibration.
+        the exposures all have the same photometric calibration, and choose
+        the instrument of the template.
 
         Parameters
         ----------
@@ -757,6 +780,8 @@ class GetTemplateTask(pipeBase.PipelineTask):
                            `lsst.afw.image.Exposure` or
                            `lsst.afw.image.Exposure`]]
             Coadds to be mosaicked.
+        scienceInstrument : `str`, optional
+            Instrument of the science image.
 
         Returns
         -------
@@ -764,6 +789,11 @@ class GetTemplateTask(pipeBase.PipelineTask):
             Filter band of all the input exposures.
         photoCalib : `lsst.afw.image.PhotoCalib`
             Photometric calibration of all of the input exposures.
+        instrument : `str`
+            ``scienceInstrument`` if any coadd was made from it, otherwise the
+            instrument that the most coadds were made from, or ``"UNKNOWN"`` if
+            no coadd records one. A tie goes to the instrument whose name sorts
+            first.
 
         Raises
         ------
@@ -784,9 +814,48 @@ class GetTemplateTask(pipeBase.PipelineTask):
             msg = f"GetTemplateTask called with exposures with different photoCalibs: {photoCalibs}"
             raise RuntimeError(msg)
         photoCalib = photoCalibs[0]
-        return band, photoCalib
+        instrumentCounts = collections.Counter(
+            GetTemplateTask._getInstrument(exposure.get(component="coaddInputs"))
+            for exposures in coaddExposures.values()
+            for exposure in exposures
+        )
+        # Drop instrument labels that are empty or set to UNKNOWN from the sort
+        del instrumentCounts[""]
+        del instrumentCounts["UNKNOWN"]
+        if scienceInstrument in instrumentCounts:
+            return band, photoCalib, scienceInstrument
+        if not instrumentCounts:
+            return band, photoCalib, "UNKNOWN"
+        instrument = max(sorted(instrumentCounts), key=instrumentCounts.get)
+        return band, photoCalib, instrument
 
-    def _makeExposureCatalog(self, exposureRefs, dataIds):
+    @staticmethod
+    def _getInstrument(coaddInputs):
+        """Return the instrument whose observations were coadded to make a
+        coadd.
+
+        Parameters
+        ----------
+        coaddInputs : `lsst.afw.image.CoaddInputs` or `None`
+            Input records of the coadd.
+
+        Returns
+        -------
+        instrument : `str`
+            Instrument label of the coadd, or ``"UNKNOWN"`` if it records none.
+
+        Notes
+        -----
+        Every input of a coadd comes from the same instrument, so the first
+        input record stands for all of them.
+        """
+        if coaddInputs is None or len(coaddInputs.ccds) == 0:
+            return _UNKNOWN_INSTRUMENT
+        visitInfo = coaddInputs.ccds[0].getVisitInfo()
+        label = visitInfo.getInstrumentLabel() if visitInfo is not None else ""
+        return label or _UNKNOWN_INSTRUMENT
+
+    def _makeExposureCatalog(self, exposureRefs, dataIds, instrument=_UNKNOWN_INSTRUMENT):
         """Make an exposure catalog for one tract.
 
         Parameters
@@ -797,6 +866,10 @@ class GetTemplateTask(pipeBase.PipelineTask):
         dataIds : `list` [`lsst.daf.butler.DataCoordinate`]
             Data ids of each of the included exposures; must have "tract" and
             "patch" entries.
+        instrument : `str`, optional
+            Instrument of the template, recorded in the catalog. Exposures
+            made from another instrument are dropped, as are exposures that
+            record no instrument unless ``instrument`` is ``"UNKNOWN"``.
 
         Returns
         -------
@@ -806,14 +879,30 @@ class GetTemplateTask(pipeBase.PipelineTask):
             Catalog of metadata for each exposure
         totalBox : `lsst.geom.Box2I`
             The union of the bounding boxes of all the input exposures.
+        coaddInputs : `lsst.afw.image.CoaddInputs` or `None`
+            Input records of the first exposure kept, or `None` if none is
+            kept.
         """
         catalog = afwTable.ExposureCatalog(self.schema)
         catalog.reserve(len(exposureRefs))
         exposures = (exposureRef.get() for exposureRef in exposureRefs)
         images = {}
         totalBox = geom.Box2I()
+        firstCoaddInputs = None
 
         for coadd, dataId in zip(exposures, dataIds):
+            coaddInputs = coadd.getInfo().getCoaddInputs()
+            coaddInstrument = self._getInstrument(coaddInputs)
+            if coaddInstrument != instrument:
+                self.log.info(
+                    "Dropping template coadd %s: it was made from %s, but the template is made from %s.",
+                    dataId,
+                    coaddInstrument,
+                    instrument,
+                )
+                continue
+            if not images:
+                firstCoaddInputs = coaddInputs
             images[dataId] = coadd.maskedImage
             bbox = coadd.getBBox()
             totalBox = totalBox.expandedTo(bbox)
@@ -825,11 +914,12 @@ class GetTemplateTask(pipeBase.PipelineTask):
             record.setValidPolygon(afwGeom.Polygon(geom.Box2D(bbox).getCorners()))
             record.set("tract", dataId["tract"])
             record.set("patch", dataId["patch"])
+            record.set("instrument", instrument)
             # Weight is used by CoaddPsf, but the PSFs from overlapping patches
             # should be very similar, so this value mostly shouldn't matter.
             record.set("weight", 1)
 
-        return images, catalog, totalBox
+        return images, catalog, totalBox, firstCoaddInputs
 
     def _merge(self, maskedImages, bbox, wcs):
         """Merge the images that came from one tract into one larger image,
@@ -1070,6 +1160,8 @@ class GetDcrTemplateTask(GetTemplateTask):
             wcs=wcs,
             dataIds=results.dataIds,
             physical_filter=physical_filter,
+            visit=outputRefs.template.dataId["visit"],
+            instrument=butlerQC.quantum.dataId["instrument"],
         )
         butlerQC.put(outputs, outputRefs)
 
