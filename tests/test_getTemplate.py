@@ -437,22 +437,23 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         # in the template are closer to the original anymore.
         self.assertTrue(np.isfinite(result.template.image.array).all())
 
-    def _runCorrection(self, doCorrectVariancePlateScale=False, doScaleVariance=False,
-                       handles=None):
-        """Run the task on tract 0 with the named variance corrections.
+    def _runCorrection(self, handles=None, instrument="SciCam"):
+        """Run the task on tract 0, with a science image from ``instrument``
+        and variance scaling turned off.
 
-        Everything defaults to off, so each test turns on exactly what it is
-        exercising.
+        The plate scale correction is applied only when ``instrument`` is not
+        the instrument of the template coadds, which is ``"TestCam"`` unless
+        ``handles`` says otherwise.
         """
         config = lsst.ip.diffim.GetTemplateTask.ConfigClass()
-        config.doCorrectVariancePlateScale = doCorrectVariancePlateScale
-        config.doScaleVariance = doScaleVariance
+        config.doScaleVariance = False
         task = lsst.ip.diffim.GetTemplateTask(config=config)
         result = task.run(coaddExposureHandles={0: handles or self.patches[0]},
                           bbox=lsst.geom.Box2I(self.varianceBox),
                           wcs=self.exposure.wcs,
                           dataIds={0: self.dataIds[0]},
-                          physical_filter="a_test")
+                          physical_filter="a_test",
+                          instrument=instrument)
         return task, result.template
 
     def _makeScaledWcs(self, factor):
@@ -466,7 +467,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
                                         cdMatrix)
 
     @staticmethod
-    def _makeCoaddInputs(records):
+    def _makeCoaddInputs(records, instrument="TestCam"):
         """Make a CoaddInputs holding the given input records.
 
         Parameters
@@ -476,6 +477,9 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
             The WCS and bbox to record for each input. A `None` WCS makes a
             record that `_plateScaleFactor` has to skip. May be empty, to
             simulate a coadd whose plate scale cannot be reconstructed.
+        instrument : `str` or `None`, optional
+            Instrument label to record for every input. `None` leaves the
+            inputs without a visit info, so the instrument is unknown.
         """
         ccdSchema = lsst.afw.table.ExposureTable.makeMinimalSchema()
         weightKey = ccdSchema.addField("weight", type=float, doc="Coadd weight")
@@ -485,19 +489,21 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
             record = coaddInputs.ccds.addNew()
             record.setWcs(wcs)
             record.setBBox(bbox)
+            if instrument is not None:
+                record.setVisitInfo(lsst.afw.image.VisitInfo(instrumentLabel=instrument))
             # Included because real coadds have it, though a single-record
             # correction does not use it.
             record.set(weightKey, 1.0)
         return coaddInputs
 
-    def _patchHandles(self, tract, records):
+    def _patchHandles(self, tract, records, instrument="TestCam"):
         """Return handles for a tract's patches, with their CoaddInputs
-        replaced by ``records``.
+        replaced by ``records`` from ``instrument``.
         """
         handles = []
         for ref in self.patches[tract]:
             coadd = ref.get()
-            coadd.getInfo().setCoaddInputs(self._makeCoaddInputs(records))
+            coadd.getInfo().setCoaddInputs(self._makeCoaddInputs(records, instrument=instrument))
             handles.append(pipeBase.InMemoryDatasetHandle(
                 coadd, storageClass="ExposureF", copy=True, dataId=ref.dataId))
         return handles
@@ -506,11 +512,15 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         """The plate scale correction is the total pixel area change from the
         images the coadds were built from to the science image.
         """
-        _, off = self._runCorrection()
+        # The science image and the coadds are from the same instrument, so
+        # the factor is 1 without reading any coadd inputs.
+        task, off = self._runCorrection(instrument="TestCam")
+        self.assertEqual(task.metadata["variancePlateScaleFactor"], 1.0)
+        self.assertNotIn("templateVarianceCorrectionFactor", task.metadata)
 
         # The fixture's records are the science image itself, so there is no
-        # net change in pixel area: the same-instrument case.
-        task, on = self._runCorrection(doCorrectVariancePlateScale=True)
+        # net change in pixel area even when the instruments differ.
+        task, on = self._runCorrection()
         self.assertFloatsAlmostEqual(task.metadata["variancePlateScaleFactor"], 1.0, rtol=1e-6)
 
         # Coarser original pixels than science pixels, the DECam-template
@@ -519,8 +529,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
             with self.subTest(scaleFactor=scaleFactor):
                 handles = self._patchHandles(
                     0, [(self._makeScaledWcs(scaleFactor), self.exposure.getBBox())])
-                task, on = self._runCorrection(doCorrectVariancePlateScale=True,
-                                               handles=handles)
+                task, on = self._runCorrection(handles=handles)
                 factor = task.metadata["variancePlateScaleFactor"]
                 self.assertFloatsAlmostEqual(factor, scaleFactor**2, rtol=1e-6)
                 self.assertFloatsAlmostEqual(on.variance.array, off.variance.array*factor,
@@ -537,20 +546,188 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
             0, [(None, self.exposure.getBBox()),
                 (self._makeScaledWcs(2.0), self.exposure.getBBox()),
                 (self.exposure.wcs, self.exposure.getBBox())])
-        task, _ = self._runCorrection(doCorrectVariancePlateScale=True, handles=handles)
+        task, _ = self._runCorrection(handles=handles)
 
         # The first record with a WCS: the one without is skipped, and the
         # last (which would give 1.0) is never reached.
         self.assertFloatsAlmostEqual(task.metadata["variancePlateScaleFactor"], 4.0, rtol=1e-6)
 
+    def testCorrectVariancePlateScaleSkipsDroppedCoadd(self):
+        """The plate scale comes from the first coadd that is used, not from
+        one dropped for its instrument.
+        """
+        bbox = self.exposure.getBBox()
+        handles = (self._patchHandles(0, [(self._makeScaledWcs(2.0), bbox)], instrument="OtherCam")[:1]
+                   + self._patchHandles(0, [(self._makeScaledWcs(1.315), bbox)])[1:])
+        task, _ = self._runCorrection(handles=handles)
+        self.assertFloatsAlmostEqual(task.metadata["variancePlateScaleFactor"], 1.315**2, rtol=1e-6)
+
+    def testCorrectVariancePlateScaleNextTract(self):
+        """If the first coadd kept in a tract cannot give the plate scale, the
+        first coadd kept in the next tract is used.
+        """
+        task = lsst.ip.diffim.GetTemplateTask()
+        handles = {0: self._patchHandles(0, []),
+                   1: self._patchHandles(1, [(self._makeScaledWcs(1.315), self.exposure.getBBox())])}
+        task.run(coaddExposureHandles=handles,
+                 bbox=lsst.geom.Box2I(self.varianceBox),
+                 wcs=self.exposure.wcs,
+                 dataIds={0: self.dataIds[0], 1: self.dataIds[1]},
+                 physical_filter="a_test",
+                 instrument="SciCam")
+        self.assertFloatsAlmostEqual(task.metadata["variancePlateScaleFactor"], 1.315**2, rtol=1e-6)
+
     def testCorrectVariancePlateScaleNeedsCoaddInputs(self):
         """Without usable coadd inputs the plate scale cannot be
-        reconstructed, and the task must say so rather than silently applying
-        only part of the correction.
+        reconstructed; the task warns and leaves the variance uncorrected.
         """
         handles = self._patchHandles(0, [])
-        with self.assertRaisesRegex(RuntimeError, "doCorrectVariancePlateScale"):
-            self._runCorrection(doCorrectVariancePlateScale=True, handles=handles)
+        with self.assertLogs("lsst.getTemplate", level="WARNING") as cm:
+            task, _ = self._runCorrection(handles=handles)
+        self.assertTrue(any("not corrected for the change in pixel area" in message
+                            for message in cm.output))
+        self.assertNotIn("variancePlateScaleFactor", task.metadata)
+        self.assertNotIn("templateVarianceCorrectionFactor", task.metadata)
+
+    def _runTract0(self, handles):
+        """Build a template from the given tract 0 patch handles.
+        """
+        box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
+        task = lsst.ip.diffim.GetTemplateTask()
+        return task.run(coaddExposureHandles={0: handles},
+                        bbox=box,
+                        wcs=self.exposure.wcs,
+                        dataIds={0: self.dataIds[0]},
+                        physical_filter="a_test")
+
+    def testRunRecordsInstrument(self):
+        """The instrument of each coadd is recorded with the template's coadd
+        inputs.
+        """
+        result = self._runTract0(self.patches[0])
+        ccds = result.template.getInfo().getCoaddInputs().ccds
+        self.assertEqual(len(ccds), 4)
+        self.assertEqual({record["instrument"] for record in ccds}, {"TestCam"})
+
+    def testRunUnknownInstrument(self):
+        """A coadd whose inputs record no instrument is kept, and the template
+        records the instrument of the other coadds, or ``"UNKNOWN"`` if none
+        of them record one.
+        """
+        records = [(self.exposure.wcs, self.exposure.getBBox())]
+        handles = (self._patchHandles(0, records, instrument=None)[:1]
+                   + self._patchHandles(0, records)[1:])
+        result = self._runTract0(handles)
+        ccds = result.template.getInfo().getCoaddInputs().ccds
+        self.assertEqual(len(ccds), 4)
+        self.assertEqual({record["instrument"] for record in ccds}, {"TestCam"})
+
+        # No coadd records an instrument.
+        result = self._runTract0(self._patchHandles(0, records, instrument=None))
+        ccds = result.template.getInfo().getCoaddInputs().ccds
+        self.assertEqual(len(ccds), 4)
+        self.assertEqual({record["instrument"] for record in ccds}, {"UNKNOWN"})
+
+    def _runLogged(self, handles, dataIds=None, box=None, instrument=None):
+        """Build a template, capturing the messages about dropped coadds.
+
+        Parameters
+        ----------
+        handles : `dict` [`int`, `list`]
+            Patch handles, keyed by tract.
+        dataIds : `dict` [`int`, `list`], optional
+            Data ids matching ``handles``; defaults to the fixture's.
+        box : `lsst.geom.Box2I`, optional
+            Box to build the template on; defaults to one in tract 0.
+        instrument : `str`, optional
+            Instrument of the science image.
+
+        Returns
+        -------
+        ccds : `lsst.afw.table.ExposureCatalog`
+            The coadd inputs recorded on the template.
+        dropped : `list` [`str`]
+            The info messages about dropped coadds.
+        """
+        if dataIds is None:
+            dataIds = {tract: self.dataIds[tract] for tract in handles}
+        if box is None:
+            box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
+        task = lsst.ip.diffim.GetTemplateTask()
+        with self.assertLogs(task.log.name, level="INFO") as cm:
+            result = task.run(coaddExposureHandles=handles,
+                              bbox=box,
+                              wcs=self.exposure.wcs,
+                              dataIds=dataIds,
+                              physical_filter="a_test",
+                              instrument=instrument)
+        dropped = [record for record in cm.records
+                   if record.getMessage().startswith("Dropping template coadd")]
+        self.assertEqual({record.levelname for record in dropped}, {"INFO"} if dropped else set())
+        return result.template.getInfo().getCoaddInputs().ccds, [record.getMessage() for record in dropped]
+
+    def testRunDropsMinorityInstrument(self):
+        """Coadds made from an instrument other than the one most coadds were
+        made from are dropped.
+        """
+        records = [(self.exposure.wcs, self.exposure.getBBox())]
+        handles = (self._patchHandles(0, records)[:3]
+                   + self._patchHandles(0, records, instrument="OtherCam")[3:])
+
+        ccds, dropped = self._runLogged({0: handles})
+        self.assertEqual({record["patch"] for record in ccds}, {0, 1, 2})
+        self.assertEqual({record["instrument"] for record in ccds}, {"TestCam"})
+        self.assertEqual(len(dropped), 1)
+        self.assertIn(str(self.dataIds[0][3]), dropped[0])
+        self.assertIn("made from OtherCam", dropped[0])
+
+    def testRunPrefersScienceInstrument(self):
+        """Coadds made from the science image's instrument are used even when
+        they are in the minority; otherwise the majority instrument is used.
+        """
+        records = [(self.exposure.wcs, self.exposure.getBBox())]
+        handles = (self._patchHandles(0, records, instrument="OtherCam")[:3]
+                   + self._patchHandles(0, records)[3:])
+
+        ccds, dropped = self._runLogged({0: handles}, instrument="TestCam")
+        self.assertEqual({record["patch"] for record in ccds}, {3})
+        self.assertEqual({record["instrument"] for record in ccds}, {"TestCam"})
+        self.assertEqual(len(dropped), 3)
+        self.assertTrue(all("made from OtherCam" in message for message in dropped))
+
+        # No coadd was made from the science image's instrument.
+        ccds, dropped = self._runLogged({0: handles}, instrument="SciCam")
+        self.assertEqual({record["patch"] for record in ccds}, {0, 1, 2})
+        self.assertEqual({record["instrument"] for record in ccds}, {"OtherCam"})
+        self.assertEqual(len(dropped), 1)
+
+    def testRunInstrumentTie(self):
+        """A tie goes to the instrument whose name sorts first.
+        """
+        records = [(self.exposure.wcs, self.exposure.getBBox())]
+        handles = (self._patchHandles(0, records)[:2]
+                   + self._patchHandles(0, records, instrument="OtherCam")[2:])
+
+        ccds, dropped = self._runLogged({0: handles})
+        self.assertEqual({record["patch"] for record in ccds}, {2, 3})
+        self.assertEqual({record["instrument"] for record in ccds}, {"OtherCam"})
+        self.assertEqual(len(dropped), 2)
+
+    def testRunDropsNonOverlappingCoadd(self):
+        """A coadd from another instrument is dropped even if it does not
+        overlap the template.
+        """
+        records = [(self.exposure.wcs, self.exposure.getBBox())]
+        # Tract 3 does not overlap a box in the lower left of tract 0.
+        box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(50, 50))
+        handles = {0: self.patches[0], 3: self._patchHandles(3, records, instrument="OtherCam")[:1]}
+        dataIds = {0: self.dataIds[0], 3: self.dataIds[3][:1]}
+
+        ccds, dropped = self._runLogged(handles, dataIds=dataIds, box=box)
+        self.assertEqual({record["tract"] for record in ccds}, {0})
+        self.assertEqual({record["instrument"] for record in ccds}, {"TestCam"})
+        self.assertEqual(len(dropped), 1)
+        self.assertIn(str(self.dataIds[3][0]), dropped[0])
 
     def _scaleInputVariance(self, tract, factor):
         """Return fresh handles for one tract's patches, with their variance
@@ -639,7 +816,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
                                      factor*scaleFactor, rtol=1e-5)
         self.assertImagesAlmostEqual(templateLow.variance, templateOn.variance, rtol=1e-5)
 
-    def _runLegacyForFuture(self, raiseOnUndefinedMaskMap=True):
+    def _runLegacyForFuture(self, raiseOnUndefinedMaskMap=True, handles=None):
         """Build a template from tract 0 with a task configured for the
         future output type, without converting it.
 
@@ -649,6 +826,8 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         ----------
         raiseOnUndefinedMaskMap : `bool`, optional
             Value of the task config field of the same name.
+        handles : `list` [`lsst.pipe.base.InMemoryDatasetHandle`], optional
+            Handles to the tract 0 patches to use instead of the fixture's.
 
         Returns
         -------
@@ -664,7 +843,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         task = lsst.ip.diffim.GetTemplateTask(config=config)
         self.visit = 9876
         box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
-        result = task.run(coaddExposureHandles={0: self.patches[0]},
+        result = task.run(coaddExposureHandles={0: self.patches[0] if handles is None else handles},
                           bbox=box,
                           wcs=self.exposure.wcs,
                           dataIds={0: self.dataIds[0]},
@@ -675,8 +854,13 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         self.futureTask = task
         return result, box
 
-    def _runFuture(self):
+    def _runFuture(self, handles=None):
         """Build a template and convert it, the way ``runQuantum`` does.
+
+        Parameters
+        ----------
+        handles : `list` [`lsst.pipe.base.InMemoryDatasetHandle`], optional
+            Handles to the tract 0 patches to use instead of the fixture's.
 
         Returns
         -------
@@ -689,7 +873,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         # lsst.images needs per-amplifier raw geometry and a field angle
         # transform, which the trivial test detectors do not have.
         detector = list(lsst.afw.cameraGeom.testUtils.CameraWrapper().camera)[0]
-        result, box = self._runLegacyForFuture()
+        result, box = self._runLegacyForFuture(handles=handles)
         result.template = self.futureTask.convert_outputs_to_future(
             result.template, self._coaddRefs(0), detector=detector,
             exposureRecord=self._exposureRecord())
@@ -851,9 +1035,23 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
                 self.assertEqual(template.skymap, "skymap")
                 self.assertEqual(template.dataset_id, ref.id)
                 self.assertEqual(template.dataset_run, ref.run)
+                self.assertEqual(template.instrument, "TestCam")
                 self.assertFalse(template.psf_shape_flag)
                 self.assertGreater(template.psf_shape_xx, 0)
                 self.assertGreater(template.bounds.area, 0)
+
+    def testConvertOutputsToFutureInstrument(self):
+        """The template instrument is the one recorded by the coadds that
+        know it, or ``"UNKNOWN"`` if none of them do.
+        """
+        records = [(self.exposure.wcs, self.exposure.getBBox())]
+        handles = (self._patchHandles(0, records, instrument=None)[:1]
+                   + self._patchHandles(0, records)[1:])
+        result, _, _ = self._runFuture(handles=handles)
+        self.assertEqual({template.instrument for template in result.template.templates}, {"TestCam"})
+
+        result, _, _ = self._runFuture(handles=self._patchHandles(0, records, instrument=None))
+        self.assertEqual({template.instrument for template in result.template.templates}, {"UNKNOWN"})
 
     def testConvertOutputsToFuturePsf(self):
         """The Gaussian PSF set by `run` is kept, defined over the detector.
