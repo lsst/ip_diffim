@@ -789,27 +789,24 @@ class GetTemplateTask(pipeBase.PipelineTask):
         if len(bands) > 1:
             raise RuntimeError(f"GetTemplateTask called with multiple bands: {bands}")
         band = bands.pop()
-        photoCalibs = [
-            exposure.get(component="photoCalib")
-            for exposures in coaddExposures.values()
-            for exposure in exposures
-        ]
+        photoCalibs = []
+        instrumentCounts = collections.Counter()
+        for exposures in coaddExposures.values():
+            for exposure in exposures:
+                # Read both components of a coadd in turn, so a butler cache
+                # can serve the second read from the first download.
+                photoCalibs.append(exposure.get(component="photoCalib"))
+                instrumentCounts[GetTemplateTask._getInstrument(exposure.get(component="coaddInputs"))] += 1
         if not all([photoCalibs[0] == x for x in photoCalibs]):
             msg = f"GetTemplateTask called with exposures with different photoCalibs: {photoCalibs}"
             raise RuntimeError(msg)
         photoCalib = photoCalibs[0]
-        instrumentCounts = collections.Counter(
-            GetTemplateTask._getInstrument(exposure.get(component="coaddInputs"))
-            for exposures in coaddExposures.values()
-            for exposure in exposures
-        )
-        # Drop instrument labels that are empty or set to UNKNOWN from the sort
-        del instrumentCounts[""]
-        del instrumentCounts["UNKNOWN"]
+        # Coadds that record no instrument do not count toward the choice.
+        del instrumentCounts[_UNKNOWN_INSTRUMENT]
         if scienceInstrument in instrumentCounts:
             return band, photoCalib, scienceInstrument
         if not instrumentCounts:
-            return band, photoCalib, "UNKNOWN"
+            return band, photoCalib, _UNKNOWN_INSTRUMENT
         instrument = max(sorted(instrumentCounts), key=instrumentCounts.get)
         return band, photoCalib, instrument
 
