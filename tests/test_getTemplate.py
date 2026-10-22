@@ -87,25 +87,40 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
     and tests GetTemplateTask's output against boxes that overlap various
     combinations of one or multiple tracts.
     """
-    def setUp(self):
-        self.scale = 0.2  # arcsec/pixel
-        # Use 5th order to minimize artifacts on the templates.
-        self.coaddWarpKernel = "lanczos5"
-        self.skymap = self._makeSkymap()
-        self.patches = collections.defaultdict(list)
-        self.dataIds = collections.defaultdict(list)
-        self.coaddRefs = {}
-        self.exposure = self._makeExposure()
-        self.varianceBox = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
+    scale = 0.2  # arcsec/pixel
+    # Use 5th order to minimize artifacts on the templates.
+    coaddWarpKernel = "lanczos5"
+
+    @classmethod
+    def setUpClass(cls):
+        # Warping the patches is the slowest part of every test, so it is done
+        # once. Tests must not modify the exposure; the patch handles return
+        # copies, and setUp gives each test its own lists of them.
+        cls.skymap = cls._makeSkymap()
+        cls.patches = collections.defaultdict(list)
+        cls.dataIds = collections.defaultdict(list)
+        cls.exposure = cls._makeExposure()
 
         if debug:
-            display.image(self.exposure, "base exposure")
+            display.image(cls.exposure, "base exposure")
 
         for tract_id in range(4):
-            tract = self.skymap.generateTract(tract_id)
-            self._makePatches(tract)
+            tract = cls.skymap.generateTract(tract_id)
+            cls._makePatches(tract)
 
-    def _makeSkymap(self):
+    @classmethod
+    def tearDownClass(cls):
+        del cls.skymap, cls.patches, cls.dataIds, cls.exposure
+
+    def setUp(self):
+        cls = type(self)
+        self.patches = collections.defaultdict(list, {k: list(v) for k, v in cls.patches.items()})
+        self.dataIds = collections.defaultdict(list, {k: list(v) for k, v in cls.dataIds.items()})
+        self.coaddRefs = {}
+        self.varianceBox = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
+
+    @classmethod
+    def _makeSkymap(cls):
         """Make a Skymap with 4 tracts with 4 patches each.
         """
         tractScale = 0.02  # degrees
@@ -121,14 +136,15 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         # Half the tract center step size, to keep the tract overlap small.
         config.radiusList = [tractScale/2 for c in coords]
         config.projection = "TAN"
-        config.pixelScale = self.scale
+        config.pixelScale = cls.scale
         config.tractOverlap = 0.0005
         config.tractBuilder = "legacy"
         config.tractBuilder["legacy"].patchInnerDimensions = (300, 300)
         config.tractBuilder["legacy"].patchBorder = 10
         return lsst.skymap.DiscreteSkyMap(config=config)
 
-    def _makeExposure(self):
+    @classmethod
+    def _makeExposure(cls):
         """Create a large image to break up into tracts and patches.
 
         The image will have a source every 100 pixels in x and y, and a WCS
@@ -141,7 +157,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         # quadrant of the image, and the other tracts fill the rest; slight
         # extra rotation as a check on the final warp layout, scaled by 5%
         # from the patch pixel scale.
-        cd_matrix = lsst.afw.geom.makeCdMatrix(1.05*self.scale*lsst.geom.arcseconds, 93*lsst.geom.degrees)
+        cd_matrix = lsst.afw.geom.makeCdMatrix(1.05*cls.scale*lsst.geom.arcseconds, 93*lsst.geom.degrees)
         wcs = lsst.afw.geom.makeSkyWcs(lsst.geom.Point2D(120, 150),
                                        lsst.geom.SpherePoint(0, 0, lsst.geom.radians),
                                        cd_matrix)
@@ -152,18 +168,19 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         exposure.setFilter(lsst.afw.image.FilterLabel("a", "a_test"))
         return exposure
 
-    def _makePatches(self, tract):
+    @classmethod
+    def _makePatches(cls, tract):
         """Populate the patches and dataId dicts, keyed on tract id, with the
         warps of the main exposure and minimal dataIds, respectively.
         """
         if debug:
             color = ['red', 'green', 'cyan', 'yellow'][tract.tract_id]
-            point = self.exposure.wcs.skyToPixel(tract.ctr_coord)
+            point = cls.exposure.wcs.skyToPixel(tract.ctr_coord)
             # Show the tract center, colored by tract id.
             display.dot("x", point.x, point.y, ctype=color, size=30)
 
         config = lsst.afw.math.Warper.ConfigClass()
-        config.warpingKernelName = self.coaddWarpKernel
+        config.warpingKernelName = cls.coaddWarpKernel
         warper = lsst.afw.math.Warper.fromConfig(config)
         for patchId in range(tract.num_patches.x*tract.num_patches.y):
             patch = tract.getPatchInfo(patchId)
@@ -171,20 +188,20 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
 
             if debug:
                 # Show the patch corners as patch ids, colored by tract id.
-                points = self.exposure.wcs.skyToPixel(patch.wcs.pixelToSky([lsst.geom.Point2D(x)
+                points = cls.exposure.wcs.skyToPixel(patch.wcs.pixelToSky([lsst.geom.Point2D(x)
                                                                            for x in box.getCorners()]))
                 for p in points:
                     display.dot(patchId, p.x, p.y, ctype=color)
 
             # This is mostly taken from drp_tasks makePsfMatchedWarp, but
             # ip_diffim cannot depend on drp_tasks.
-            xyTransform = lsst.afw.geom.makeWcsPairTransform(self.exposure.wcs, patch.wcs)
-            warpedPsf = lsst.meas.algorithms.WarpedPsf(self.exposure.psf, xyTransform)
-            warped = warper.warpExposure(patch.wcs, self.exposure, destBBox=box)
+            xyTransform = lsst.afw.geom.makeWcsPairTransform(cls.exposure.wcs, patch.wcs)
+            warpedPsf = lsst.meas.algorithms.WarpedPsf(cls.exposure.psf, xyTransform)
+            warped = warper.warpExposure(patch.wcs, cls.exposure, destBBox=box)
             warped.setPsf(warpedPsf)
 
             warped.getInfo().setCoaddInputs(
-                self._makeCoaddInputs([(self.exposure.wcs, self.exposure.getBBox())]))
+                cls._makeCoaddInputs([(cls.exposure.wcs, cls.exposure.getBBox())]))
             dataRef = pipeBase.InMemoryDatasetHandle(
                 warped,
                 storageClass="ExposureF",
@@ -194,13 +211,13 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
                     patch=patch,
                 )
             )
-            self.patches[tract.tract_id].append(dataRef)
+            cls.patches[tract.tract_id].append(dataRef)
             dataCoordinate = DataCoordinate.standardize({"tract": tract.tract_id,
                                                          "patch": patchId,
                                                          "band": "a",
                                                          "skymap": "skymap"},
                                                         universe=DimensionUniverse())
-            self.dataIds[tract.tract_id].append(dataCoordinate)
+            cls.dataIds[tract.tract_id].append(dataCoordinate)
 
     def _checkMetadata(self, template, config, box, wcs, nPsfs):
         """Check that the various metadata components were set correctly.
@@ -332,32 +349,28 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
         calibration = self.exposure.photoCalib.getCalibrationMean()
         self.assertNotEqual(calibration, 1.0)
+        # The same coadd pixels, labelled as already in nJy.
+        uncalibrated = []
+        for handle in self.patches[0]:
+            coadd = handle.get()
+            coadd.setPhotoCalib(lsst.afw.image.PhotoCalib(1.0))
+            uncalibrated.append(pipeBase.InMemoryDatasetHandle(coadd, storageClass="ExposureF", copy=True,
+                                                               dataId=handle.dataId))
         task = lsst.ip.diffim.GetTemplateTask(config=self._makeConfig())
         templates = {}
-        for photoCalib in (self.exposure.photoCalib, lsst.afw.image.PhotoCalib(1.0)):
-            self._remakePatches(photoCalib)
-            result = task.run(coaddExposureHandles={0: self.patches[0]},
+        for key, handles in ((calibration, self.patches[0]), (1.0, uncalibrated)):
+            result = task.run(coaddExposureHandles={0: handles},
                               bbox=box,
                               wcs=self.exposure.wcs,
                               dataIds={0: self.dataIds[0]},
                               physical_filter="a_test")
             self.assertEqual(result.template.photoCalib, lsst.afw.image.PhotoCalib(1.0))
-            templates[photoCalib.getCalibrationMean()] = result.template
+            templates[key] = result.template
 
         self.assertFloatsAlmostEqual(templates[calibration].image.array,
                                      calibration*templates[1.0].image.array, rtol=1e-6)
         self.assertFloatsAlmostEqual(templates[calibration].variance.array,
                                      calibration**2*templates[1.0].variance.array, rtol=1e-6)
-
-    def _remakePatches(self, photoCalib):
-        """Rebuild the coadd patches from the main exposure with a different
-        photometric calibration.
-        """
-        self.exposure.setPhotoCalib(photoCalib)
-        self.patches.clear()
-        self.dataIds.clear()
-        for tract_id in range(4):
-            self._makePatches(self.skymap.generateTract(tract_id))
 
     def testGaussianPsfGridFallback(self):
         """If the CoaddPsf cannot be evaluated at its average position, the
