@@ -20,6 +20,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import collections
 import dataclasses
+import functools
 
 import astropy.units
 from astropy.stats import gaussian_sigma_to_fwhm
@@ -63,6 +64,47 @@ _UNKNOWN_INSTRUMENT = "UNKNOWN"
 """Instrument recorded for a coadd or template made from observations of an
 unknown instrument.
 """
+
+
+@functools.cache
+def _warpKernelSumSq(kernelName, nPhase=100):
+    """Compute the phase-averaged sum of squared values of a warping kernel.
+
+    Warping with a kernel normalized to unit sum multiplies the variance by
+    this sum, which is less than one. The power the warp took off the
+    diagonal became covariance between neighboring pixels, which a variance
+    plane cannot represent, so dividing by it restores the noise power: the
+    variance of a flux measured over a region and not a single pixel.
+
+    Parameters
+    ----------
+    kernelName : `str`
+        Name of the warping kernel, as `lsst.afw.math.Warper` takes it.
+    nPhase : `int`, optional
+        Number of sub-pixel phases to average over.
+
+    Returns
+    -------
+    sumSq : `float`
+        Sum of the squared 2-D kernel values, averaged over sub-pixel
+        phase: 0.798 for ``lanczos3``, 4/9 for ``bilinear``, and 1 for no
+        interpolation.
+
+    Notes
+    -----
+    The kernels are separable and the phases of the two axes independent,
+    so this is the square of the 1-D average.
+    """
+    # Disable the cache since we are evaluating fewer phase points than the
+    # default cache size.
+    kernel = afwMath.Warper(kernelName, cacheSize=0).getWarpingKernel()
+    image = afwImage.ImageD(kernel.getDimensions())
+    total = 0.0
+    for phase in (np.arange(nPhase) + 0.5)/nPhase:
+        kernel.setKernelParameters((float(phase), 0.0))
+        kernel.computeImage(image, True)
+        total += float((image.array.sum(axis=0)**2).sum())
+    return (total/nPhase)**2
 
 
 class GetTemplateConnections(
@@ -149,6 +191,29 @@ class GetTemplateConfig(
         dtype=afwMath.Warper.ConfigClass,
         doc="warper configuration",
     )
+    doCorrectVarianceWarpCorrelation = pexConfig.Field(
+        dtype=bool,
+        default=True,
+        doc="Correct the template variance for the correlation that warping"
+        " introduced between neighboring pixels? This covers both warps: the"
+        " one that built the coadds, named by coaddWarpKernel, and the one"
+        " this task performs, named by warp.warpingKernelName. It is a single"
+        " scalar factor, fixed entirely by those two kernels and independent"
+        " of the pixel scales involved.",
+    )
+    coaddWarpKernel = pexConfig.ChoiceField(
+        dtype=str,
+        default="lanczos3",
+        allowed={
+            "bilinear": "bilinear interpolation",
+            "lanczos3": "Lanczos kernel of order 3",
+            "lanczos4": "Lanczos kernel of order 4",
+            "lanczos5": "Lanczos kernel of order 5",
+        },
+        doc="Warping kernel that was used to build the input coadds. This"
+        " cannot be recovered from the coadds themselves, and is used only if"
+        " doCorrectVarianceWarpCorrelation is True.",
+    )
     coaddPsf = pexConfig.ConfigField(
         doc="Configuration for CoaddPsf",
         dtype=CoaddPsfConfig,
@@ -183,8 +248,10 @@ class GetTemplateConfig(
     )
     doScaleVariance = pexConfig.Field(
         dtype=bool,
-        default=True,
-        doc="Scale variance of the template image?"
+        default=False,
+        doc="Scale the variance of the template image to match its per-pixel"
+        " scatter? Warping correlates the noise, so when combined with"
+        " doCorrectVarianceWarpCorrelation this overcounts the correction.",
     )
     scaleVariance = pexConfig.ConfigurableField(
         target=ScaleVarianceTask,
@@ -650,14 +717,20 @@ class GetTemplateTask(pipeBase.PipelineTask):
     def _correctVariance(self, template, plateScaleFactor):
         """Correct the template variance plane for the effects of warping.
 
-        Apply a multiplicative correction factor to the template variance if
-        the plate scale of the coadd's constituent images is different than
-        the science image the template is being constructed for. This should
-        only be necessary if the coadd images were from a different instrument
-        than the science image. If the plate scale of the science instrument is
-        smaller than the plate scale of the coadd instrument, then the template
-        pixels will be correlated and the true variance will be higher than the
-        image pixel noise level would suggest.
+        Warping introduces a covariance between neighboring pixels, while the
+        input variance plane captures only the diagonal term. Compute a
+        multiplicative correction factor to apply to the final variance so that
+        the detection significance on the convolved difference image is correct
+        on average.
+
+        Separately, also apply a scalar multiplicative correction factor to the
+        template variance if the plate scale of the coadd's constituent images
+        is different than the science image the template is being constructed
+        for. This should only be necessary if the coadd images were from a
+        different instrument than the science image. If the plate scale of the
+        science instrument is smaller than the plate scale of the coadd
+        instrument, then the template pixels will be correlated and the true
+        variance will be higher than the image pixel noise level would suggest.
 
         Parameters
         ----------
@@ -677,13 +750,29 @@ class GetTemplateTask(pipeBase.PipelineTask):
                 " so the template variance cannot be corrected for the change in pixel area."
             )
         self.metadata["variancePlateScaleFactor"] = plateScaleFactor
-        if plateScaleFactor == 1.0:
+        correlationFactor = 1.0
+        if self.config.doCorrectVarianceWarpCorrelation:
+            # Both warps correlate the noise: the one that built the coadds,
+            # and the one this task just performed.
+            correlationFactor = 1/(_warpKernelSumSq(self.config.coaddWarpKernel)
+                                   * _warpKernelSumSq(self.config.warp.warpingKernelName))
+            self.metadata["varianceWarpCorrelationFactor"] = correlationFactor
+        scale = correlationFactor*plateScaleFactor
+        if scale == 1.0:
             return
-        template.variance.array *= plateScaleFactor
-        self.metadata["templateVarianceCorrectionFactor"] = plateScaleFactor
+        template.variance.array *= scale
+        self.metadata["templateVarianceCorrectionFactor"] = scale
         self.log.info(
-            "Corrected the template variance plane for the change in pixel area by a factor of %.4f.",
+            "Variance correction factor due to plate scale changes: %.4f",
             plateScaleFactor,
+        )
+        self.log.info(
+            "Variance correction factor due to warping correlations: %.4f",
+            correlationFactor,
+        )
+        self.log.info(
+            "Overall template variance correction factor: %.4f",
+            scale,
         )
 
     def _plateScaleFactor(self, coaddInputs, wcs, bbox):
