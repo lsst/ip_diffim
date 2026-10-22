@@ -248,8 +248,10 @@ class GetTemplateConfig(
     )
     doScaleVariance = pexConfig.Field(
         dtype=bool,
-        default=True,
-        doc="Scale variance of the template image?"
+        default=False,
+        doc="Scale the variance of the template image to match its per-pixel"
+        " scatter? Warping correlates the noise, so when combined with"
+        " doCorrectVarianceWarpCorrelation this overcounts the correction.",
     )
     scaleVariance = pexConfig.ConfigurableField(
         target=ScaleVarianceTask,
