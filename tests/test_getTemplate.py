@@ -58,6 +58,15 @@ if debug:
     display = lsst.afw.display.Display()
     display.frame = 1
 
+# Sum of squared warping kernel values along one axis, with the kernel
+# normalized to unit sum at each sub-pixel phase, averaged over phase.
+KERNEL_SUM_SQ_1D = {
+    "bilinear": 2/3,
+    "lanczos3": 0.8933699084,
+    "lanczos4": 0.9141249535,
+    "lanczos5": 0.9342245513,
+}
+
 
 def _showTemplate(box, template):
     """Show the corners of the template we made in this test."""
@@ -80,6 +89,8 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
     """
     def setUp(self):
         self.scale = 0.2  # arcsec/pixel
+        # Use 5th order to minimize artifacts on the templates.
+        self.coaddWarpKernel = "lanczos5"
         self.skymap = self._makeSkymap()
         self.patches = collections.defaultdict(list)
         self.dataIds = collections.defaultdict(list)
@@ -151,9 +162,8 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
             # Show the tract center, colored by tract id.
             display.dot("x", point.x, point.y, ctype=color, size=30)
 
-        # Use 5th order to minimize artifacts on the templates.
         config = lsst.afw.math.Warper.ConfigClass()
-        config.warpingKernelName = "lanczos5"
+        config.warpingKernelName = self.coaddWarpKernel
         warper = lsst.afw.math.Warper.fromConfig(config)
         for patchId in range(tract.num_patches.x*tract.num_patches.y):
             patch = tract.getPatchInfo(patchId)
@@ -218,6 +228,14 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         self.assertTrue(template.getInfo().hasCoaddInputs())
         self.assertEqual(len(template.getInfo().getCoaddInputs().ccds), nPsfs)
 
+    def _makeConfig(self):
+        """Make a GetTemplateTask config whose coaddWarpKernel is the kernel
+        the test patches were made with.
+        """
+        config = lsst.ip.diffim.GetTemplateTask.ConfigClass()
+        config.coaddWarpKernel = self.coaddWarpKernel
+        return config
+
     def _makeCoaddPsf(self, template, config):
         """Return the CoaddPsf that ``run`` approximated with a Gaussian,
         rebuilt from the coadd inputs recorded on the template.
@@ -246,15 +264,13 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         self.assertImagesAlmostEqual(template.image, expected.image, rtol=.1, atol=4*calibration)
         # Variance plane ==4 in the original image (realize() takes a noise
         # sigma). Warping sets the level from the pixel areas and the two
-        # warping kernels, which `_correctVariance` corrects up to the
-        # difference between the configured coaddWarpKernel and the lanczos5
-        # `_makePatches` really used. A per-pixel ripple that no scalar
-        # correction can remove remains on top of that, so check the level
-        # tightly and allow for the ripple around it.
+        # warping kernels, which `_correctVariance` corrects. A per-pixel
+        # ripple that no scalar correction can remove remains on top of that,
+        # so check the level tightly and allow for the ripple around it.
         variance = template.variance.array[np.isfinite(template.variance.array)]
         median = np.median(variance)
         self.assertFloatsAlmostEqual(median, np.median(expected.variance.array),
-                                     rtol=0.35, msg="variance level differs")
+                                     rtol=0.02, msg="variance level differs")
         self.assertLess(np.percentile(variance, 99)/median, 1.6, msg="variance ripple too large")
         self.assertGreater(np.percentile(variance, 1)/median, 0.6, msg="variance ripple too large")
         # Not checking the mask, as warping changes the sizes of the masks.
@@ -265,7 +281,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         tract input correctly.
         """
         box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
-        task = lsst.ip.diffim.GetTemplateTask()
+        task = lsst.ip.diffim.GetTemplateTask(config=self._makeConfig())
         # Restrict to tract 0, since the box fits in just that tract.
         result = task.run(coaddExposureHandles={0: self.patches[0]},
                           bbox=box,
@@ -283,7 +299,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         mostly NaN after warping are merged correctly in the output.
         """
         box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
-        task = lsst.ip.diffim.GetTemplateTask()
+        task = lsst.ip.diffim.GetTemplateTask(config=self._makeConfig())
         result = task.run(coaddExposureHandles=self.patches,
                           bbox=box,
                           wcs=self.exposure.wcs,
@@ -298,7 +314,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         """Test a bounding box that crosses tract boundaries.
         """
         box = lsst.geom.Box2I(lsst.geom.Point2I(200, 200), lsst.geom.Point2I(600, 600))
-        task = lsst.ip.diffim.GetTemplateTask()
+        task = lsst.ip.diffim.GetTemplateTask(config=self._makeConfig())
         result = task.run(coaddExposureHandles=self.patches,
                           bbox=box,
                           wcs=self.exposure.wcs,
@@ -316,7 +332,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
         calibration = self.exposure.photoCalib.getCalibrationMean()
         self.assertNotEqual(calibration, 1.0)
-        task = lsst.ip.diffim.GetTemplateTask()
+        task = lsst.ip.diffim.GetTemplateTask(config=self._makeConfig())
         templates = {}
         for photoCalib in (self.exposure.photoCalib, lsst.afw.image.PhotoCalib(1.0)):
             self._remakePatches(photoCalib)
@@ -348,7 +364,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         Gaussian width is averaged over a grid of positions instead.
         """
         box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
-        task = lsst.ip.diffim.GetTemplateTask()
+        task = lsst.ip.diffim.GetTemplateTask(config=self._makeConfig())
         result = task.run(coaddExposureHandles={0: self.patches[0]},
                           bbox=box,
                           wcs=self.exposure.wcs,
@@ -376,7 +392,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         """A bounding box that doesn't overlap the patches will raise.
         """
         box = lsst.geom.Box2I(lsst.geom.Point2I(1200, 1200), lsst.geom.Point2I(1600, 1600))
-        task = lsst.ip.diffim.GetTemplateTask()
+        task = lsst.ip.diffim.GetTemplateTask(config=self._makeConfig())
         with self.assertRaisesRegex(lsst.pipe.base.NoWorkFound, "No patches found"):
             task.run(coaddExposureHandles=self.patches,
                      bbox=box,
@@ -393,7 +409,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         # tract=0, patch=1 is the lower-left corner, as displayed in DS9.
         self.patches[0].pop(1)
         box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
-        task = lsst.ip.diffim.GetTemplateTask()
+        task = lsst.ip.diffim.GetTemplateTask(config=self._makeConfig())
         result = task.run(coaddExposureHandles=self.patches,
                           bbox=box,
                           wcs=self.exposure.wcs,
@@ -424,7 +440,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
                 patchCoadd.variance[bbox].array *= np.nan
 
         box = lsst.geom.Box2I(lsst.geom.Point2I(200, 200), lsst.geom.Point2I(600, 600))
-        task = lsst.ip.diffim.GetTemplateTask()
+        task = lsst.ip.diffim.GetTemplateTask(config=self._makeConfig())
         result = task.run(coaddExposureHandles=self.patches,
                           bbox=box,
                           wcs=self.exposure.wcs,
@@ -437,16 +453,22 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         # in the template are closer to the original anymore.
         self.assertTrue(np.isfinite(result.template.image.array).all())
 
-    def _runCorrection(self, handles=None, instrument="SciCam"):
-        """Run the task on tract 0, with a science image from ``instrument``
-        and variance scaling turned off.
+    def _runCorrection(self, doCorrectVarianceWarpCorrelation=False, doScaleVariance=False,
+                       handles=None, instrument="SciCam", coaddWarpKernel=None,
+                       templateWarpKernel="lanczos3"):
+        """Run the task on tract 0, with a science image from ``instrument``.
 
         The plate scale correction is applied only when ``instrument`` is not
         the instrument of the template coadds, which is ``"TestCam"`` unless
-        ``handles`` says otherwise.
+        ``handles`` says otherwise. ``coaddWarpKernel`` defaults to the kernel
+        the patches were made with, so the reconstructed factors are exact.
         """
-        config = lsst.ip.diffim.GetTemplateTask.ConfigClass()
-        config.doScaleVariance = False
+        config = self._makeConfig()
+        config.doCorrectVarianceWarpCorrelation = doCorrectVarianceWarpCorrelation
+        config.doScaleVariance = doScaleVariance
+        if coaddWarpKernel is not None:
+            config.coaddWarpKernel = coaddWarpKernel
+        config.warp.warpingKernelName = templateWarpKernel
         task = lsst.ip.diffim.GetTemplateTask(config=config)
         result = task.run(coaddExposureHandles={0: handles or self.patches[0]},
                           bbox=lsst.geom.Box2I(self.varianceBox),
@@ -509,6 +531,38 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
                 coadd, storageClass="ExposureF", copy=True, dataId=ref.dataId))
         return handles
 
+    def testCorrectVarianceWarpCorrelation(self):
+        """The correlation correction covers both warps: the one that built
+        the coadds and the one this task performs.
+        """
+        _, off = self._runCorrection(instrument="TestCam")
+        for coaddKernel, templateKernel in (("lanczos3", "lanczos3"),
+                                            ("lanczos5", "lanczos3"),
+                                            ("lanczos5", "lanczos5"),
+                                            ("bilinear", "lanczos3")):
+            with self.subTest(coaddWarpKernel=coaddKernel, templateWarpKernel=templateKernel):
+                task, on = self._runCorrection(doCorrectVarianceWarpCorrelation=True,
+                                               instrument="TestCam",
+                                               coaddWarpKernel=coaddKernel,
+                                               templateWarpKernel=templateKernel)
+                factor = task.metadata["varianceWarpCorrelationFactor"]
+                # A kernel spreads power, so this always makes the plane
+                # larger.
+                self.assertGreater(factor, 1.0)
+                # The phase average converges slowly for bilinear, because
+                # its sum of squares has a kink where the phase wraps.
+                rtol = 1e-4 if "bilinear" in (coaddKernel, templateKernel) else 1e-5
+                self.assertFloatsAlmostEqual(
+                    factor,
+                    1/(KERNEL_SUM_SQ_1D[coaddKernel]*KERNEL_SUM_SQ_1D[templateKernel])**2,
+                    rtol=rtol)
+                self.assertEqual(task.metadata["variancePlateScaleFactor"], 1.0)
+                if templateKernel == "lanczos3":
+                    # A pure scalar, with no per-pixel structure of its own;
+                    # only comparable when `off` used the same template warp.
+                    self.assertFloatsAlmostEqual(on.variance.array, off.variance.array*factor,
+                                                 rtol=1e-5, ignoreNaNs=True)
+
     def testCorrectVariancePlateScale(self):
         """The plate scale correction is the total pixel area change from the
         images the coadds were built from to the science image.
@@ -523,6 +577,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         # net change in pixel area even when the instruments differ.
         task, on = self._runCorrection()
         self.assertFloatsAlmostEqual(task.metadata["variancePlateScaleFactor"], 1.0, rtol=1e-6)
+        self.assertNotIn("varianceWarpCorrelationFactor", task.metadata)
 
         # Coarser original pixels than science pixels, the DECam-template
         # case: the correction is the ratio of their areas.
@@ -535,6 +590,49 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
                 self.assertFloatsAlmostEqual(factor, scaleFactor**2, rtol=1e-6)
                 self.assertFloatsAlmostEqual(on.variance.array, off.variance.array*factor,
                                              rtol=1e-5, ignoreNaNs=True)
+
+    def testVarianceCorrectionsCompose(self):
+        """The two corrections are independent and multiply together.
+
+        The patches are warped from the exposure and the template is warped
+        back to its pixel grid, so the two warps cancel geometrically, leaving
+        only the two kernels' correlation to undo. The substituted coadd
+        inputs claim coarser original pixels than the exposure really has, so
+        with both corrections applied the variance must come back to its
+        original value times the claimed change in pixel area.
+        """
+        plateScale = 1.315
+        handles = self._patchHandles(0, [(self._makeScaledWcs(plateScale), self.exposure.getBBox())])
+        # A science image from the coadds' instrument applies no correction
+        # at all; one from another instrument applies both.
+        _, off = self._runCorrection(handles=handles, instrument="TestCam")
+        task, on = self._runCorrection(doCorrectVarianceWarpCorrelation=True, handles=handles)
+
+        # Both together is exactly the product of the two factors.
+        self.assertFloatsAlmostEqual(task.metadata["variancePlateScaleFactor"], plateScale**2, rtol=1e-6)
+        scale = (task.metadata["varianceWarpCorrelationFactor"]
+                 * task.metadata["variancePlateScaleFactor"])
+        self.assertFloatsAlmostEqual(task.metadata["templateVarianceCorrectionFactor"],
+                                     scale, rtol=1e-12)
+        self.assertFloatsAlmostEqual(on.variance.array, off.variance.array*scale,
+                                     rtol=1e-5, ignoreNaNs=True)
+
+        # Only the variance plane is touched. Nothing about the correction
+        # feeds back into how the patches are combined.
+        self.assertImagesEqual(on.image, off.image)
+        self.assertMasksEqual(on.mask, off.mask)
+
+        # realize() takes a noise sigma, so the original variance is 4, not 2,
+        # before calibrating to nJy.
+        calibration = self.exposure.photoCalib.getCalibrationMean()
+        original = calibration**2*np.median(self.exposure.variance.array)
+        self.assertFloatsAlmostEqual(np.median(on.variance.array), original*plateScale**2, rtol=0.02)
+
+        # Which is a real correction: uncorrected, the plane is too small by
+        # the two warping kernels' phase-averaged sums of squares.
+        self.assertFloatsAlmostEqual(
+            np.median(off.variance.array)/original,
+            (KERNEL_SUM_SQ_1D[self.coaddWarpKernel]*KERNEL_SUM_SQ_1D["lanczos3"])**2, rtol=0.02)
 
     def testCorrectVariancePlateScaleUsesOneRecord(self):
         """Only the first usable coadd input is read.
@@ -567,7 +665,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         """If the first coadd kept in a tract cannot give the plate scale, the
         first coadd kept in the next tract is used.
         """
-        task = lsst.ip.diffim.GetTemplateTask()
+        task = lsst.ip.diffim.GetTemplateTask(config=self._makeConfig())
         handles = {0: self._patchHandles(0, []),
                    1: self._patchHandles(1, [(self._makeScaledWcs(1.315), self.exposure.getBBox())])}
         task.run(coaddExposureHandles=handles,
@@ -590,7 +688,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         """Build a template from the given tract 0 patch handles.
         """
         box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
-        task = lsst.ip.diffim.GetTemplateTask()
+        task = lsst.ip.diffim.GetTemplateTask(config=self._makeConfig())
         return task.run(coaddExposureHandles={0: handles},
                         bbox=box,
                         wcs=self.exposure.wcs,
@@ -654,7 +752,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
             dataIds = {tract: self.dataIds[tract] for tract in handles}
         if box is None:
             box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
-        task = lsst.ip.diffim.GetTemplateTask()
+        task = lsst.ip.diffim.GetTemplateTask(config=self._makeConfig())
         with self.assertLogs(task.log.name, level="INFO") as cm:
             result = task.run(coaddExposureHandles=handles,
                               bbox=box,
@@ -770,7 +868,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
             """Build a template from tract 0, optionally rescaling the input
             variance planes by ``varianceScale`` first.
             """
-            config = lsst.ip.diffim.GetTemplateTask.ConfigClass()
+            config = self._makeConfig()
             config.doScaleVariance = doScaleVariance
             task = lsst.ip.diffim.GetTemplateTask(config=config)
             result = task.run(coaddExposureHandles={0: self._scaleInputVariance(0, varianceScale)},
@@ -782,25 +880,19 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
 
         # With scaling disabled the subtask is never constructed, and nothing
         # is recorded in the metadata.
-        taskOff, templateOff = _configureAndRunTask(False)
+        taskOff, templateOff = _configureAndRunTask(doScaleVariance=False)
         self.assertFalse(hasattr(taskOff, "scaleVariance"))
         self.assertNotIn("scaleTemplateVarianceFactor", taskOff.metadata)
 
-        # Both warps -- lanczos5 in ``_makePatches`` and lanczos3 in the
-        # task -- correlate the noise. The variance plane tracks only the
-        # per-pixel diagonal, which the second warp leaves too low, so
-        # ``scaleVariance`` measures a factor well above 1 even though the
-        # input variance planes are correct.
-        #
-        taskOn, templateOn = _configureAndRunTask(True)
+        # The image is correlated after warping, so ``doScaleVariance`` will
+        # apply a correction. The value here is empirical from a warped image
+        # with white noise and no sources.
+        taskOn, templateOn = _configureAndRunTask(doScaleVariance=True)
         factor = taskOn.metadata["scaleTemplateVarianceFactor"]
-        # TODO DM-55879: this value is pinned on purpose. The lanczos warping
-        # kernels introduce small correlations that artificially suppress the
-        # image pixel stddev and inflate the variance scaling factor. This
-        # should be changed to 1.0 after DM-55879 is merged.
-        self.assertFloatsAlmostEqual(factor, 1.1465, atol=0.01,
-                                     msg="Measured template variance scaling changed; see the"
-                                         " comment above if the correlation correction landed.")
+        self.assertFloatsAlmostEqual(factor, 1.145, atol=0.01,
+                                     msg="Measured template variance scaling changed; check the"
+                                         " warping kernels used by _makePatches and the task,"
+                                         " and the order of the variance corrections.")
         # The only difference from the unscaled template is the constant
         # factor applied to the variance plane.
         self.assertFloatsAlmostEqual(templateOn.variance.array,
@@ -812,7 +904,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         # If the input variance planes under-estimate the noise by a known
         # factor, the measured factor grows by that amount and the same
         # output variance plane is recovered.
-        taskLow, templateLow = _configureAndRunTask(True, varianceScale=1/scaleFactor)
+        taskLow, templateLow = _configureAndRunTask(doScaleVariance=True, varianceScale=1/scaleFactor)
         self.assertFloatsAlmostEqual(taskLow.metadata["scaleTemplateVarianceFactor"],
                                      factor*scaleFactor, rtol=1e-5)
         self.assertImagesAlmostEqual(templateLow.variance, templateOn.variance, rtol=1e-5)
@@ -838,7 +930,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
             The bounding box the template was requested on, before the task
             grew it by the template border.
         """
-        config = lsst.ip.diffim.GetTemplateTask.ConfigClass()
+        config = self._makeConfig()
         config.output_image_type = "future"
         config.raiseOnUndefinedMaskMap = raiseOnUndefinedMaskMap
         task = lsst.ip.diffim.GetTemplateTask(config=config)
@@ -1080,6 +1172,87 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         psf = result.template.to_legacy().getPsf()
         self.assertIsInstance(psf, lsst.afw.detection.GaussianPsf)
         self.assertFloatsAlmostEqual(psf.getSigma(), result.template.psf.sigma)
+
+
+class WarpCorrelationFactorTestCase(lsst.utils.tests.TestCase):
+    """Test the warping correlation correction on pure noise, with no other
+    variance correction.
+    """
+
+    def setUp(self):
+        self.size = 1024
+        self.bbox = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Extent2I(self.size, self.size))
+
+    def _makeWcs(self, angle, offset):
+        """Make a WCS with a fixed plate scale, rotated by ``angle`` degrees
+        and with its reference pixel moved by ``offset`` pixels.
+        """
+        center = lsst.geom.Point2D(self.size/2 + offset[0], self.size/2 + offset[1])
+        cdMatrix = lsst.afw.geom.makeCdMatrix(0.2*lsst.geom.arcseconds, angle*lsst.geom.degrees)
+        return lsst.afw.geom.makeSkyWcs(center, lsst.geom.SpherePoint(45, 30, lsst.geom.degrees),
+                                        cdMatrix)
+
+    def testCorrelationFactorRestoresNoisePower(self):
+        """Warp pure noise to a rotated, offset frame with the coadd kernel,
+        then to a third frame with the task's own warper.
+
+        Warping leaves the variance of a flux summed over a region (the noise
+        power) unchanged, but lowers the per-pixel scatter and, by more, the
+        variance plane. The correction must bring the variance plane back to
+        the noise power of the original image.
+        """
+        sigma = 2.0
+        rng = np.random.default_rng(42)
+        original = lsst.afw.image.ExposureF(self.bbox, self._makeWcs(0, (0, 0)))
+        original.image.array[:] = rng.normal(0, sigma, original.image.array.shape)
+        original.variance.array[:] = sigma**2
+
+        config = lsst.ip.diffim.GetTemplateTask.ConfigClass()
+        config.doScaleVariance = False
+        config.coaddWarpKernel = "lanczos3"
+        task = lsst.ip.diffim.GetTemplateTask(config=config)
+        coadd = lsst.afw.math.Warper(config.coaddWarpKernel).warpExposure(
+            self._makeWcs(37, (0.31, 0.72)), original, destBBox=self.bbox)
+        template = task.warper.warpExposure(self._makeWcs(-21, (0.58, 0.23)), coadd, destBBox=self.bbox)
+
+        # The central quarter is covered in every frame.
+        inner = lsst.geom.Box2I(lsst.geom.Point2I(self.size//4, self.size//4),
+                                lsst.geom.Extent2I(self.size//2, self.size//2))
+        originalStd = original.image[inner].array.std()
+        image = template.image[inner].array.astype(float)
+        pixelStd = image.std()
+        # Each warp moves flux between neighboring pixels but doesn't create
+        # or destroy any, so the noise in a flux summed over a region is the
+        # same before and after. Summing the image over blocks and measuring
+        # how much those sums scatter gives that quantity directly, without
+        # depending on the variance plane. Every placement of the block is
+        # used, from a summed-area table, to reduce the noise.
+        blockSize = 8
+        table = np.pad(image.cumsum(axis=0).cumsum(axis=1), ((1, 0), (1, 0)))
+        sums = (table[blockSize:, blockSize:] - table[:-blockSize, blockSize:]
+                - table[blockSize:, :-blockSize] + table[:-blockSize, :-blockSize])
+        blockStd = sums.std()/blockSize
+        planeStdBefore = np.sqrt(template.variance[inner].array.mean())
+        task._correctVariance(template, plateScaleFactor=1.0)
+        planeStdAfter = np.sqrt(template.variance[inner].array.mean())
+        factor = task.metadata["varianceWarpCorrelationFactor"]
+
+        # afw propagates the variance as if each warp's input pixels were
+        # independent, so the plane drops by exactly the factor's reciprocal.
+        self.assertFloatsAlmostEqual(planeStdBefore, sigma/np.sqrt(factor), rtol=1e-5)
+        self.assertFloatsAlmostEqual(planeStdAfter, sigma, rtol=1e-5)
+
+        # The warps conserve the noise power, which the corrected plane
+        # matches.
+        self.assertFloatsAlmostEqual(blockStd, originalStd, rtol=0.03)
+        self.assertFloatsAlmostEqual(blockStd, planeStdAfter, rtol=0.03)
+
+        # The per-pixel scatter drops, though by less than the uncorrected
+        # plane, because the second warp receives correlated input. The
+        # corrected plane deliberately exceeds it.
+        self.assertLess(pixelStd, 0.9*originalStd)
+        self.assertGreater(pixelStd, planeStdBefore)
+        self.assertLess(pixelStd, planeStdAfter)
 
 
 class GetTemplateConnectionsTestCase(lsst.utils.tests.TestCase):
