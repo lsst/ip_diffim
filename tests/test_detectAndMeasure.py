@@ -126,7 +126,8 @@ class DetectAndMeasureTestBase:
 
     def _setup_detection(self, doSkySources=True, nSkySources=5,
                          doSubtractBackground=False, run_sattle=False,
-                         badSourceFlags=None, **kwargs):
+                         badSourceFlags=None, clusterRadius=None,
+                         doReplaceWithNoise=None, **kwargs):
         """Setup and configure the detection and measurement PipelineTask.
 
         Parameters
@@ -148,6 +149,10 @@ class DetectAndMeasureTestBase:
         if doSkySources:
             config.skySources.nSources = nSkySources
         config.update(**kwargs)
+        if clusterRadius is not None:
+            config.deblend.clusterRadius = clusterRadius
+        if doReplaceWithNoise is not None:
+            config.measurement.doReplaceWithNoise = doReplaceWithNoise
 
         config.run_sattle = run_sattle
 
@@ -193,7 +198,7 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         # Set the subtraction residual metric threshold high, since the template
         # is not actually subtracted from the science image.
         detectionTask = self._setup_detection(doDeblend=True, badSubtractionRatioThreshold=1.,
-                                              doSkySources=False)
+                                              doSkySources=False, clusterRadius=1.5)
 
         # Run detection and check the results
         output = detectionTask.run(science, matchedTemplate, difference, sources,
@@ -211,6 +216,64 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         refIds = []
         for source in sources:
             self._check_diaSource(output.diaSources, source, refIds=refIds)
+
+    def test_deblended_measurement_limited_to_footprint(self):
+        """Deblended sources should be measured from only their own footprint
+        pixels: with neighbor pixels replaced by noise, a source's aperture
+        flux recovers its injected value, but should be biased without
+        replacement.
+        """
+        # Set up the simulated images.
+        noiseLevel = 1.
+        staticSeed = 1
+        transientSeed = 6
+        psfSize = 2.4
+        apColumn = "base_CircularApertureFlux_12_0_instFlux"
+        kwargs = {"psfSize": psfSize, "x0": 0, "y0": 0, "xSize": 256, "ySize": 256}
+        science, _ = makeTestImage(seed=staticSeed, noiseLevel=noiseLevel, noiseSeed=6, nSrc=1, **kwargs)
+        science.getInfo().setVisitInfo(makeVisitInfo())
+        matchedTemplate, _ = makeTestImage(seed=staticSeed, noiseLevel=noiseLevel/4, noiseSeed=7,
+                                           nSrc=1, **kwargs)
+
+        # Two equal-flux transients, close enough to share a footprint (so they
+        # are deblended) but far enough apart to be detected as separate peaks
+        # and split into two clusters. Their separation is well within the 12
+        # pixel aperture, so each source's aperture overlaps the other.
+        fluxLevel = 3000.
+        separation = 10.
+        center = 128.
+        xLoc = [center - separation/2, center + separation/2]
+        yLoc = [center, center]
+        transients, _ = makeTestImage(seed=transientSeed, nSrc=2, xLoc=xLoc, yLoc=yLoc,
+                                      flux=[fluxLevel, fluxLevel],
+                                      noiseLevel=noiseLevel, noiseSeed=8, **kwargs)
+        difference = science.clone()
+        difference.maskedImage -= matchedTemplate.maskedImage
+        difference.maskedImage += transients.maskedImage
+
+        def _run(doReplaceWithNoise):
+            detectionTask = self._setup_detection(doDeblend=True, doSkySources=False,
+                                                  clusterRadius=1.0, badSubtractionRatioThreshold=1.,
+                                                  doReplaceWithNoise=doReplaceWithNoise)
+            diaSources = detectionTask.run(
+                science, matchedTemplate, difference.clone(),
+                idFactory=self.idGenerator.make_table_id_factory()).diaSources
+            # The blend should split into two separate deblended diaSources.
+            self.assertEqual(len(diaSources), 2)
+            self.assertTrue(all(diaSources["is_deblended"]))
+            return np.array(diaSources[apColumn])
+
+        apFluxReplaced = _run(doReplaceWithNoise=True)
+        apFluxContaminated = _run(doReplaceWithNoise=False)
+
+        # Every source's aperture flux is inflated by its neighbor when the
+        # neighbor pixels are left in place.
+        self.assertTrue(np.all(apFluxContaminated > apFluxReplaced))
+        # With the neighbor replaced by noise, aperture flux recovers the
+        # injected flux; without it, the aperture flux is inflated well beyond
+        # tolerance.
+        self.assertFloatsAlmostEqual(np.mean(apFluxReplaced), fluxLevel, rtol=0.1)
+        self.assertGreater(np.mean(apFluxContaminated), fluxLevel*1.3)
 
     def test_raise_bad_psf(self):
         """Detection should raise if the PSF width is NaN
@@ -825,7 +888,8 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
 
         detectionTask = self._setup_detection(doDeblend=True,
                                               badSubtractionRatioThreshold=1.,
-                                              doSkySources=False, run_sattle=True)
+                                              doSkySources=False, run_sattle=True,
+                                              clusterRadius=1.5)
 
         return science, matchedTemplate, difference, sources, detectionTask
 
@@ -957,7 +1021,7 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         # Set the subtraction residual metric threshold high, since the template
         # is not actually subtracted from the science image.
         detectionTask = self._setup_detection(doDeblend=True, badSubtractionRatioThreshold=1.,
-                                              doSkySources=False)
+                                              doSkySources=False, clusterRadius=1.5)
 
         # Run detection and check the results
         output = detectionTask.run(science, matchedTemplate, difference, score, sources,
@@ -975,6 +1039,68 @@ class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestC
         refIds = []
         for source in sources:
             self._check_diaSource(output.diaSources, source, refIds=refIds)
+
+    def test_deblended_measurement_limited_to_footprint(self):
+        """Deblended sources should be measured from only their own footprint
+        pixels: with neighbor pixels replaced by noise, a source's aperture
+        flux recovers its injected value, but should be biased without
+        replacement.
+        """
+        # Set up the simulated images.
+        noiseLevel = 1.
+        staticSeed = 1
+        transientSeed = 6
+        psfSize = 2.4
+        apColumn = "base_CircularApertureFlux_12_0_instFlux"
+        kwargs = {"psfSize": psfSize, "x0": 0, "y0": 0, "xSize": 256, "ySize": 256}
+        science, sources = makeTestImage(seed=staticSeed, noiseLevel=noiseLevel, noiseSeed=6,
+                                         nSrc=1, **kwargs)
+        science.getInfo().setVisitInfo(makeVisitInfo())
+        matchedTemplate, _ = makeTestImage(seed=staticSeed, noiseLevel=noiseLevel/4, noiseSeed=7,
+                                           nSrc=1, **kwargs)
+
+        # Two equal-flux transients, close enough to share a footprint (so they
+        # are deblended) but far enough apart to be detected as separate peaks
+        # and split into two clusters. Their separation is well within the 12
+        # pixel aperture, so each source's aperture overlaps the other.
+        fluxLevel = 3000.
+        separation = 10.
+        center = 128.
+        xLoc = [center - separation/2, center + separation/2]
+        yLoc = [center, center]
+        transients, _ = makeTestImage(seed=transientSeed, nSrc=2, xLoc=xLoc, yLoc=yLoc,
+                                      flux=[fluxLevel, fluxLevel],
+                                      noiseLevel=noiseLevel, noiseSeed=8, **kwargs)
+        difference = science.clone()
+        difference.maskedImage -= matchedTemplate.maskedImage
+        difference.maskedImage += transients.maskedImage
+        subtractTask = subtractImages.AlardLuptonPreconvolveSubtractTask()
+        scienceKernel = science.psf.getKernel()
+        score = subtractTask._convolveExposure(difference, scienceKernel, subtractTask.convolutionControl)
+
+        def _run(doReplaceWithNoise):
+            detectionTask = self._setup_detection(doDeblend=True, doSkySources=False,
+                                                  clusterRadius=1.0, badSubtractionRatioThreshold=1.,
+                                                  doReplaceWithNoise=doReplaceWithNoise)
+            diaSources = detectionTask.run(
+                science, matchedTemplate, difference.clone(), score.clone(), sources,
+                idFactory=self.idGenerator.make_table_id_factory()).diaSources
+            # The blend should split into two separate deblended diaSources.
+            self.assertEqual(len(diaSources), 2)
+            self.assertTrue(all(diaSources["is_deblended"]))
+            return np.array(diaSources[apColumn])
+
+        apFluxReplaced = _run(doReplaceWithNoise=True)
+        apFluxContaminated = _run(doReplaceWithNoise=False)
+
+        # Every source's aperture flux is inflated by its neighbor when the
+        # neighbor pixels are left in place.
+        self.assertTrue(np.all(apFluxContaminated > apFluxReplaced))
+        # With the neighbor replaced by noise, aperture flux recovers the
+        # injected flux; without it, the aperture flux is inflated well beyond
+        # tolerance.
+        self.assertFloatsAlmostEqual(np.mean(apFluxReplaced), fluxLevel, rtol=0.1)
+        self.assertGreater(np.mean(apFluxContaminated), fluxLevel*1.3)
 
     def test_measurements_finite(self):
         """Measured fluxes and centroids should always be finite.
@@ -1404,57 +1530,6 @@ class TestNegativePeaks(lsst.utils.tests.TestCase):
     various problems found on DM-48596.
     """
 
-    def testDeblendNegatives(self):
-        """Test that negative peaks get deblended and not destroyed: DM-48704.
-        This is only a test of deblending, not of merging.
-        """
-        # Make a science image with one blend of two positive sources, to
-        # subtract from an empty template, resulting in a negative diffim.
-        bbox = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(100, 100))
-        dataset = lsst.meas.base.tests.TestDataset(bbox)
-        delta = 10
-        with dataset.addBlend() as family:
-            family.addChild(instFlux=2E5, centroid=lsst.geom.Point2D(50, 72))
-            family.addChild(instFlux=2.5E5, centroid=lsst.geom.Point2D(50+delta, 74))
-        science, catalog = dataset.realize(noise=1.0,
-                                           schema=lsst.meas.base.tests.TestDataset.makeMinimalSchema())
-        dataset = lsst.meas.base.tests.TestDataset(bbox)
-        template, _ = dataset.realize(noise=1.0,
-                                      schema=lsst.meas.base.tests.TestDataset.makeMinimalSchema())
-        difference = template.clone()
-        difference.image -= science.image
-
-        config = detectAndMeasure.DetectAndMeasureTask.ConfigClass()
-        config.doDeblend = True
-        task = detectAndMeasure.DetectAndMeasureTask(config=config)
-        # prelude steps taken from `detectAndMeasure.run`
-        task._prepareInputs(difference)
-        table = lsst.afw.table.SourceTable.make(task.schema)
-        results = task.detection.run(table=table, exposure=difference, doSmooth=True)
-        # Just run the deblend step so we can check the footprints independently.
-        sources, positives, negatives = task._deblend(difference, results.positive, results.negative)
-
-        # DM-48704 fixed a problem where the peaks were in the footprints, but
-        # the spans were empty.
-        self.assertEqual(len(negatives), 2)
-        self.assertEqual(len(positives), 0)
-        self.assertGreater(negatives[0].getFootprint().getSpans().getArea(), 0)
-        self.assertGreater(negatives[1].getFootprint().getSpans().getArea(), 0)
-        # Deblended children are HeavyFootprints; we have to make sure the
-        # pixel values in those are correct (though DetectAndMeasureTask
-        # doesn't use the fact that they're Heavy).
-        # The sources are positive in the science image, and negative in the
-        # diffim, so the minimum value in the deblended negative footprint is
-        # the maximum value in the science catalog footprint (ignoring the
-        # noise in the science and template, hence rtol).
-        # (catalog[0] is the parent; we want the children)
-        self.assertFloatsAlmostEqual(negatives[0].getFootprint().getImageArray().min(),
-                                     -catalog[1].getFootprint().getImageArray().max(), rtol=1e-4)
-        self.assertFloatsAlmostEqual(negatives[1].getFootprint().getImageArray().min(),
-                                     -catalog[2].getFootprint().getImageArray().max(), rtol=1e-4)
-
-        self.assertEqual(sources["is_negative"].sum(), 2)
-
     def testMergeFootprints(self):
         """Test that merging footprints does not cause negative ones to
         disappear (e.g. get merged into non-connected footprints).
@@ -1506,6 +1581,9 @@ class TestNegativePeaks(lsst.utils.tests.TestCase):
 
         config = detectAndMeasure.DetectAndMeasureTask.ConfigClass()
         config.doDeblend = True
+        # Keep the positive blended pair (~10 px apart) in a single cluster, so
+        # this test exercises footprint merging rather than deblend splitting.
+        config.deblend.clusterRadius = 3.0
         config.raiseOnBadSubtractionRatio = False
         config.raiseOnNoDiaSources = False
         task = detectAndMeasure.DetectAndMeasureTask(config=config)
@@ -1539,10 +1617,10 @@ class TestNegativePeaks(lsst.utils.tests.TestCase):
         unique_peaks, counts = np.unique(peaks, axis=0, return_counts=True)
         self.assertEqual(np.sum(counts > 1), 0)
 
-        # There are three positive sources that should not have `is_negative`
-        # set, independent of how deblending/merging of negative sources is
-        # handled.
-        self.assertEqual((~result.diaSources["is_negative"]).sum(), 3)
+        # Two positive sources should not have `is_negative` set: the isolated
+        # source at (25, 26) and the positive blended pair, which stays merged
+        # as a single source because its peaks are within ``clusterRadius``.
+        self.assertEqual((~result.diaSources["is_negative"]).sum(), 2)
 
     def testReorderPeaksBySignificance(self):
         """A merged footprint whose most significant peak is negative should
@@ -1578,6 +1656,54 @@ class TestNegativePeaks(lsst.utils.tests.TestCase):
         self.assertEqual(peaks[0]["significance"], 40.0)
         self.assertEqual(peaks[1].getPeakValue(), 30.0)
         self.assertEqual(peaks[1]["significance"], 5.0)
+
+    def _makeDeblendableCatalog(self, schema, bbox, peakXY):
+        """A single-source catalog whose footprint has well-separated peaks."""
+        peakSchema = afwDetection.FootprintMergeList(
+            afwTable.SourceTable.makeMinimalSchema(), ["positive", "negative"]).getPeakSchema()
+        negativeKey = peakSchema.find("merge_peak_negative").key
+        positiveKey = peakSchema.find("merge_peak_positive").key
+        catalog = afwTable.SourceCatalog(schema)
+        source = catalog.addNew()
+        footprint = afwDetection.Footprint(afwGeom.SpanSet(bbox), peakSchema)
+        for ix, iy in peakXY:
+            peak = footprint.addPeak(ix, iy, 100.0)
+            peak.set(negativeKey, False)
+            peak.set(positiveKey, True)
+        source.setFootprint(footprint)
+        return catalog
+
+    def testDeblendGuardrailSkipsManyPeaks(self):
+        """A deblendable footprint with more peaks than the cap is left whole."""
+        config = detectAndMeasure.DetectAndMeasureTask.ConfigClass()
+        config.doDeblend = True
+        config.deblend.maxPeaks = 2
+        task = detectAndMeasure.DetectAndMeasureTask(config=config)
+        # psfSize=1 keeps the linking radius small enough that the peaks below
+        # split into separate clusters, so the footprint is deblendable.
+        difference, _ = makeTestImage(psfSize=1., x0=0, y0=0)
+        bbox = geom.Box2I(geom.Point2I(0, 0), geom.Extent2I(40, 40))
+        # Three peaks, spaced beyond the linking radius, so the footprint is
+        # deblendable but exceeds maxPeaks.
+        diaSources = self._makeDeblendableCatalog(task.schema, bbox, [(8, 20), (20, 20), (32, 20)])
+        result = task.deblend.run(diaSources, difference).diaSources
+        self.assertEqual(len(result), 1)
+        self.assertFalse(result[0]["is_deblended"])
+        self.assertEqual(task.deblend.metadata["nSkipped"], 1)
+
+    def testDeblendGuardrailSkipsLargeArea(self):
+        """A deblendable footprint bigger than the area cap is left whole."""
+        config = detectAndMeasure.DetectAndMeasureTask.ConfigClass()
+        config.doDeblend = True
+        config.deblend.maxFootprintArea = 100
+        task = detectAndMeasure.DetectAndMeasureTask(config=config)
+        difference, _ = makeTestImage(psfSize=1., x0=0, y0=0)
+        bbox = geom.Box2I(geom.Point2I(0, 0), geom.Extent2I(40, 40))  # area 1600 > 100
+        diaSources = self._makeDeblendableCatalog(task.schema, bbox, [(8, 20), (20, 20), (32, 20)])
+        result = task.deblend.run(diaSources, difference).diaSources
+        self.assertEqual(len(result), 1)
+        self.assertFalse(result[0]["is_deblended"])
+        self.assertEqual(task.deblend.metadata["nSkipped"], 1)
 
 
 def makeVisitInfo(id=1):
