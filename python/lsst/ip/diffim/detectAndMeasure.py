@@ -1231,8 +1231,10 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         stderrs = np.array([trail.stderr for trail in trailed_glints.parameters])
         lengths = np.array([trail.length for trail in trailed_glints.parameters])
         angles = np.array([trail.angle for trail in trailed_glints.parameters])
+        center_xs = np.array([trail.center_x for trail in trailed_glints.parameters])
+        center_ys = np.array([trail.center_y for trail in trailed_glints.parameters])
         parameters = {'slopes': slopes, 'intercepts': intercepts, 'stderrs': stderrs, 'lengths': lengths,
-                      'angles': angles}
+                      'angles': angles, 'center_xs': center_xs, 'center_ys': center_ys}
 
         trail_parameters = pipeBase.Struct(glintTrailInfo=parameters)
 

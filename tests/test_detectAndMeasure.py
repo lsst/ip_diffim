@@ -926,6 +926,8 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         self.assertTrue('stderrs' in output.glintTrailInfo)
         self.assertTrue('lengths' in output.glintTrailInfo)
         self.assertTrue('angles' in output.glintTrailInfo)
+        self.assertTrue('center_xs' in output.glintTrailInfo)
+        self.assertTrue('center_ys' in output.glintTrailInfo)
 
 
 class DetectAndMeasureScoreTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
