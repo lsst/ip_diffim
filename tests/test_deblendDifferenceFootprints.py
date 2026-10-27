@@ -33,6 +33,7 @@ from lsst.ip.diffim.deblendDifferenceFootprints import (
     DeblendDifferenceFootprintsTask,
     _cluster_peak_indices,
     _deblend_footprint,
+    _merge_trail_clusters,
 )
 
 
@@ -245,6 +246,19 @@ class DeblendFootprintTestCase(lsst.utils.tests.TestCase):
         self.assertIsNotNone(result)
         self.assertEqual(len(result.children), 1)
 
+    def test_trail_survives_contamination_merge(self):
+        """A cluster that absorbs a trailed source through the contamination
+        merge is still a trailed source, and is left as detected.
+        """
+        footprint = makeFootprint(self.peakSchema, [(10, 20, False, 100.0), (22, 20, False, 100.0),
+                                                    (34, 20, False, 100.0), (38, 20, False, 100.0)])
+        # 4 px from the trail's last peak, with sigma=2: overlap exp(-1) > 0.05.
+        result = _deblend_footprint(footprint, [[3], [0, 1, 2]], sigma=2.0, trails=[False, True])
+        self.assertIsNotNone(result)
+        self.assertEqual(result.children, [])
+        self.assertEqual(result.trails, [True])
+        self.assertIs(result.parent, footprint)
+
 
 class RunTestCase(lsst.utils.tests.TestCase):
     """Tests of the task-level ``run`` over a diaSource catalog."""
@@ -257,7 +271,8 @@ class RunTestCase(lsst.utils.tests.TestCase):
         # the NOT_DEBLENDED plane for any guardrail-skipped footprints.
         bbox = geom.Box2I(geom.Point2I(0, 0), geom.Extent2I(64, 64))
         exposure = afwImage.ExposureF(bbox)
-        exposure.setPsf(afwDetection.GaussianPsf(11, 11, psfSigma))
+        exposure.setPsf(afwDetection.GaussianPsf(21, 21, psfSigma))
+        exposure.variance.array[:] = 1.0
         return exposure
 
     def makeCatalog(self, footprints):
@@ -331,6 +346,8 @@ class RunTestCase(lsst.utils.tests.TestCase):
         self.assertEqual(len(result.diaSources), 1)
         self.assertFalse(result.diaSources[0]["is_deblended"])
         self.assertEqual(task.metadata["nSkipped"], 1)
+        # The size limits apply before the collinear peaks could form a trail.
+        self.assertEqual(task.metadata["nTrailedDiaSources"], 0)
         # The whole (full-frame) footprint is flagged NOT_DEBLENDED.
         notDeblended = difference.mask.getPlaneBitMask("NOT_DEBLENDED")
         self.assertTrue(np.all((difference.mask.array & notDeblended) != 0))
@@ -414,6 +431,338 @@ class FootprintAreaTestCase(lsst.utils.tests.TestCase):
 
         self.assertEqual(len(diaSources), 1)
         self.assertEqual(task.metadata["nSkipped"], 1)
+
+
+class TrailTestCase(lsst.utils.tests.TestCase):
+    """Tests that clusters of positive peaks along one line are kept together
+    as a trailed source.
+
+    With a 2 pixel Gaussian PSF the FWHM is ~4.7 pixels, so peaks 12 pixels
+    apart are beyond the ~9.4 pixel linking radius: each forms its own cluster,
+    and only the trail stage can keep them together.
+    """
+
+    def setUp(self):
+        self.schema, self.peakSchema = makeSchemas()
+
+    def runTask(self, peaks, footprint=None, **configKwargs):
+        """Deblend one full-frame footprint carrying the given peaks.
+
+        Parameters
+        ----------
+        peaks : `list` of `tuple`
+            Each ``(ix, iy)`` for a positive peak of significance 20, or
+            ``(ix, iy, isNegative[, significance])``.
+        footprint : `lsst.afw.detection.Footprint`, optional
+            Footprint to deblend instead, carrying its own peaks.
+        """
+        bbox = geom.Box2I(geom.Point2I(0, 0), geom.Extent2I(64, 64))
+        self.difference = afwImage.ExposureF(bbox)
+        self.difference.setPsf(afwDetection.GaussianPsf(21, 21, 2.0))
+        config = DeblendDifferenceFootprintsTask.ConfigClass()
+        config.clusterRadius = 2.0
+        for key, value in configKwargs.items():
+            setattr(config, key, value)
+        catalog = afwTable.SourceCatalog(self.schema)
+        if footprint is None:
+            footprintPeaks = [(peak[0], peak[1], len(peak) > 2 and peak[2],
+                               peak[3] if len(peak) > 3 else 20.0) for peak in peaks]
+            footprint = makeFootprint(self.peakSchema, footprintPeaks)
+        catalog.addNew().setFootprint(footprint)
+        self.task = DeblendDifferenceFootprintsTask(config=config)
+        return self.task.run(catalog, self.difference).diaSources
+
+    def assertPeakCounts(self, diaSources, counts):
+        self.assertEqual(sorted(len(record.getFootprint().getPeaks()) for record in diaSources), counts)
+
+    def notDeblendedPixels(self):
+        bit = self.difference.mask.getPlaneBitMask("NOT_DEBLENDED")
+        return (self.difference.mask.array & bit) != 0
+
+    def test_isolated_peaks_on_a_line(self):
+        """A line of isolated peaks stays one diaSource, left as detected."""
+        diaSources = self.runTask([(14, 32), (26, 32), (38, 32), (50, 32)])
+
+        self.assertPeakCounts(diaSources, [4])
+        self.assertFalse(diaSources[0]["is_deblended"])
+        self.assertTrue(np.all(self.notDeblendedPixels()))
+        self.assertEqual(self.task.metadata["nTrailedDiaSources"], 1)
+
+    def test_three_isolated_peaks_on_a_line(self):
+        """A line of exactly the minimum number of isolated peaks is found."""
+        diaSources = self.runTask([(20, 32), (32, 32), (44, 32)])
+
+        self.assertPeakCounts(diaSources, [3])
+
+    def test_vertical_line(self):
+        """A vertical line of isolated peaks stays one diaSource."""
+        diaSources = self.runTask([(32, 14), (32, 26), (32, 38), (32, 50)])
+
+        self.assertPeakCounts(diaSources, [4])
+
+    def test_two_isolated_peaks_split(self):
+        """Two isolated peaks are too few to make a line, so they deblend."""
+        diaSources = self.runTask([(20, 32), (32, 32)])
+
+        self.assertPeakCounts(diaSources, [1, 1])
+        self.assertTrue(all(record["is_deblended"] for record in diaSources))
+        self.assertFalse(np.any(self.notDeblendedPixels()))
+        self.assertEqual(self.task.metadata["nTrailedDiaSources"], 0)
+
+    def test_cluster_extends_along_its_line(self):
+        """A cluster of collinear positive peaks picks up isolated peaks on its
+        line beyond the linking radius.
+
+        Two isolated peaks are too few for a line of isolated peaks, so only
+        the cluster's own line can pick them up.
+        """
+        # The cluster's peaks are 8 pixels (1.7 FWHM) apart, enough to fix a
+        # direction.
+        diaSources = self.runTask([(10, 32), (18, 32), (30, 32), (42, 32)])
+
+        self.assertPeakCounts(diaSources, [4])
+
+    def test_cluster_and_one_peak_split(self):
+        """A cluster and one isolated peak on its line are too few clusters to
+        make a trail, so they deblend.
+        """
+        diaSources = self.runTask([(10, 32), (18, 32), (30, 32)])
+
+        self.assertPeakCounts(diaSources, [1, 2])
+        self.assertEqual(self.task.metadata["nTrailedDiaSources"], 0)
+
+    def test_cluster_absorbs_collinear_clusters(self):
+        """A cluster absorbs whole clusters of positive peaks on its line."""
+        diaSources = self.runTask([(4, 32), (12, 32), (24, 32), (32, 32), (44, 32), (52, 32)])
+
+        self.assertPeakCounts(diaSources, [6])
+
+    def test_negative_peak_blocks_absorption(self):
+        """A cluster on the line that holds a negative peak stays separate,
+        and the trail deblended from it is not flagged NOT_DEBLENDED.
+        """
+        # The negative peak is on the line, within the linking radius of the
+        # last crest, so only its sign keeps the cluster out of the trail.
+        diaSources = self.runTask([(8, 32), (20, 32), (32, 32), (44, 32), (56, 32), (59, 32, True)])
+
+        self.assertPeakCounts(diaSources, [2, 4])
+        self.assertTrue(all(record["is_deblended"] for record in diaSources))
+        self.assertFalse(np.any(self.notDeblendedPixels()))
+        self.assertEqual(self.task.metadata["nTrailedDiaSources"], 1)
+
+    def test_isolated_negative_peak_not_in_line(self):
+        """An isolated negative peak on the line is not part of the trail."""
+        diaSources = self.runTask([(8, 32), (20, 32), (32, 32), (44, 32), (56, 32, True)])
+
+        self.assertPeakCounts(diaSources, [1, 4])
+
+    def test_two_peak_cluster_refit(self):
+        """A two-peak cluster picks up peaks that lie within tolerance of the
+        line refit to the trail, though not of the pair's own axis.
+        """
+        # (40, 34) is 0.42 FWHM off the pair's axis, and fits best of the two.
+        diaSources = self.runTask([(16, 32), (24, 32), (40, 34), (56, 36)])
+
+        self.assertPeakCounts(diaSources, [4])
+
+    def test_two_peak_cluster_off_axis(self):
+        """A two-peak cluster does not pick up a peak far off its axis."""
+        diaSources = self.runTask([(16, 32), (24, 32), (28, 46)])
+
+        self.assertPeakCounts(diaSources, [1, 2])
+
+    def test_compact_cluster_joins_line_as_a_point(self):
+        """A cluster spanning less than 1.5 FWHM joins a line of isolated peaks
+        at its mean position.
+        """
+        diaSources = self.runTask([(8, 32), (20, 32), (31, 31), (33, 33), (44, 32)])
+
+        self.assertPeakCounts(diaSources, [5])
+
+    def test_compact_cluster_span(self):
+        """A cluster spread across a line joins it as a point only when its
+        span is below ``compactClusterSpan``.
+        """
+        # The cluster's peaks are 6 pixels (1.3 FWHM) apart, each 0.64 FWHM
+        # off the line, but their mean is on it.
+        peaks = [(20, 32), (32, 29), (32, 35), (44, 32), (56, 32)]
+        self.assertPeakCounts(self.runTask(peaks), [5])
+        self.assertPeakCounts(self.runTask(peaks, compactClusterSpan=1.0), [2, 3])
+
+    def test_compact_cluster_absorbed_at_its_mean(self):
+        """A trail grown from a wider cluster absorbs a compact cluster whose
+        mean lies on its line, though its peaks do not.
+        """
+        # The middle pair's peaks are 6 pixels (1.3 FWHM) apart and 0.64 FWHM
+        # off the line; the first pair's are 8 pixels (1.7 FWHM) apart, so only
+        # the first fixes a direction.
+        peaks = [(8, 32), (16, 32), (28, 29), (28, 35), (40, 32), (52, 32)]
+        self.assertPeakCounts(self.runTask(peaks), [6])
+        self.assertPeakCounts(self.runTask(peaks, compactClusterSpan=1.0), [2, 4])
+
+    def test_tolerance_in_fwhm(self):
+        """A peak 1 pixel (0.21 FWHM) off the line joins the trail, and one 2
+        pixels (0.42 FWHM) off does not.
+        """
+        line = [(12, 32), (32, 32), (42, 32), (52, 32)]
+        self.assertPeakCounts(self.runTask(line + [(22, 33)]), [5])
+        self.assertPeakCounts(self.runTask(line + [(22, 34)]), [1, 4])
+
+    def test_off_line_peak_blocks_absorption(self):
+        """A cluster with a peak off the line stays separate."""
+        # 8 pixels from the line: within the linking radius of the last crest,
+        # but well beyond the 0.25 FWHM tolerance.
+        diaSources = self.runTask([(8, 32), (20, 32), (32, 32), (44, 32), (56, 32), (56, 40)])
+
+        self.assertPeakCounts(diaSources, [2, 4])
+
+    def test_wide_gap_joins_line(self):
+        """A collinear peak far along the line still joins the trail when the
+        footprint covers the space between them.
+        """
+        # 32 pixels, ~6.8 FWHM, from the nearest other peak.
+        diaSources = self.runTask([(4, 32), (16, 32), (28, 32), (60, 32)])
+
+        self.assertPeakCounts(diaSources, [4])
+
+    def notchedFootprint(self, columns, peaks):
+        """Build a footprint whose band along row 32 is cut by a notch, with
+        the two sides joined below it.
+
+        Parameters
+        ----------
+        columns : `tuple` [`int`, `int`]
+            First and last column of the notch.
+        peaks : `list` of `tuple`
+            Each ``(ix, iy)`` for a positive peak of significance 20.
+        """
+        mask = afwImage.Mask(geom.Box2I(geom.Point2I(0, 0), geom.Extent2I(64, 64)))
+        bit = mask.getPlaneBitMask("DETECTED")
+        rows, cols = np.mgrid[0:64, 0:64]
+        notch = (rows <= 39) & (cols >= columns[0]) & (cols <= columns[1])
+        mask.array[(rows >= 30) & (rows <= 44) & ~notch] = bit
+        footprint = afwDetection.Footprint(afwGeom.SpanSet.fromMask(mask, bit), self.peakSchema)
+        for ix, iy in peaks:
+            footprint.addPeak(ix, iy, 20.0)["significance"] = 20.0
+        return footprint
+
+    def test_footprint_gap_splits_line(self):
+        """A gap in the footprint splits a line of isolated peaks into a trail
+        on each side.
+        """
+        footprint = self.notchedFootprint((30, 36), [(3, 32), (15, 32), (27, 32),
+                                                     (39, 32), (51, 32), (63, 32)])
+
+        diaSources = self.runTask([], footprint=footprint)
+
+        self.assertPeakCounts(diaSources, [3, 3])
+        self.assertEqual(self.task.metadata["nTrailedDiaSources"], 2)
+
+    def test_footprint_gap_stops_cluster_trail(self):
+        """A cluster does not extend its line across a gap in the footprint."""
+        footprint = self.notchedFootprint((22, 26), [(10, 32), (18, 32), (30, 32), (42, 32)])
+
+        diaSources = self.runTask([], footprint=footprint)
+
+        self.assertPeakCounts(diaSources, [1, 1, 2])
+        self.assertEqual(self.task.metadata["nTrailedDiaSources"], 0)
+
+    def test_trail_footprint_is_contiguous(self):
+        """A neighbor beside a gap between a trail's crests does not cut the
+        trail's footprint in two.
+        """
+        # A narrow band holding the trail, with a bulge for the neighbor.
+        mask = afwImage.Mask(geom.Box2I(geom.Point2I(0, 0), geom.Extent2I(64, 64)))
+        bit = mask.getPlaneBitMask("DETECTED")
+        rows, columns = np.mgrid[0:64, 0:64]
+        mask.array[(np.abs(rows - 32) <= 2) & (columns >= 2) & (columns <= 61)] = bit
+        mask.array[(rows - 37)**2 + (columns - 32)**2 <= 9] = bit
+        footprint = afwDetection.Footprint(afwGeom.SpanSet.fromMask(mask, bit), self.peakSchema)
+        for ix, iy in [(8, 32), (20, 32), (44, 32), (56, 32), (32, 37)]:
+            footprint.addPeak(ix, iy, 20.0)["significance"] = 20.0
+
+        diaSources = self.runTask([], footprint=footprint)
+
+        self.assertPeakCounts(diaSources, [1, 4])
+        trail = [record for record in diaSources if len(record.getFootprint().getPeaks()) == 4][0]
+        self.assertEqual(len(trail.getFootprint().getSpans().split()), 1)
+
+    def test_split_line_keeps_every_peak(self):
+        """Every peak ends in exactly one cluster when the trail grown from a
+        line also absorbs a peak just off that line.
+        """
+        # Positions in FWHM: the peak at 9.5 is off the line the finder
+        # returns, but within tolerance of the line refit to the trail.
+        positions = np.array([(0, 0), (3, 0), (6, 0), (9.5, 0.27), (13, 0), (16, 0), (19, 0), (22, -0.2)])
+
+        def findLines(points):
+            return [[0, 1, 2, 4, 5, 6, 7]]
+
+        def connected(start, end):
+            return True
+
+        clusters, trails = _merge_trail_clusters([[index] for index in range(8)], positions,
+                                                 np.zeros(8, dtype=bool), findLines, connected,
+                                                 min_points=3, tolerance=0.25, compact_span=1.5)
+
+        self.assertEqual(sorted(peak for cluster in clusters for peak in cluster), list(range(8)))
+        self.assertEqual(sum(trails), 1)
+
+    def test_short_trail_does_not_pivot(self):
+        """A short trail absorbs the far peaks of its own line before a nearer
+        peak off the line that a refit could also reach.
+        """
+        # Positions in FWHM along and across a trail; the last peak is a
+        # bright neighbor about 1.2 FWHM off the line.
+        positions = np.array([(2.85, 0.15), (4.06, -0.15), (5.56, -0.15),
+                              (-2.25, -0.15), (-4.5, 0.0), (0.0, 1.21)])
+
+        def findLines(points):
+            return []
+
+        def connected(start, end):
+            return True
+
+        clusters, trails = _merge_trail_clusters([[0, 1, 2], [3], [4], [5]], positions,
+                                                 np.zeros(6, dtype=bool), findLines, connected,
+                                                 min_points=3, tolerance=0.25, compact_span=1.5)
+
+        flags = {tuple(sorted(cluster)): trail for cluster, trail in zip(clusters, trails)}
+        self.assertEqual(flags, {(0, 1, 2, 3, 4): True, (5,): False})
+
+    def test_contamination_merge_into_trail(self):
+        """A faint peak merged into a trail by the contamination merge leaves
+        the footprint whole, as one trailed source.
+        """
+        # 10 pixels off the line, beyond the linking radius, but 40 times
+        # fainter, so its PSF flux is contaminated by more than 5%.
+        diaSources = self.runTask([(14, 32), (26, 32), (38, 32), (50, 32), (26, 42, False, 0.5)])
+
+        self.assertPeakCounts(diaSources, [5])
+        self.assertFalse(diaSources[0]["is_deblended"])
+        self.assertTrue(np.all(self.notDeblendedPixels()))
+        self.assertEqual(self.task.metadata["nTrailedDiaSources"], 1)
+
+    def test_two_trails_in_one_footprint(self):
+        """Two separate lines of peaks become two trailed sources."""
+        diaSources = self.runTask([(8, 12), (20, 12), (32, 12), (44, 12),
+                                   (8, 52), (20, 52), (32, 52), (44, 52)])
+
+        self.assertPeakCounts(diaSources, [4, 4])
+        self.assertFalse(np.any(self.notDeblendedPixels()))
+        self.assertEqual(self.task.metadata["nTrailedDiaSources"], 2)
+        self.assertEqual(self.task.metadata["nDeblendedFootprints"], 1)
+        self.assertEqual(self.task.metadata["nDeblendedDiaSources"], 1)
+
+    def test_trail_and_separate_transient(self):
+        """A trail is kept together while an unrelated transient is deblended
+        from it, and neither is flagged NOT_DEBLENDED.
+        """
+        diaSources = self.runTask([(14, 32), (26, 32), (38, 32), (50, 32), (32, 50)])
+
+        self.assertPeakCounts(diaSources, [1, 4])
+        self.assertTrue(all(record["is_deblended"] for record in diaSources))
+        self.assertFalse(np.any(self.notDeblendedPixels()))
 
 
 class MemoryTester(lsst.utils.tests.MemoryTestCase):
