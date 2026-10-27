@@ -21,6 +21,7 @@
 
 import numpy as np
 import os
+from scipy.special import erf
 import unittest
 import uuid
 from unittest import mock
@@ -216,6 +217,34 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         refIds = []
         for source in sources:
             self._check_diaSource(output.diaSources, source, refIds=refIds)
+
+    def test_trailed_source_kept_whole(self):
+        """A trailed source should come out as one diaSource, though its peaks
+        fall into two clusters.
+        """
+        noiseLevel = 1.
+        psfSize = 2.4
+        length = 70.
+        kwargs = {"seed": 1, "psfSize": psfSize, "x0": 0, "y0": 0, "xSize": 256, "ySize": 256, "nSrc": 1}
+        science, _ = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
+        science.getInfo().setVisitInfo(makeVisitInfo())
+        matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
+        difference = science.clone()
+        difference.maskedImage -= matchedTemplate.maskedImage
+        # A vertical line of uniform brightness, convolved with the PSF.
+        y, x = np.mgrid[0:256, 0:256] - 128.
+        root = np.sqrt(2)*psfSize
+        ends = (erf((y + length/2)/root) - erf((y - length/2)/root))/2
+        trail = (10*noiseLevel*np.exp(-x**2/(2*psfSize**2))*ends).astype(np.float32)
+        science.image.array += trail
+        difference.image.array += trail
+
+        detectionTask = self._setup_detection(doSkySources=False, badSubtractionRatioThreshold=1.)
+        output = detectionTask.run(science, matchedTemplate, difference,
+                                   idFactory=self.idGenerator.make_table_id_factory())
+
+        self.assertEqual(len(output.diaSources), 1)
+        self.assertEqual(detectionTask.deblend.metadata["nTrailedDiaSources"], 1)
 
     def test_measurement_noise_seed(self):
         """The noise that replaces neighboring sources during measurement
