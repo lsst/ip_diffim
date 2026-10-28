@@ -1,3 +1,3 @@
 # -*- python -*-
 from lsst.sconsUtils import scripts
-scripts.BasicSConstruct("ip_diffim")
+scripts.BasicSConstruct("ip_diffim", noCfgFile=True)
