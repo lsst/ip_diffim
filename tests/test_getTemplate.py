@@ -26,6 +26,7 @@ import unittest.mock
 
 import astropy.units as u
 from astropy.stats import gaussian_sigma_to_fwhm
+import astshim
 import numpy as np
 
 import lsst.afw.cameraGeom.testUtils
@@ -34,6 +35,7 @@ import lsst.afw.geom
 import lsst.afw.image
 import lsst.afw.math
 import lsst.afw.table
+from lsst.daf.base import DateTime
 from lsst.daf.butler import DataCoordinate, DatasetRef, DatasetType, DimensionUniverse
 import lsst.geom
 import lsst.images
@@ -502,7 +504,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
                                         cdMatrix)
 
     @staticmethod
-    def _makeCoaddInputs(records, instrument="TestCam"):
+    def _makeCoaddInputs(records, instrument="TestCam", epochs=None):
         """Make a CoaddInputs holding the given input records.
 
         Parameters
@@ -516,30 +518,39 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
             Instrument label to record for every input. `None` leaves the
             inputs without a visit info, and an empty string gives them a
             visit info with no label; either way the instrument is unknown.
+        epochs : `list` [`tuple` [`int`, `float`, `float`]], optional
+            Visit, mid-exposure MJD (TAI) and coadd weight of each input. By
+            default every input is visit 0 with weight 1 and no observation
+            time. The time is not recorded if ``instrument`` is `None`.
         """
         ccdSchema = lsst.afw.table.ExposureTable.makeMinimalSchema()
         weightKey = ccdSchema.addField("weight", type=float, doc="Coadd weight")
+        visitKey = ccdSchema.addField("visit", type=np.int64, doc="Visit of the input")
+        ccdSchema.addField("ccd", type=np.int32, doc="Detector of the input")
         coaddInputs = lsst.afw.image.CoaddInputs(
             lsst.afw.table.ExposureTable.makeMinimalSchema(), ccdSchema)
-        for wcs, bbox in records:
+        if epochs is None:
+            epochs = [(0, None, 1.0)]*len(records)
+        for (wcs, bbox), (visit, mjd, weight) in zip(records, epochs, strict=True):
             record = coaddInputs.ccds.addNew()
             record.setWcs(wcs)
             record.setBBox(bbox)
+            record.set(visitKey, visit)
+            record.set(weightKey, weight)
             if instrument is not None:
-                record.setVisitInfo(lsst.afw.image.VisitInfo(instrumentLabel=instrument))
-            # Included because real coadds have it, though a single-record
-            # correction does not use it.
-            record.set(weightKey, 1.0)
+                date = DateTime(mjd, DateTime.MJD, DateTime.TAI) if mjd is not None else DateTime()
+                record.setVisitInfo(lsst.afw.image.VisitInfo(instrumentLabel=instrument, date=date))
         return coaddInputs
 
-    def _patchHandles(self, tract, records, instrument="TestCam"):
+    def _patchHandles(self, tract, records, instrument="TestCam", epochs=None):
         """Return handles for a tract's patches, with their CoaddInputs
-        replaced by ``records`` from ``instrument``.
+        replaced by ``records`` from ``instrument``, observed at ``epochs``.
         """
         handles = []
         for ref in self.patches[tract]:
             coadd = ref.get()
-            coadd.getInfo().setCoaddInputs(self._makeCoaddInputs(records, instrument=instrument))
+            coadd.getInfo().setCoaddInputs(self._makeCoaddInputs(records, instrument=instrument,
+                                                                 epochs=epochs))
             handles.append(pipeBase.InMemoryDatasetHandle(
                 coadd, storageClass="ExposureF", copy=True, dataId=ref.dataId))
         return handles
@@ -697,14 +708,112 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         with self.assertRaisesRegex(RuntimeError, "cannot be corrected for the change in pixel area"):
             self._runCorrection(handles=handles)
 
-    def _runTract0(self, handles):
-        """Build a template from the given tract 0 patch handles.
+    def testRunReturnsTemplateInputs(self):
+        """`run` returns the inputs of each coadd that overlap the science
+        image, with the part of the science image each one covers. Inputs
+        with no weight or no observation time are left out, as are inputs
+        that cover only the template border.
+        """
+        wcs = self.exposure.wcs
+        whole = (wcs, self.exposure.getBBox())
+        right = (wcs, lsst.geom.Box2I(lsst.geom.Point2I(90, -200), lsst.geom.Point2I(800, 800)))
+        outside = (wcs, lsst.geom.Box2I(lsst.geom.Point2I(600, 600), lsst.geom.Point2I(800, 800)))
+        border = (wcs, lsst.geom.Box2I(lsst.geom.Point2I(185, 0), lsst.geom.Point2I(195, 180)))
+        handles = (self._patchHandles(0, [whole, right, outside, whole, whole, border],
+                                      epochs=[(1, 60000.25, 1.0), (2, 60010.5, 3.0), (3, 60100.0, 1.0),
+                                              (4, 60200.0, 0.0), (5, None, 1.0), (6, 60300.0, 1.0)])[:1]
+                   + self._patchHandles(0, [whole], epochs=[(1, 60000.25, 2.0)])[1:])
+        result = self._runTract0(handles, outputImageType="future")
+
+        templateInputs = result.templateInputs
+        self.assertEqual(set(templateInputs), {(0, patch) for patch in range(4)})
+        first = templateInputs[0, 0]
+        self.assertEqual([(i.visit, i.detector, i.weight) for i in first], [(1, 0, 1.0), (2, 0, 3.0)])
+        self.assertFloatsAlmostEqual(np.array([i.mid_mjd_tai for i in first]), np.array([60000.25, 60010.5]),
+                                     rtol=0, atol=1e-6)
+        # The box that _runTract0 requests.
+        scienceBox = lsst.geom.Box2D(lsst.geom.Point2D(-0.5, -0.5), lsst.geom.Point2D(180.5, 180.5))
+        self.assertFloatsAlmostEqual(first[0].bounds.area, scienceBox.getArea(), rtol=1e-6)
+        # Warping with lanczos5 left the 4.5 pixels along the input's edges
+        # out of the coadd.
+        rightArea = (scienceBox.getMaxX() - 94.0)*scienceBox.getHeight()
+        self.assertFloatsAlmostEqual(first[1].bounds.area, rightArea, rtol=1e-6)
+        self.assertFloatsAlmostEqual(first[1].bounds.x_vertices.min(), 94.0, rtol=0, atol=1e-6)
+        # Each coadd lists its own record of an input shared with another.
+        for patch in range(1, 4):
+            self.assertEqual([(i.visit, i.weight) for i in templateInputs[0, patch]], [(1, 2.0)])
+
+    def testRunTemplateInputsOnlyForFuture(self):
+        """`run` records no template inputs for the legacy output type.
+        """
+        records = [(self.exposure.wcs, self.exposure.getBBox())]
+        result = self._runTract0(self._patchHandles(0, records, epochs=[(1, 60000.25, 1.0)]))
+        self.assertEqual(result.templateInputs, {})
+
+    def testRunTemplateInputsSkipDroppedCoadd(self):
+        """A coadd dropped for its instrument has no template inputs.
+        """
+        records = [(self.exposure.wcs, self.exposure.getBBox())]
+        handles = (self._patchHandles(0, records, epochs=[(1, 60000.25, 1.0)])[:3]
+                   + self._patchHandles(0, records, instrument="OtherCam",
+                                        epochs=[(2, 60100.0, 1.0)])[3:])
+        result = self._runTract0(handles, outputImageType="future")
+        self.assertEqual(set(result.templateInputs), {(0, 0), (0, 1), (0, 2)})
+
+    def testRunTemplateInputsLeaveOutWarpBorder(self):
+        """An input's footprint leaves out the border along its edges that
+        the coadd's warping kernel left out.
+        """
+        right = (self.exposure.wcs, lsst.geom.Box2I(lsst.geom.Point2I(90, -200), lsst.geom.Point2I(800, 800)))
+        for kernel, border in (("bilinear", 0.5), ("lanczos3", 2.5)):
+            with self.subTest(coaddWarpKernel=kernel):
+                result = self._runTract0(self._patchHandles(0, [right], epochs=[(1, 60000.25, 1.0)]),
+                                         outputImageType="future", coaddWarpKernel=kernel)
+                bounds = result.templateInputs[0, 0][0].bounds
+                self.assertFloatsAlmostEqual(bounds.x_vertices.min(), 89.5 + border, rtol=0, atol=1e-6)
+
+    def testRunTemplateInputsCoverScienceEdges(self):
+        """An input's footprint reaches the edges of a distorted science image
+        wherever the input covers them.
+        """
+        # Science pixel (x, y) lands on input pixel (x, y + a*(x - xc)**2),
+        # which distorts the top and bottom edges of the science image by about
+        # 2 pixels between its corners.
+        xc = 90.0
+        left = (self.exposure.wcs, lsst.geom.Box2I(lsst.geom.Point2I(-200, -200), lsst.geom.Point2I(89, 800)))
+        # The centers of the edge pixels that the input's warp covers; warping
+        # with lanczos5 left the 4.5 pixels along the input's edges out.
+        x = np.arange(0.0, 85.0)
+        y = np.arange(0.0, 181.0)
+        edgeX = np.concatenate([x, x, np.zeros_like(y)])
+        edgeY = np.concatenate([np.zeros_like(x), np.full_like(x, 180.0), y])
+        for a in (-2.5e-4, 2.5e-4):
+            with self.subTest(a=a):
+                forward = np.array([[1.0, 1, 1, 0], [1.0, 2, 0, 1], [a, 2, 2, 0], [-2*a*xc, 2, 1, 0],
+                                    [a*xc**2, 2, 0, 0]])
+                inverse = np.array([[1.0, 1, 1, 0], [1.0, 2, 0, 1], [-a, 2, 2, 0], [2*a*xc, 2, 1, 0],
+                                    [-a*xc**2, 2, 0, 0]])
+                distortion = lsst.afw.geom.TransformPoint2ToPoint2(astshim.PolyMap(forward, inverse))
+                wcs = lsst.afw.geom.makeModifiedWcs(distortion, self.exposure.wcs, False)
+                result = self._runTract0(self._patchHandles(0, [left], epochs=[(1, 60000.25, 1.0)]),
+                                         outputImageType="future", wcs=wcs)
+                bounds = result.templateInputs[0, 0][0].bounds
+                self.assertTrue(np.all(bounds.contains(x=edgeX, y=edgeY)))
+
+    def _runTract0(self, handles, outputImageType="legacy", wcs=None, coaddWarpKernel=None):
+        """Build a template from the given tract 0 patch handles, with a task
+        configured for ``outputImageType`` and ``coaddWarpKernel``, for a
+        science image with ``wcs``, by default that of the test exposure.
         """
         box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
-        task = lsst.ip.diffim.GetTemplateTask(config=self._makeConfig())
+        config = self._makeConfig()
+        config.output_image_type = outputImageType
+        if coaddWarpKernel is not None:
+            config.coaddWarpKernel = coaddWarpKernel
+        task = lsst.ip.diffim.GetTemplateTask(config=config)
         return task.run(coaddExposureHandles={0: handles},
                         bbox=box,
-                        wcs=self.exposure.wcs,
+                        wcs=self.exposure.wcs if wcs is None else wcs,
                         dataIds={0: self.dataIds[0]},
                         physical_filter="a_test")
 
@@ -982,7 +1091,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         result, box = self._runLegacyForFuture(handles=handles)
         result.template = self.futureTask.convert_outputs_to_future(
             result.template, self._coaddRefs(0), detector=detector,
-            exposureRecord=self._exposureRecord())
+            exposureRecord=self._exposureRecord(), templateInputs=result.templateInputs)
         return result, box, detector
 
     def _exposureRecord(self):
@@ -1158,6 +1267,19 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
 
         result, _, _ = self._runFuture(handles=self._patchHandles(0, records, instrument=None))
         self.assertEqual({template.instrument for template in result.template.templates}, {"UNKNOWN"})
+
+    def testConvertOutputsToFutureTemplateInputs(self):
+        """Each coadd recorded on the converted template lists its inputs.
+        """
+        records = [(self.exposure.wcs, self.exposure.getBBox())]
+        handles = self._patchHandles(0, records, epochs=[(1, 60000.25, 1.0)])
+        result, _, _ = self._runFuture(handles=handles)
+        templates = result.template.templates
+        self.assertGreater(len(templates), 0)
+        for template in templates:
+            with self.subTest(tract=template.tract, patch=template.patch):
+                self.assertEqual([(i.visit, i.detector, i.weight) for i in template.inputs], [(1, 0, 1.0)])
+                self.assertFloatsAlmostEqual(template.inputs[0].mid_mjd_tai, 60000.25, rtol=0, atol=1e-6)
 
     def testConvertOutputsToFuturePsf(self):
         """The Gaussian PSF set by `run` is kept, defined over the detector.
