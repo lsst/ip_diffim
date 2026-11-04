@@ -53,6 +53,16 @@ from . import DipoleFitTask
 __all__ = ["DetectAndMeasureConfig", "DetectAndMeasureTask",
            "DetectAndMeasureScoreConfig", "DetectAndMeasureScoreTask"]
 
+_TEMPLATE_EPOCH_NAMES = {
+    "TEMPLATE MJD MIN": "templateMjdMin",
+    "TEMPLATE MJD MAX": "templateMjdMax",
+    "TEMPLATE MJD MEAN": "templateMjdMean",
+}
+"""Image metadata key of each summary of the template epochs of the
+diaSources, mapped to the name of the diaSource field and task metadata
+entry it summarizes.
+"""
+
 
 class BadSubtractionError(pipeBase.AlgorithmError):
     """Raised when the residuals in footprints of stars used to compute the
@@ -596,6 +606,15 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         self.schema.addField("glint_trail", "Flag", "DiaSource is part of a glint trail.")
         self.schema.addField("reliability", type="F", doc="Reliability score of the DiaSource")
         self.schema.addField("reliabilityVersion", type=str, size=7, doc="Version of the reliability model")
+        self.schema.addField("templateMjdMean", type="D", units="d",
+                             doc="Weighted mean time (MJD, TAI) of the template inputs that"
+                                 " cover the diaSource centroid.")
+        self.schema.addField("templateMjdMin", type="D", units="d",
+                             doc="Earliest time (MJD, TAI) of the template inputs that"
+                                 " cover the diaSource centroid.")
+        self.schema.addField("templateMjdMax", type="D", units="d",
+                             doc="Latest time (MJD, TAI) of the template inputs that"
+                                 " cover the diaSource centroid.")
 
         # To get the "merge_*" fields in the schema; have to re-initialize
         # this later, once we have a peak schema post-detection.
@@ -619,6 +638,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
         # Input image that each output is measured from, keyed by output name.
         inputImages = {}
+        templateInfo = None
         if self.config.image_type == "future":
             dataId = butlerQC.quantum.dataId
             for output, connection in (("subtractedMeasuredExposure", "difference"),
@@ -629,7 +649,9 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                 # The output is written back into this image, so it must
                 # already carry the kernel and the template records.
                 get_difference_image_provenance(image, "kernel", connection, dataId)
-                get_difference_image_provenance(image, "templates", connection, dataId)
+                imageTemplates = get_difference_image_provenance(image, "templates", connection, dataId)
+                if connection == "difference":
+                    templateInfo = imageTemplates
                 inputImages[output] = image
                 inputs[connection] = image.to_legacy()
 
@@ -641,9 +663,11 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             diaSources=None,
             maskedStreaks=None,
             differenceBackground=None,
+            templateEpochs=None,
         )
         try:
-            self.run(**inputs, idFactory=idFactory, measurementResults=measurementResults)
+            self.run(**inputs, idFactory=idFactory, measurementResults=measurementResults,
+                     templateInfo=templateInfo)
         except pipeBase.AlgorithmError as e:
             # Annotate before converting
             error = pipeBase.AnnotatedPartialOutputsError.annotate(
@@ -689,6 +713,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         for any pixels in the image.
         """
         background = getattr(results, "differenceBackground", None)
+        templateEpochs = getattr(results, "templateEpochs", None) or {}
         for name, image in inputImages.items():
             exposure = getattr(results, name, None)
             if exposure is None:
@@ -699,6 +724,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             image.variance.array[...] = exposure.variance.array
             image.mask = Mask.from_legacy(exposure.mask, get_legacy_difference_image_mask_planes(),
                                           sky_projection=image.sky_projection)
+            image.metadata.update(templateEpochs)
             if background is not None and len(background) > 0:
                 # The same background is subtracted from the difference image
                 # and the score image, so it applies to both.
@@ -716,7 +742,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
     @timeMethod
     def run(self, science, matchedTemplate, difference, kernelSources=None,
-            idFactory=None, measurementResults=None):
+            idFactory=None, measurementResults=None, templateInfo=None):
         """Detect and measure sources on a difference image.
 
         The difference image will be convolved with a gaussian approximation of
@@ -746,6 +772,11 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             Result struct that is modified to allow saving of partial outputs
             for some failure conditions. If the task completes successfully,
             this is also returned.
+        templateInfo : `list` [`lsst.images.DifferenceImageTemplateInfo`], \
+                optional
+            Information about the coadds and their input images that the
+            template was built from. Without it the template epochs of every
+            diaSource are NaN.
 
         Returns
         -------
@@ -757,6 +788,9 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                 The catalog of detected sources.
             ``differenceBackground`` : `lsst.afw.math.BackgroundList`
                 Background that was subtracted from the difference image.
+            ``templateEpochs`` : `dict` [`str`, `float`]
+                Summary of the template epochs of the diaSources, keyed by
+                image metadata key; empty if they are not known.
         """
         if measurementResults is None:
             measurementResults = pipeBase.Struct()
@@ -802,7 +836,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                             sources, idFactory, kernelSources,
                             positives=positives,
                             negatives=negatives,
-                            measurementResults=measurementResults)
+                            measurementResults=measurementResults,
+                            templateInfo=templateInfo)
         return measurementResults
 
     def _prepareInputs(self, difference):
@@ -901,7 +936,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         return background
 
     def processResults(self, science, matchedTemplate, difference, sources, idFactory,
-                       kernelSources=None, positives=None, negatives=None, measurementResults=None):
+                       kernelSources=None, positives=None, negatives=None, measurementResults=None,
+                       templateInfo=None):
         """Measure and process the results of source detection.
 
         Parameters
@@ -928,6 +964,10 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             Result struct that is modified to allow saving of partial outputs
             for some failure conditions. If the task completes successfully,
             this is also returned.
+        templateInfo : `list` [`lsst.images.DifferenceImageTemplateInfo`], \
+                optional
+            Information about the coadds and their input images that the
+            template was built from.
 
         Returns
         -------
@@ -937,6 +977,9 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
                 Subtracted exposure with detection mask applied.
             ``diaSources``  : `lsst.afw.table.SourceCatalog`
                 The catalog of detected sources.
+            ``templateEpochs`` : `dict` [`str`, `float`]
+                Summary of the template epochs of the diaSources, keyed by
+                image metadata key; empty if they are not known.
         """
         if measurementResults is None:
             measurementResults = pipeBase.Struct()
@@ -1005,6 +1048,9 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         diaSources, trail_parameters = self._find_glint_trails(diaSources)
         if self.config.writeGlintInfo:
             measurementResults.mergeItems(trail_parameters, 'glintTrailInfo')
+
+        self._measureTemplateEpochs(diaSources, templateInfo)
+        measurementResults.templateEpochs = self._summarizeTemplateEpochs(diaSources)
 
         if self.config.doForcedMeasurement:
             self.measureForcedSources(diaSources, science, difference.getWcs())
@@ -1239,6 +1285,89 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         trail_parameters = pipeBase.Struct(glintTrailInfo=parameters)
 
         return diaSources, trail_parameters
+
+    def _measureTemplateEpochs(self, diaSources, templateInfo):
+        """Determine the observed epochs of the template for each diaSource.
+
+        Parameters
+        ----------
+        diaSources : `lsst.afw.table.SourceCatalog`
+            Contiguous catalog to fill in place.
+        templateInfo : `list` [`lsst.images.DifferenceImageTemplateInfo`] or \
+                `None`
+            Information about the coadds and their input images that the
+            template was built from.
+
+        Notes
+        -----
+        An input covers a diaSource if both its coadd's bounds and its own
+        bounds contain the centroid. Each coadd's inputs give a mean weighted
+        by their coadd weights, and where coadds overlap their means are
+        averaged with weights ``sqrt(W)``, ``W`` being the total weight of a
+        coadd's inputs there. `GetTemplateTask` merges the patches of a tract
+        with weights ``variance**-0.5``, and the variance of a coadd is about
+        ``1/W``.
+        """
+        x = diaSources.getX()
+        y = diaSources.getY()
+        numerator = np.zeros(len(diaSources))
+        denominator = np.zeros(len(diaSources))
+        epochMin = np.full(len(diaSources), np.inf)
+        epochMax = np.full(len(diaSources), -np.inf)
+        for info in templateInfo or []:
+            inCoadd = info.bounds.contains(x=x, y=y)
+            if not inCoadd.any():
+                continue
+            weightSum = np.zeros(len(diaSources))
+            weightedSum = np.zeros(len(diaSources))
+            for record in info.inputs:
+                covers = inCoadd & record.bounds.contains(x=x, y=y)
+                weightSum[covers] += record.weight
+                weightedSum[covers] += record.weight*record.mid_mjd_tai
+                epochMin[covers] = np.minimum(epochMin[covers], record.mid_mjd_tai)
+                epochMax[covers] = np.maximum(epochMax[covers], record.mid_mjd_tai)
+            inputs = weightSum > 0
+            numerator[inputs] += weightedSum[inputs]/np.sqrt(weightSum[inputs])
+            denominator[inputs] += np.sqrt(weightSum[inputs])
+        known = denominator > 0
+        epoch = np.full(len(diaSources), np.nan)
+        epoch[known] = numerator[known]/denominator[known]
+        epochMin[~known] = np.nan
+        epochMax[~known] = np.nan
+        diaSources["templateMjdMean"] = epoch
+        diaSources["templateMjdMin"] = epochMin
+        diaSources["templateMjdMax"] = epochMax
+
+    def _summarizeTemplateEpochs(self, diaSources):
+        """Summarize the template epochs of a catalog in the task metadata.
+
+        The earliest, latest and mean values over the rows with a template
+        epoch, sky sources included, are set in the task metadata under the
+        names of the diaSource fields they summarize. They are NaN if no row
+        has a template epoch.
+
+        Parameters
+        ----------
+        diaSources : `lsst.afw.table.SourceCatalog`
+            Contiguous catalog with the template epoch fields set.
+
+        Returns
+        -------
+        templateEpochs : `dict` [`str`, `float`]
+            The same values keyed by their image metadata key in
+            ``_TEMPLATE_EPOCH_NAMES``, or empty if no row has a template epoch.
+        """
+        known = np.isfinite(diaSources["templateMjdMean"])
+        if not known.any():
+            for name in _TEMPLATE_EPOCH_NAMES.values():
+                self.metadata[name] = np.nan
+            return {}
+        values = {"templateMjdMin": float(np.min(diaSources["templateMjdMin"][known])),
+                  "templateMjdMax": float(np.max(diaSources["templateMjdMax"][known])),
+                  "templateMjdMean": float(np.mean(diaSources["templateMjdMean"][known]))}
+        for name, value in values.items():
+            self.metadata[name] = value
+        return {key: values[name] for key, name in _TEMPLATE_EPOCH_NAMES.items()}
 
     def addSkySources(self, diaSources, mask, seed,
                       subtask=None):
@@ -1617,7 +1746,7 @@ class DetectAndMeasureScoreTask(DetectAndMeasureTask):
 
     @timeMethod
     def run(self, science, matchedTemplate, difference, scoreExposure, kernelSources,
-            idFactory=None, measurementResults=None):
+            idFactory=None, measurementResults=None, templateInfo=None):
         """Detect and measure sources on a score image.
 
         Parameters
@@ -1641,6 +1770,11 @@ class DetectAndMeasureScoreTask(DetectAndMeasureTask):
             Result struct that is modified to allow saving of partial outputs
             for some failure conditions. If the task completes successfully,
             this is also returned.
+        templateInfo : `list` [`lsst.images.DifferenceImageTemplateInfo`], \
+                optional
+            Information about the coadds and their input images that the
+            template was built from. Without it the template epochs of every
+            diaSource are NaN.
 
         Returns
         -------
@@ -1654,6 +1788,9 @@ class DetectAndMeasureScoreTask(DetectAndMeasureTask):
                 The catalog of detected sources.
             ``differenceBackground`` : `lsst.afw.math.BackgroundList`
                 Background that was subtracted from the difference image.
+            ``templateEpochs`` : `dict` [`str`, `float`]
+                Summary of the template epochs of the diaSources, keyed by
+                image metadata key; empty if they are not known.
         """
         if measurementResults is None:
             measurementResults = pipeBase.Struct()
@@ -1713,7 +1850,8 @@ class DetectAndMeasureScoreTask(DetectAndMeasureTask):
                                 sources, idFactory, kernelSources,
                                 positives=positives,
                                 negatives=negatives,
-                                measurementResults=measurementResults)
+                                measurementResults=measurementResults,
+                                templateInfo=templateInfo)
 
         else:
             positives = afwTable.SourceCatalog(self.schema)
@@ -1724,5 +1862,6 @@ class DetectAndMeasureScoreTask(DetectAndMeasureTask):
                                 detectResults.sources, idFactory, kernelSources,
                                 positives=positives,
                                 negatives=negatives,
-                                measurementResults=measurementResults)
+                                measurementResults=measurementResults,
+                                templateInfo=templateInfo)
         return measurementResults
