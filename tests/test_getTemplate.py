@@ -28,6 +28,7 @@ import astropy.units as u
 from astropy.stats import gaussian_sigma_to_fwhm
 import astshim
 import numpy as np
+import scipy.ndimage
 
 import lsst.afw.cameraGeom.testUtils
 import lsst.afw.detection
@@ -314,8 +315,8 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
 
     def testRunOneTractMultipleInputs(self):
         """Test a bounding box that fully fits inside one tract but where
-        multiple tracts were passed in. This checks that patches that are
-        mostly NaN after warping are merged correctly in the output.
+        multiple tracts were passed in. Only that tract supplies pixels, so
+        only its coadds are recorded.
         """
         box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
         task = lsst.ip.diffim.GetTemplateTask(config=self._makeConfig())
@@ -325,8 +326,10 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
                           dataIds=self.dataIds,
                           physical_filter="a_test")
 
-        # All 4 patches from two tracts are included in this template.
-        self._checkMetadata(result.template, task.config, box, self.exposure.wcs, 6)
+        # Only the 4 patches of tract 0 are included in this template.
+        self._checkMetadata(result.template, task.config, box, self.exposure.wcs, 4)
+        self.assertEqual({record["tract"] for record in result.template.getInfo().getCoaddInputs().ccds},
+                         {0})
         self._checkPixels(result.template, task.config, box)
 
     def testRunTwoTracts(self):
@@ -343,6 +346,210 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         # All 4 patches from all 4 tracts are included in this template
         self._checkMetadata(result.template, task.config, box, self.exposure.wcs, 9)
         self._checkPixels(result.template, task.config, box)
+
+    def _offsetTractHandles(self, mjds=None):
+        """Return handles for every tract's patches, with each tract's pixels
+        offset by 1000 times its id, so that an average over tracts matches
+        none of them.
+
+        Parameters
+        ----------
+        mjds : `dict` [`int`, `float`], optional
+            Mid-exposure MJD (TAI) to record for the input of each tract's
+            coadds. By default the inputs have no observation time.
+
+        Returns
+        -------
+        handles : `dict` [`int`, `list` [`lsst.pipe.base.InMemoryDatasetHandle`]]
+            Patch handles, keyed by tract.
+        """
+        handles = collections.defaultdict(list)
+        for tract, refs in self.patches.items():
+            for ref in refs:
+                coadd = ref.get()
+                coadd.image.array += 1000.0*tract
+                if mjds is not None:
+                    coadd.getInfo().setCoaddInputs(self._makeCoaddInputs(
+                        [(self.exposure.wcs, self.exposure.getBBox())], epochs=[(tract, mjds[tract], 1.0)]))
+                handles[tract].append(pipeBase.InMemoryDatasetHandle(coadd, storageClass="ExposureF",
+                                                                     copy=True, dataId=ref.dataId))
+        return handles
+
+    def _runOffsetTracts(self, handles, tracts):
+        """Build a template on a box that spans all four tracts, from some of
+        the tracts.
+
+        Returns
+        -------
+        image : `numpy.ndarray`
+            Template pixels, NaN where the template has no data.
+        destBoxes : `list` [`lsst.geom.Box2I`]
+            Template boxes that the tracts were warped onto.
+        """
+        box = lsst.geom.Box2I(lsst.geom.Point2I(200, 200), lsst.geom.Point2I(600, 600))
+        task = lsst.ip.diffim.GetTemplateTask(config=self._makeConfig())
+        task.warper = unittest.mock.Mock(wraps=task.warper)
+        template = task.run(coaddExposureHandles={tract: handles[tract] for tract in tracts},
+                            bbox=box,
+                            wcs=self.exposure.wcs,
+                            dataIds={tract: self.dataIds[tract] for tract in tracts},
+                            physical_filter="a_test").template
+        image = template.image.array
+        image[(template.mask.array & template.mask.getPlaneBitMask("NO_DATA")) != 0] = np.nan
+        return image, [call.kwargs["destBBox"] for call in task.warper.warpExposure.call_args_list]
+
+    def testRunTakesEachPixelFromOneTract(self):
+        """Each template pixel has the value of the template built from one
+        of the tracts alone, not an average over tracts, and each tract is
+        warped over only part of the template.
+        """
+        handles = self._offsetTractHandles()
+        template, destBoxes = self._runOffsetTracts(handles, self.patches)
+        singles = np.array([self._runOffsetTracts(handles, [tract])[0] for tract in self.patches])
+
+        self.assertEqual(len(destBoxes), 4)
+        self.assertTrue(all(destBox.getArea() < template.size for destBox in destBoxes))
+        self.assertLess(sum(destBox.getArea() for destBox in destBoxes), 1.5*template.size)
+        self.assertTrue(np.all(np.isfinite(template)))
+        # The tracts overlap, so their single-tract templates were candidates
+        # for averaging.
+        self.assertGreater(np.count_nonzero(np.sum(np.isfinite(singles), axis=0) > 1), 0)
+        # Warping one tract onto different boxes changes its pixels by a few
+        # hundredths of a nJy; the offsets separate the tracts by 4000.
+        closest = np.nanmin(np.abs(singles - template), axis=0)
+        self.assertFloatsAlmostEqual(closest, 0.0, rtol=0, atol=0.1)
+
+    def testRunNewestTractTakesPrecedence(self):
+        """Wherever the tract with the most recent inputs has data, the
+        template is taken from it, whichever tract that is.
+        """
+        for newest in (0, 3):
+            with self.subTest(newest=newest):
+                mjds = {tract: 60000.0 + 10*tract for tract in self.patches}
+                mjds[newest] = 61000.0
+                handles = self._offsetTractHandles(mjds)
+                template, _ = self._runOffsetTracts(handles, self.patches)
+                single, _ = self._runOffsetTracts(handles, [newest])
+
+                self.assertTrue(np.all(np.isfinite(template)))
+                # Blocks of _TRACT_GRID_STEP pixels at the edge of the newest
+                # tract's data can come from other tracts.
+                interior = scipy.ndimage.binary_erosion(np.isfinite(single), iterations=16)
+                self.assertGreater(np.count_nonzero(interior), 0)
+                self.assertFloatsAlmostEqual(template[interior], single[interior], rtol=0, atol=0.1)
+
+    def testRunEmptyNewestTract(self):
+        """A tract with the most recent inputs but no data supplies no pixels,
+        so the template is the one built without it.
+        """
+        box = lsst.geom.Box2I(lsst.geom.Point2I(200, 200), lsst.geom.Point2I(600, 600))
+        records = [(self.exposure.wcs, self.exposure.getBBox())]
+        handles = {tract: self._patchHandles(tract, records, epochs=[(tract, 60000.0 + 10*tract, 1.0)])
+                   for tract in self.patches}
+        for handle in handles[3]:
+            handle.inMemoryDataset.image.array[:] = np.nan
+            handle.inMemoryDataset.variance.array[:] = np.nan
+
+        templates = []
+        for tracts in ([0, 1, 2, 3], [0, 1, 2]):
+            task = lsst.ip.diffim.GetTemplateTask(config=self._makeConfig())
+            templates.append(task.run(coaddExposureHandles={tract: handles[tract] for tract in tracts},
+                                      bbox=box,
+                                      wcs=self.exposure.wcs,
+                                      dataIds={tract: self.dataIds[tract] for tract in tracts},
+                                      physical_filter="a_test").template)
+        recorded = [{record["tract"] for record in template.getInfo().getCoaddInputs().ccds}
+                    for template in templates]
+        self.assertNotIn(3, recorded[0])
+        self.assertEqual(recorded[0], recorded[1])
+        self.assertMaskedImagesEqual(templates[0].maskedImage, templates[1].maskedImage)
+
+    def testMeanInputMjd(self):
+        """The mean is weighted by the coadd weights, and leaves out inputs
+        with no observation time or no weight.
+        """
+        records = [(self.exposure.wcs, self.exposure.getBBox())]*4
+        coaddInputs = self._makeCoaddInputs(records, epochs=[(1, 60000.0, 1.0), (2, 60010.0, 3.0),
+                                                             (3, None, 1.0), (4, 60100.0, 0.0)])
+        meanInputMjd = lsst.ip.diffim.GetTemplateTask._meanInputMjd
+        self.assertFloatsAlmostEqual(meanInputMjd([coaddInputs, None]), 60007.5, rtol=0, atol=1e-6)
+        undated = self._makeCoaddInputs(records[:1])
+        self.assertTrue(np.isnan(meanInputMjd([undated, None])))
+
+    def testRunFillsWhereNewestTractHasNoData(self):
+        """Pixels that the newest tract has no data for are taken from the
+        other tracts, so the template has data wherever any tract does.
+        """
+        mjds = {tract: 60000.0 + 10*tract for tract in self.patches}
+        handles = self._offsetTractHandles(mjds)
+        for handle in handles[3][:1]:
+            handle.inMemoryDataset.image.array[:] = np.nan
+            handle.inMemoryDataset.variance.array[:] = np.nan
+        template, _ = self._runOffsetTracts(handles, self.patches)
+        singles = np.array([self._runOffsetTracts(handles, [tract])[0] for tract in self.patches])
+
+        anyData = np.any(np.isfinite(singles), axis=0)
+        self.assertTrue(np.all(np.isfinite(template[anyData])))
+        closest = np.nanmin(np.abs(singles[:, anyData] - template[anyData]), axis=0)
+        self.assertFloatsAlmostEqual(closest, 0.0, rtol=0, atol=0.1)
+
+    def testNeededBox(self):
+        """A tract is warped over the blocks that still need data and where
+        its coadds have data.
+        """
+        bbox = lsst.geom.Box2I(lsst.geom.Point2I(10, 20), lsst.geom.Extent2I(64, 48))
+        coadd = lsst.afw.image.MaskedImageF(bbox)
+        coadd.variance.array[:] = 1.0
+        # The coadd has no data in the last of four columns of blocks.
+        coadd.image.array[:, 48:] = np.nan
+        supplied = np.zeros((48, 64), dtype=bool)
+        # The first column of blocks is supplied, but one pixel of the second
+        # is not.
+        supplied[:, :32] = True
+        supplied[5, 20] = False
+        wcs = self.exposure.wcs
+        neededBox = lsst.ip.diffim.GetTemplateTask._neededBox
+
+        box = neededBox(supplied, wcs, [coadd], bbox, wcs)
+        self.assertEqual(box, lsst.geom.Box2I(lsst.geom.Point2I(26, 20), lsst.geom.Point2I(57, 67)))
+        self.assertTrue(neededBox(np.ones_like(supplied), wcs, [coadd], bbox, wcs).isEmpty())
+
+    def testRunReadsEachCoaddOnce(self):
+        """Each coadd is read in one call, cut to the template's footprint.
+        Only its bounding box, and the WCS of the first coadd of each tract,
+        are read on their own.
+        """
+        box = lsst.geom.Box2I(lsst.geom.Point2I(200, 200), lsst.geom.Point2I(600, 600))
+        task = lsst.ip.diffim.GetTemplateTask(config=self._makeConfig())
+        keys = {id(handle): (tract, patch)
+                for tract in self.patches for patch, handle in enumerate(self.patches[tract])}
+        with unittest.mock.patch.object(pipeBase.InMemoryDatasetHandle, "get", autospec=True,
+                                        side_effect=pipeBase.InMemoryDatasetHandle.get) as get:
+            task.run(coaddExposureHandles=self.patches,
+                     bbox=box,
+                     wcs=self.exposure.wcs,
+                     dataIds=self.dataIds,
+                     physical_filter="a_test")
+
+        reads = collections.defaultdict(list)
+        for call in get.call_args_list:
+            key = keys[id(call.args[0])]
+            reads[key].append((call.kwargs.get("component"), call.kwargs.get("parameters")))
+        self.assertEqual(set(reads), set(keys.values()))
+        cut = []
+        for (tract, patch), calls in reads.items():
+            with self.subTest(tract=tract, patch=patch):
+                self.assertEqual(sorted(c for c, _ in calls if c is not None),
+                                 ["bbox", "wcs"] if patch == 0 else ["bbox"])
+                parameters = [p for c, p in calls if c is None]
+                self.assertEqual(len(parameters), 1)
+                if parameters[0] is not None:
+                    readBox = parameters[0]["bbox"]
+                    patchBox = self.patches[tract][patch].get(component="bbox")
+                    self.assertTrue(patchBox.contains(readBox))
+                    if readBox != patchBox:
+                        cut.append((tract, patch))
+        self.assertGreater(len(cut), 0)
 
     def testRunCalibratesToNanojansky(self):
         """Test that the template is in nJy whatever the calibration of the

@@ -80,6 +80,11 @@ line between its corners, and limits how far outside the science image its
 WCS is evaluated.
 """
 
+_TRACT_GRID_STEP = 16
+"""Size, in template pixels, of the square blocks of a template used to choose
+the part of it that a tract is warped onto.
+"""
+
 
 def _pixelTransform(fromWcs, toWcs):
     """Return a chainable transformation between two pixel frames.
@@ -675,12 +680,16 @@ class GetTemplateTask(pipeBase.PipelineTask):
         """Warp coadds from multiple tracts and patches to form a template to
         subtract from a science image.
 
-        Tract and patch overlap regions are combined by a variance-weighted
-        average, and the variance planes are combined with the same weights,
-        not added in quadrature; the overlap regions are not statistically
-        independent, because they're derived from the same original data.
-        The PSF of the template is a Gaussian with the same width as the
-        CoaddPsf evaluated at the center of the detector.
+        Patch overlap regions within a tract are combined by a
+        variance-weighted average, and the variance planes are combined with
+        the same weights, not added in quadrature; the overlap regions are not
+        statistically independent, because they're derived from the same
+        original data. Each template pixel is taken from a single tract: the
+        one with the most recent mean input epoch among the tracts with data
+        there. Tracts are warped in that order, each only over the part of the
+        template that the tracts before it left without data (see
+        `_neededBox`). The PSF of the template is a Gaussian with the same
+        width as the CoaddPsf evaluated at the center of the detector.
 
         The template is built from coadds of one instrument: the science
         image's ``instrument`` if any coadd was made from it, and otherwise the
@@ -738,20 +747,22 @@ class GetTemplateTask(pipeBase.PipelineTask):
             instrument and no coadd records the plate scale of its input
             images, so the template variance cannot be corrected.
         """
-        band, photoCalib, templateInstrument = self._checkInputs(dataIds, coaddExposureHandles, instrument)
-
         scienceBBox = bbox
         bbox = geom.Box2I(bbox)
         bbox.grow(self.config.templateBorderSize)
+
+        coadds, warpedBoxes = self._readCoadds(coaddExposureHandles, bbox, wcs)
+        band, photoCalib, templateInstrument = self._checkInputs(dataIds, coadds, instrument)
 
         warped = {}
         catalogs = []
         inputs = []
         plateScaleFactor = 1.0 if instrument == templateInstrument else None
 
+        tracts = {}
         for tract in coaddExposureHandles:
             maskedImages, catalog, totalBox, coaddInputs = self._makeExposureCatalog(
-                coaddExposureHandles[tract], dataIds[tract], templateInstrument
+                coadds.pop(tract), dataIds[tract], templateInstrument
             )
             if len(catalog) == 0:
                 # Every coadd in this tract was dropped for its instrument.
@@ -762,8 +773,28 @@ class GetTemplateTask(pipeBase.PipelineTask):
             # is calculated from the first usable coadd and applied to all.
             if plateScaleFactor is None:
                 plateScaleFactor = self._plateScaleFactor(coaddInputs[0], wcs, bbox)
-            warpedBox = computeWarpedBBox(catalog[0].wcs, bbox, wcs)
-            warpedBox.grow(5)  # to ensure we catch all relevant input pixels
+            tracts[tract] = (maskedImages, catalog, totalBox, coaddInputs)
+
+        # Where tracts overlap, the tract with the most recent coadd inputs
+        # takes precedence. Tracts with no dated inputs come last, in order of
+        # tract id.
+        epochs = {tract: self._meanInputMjd(coaddInputs) for tract, (_, _, _, coaddInputs) in tracts.items()}
+        precedence = sorted((np.isnan(mjd), -np.nan_to_num(mjd), tract) for tract, mjd in epochs.items())
+        order = [tract for _, _, tract in precedence]
+        self.log.info("Tracts in order of precedence, with the mean MJD of their inputs: %s",
+                      ", ".join(f"{tract} ({epochs[tract]:.2f})" for tract in order))
+
+        # Merge and warp one tract at a time in order of precedence, each only
+        # over the part of the template that the tracts before it left without
+        # data. Only one merged tract image is held in memory at a time.
+        supplied = np.zeros((bbox.getHeight(), bbox.getWidth()), dtype=bool)
+        for tract in order:
+            maskedImages, catalog, totalBox, coaddInputs = tracts.pop(tract)
+            destBox = self._neededBox(supplied, catalog[0].wcs, list(maskedImages.values()), bbox, wcs)
+            if destBox.isEmpty():
+                self.log.info("Tract %s supplies no template pixels; not including in output.", tract)
+                continue
+            warpedBox = warpedBoxes[tract]
             # Combine images from individual patches together.
             unwarped, count, included = self._merge(
                 maskedImages, warpedBox, catalog[0].wcs
@@ -777,20 +808,27 @@ class GetTemplateTask(pipeBase.PipelineTask):
                 )
                 continue
             warpedBox.clip(totalBox)
-            potentialInput = self.warper.warpExposure(
-                wcs, unwarped.subset(warpedBox), destBBox=bbox
-            )
+            potentialInput = self.warper.warpExposure(wcs, unwarped.subset(warpedBox), destBBox=destBox)
             # Delete the single large `unwarped` image after warping to reduce peak memory use
             del unwarped
-            if np.all(
-                potentialInput.mask.array
-                & potentialInput.mask.getPlaneBitMask("NO_DATA")
-            ):
+            # Keep only the pixels with data that no earlier tract supplied;
+            # `_merge` gives no weight to the NaN pixels left out.
+            image = potentialInput.image.array
+            variance = potentialInput.variance.array
+            noData = potentialInput.mask.array & potentialInput.mask.getPlaneBitMask("NO_DATA")
+            region = (slice(destBox.getMinY() - bbox.getMinY(), destBox.getMaxY() - bbox.getMinY() + 1),
+                      slice(destBox.getMinX() - bbox.getMinX(), destBox.getMaxX() - bbox.getMinX() + 1))
+            kept = ((variance > 0) & np.isfinite(variance) & np.isfinite(image) & (noData == 0)
+                    & ~supplied[region])
+            if not kept.any():
                 self.log.info(
                     "No overlap from coadd patches in tract %s; not including in output.",
                     tract,
                 )
                 continue
+            image[~kept] = np.nan
+            variance[~kept] = np.nan
+            supplied[region] |= kept
 
             # Trim the exposure catalog to just the patches that were used.
             tempCatalog = afwTable.ExposureCatalog(self.schema)
@@ -1028,6 +1066,50 @@ class GetTemplateTask(pipeBase.PipelineTask):
             template.mask.array[highVariancePix] |= 2**highVarianceMaskPlaneBit
 
     @staticmethod
+    def _readCoadds(coaddExposureHandles, bbox, wcs):
+        """Read the part of each coadd that a template covers.
+
+        Each coadd is read in a single call, because every read of a component
+        stored in a coadd's archive loads the whole archive, and for a legacy
+        coadd that holds the PSF of every input image. Only the WCS of the
+        first coadd of each tract is read on its own, to find the footprint
+        before any pixels are read.
+
+        Parameters
+        ----------
+        coaddExposureHandles : `dict` [`int`,  `list` of \
+                          [`lsst.daf.butler.DeferredDatasetHandle` of \
+                           `lsst.afw.image.Exposure`]]
+            Coadds to read, indexed on tract id.
+        bbox : `lsst.geom.Box2I`
+            Bounding box of the template.
+        wcs : `lsst.afw.geom.SkyWcs`
+            WCS of the template.
+
+        Returns
+        -------
+        coadds : `dict` [`int`, `list` [`lsst.afw.image.Exposure`]]
+            Coadds indexed on tract id, in the order of
+            ``coaddExposureHandles``, each cut to the template's footprint in
+            its tract. A coadd the footprint does not overlap is read whole.
+        warpedBoxes : `dict` [`int`, `lsst.geom.Box2I`]
+            Footprint of the template in the pixels of each tract.
+        """
+        coadds = {}
+        warpedBoxes = {}
+        for tract, handles in coaddExposureHandles.items():
+            # Every coadd in a tract has the tract's WCS.
+            warpedBox = computeWarpedBBox(handles[0].get(component="wcs"), bbox, wcs)
+            warpedBox.grow(5)  # to ensure we catch all relevant input pixels
+            warpedBoxes[tract] = warpedBox
+            coadds[tract] = []
+            for handle in handles:
+                readBox = handle.get(component="bbox").clippedTo(warpedBox)
+                parameters = None if readBox.isEmpty() else {"bbox": readBox}
+                coadds[tract].append(handle.get(parameters=parameters))
+        return coadds, warpedBoxes
+
+    @staticmethod
     def _checkInputs(dataIds, coaddExposures, scienceInstrument=None):
         """Check that the all the dataIds are from the same band and that
         the exposures all have the same photometric calibration, and choose
@@ -1037,11 +1119,8 @@ class GetTemplateTask(pipeBase.PipelineTask):
         ----------
         dataIds : `dict` [`int`, `list` [`lsst.daf.butler.DataCoordinate`]]
             Record of the tract and patch of each coaddExposure.
-        coaddExposures : `dict` [`int`,  `list` of \
-                          [`lsst.daf.butler.DeferredDatasetHandle` of \
-                           `lsst.afw.image.Exposure` or
-                           `lsst.afw.image.Exposure`]]
-            Coadds to be mosaicked.
+        coaddExposures : `dict` [`int`,  `list` [`lsst.afw.image.Exposure`]]
+            Coadds to be mosaicked, indexed on tract id.
         scienceInstrument : `str`, optional
             Instrument of the science image.
 
@@ -1071,10 +1150,8 @@ class GetTemplateTask(pipeBase.PipelineTask):
         instrumentCounts = collections.Counter()
         for exposures in coaddExposures.values():
             for exposure in exposures:
-                # Read both components of a coadd in turn, so a butler cache
-                # can serve the second read from the first download.
-                photoCalibs.append(exposure.get(component="photoCalib"))
-                instrumentCounts[GetTemplateTask._getInstrument(exposure.get(component="coaddInputs"))] += 1
+                photoCalibs.append(exposure.photoCalib)
+                instrumentCounts[GetTemplateTask._getInstrument(exposure.getInfo().getCoaddInputs())] += 1
         if not all([photoCalibs[0] == x for x in photoCalibs]):
             msg = f"GetTemplateTask called with exposures with different photoCalibs: {photoCalibs}"
             raise RuntimeError(msg)
@@ -1114,13 +1191,12 @@ class GetTemplateTask(pipeBase.PipelineTask):
         label = visitInfo.getInstrumentLabel() if visitInfo is not None else ""
         return label or _UNKNOWN_INSTRUMENT
 
-    def _makeExposureCatalog(self, exposureRefs, dataIds, instrument=_UNKNOWN_INSTRUMENT):
+    def _makeExposureCatalog(self, coadds, dataIds, instrument=_UNKNOWN_INSTRUMENT):
         """Make an exposure catalog for one tract.
 
         Parameters
         ----------
-        exposureRefs : `list` of [`lsst.daf.butler.DeferredDatasetHandle` of \
-                        `lsst.afw.image.Exposure`]
+        coadds : `list` [`lsst.afw.image.Exposure`]
             Exposures to include in the catalog.
         dataIds : `list` [`lsst.daf.butler.DataCoordinate`]
             Data ids of each of the included exposures; must have "tract" and
@@ -1142,13 +1218,12 @@ class GetTemplateTask(pipeBase.PipelineTask):
             Input records of each exposure in ``catalog``, in the same order.
         """
         catalog = afwTable.ExposureCatalog(self.schema)
-        catalog.reserve(len(exposureRefs))
-        exposures = (exposureRef.get() for exposureRef in exposureRefs)
+        catalog.reserve(len(coadds))
         images = {}
         totalBox = geom.Box2I()
         keptCoaddInputs = []
 
-        for coadd, dataId in zip(exposures, dataIds):
+        for coadd, dataId in zip(coadds, dataIds):
             coaddInputs = coadd.getInfo().getCoaddInputs()
             coaddInstrument = self._getInstrument(coaddInputs)
             if coaddInstrument != instrument:
@@ -1177,6 +1252,100 @@ class GetTemplateTask(pipeBase.PipelineTask):
             record.set("weight", 1)
 
         return images, catalog, totalBox, keptCoaddInputs
+
+    @staticmethod
+    def _meanInputMjd(coaddInputs):
+        """Return the weighted mean observation time of the inputs of some
+        coadds.
+
+        Parameters
+        ----------
+        coaddInputs : `list` [`lsst.afw.image.CoaddInputs` or `None`]
+            Input records of the coadds.
+
+        Returns
+        -------
+        mjd : `float`
+            Mean mid-exposure MJD (TAI) of the inputs, weighted by their coadd
+            weights, or NaN if no input has both an observation time and a
+            positive weight.
+        """
+        mjds = []
+        weights = []
+        for inputs in coaddInputs:
+            if inputs is None:
+                continue
+            for record in inputs.ccds:
+                visitInfo = record.getVisitInfo()
+                weight = record["weight"]
+                if visitInfo is None or not visitInfo.getDate().isValid() or not weight > 0:
+                    continue
+                mjds.append(visitInfo.getDate().get(DateTime.MJD, DateTime.TAI))
+                weights.append(weight)
+        return float(np.average(mjds, weights=weights)) if mjds else np.nan
+
+    @staticmethod
+    def _neededBox(supplied, coaddWcs, images, bbox, wcs):
+        """Return the part of a template that a tract can still supply.
+
+        The template is divided into blocks of ``_TRACT_GRID_STEP`` pixels.
+        The result covers every block that has a pixel no tract has supplied,
+        and where the tract's coadds have data at the center or a corner of
+        the block.
+
+        Parameters
+        ----------
+        supplied : `numpy.ndarray`
+            Template pixels that tracts earlier in the order of precedence
+            supplied, with the shape of ``bbox``.
+        coaddWcs : `lsst.afw.geom.SkyWcs`
+            WCS of the tract.
+        images : `list` [`lsst.afw.image.MaskedImage`]
+            Pixels of the tract's coadds.
+        bbox : `lsst.geom.Box2I`
+            Bounding box of the template.
+        wcs : `lsst.afw.geom.SkyWcs`
+            WCS of the template.
+
+        Returns
+        -------
+        box : `lsst.geom.Box2I`
+            Bounding box of those blocks, in template pixels; empty if there
+            are none.
+        """
+        step = _TRACT_GRID_STEP
+        ny = -(-bbox.getHeight()//step)
+        nx = -(-bbox.getWidth()//step)
+        padded = np.ones((ny*step, nx*step), dtype=bool)
+        padded[:bbox.getHeight(), :bbox.getWidth()] = supplied
+        blockY, blockX = np.nonzero(~padded.reshape(ny, step, nx, step).all(axis=(1, 3)))
+        if blockX.size == 0:
+            return geom.Box2I()
+        transform = afwGeom.makeWcsPairTransform(wcs, coaddWcs).getMapping()
+        hasData = np.zeros(blockX.size, dtype=bool)
+        for dx, dy in ((step//2, step//2), (0, 0), (step - 1, 0), (0, step - 1), (step - 1, step - 1)):
+            x = np.minimum(bbox.getMinX() + step*blockX + dx, bbox.getMaxX())
+            y = np.minimum(bbox.getMinY() + step*blockY + dy, bbox.getMaxY())
+            coaddX, coaddY = transform.applyForward(np.array([x, y], dtype=float))
+            column = np.floor(coaddX + 0.5).astype(int)
+            row = np.floor(coaddY + 0.5).astype(int)
+            for image in images:
+                box = image.getBBox()
+                inside = ((column >= box.getMinX()) & (column <= box.getMaxX())
+                          & (row >= box.getMinY()) & (row <= box.getMaxY()))
+                index = (row[inside] - box.getMinY(), column[inside] - box.getMinX())
+                variance = image.variance.array[index]
+                noData = image.mask.array[index] & image.mask.getPlaneBitMask("NO_DATA")
+                hasData[inside] |= ((variance > 0) & np.isfinite(variance)
+                                    & np.isfinite(image.image.array[index]) & (noData == 0))
+        if not hasData.any():
+            return geom.Box2I()
+        box = geom.Box2I(geom.Point2I(bbox.getMinX() + step*blockX[hasData].min(),
+                                      bbox.getMinY() + step*blockY[hasData].min()),
+                         geom.Point2I(bbox.getMinX() + step*(blockX[hasData].max() + 1) - 1,
+                                      bbox.getMinY() + step*(blockY[hasData].max() + 1) - 1))
+        box.clip(bbox)
+        return box
 
     def _merge(self, maskedImages, bbox, wcs):
         """Merge the images that came from one tract into one larger image,
