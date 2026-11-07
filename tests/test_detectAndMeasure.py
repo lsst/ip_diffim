@@ -34,8 +34,8 @@ import lsst.afw.image as afwImage
 import lsst.afw.table as afwTable
 import lsst.afw.math as afwMath
 import lsst.geom
-from lsst.images import (Box, DifferenceImage, DifferenceImageTemplateInfo, Polygon,
-                         get_legacy_difference_image_mask_planes, get_legacy_optional_mask_planes)
+from lsst.images import (Box, DifferenceImage, DifferenceImageTemplateInfo, DifferenceImageTemplateInput,
+                         Polygon, get_legacy_difference_image_mask_planes, get_legacy_optional_mask_planes)
 from lsst.images.convolution_kernels import ImageBasisConvolutionKernel
 from lsst.images.fields import ChebyshevField
 import lsst.images.psfs
@@ -2031,6 +2031,205 @@ class DetectAndMeasureOutputFormatTest(DetectAndMeasureTestBase, lsst.utils.test
         self.assertEqual(scoreOut.kernel, scoreKernel)
         self.assertIs(out.photometric_scaling, photometricScaling)
         self.assertIs(scoreOut.photometric_scaling, photometricScaling)
+
+    @staticmethod
+    def _makeEpochTemplates(bbox):
+        """Return two coadd records covering the left and right parts of an
+        image, overlapping in a strip down the middle, with three inputs
+        between them.
+
+        Neither coadd covers the lowest quarter of the image. Input 1 is
+        listed by both coadds, and input 2 only by the left one; both cover
+        the whole image. Input 3 is listed only by the right coadd and covers
+        the upper half.
+
+        Parameters
+        ----------
+        bbox : `lsst.geom.Box2I`
+            Bounding box of the image.
+
+        Returns
+        -------
+        templates : `list` [`lsst.images.DifferenceImageTemplateInfo`]
+            The left and right coadd records.
+        xLeft, xRight : `float`
+            Right edge of the left coadd and left edge of the right one.
+        yMid : `float`
+            Lower edge of input 3.
+        yLow : `float`
+            Lower edge of both coadds.
+        """
+        x0, x1 = bbox.getMinX() - 0.5, bbox.getMaxX() + 0.5
+        y0, y1 = bbox.getMinY() - 0.5, bbox.getMaxY() + 0.5
+        xLeft = x0 + 0.6*(x1 - x0)
+        xRight = x0 + 0.4*(x1 - x0)
+        yMid = 0.5*(y0 + y1)
+        yLow = y0 + 0.25*(y1 - y0)
+
+        def box(xa, xb, ya, yb):
+            return Polygon(x_vertices=[xa, xb, xb, xa], y_vertices=[ya, ya, yb, yb])
+
+        def makeInput(visit, mjd, weight, bounds):
+            return DifferenceImageTemplateInput(visit=visit, detector=5, mid_mjd_tai=mjd, weight=weight,
+                                                bounds=bounds)
+
+        whole = box(x0, x1, y0, y1)
+        templates = []
+        for patch, coaddBounds, inputs in (
+            (1, box(x0, xLeft, yLow, y1), [makeInput(1, 60000.0, 1.0, whole),
+                                           makeInput(2, 60010.0, 3.0, whole)]),
+            (2, box(xRight, x1, yLow, y1), [makeInput(1, 60000.0, 1.0, whole),
+                                            makeInput(3, 60020.0, 1.0, box(x0, x1, yMid, y1))]),
+        ):
+            info = DetectAndMeasureOutputFormatTest._makeTemplateInfo(patch=patch)
+            info.bounds = coaddBounds
+            info.inputs = inputs
+            templates.append(info)
+        return templates, xLeft, xRight, yMid, yLow
+
+    def _checkTemplateEpochs(self, diaSources, xLeft, xRight, yMid, yLow):
+        """Check the template epochs of diaSources measured with the records
+        of `_makeEpochTemplates`.
+        """
+        x = diaSources.getX()
+        y = diaSources.getY()
+        covered = y >= yLow
+        left = covered & (x < xLeft)
+        right = covered & (x >= xRight)
+        upper = y >= yMid
+        for region in (left & ~right, right & ~left & upper, right & ~left & ~upper, left & right & upper,
+                       ~covered):
+            self.assertTrue(region.any(), msg="The test image needs a diaSource in every region.")
+        # The left coadd has total weight 4 everywhere, the right one 2 where
+        # input 3 covers it and 1 elsewhere; overlapping coadds are averaged
+        # with weights sqrt(total weight).
+        leftMean = (60000.0 + 3.0*60010.0)/4.0
+        rightWeight = np.where(upper, 2.0, 1.0)
+        rightMean = np.where(upper, (60000.0 + 60020.0)/2.0, 60000.0)
+        expected = ((left*2.0*leftMean + right*np.sqrt(rightWeight)*rightMean)
+                    / np.where(covered, left*2.0 + right*np.sqrt(rightWeight), 1.0))
+        expectedMax = np.where(right & upper, 60020.0, np.where(left, 60010.0, 60000.0))
+        self.assertFloatsAlmostEqual(diaSources["templateMjdMean"][covered], expected[covered], rtol=1e-12)
+        self.assertTrue(np.all(diaSources["templateMjdMin"][covered] == 60000.0))
+        self.assertFloatsEqual(diaSources["templateMjdMax"][covered], expectedMax[covered])
+        for name in ("templateMjdMean", "templateMjdMin", "templateMjdMax"):
+            self.assertTrue(np.all(np.isnan(diaSources[name][~covered])), msg=name)
+
+    _EPOCH_NAMES = {"TEMPLATE MJD MIN": "templateMjdMin",
+                    "TEMPLATE MJD MAX": "templateMjdMax",
+                    "TEMPLATE MJD MEAN": "templateMjdMean"}
+    """Image metadata key of each summary of the diaSource template epochs,
+    mapped to the field and task metadata name it summarizes.
+    """
+
+    def _checkTemplateEpochSummary(self, task, templateEpochs, diaSources):
+        """Check the summary of the template epochs of a catalog in the task
+        metadata and in the result struct.
+        """
+        known = np.isfinite(diaSources["templateMjdMean"])
+        self.assertTrue(known.any())
+        expected = {"templateMjdMin": np.min(diaSources["templateMjdMin"][known]),
+                    "templateMjdMax": np.max(diaSources["templateMjdMax"][known]),
+                    "templateMjdMean": np.mean(diaSources["templateMjdMean"][known])}
+        self.assertEqual(set(templateEpochs), set(self._EPOCH_NAMES))
+        for key, name in self._EPOCH_NAMES.items():
+            with self.subTest(name=name):
+                self.assertFloatsAlmostEqual(task.metadata[name], expected[name], rtol=1e-12)
+                self.assertEqual(templateEpochs[key], task.metadata[name])
+
+    def _checkNoTemplateEpochSummary(self, task, templateEpochs):
+        """Check that no template epoch summary is recorded beyond NaN task
+        metadata.
+        """
+        self.assertEqual(templateEpochs, {})
+        for name in self._EPOCH_NAMES.values():
+            self.assertTrue(np.isnan(task.metadata[name]), msg=name)
+
+    def test_template_epochs(self):
+        """Each diaSource records the observation times of the template
+        inputs that cover its centroid, counting an input only inside the
+        bounds of a coadd that lists it, and the task records their summary.
+        """
+        science, sources, matchedTemplate, difference = self._make_images()
+        templates, *geometry = self._makeEpochTemplates(difference.getBBox())
+        task = self._setup_task()
+        output = task.run(science, matchedTemplate, difference, sources, templateInfo=templates)
+        self._checkTemplateEpochs(output.diaSources, *geometry)
+        self._checkTemplateEpochSummary(task, output.templateEpochs, output.diaSources)
+
+        # Without template records the epochs are not known.
+        science, sources, matchedTemplate, difference = self._make_images()
+        task = self._setup_task()
+        output = task.run(science, matchedTemplate, difference, sources)
+        for name in ("templateMjdMean", "templateMjdMin", "templateMjdMax"):
+            self.assertTrue(np.all(np.isnan(output.diaSources[name])), msg=name)
+        self._checkNoTemplateEpochSummary(task, output.templateEpochs)
+
+    def test_template_epoch_summary_includes_sky_sources(self):
+        """Sky sources are measured and summarized like diaSources.
+        """
+        science, sources, matchedTemplate, difference = self._make_images()
+        templates, *_ = self._makeEpochTemplates(difference.getBBox())
+        task = self._setup_detection(doSkySources=True, nSkySources=20, badSubtractionRatioThreshold=1.)
+        output = task.run(science, matchedTemplate, difference, sources, templateInfo=templates)
+        diaSources = output.diaSources
+        sky = diaSources["sky_source"]
+        self.assertTrue(np.isfinite(diaSources["templateMjdMean"][sky]).any())
+        self._checkTemplateEpochSummary(task, output.templateEpochs, diaSources)
+
+    def test_template_epochs_score(self):
+        """``DetectAndMeasureScoreTask`` measures the template epochs too, and
+        both converted images record their summary.
+        """
+        self.detectionTask = detectAndMeasure.DetectAndMeasureScoreTask
+        science, sources, matchedTemplate, difference, score = self._make_images(withScore=True)
+        templates, *geometry = self._makeEpochTemplates(difference.getBBox())
+        task = self._setup_task(image_type="future")
+        inputImages = {"subtractedMeasuredExposure": self._makeFutureInput(difference),
+                       "scoreMeasuredExposure": self._makeFutureInput(score)}
+        output = task.run(science, matchedTemplate,
+                          inputImages["subtractedMeasuredExposure"].to_legacy(),
+                          inputImages["scoreMeasuredExposure"].to_legacy(), sources, templateInfo=templates)
+        self._checkTemplateEpochs(output.diaSources, *geometry)
+        task.convert_outputs_to_future(output, inputImages)
+        for name in inputImages:
+            for key, value in output.templateEpochs.items():
+                with self.subTest(image=name, key=key):
+                    self.assertEqual(getattr(output, name).metadata.native[key], value)
+
+    def test_run_quantum_template_epochs(self):
+        """In future mode ``runQuantum`` measures the template epochs from the
+        template records of the difference image and records their summary
+        on the output image; in legacy mode they are NaN.
+        """
+        for imageType, withInputs in (("legacy", True), ("future", True), ("future", False)):
+            with self.subTest(imageType=imageType, withInputs=withInputs):
+                science, sources, matchedTemplate, difference = self._make_images()
+                templates, *geometry = self._makeEpochTemplates(difference.getBBox())
+                if not withInputs:
+                    for info in templates:
+                        info.inputs = []
+                if imageType == "future":
+                    difference = self._makeFutureInput(difference, templates, self._makeKernel(),
+                                                       self._makePhotometricScaling(difference))
+                task = self._setup_task(image_type=imageType)
+                butlerQC = _RecordingQuantumContext(self.dataId)
+                task.runQuantum(butlerQC,
+                                _FakeRefs(science=science, matchedTemplate=matchedTemplate,
+                                          difference=difference, kernelSources=sources),
+                                _FakeRefs())
+                diaSources = butlerQC.put_values.diaSources
+                out = butlerQC.put_values.subtractedMeasuredExposure
+                if imageType == "future" and withInputs:
+                    self._checkTemplateEpochs(diaSources, *geometry)
+                    self._checkTemplateEpochSummary(task, butlerQC.put_values.templateEpochs, diaSources)
+                    for key, name in self._EPOCH_NAMES.items():
+                        self.assertEqual(out.metadata.native[key], task.metadata[name])
+                else:
+                    self.assertTrue(np.all(np.isnan(diaSources["templateMjdMean"])))
+                    self._checkNoTemplateEpochSummary(task, butlerQC.put_values.templateEpochs)
+                    for key in self._EPOCH_NAMES:
+                        self.assertNotIn(key, out.metadata)
 
     def test_connections_future_reads_difference_image(self):
         """The inputs whose provenance is copied ask for the type that

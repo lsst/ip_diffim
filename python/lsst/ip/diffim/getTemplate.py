@@ -34,13 +34,20 @@ from lsst.afw.image import VisitInfo
 import lsst.afw.table as afwTable
 from lsst.afw.math._warper import computeWarpedBBox
 import lsst.afw.math as afwMath
+from lsst.daf.base import DateTime
 import lsst.pex.config as pexConfig
 import lsst.pex.exceptions
 import lsst.pipe.base as pipeBase
 
 from lsst.images import (
+    Box,
     DifferenceImage,
     DifferenceImageTemplateInfo,
+    DifferenceImageTemplateInput,
+    GeneralFrame,
+    NoOverlapError,
+    Polygon,
+    Transform,
     get_legacy_optional_mask_planes,
     get_legacy_template_mask_planes,
 )
@@ -64,6 +71,106 @@ _UNKNOWN_INSTRUMENT = "UNKNOWN"
 """Instrument recorded for a coadd or template made from observations of an
 unknown instrument.
 """
+
+_FOOTPRINT_MARGIN = 32.0
+"""Distance, in coadd pixels, by which the science image's footprint in a
+coadd is grown before a coadd input is clipped to it.  It must exceed twice
+the distance by which a distorted science image edge departs from a straight
+line between its corners, and limits how far outside the science image its
+WCS is evaluated.
+"""
+
+
+def _pixelTransform(fromWcs, toWcs):
+    """Return a chainable transformation between two pixel frames.
+
+    Parameters
+    ----------
+    fromWcs, toWcs : `lsst.afw.geom.SkyWcs`
+        WCSs of the input and output pixels.
+
+    Returns
+    -------
+    transform : `lsst.images.Transform`
+        Transform from ``fromWcs`` pixels to ``toWcs`` pixels.
+    """
+    return Transform.from_legacy(afwGeom.makeWcsPairTransform(fromWcs, toWcs),
+                                 GeneralFrame(unit=astropy.units.pix),
+                                 GeneralFrame(unit=astropy.units.pix)
+                                 )
+
+
+def _getImageOverlap(record, coaddWcs, scienceFootprint, coaddToScienceTransform, scienceBox, border):
+    """Return the region enclosing the overlap of the science image and one
+    input image of the coadd.
+
+    Note that there are three different WCS's involved here: the WCS of the
+    original image that was warped to contribute to the coadd, the coadd WCS,
+    and the current science image WCS that we are building a template for.
+
+    Parameters
+    ----------
+    record : `lsst.afw.table.ExposureRecord`
+        Input record of a coadd, with the input's WCS, bounding box and
+        optional valid polygon.
+    coaddWcs : `lsst.afw.geom.SkyWcs`
+        WCS of the coadd.
+    scienceFootprint : `lsst.images.Region`
+        ``scienceBox`` in coadd pixels, grown by ``_FOOTPRINT_MARGIN``.
+    coaddToScienceTransform : `lsst.images.Transform`
+        Transform from coadd pixels to science image pixels.
+    scienceBox : `lsst.images.Box`
+        Bounding box of the science image.
+    border : `float`
+        Width, in input pixels, of the border of the input that warping left
+        out of the coadd.
+
+    Returns
+    -------
+    footprint : `lsst.images.Polygon` or `None`
+        The part of ``scienceBox`` the input's warp covers, in science image
+        pixels, or `None` if it covers none of it.
+    """
+    inputBox = geom.Box2D(record.getBBox())
+    inputBox.grow(-border)
+    inputBounds = Polygon.from_legacy(afwGeom.Polygon(inputBox))
+    polygon = record.getValidPolygon()
+    inputToCoadd = _pixelTransform(record.getWcs(), coaddWcs)
+    try:
+        if polygon is not None:
+            inputBounds = inputBounds.intersection(Polygon.from_legacy(polygon))
+        # Only vertices are transformed, so the edges of the input stay
+        # straight.
+        footprint = (
+            inputBounds.transform(inputToCoadd)
+            .intersection(scienceFootprint)
+            .transform(coaddToScienceTransform)
+        )
+        # The convex hull keeps the footprint in one piece when it is clipped.
+        footprint = footprint.convex_hull().intersection(scienceBox)
+    except NoOverlapError:
+        return None
+    return Polygon.from_box(footprint) if isinstance(footprint, Box) else footprint
+
+
+def _warpBorder(kernelName):
+    """Return the width of the border of an image that warping leaves out.
+
+    A warped pixel is computed only where the whole kernel lies on the image.
+
+    Parameters
+    ----------
+    kernelName : `str`
+        Name of the warping kernel, as `lsst.afw.math.Warper` takes it.
+
+    Returns
+    -------
+    border : `float`
+        Width of the border on each side, in pixels from the edge of the
+        image's bounding box; 2.5 for ``lanczos3``.
+    """
+    kernel = afwMath.WarpingControl(kernelName).getWarpingKernel()
+    return kernel.getCtr().getX() + 0.5
 
 
 @functools.cache
@@ -213,8 +320,10 @@ class GetTemplateConfig(
             "lanczos5": "Lanczos kernel of order 5",
         },
         doc="Warping kernel that was used to build the input coadds. This"
-        " cannot be recovered from the coadds themselves, and is used only if"
-        " doCorrectVarianceWarpCorrelation is True.",
+        " cannot be recovered from the coadds themselves. It is used to"
+        " correct the variance if doCorrectVarianceWarpCorrelation is True,"
+        " and to trim the coadd inputs bboxes to account for the size of the"
+        " warping kernel.",
     )
     coaddPsf = pexConfig.ConfigField(
         doc="Configuration for CoaddPsf",
@@ -369,16 +478,19 @@ class GetTemplateTask(pipeBase.PipelineTask):
             outputs.template = self.convert_outputs_to_future(outputs.template,
                                                               inputRefs.coaddExposures,
                                                               detector=detector,
-                                                              exposureRecord=exposureRecord)
+                                                              exposureRecord=exposureRecord,
+                                                              templateInputs=outputs.templateInputs)
         butlerQC.put(outputs, outputRefs)
 
-    def convert_outputs_to_future(self, template, coadd_refs, detector, exposureRecord):
+    def convert_outputs_to_future(self, template, coadd_refs, detector, exposureRecord,
+                                  templateInputs=None):
         """Convert a template image to DifferenceImage format.
 
         This replaces ``template`` with an `lsst.images.DifferenceImage`
         instance and records the coadds contributed to it, along with the
-        instrument they were made from. The Gaussian PSF set by `run` is
-        converted to an `lsst.images.psfs.GaussianPointSpreadFunction`.
+        instrument they were made from and their input image identifiers.
+        The Gaussian PSF set by `run` is converted to an
+        `lsst.images.psfs.GaussianPointSpreadFunction`.
 
         Parameters
         ----------
@@ -395,6 +507,10 @@ class GetTemplateTask(pipeBase.PipelineTask):
             The ``exposure`` record of the observation the template was built
             for, which supplies the observation metadata recorded on the
             output.
+        templateInputs : `dict` [`tuple` [`int`, `int`], \
+                `list` [`lsst.images.DifferenceImageTemplateInput`]], optional
+            Input image records of each coadd, keyed by tract and patch, as
+            returned by `run`. Coadds not listed record no inputs.
 
         Returns
         -------
@@ -440,6 +556,9 @@ class GetTemplateTask(pipeBase.PipelineTask):
             log=self.log,
             instrument=instrument,
         )
+        if templateInputs:
+            for info in convertedTemplate.templates:
+                info.inputs = templateInputs.get((info.tract, info.patch), [])
         return convertedTemplate
 
     def _clearUnmappedMaskPlanes(self, mask, planeMap):
@@ -603,6 +722,12 @@ class GetTemplateTask(pipeBase.PipelineTask):
                A template coadd exposure assembled out of patches, with
                pixels in nJy. Its PSF is a Gaussian approximation to the
                CoaddPsf of its inputs (`lsst.afw.image.ExposureF`).
+           ``templateInputs``
+               Input image records of each coadd that cover part of the
+               science image, keyed by tract and patch (`dict`
+               [`tuple` [`int`, `int`],
+               `list` [`lsst.images.DifferenceImageTemplateInput`]]). Empty
+               unless ``config.output_image_type`` is ``"future"``.
 
         Raises
         ------
@@ -615,11 +740,13 @@ class GetTemplateTask(pipeBase.PipelineTask):
         """
         band, photoCalib, templateInstrument = self._checkInputs(dataIds, coaddExposureHandles, instrument)
 
+        scienceBBox = bbox
         bbox = geom.Box2I(bbox)
         bbox.grow(self.config.templateBorderSize)
 
         warped = {}
         catalogs = []
+        inputs = []
         plateScaleFactor = 1.0 if instrument == templateInstrument else None
 
         for tract in coaddExposureHandles:
@@ -634,7 +761,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
             # coadd was from a different instrument. A single correction factor
             # is calculated from the first usable coadd and applied to all.
             if plateScaleFactor is None:
-                plateScaleFactor = self._plateScaleFactor(coaddInputs, wcs, bbox)
+                plateScaleFactor = self._plateScaleFactor(coaddInputs[0], wcs, bbox)
             warpedBox = computeWarpedBBox(catalog[0].wcs, bbox, wcs)
             warpedBox.grow(5)  # to ensure we catch all relevant input pixels
             # Combine images from individual patches together.
@@ -670,6 +797,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
             tempCatalog.reserve(len(included))
             for i in included:
                 tempCatalog.append(catalog[i])
+                inputs.append(coaddInputs[i])
             catalogs.append(tempCatalog)
             warped[tract] = potentialInput.maskedImage
 
@@ -696,6 +824,11 @@ class GetTemplateTask(pipeBase.PipelineTask):
         catalog.reserve(sum([len(c) for c in catalogs]))
         for c in catalogs:
             catalog.extend(c)
+        # Only the future output type records the inputs.
+        if self.config.output_image_type == "future":
+            templateInputs = self._collectTemplateInputs(catalog, inputs, wcs, scienceBBox)
+        else:
+            templateInputs = {}
 
         # Set a mask plane for any regions with exceptionally high variance.
         self.checkHighVariance(template)
@@ -714,7 +847,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
         coaddInputs = afwImage.CoaddInputs(afwTable.ExposureTable.makeMinimalSchema(), self.schema)
         coaddInputs.ccds.extend(catalog, deep=True)
         template.getInfo().setCoaddInputs(coaddInputs)
-        return pipeBase.Struct(template=template)
+        return pipeBase.Struct(template=template, templateInputs=templateInputs)
 
     def _correctVariance(self, template, plateScaleFactor):
         """Correct the template variance plane for the effects of warping.
@@ -816,6 +949,59 @@ class GetTemplateTask(pipeBase.PipelineTask):
             if np.isfinite(factor) and factor > 0:
                 return factor
         return None
+
+    def _collectTemplateInputs(self, catalog, coaddInputs, wcs, bbox):
+        """Find the input images and epochs of each coadd in the template.
+
+        Parameters
+        ----------
+        catalog : `lsst.afw.table.ExposureCatalog`
+            Coadds the template was built from, with their tract, patch and
+            WCS.
+        coaddInputs : `list` [`lsst.afw.image.CoaddInputs` or `None`]
+            Input records of each coadd in ``catalog``, in the same order.
+        wcs : `lsst.afw.geom.SkyWcs`
+            WCS of the science image.
+        bbox : `lsst.geom.Box2I`
+            Bounding box of the science image.
+
+        Returns
+        -------
+        templateInputs : `dict` [`tuple` [`int`, `int`], \
+                `list` [`lsst.images.DifferenceImageTemplateInput`]]
+            Inputs of each coadd that cover part of the science image, keyed
+            by tract and patch, with the part their warps cover in science
+            image pixels.
+        """
+        scienceBox = Box.from_legacy(bbox)
+        border = _warpBorder(self.config.coaddWarpKernel)
+        regions = {}
+        templateInputs = {}
+        for coadd, coaddInput in zip(catalog, coaddInputs, strict=True):
+            coaddList = templateInputs.setdefault((coadd["tract"], coadd["patch"]), [])
+            if coaddInput is None:
+                continue
+            scienceToCoadd = _pixelTransform(wcs, coadd.getWcs())
+            scienceFootprint = scienceBox.transform(scienceToCoadd).dilated_by(_FOOTPRINT_MARGIN)
+            coaddToScience = scienceToCoadd.inverted()
+            for record in coaddInput.ccds:
+                visitInfo = record.getVisitInfo()
+                weight = record["weight"]
+                if visitInfo is None or not visitInfo.getDate().isValid() or not weight > 0:
+                    continue
+                key = (record["visit"], record["ccd"])
+                # Record a single region for a ccd in overlapping patches.
+                if key not in regions:
+                    regions[key] = _getImageOverlap(record, coadd.getWcs(), scienceFootprint, coaddToScience,
+                                                    scienceBox, border)
+                region = regions[key]
+                if region is None:
+                    continue
+                mjd = visitInfo.getDate().get(DateTime.MJD, DateTime.TAI)
+                coaddList.append(DifferenceImageTemplateInput(visit=key[0], detector=key[1],
+                                                              mid_mjd_tai=mjd, weight=weight,
+                                                              bounds=region))
+        return templateInputs
 
     def checkHighVariance(self, template):
         """Set a mask plane for regions with unusually high variance.
@@ -952,16 +1138,15 @@ class GetTemplateTask(pipeBase.PipelineTask):
             Catalog of metadata for each exposure
         totalBox : `lsst.geom.Box2I`
             The union of the bounding boxes of all the input exposures.
-        coaddInputs : `lsst.afw.image.CoaddInputs` or `None`
-            Input records of the first exposure kept, or `None` if none is
-            kept.
+        coaddInputs : `list` [`lsst.afw.image.CoaddInputs` or `None`]
+            Input records of each exposure in ``catalog``, in the same order.
         """
         catalog = afwTable.ExposureCatalog(self.schema)
         catalog.reserve(len(exposureRefs))
         exposures = (exposureRef.get() for exposureRef in exposureRefs)
         images = {}
         totalBox = geom.Box2I()
-        firstCoaddInputs = None
+        keptCoaddInputs = []
 
         for coadd, dataId in zip(exposures, dataIds):
             coaddInputs = coadd.getInfo().getCoaddInputs()
@@ -974,8 +1159,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
                     instrument,
                 )
                 continue
-            if not images:
-                firstCoaddInputs = coaddInputs
+            keptCoaddInputs.append(coaddInputs)
             images[dataId] = coadd.maskedImage
             bbox = coadd.getBBox()
             totalBox = totalBox.expandedTo(bbox)
@@ -992,7 +1176,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
             # should be very similar, so this value mostly shouldn't matter.
             record.set("weight", 1)
 
-        return images, catalog, totalBox, firstCoaddInputs
+        return images, catalog, totalBox, keptCoaddInputs
 
     def _merge(self, maskedImages, bbox, wcs):
         """Merge the images that came from one tract into one larger image,
