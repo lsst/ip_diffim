@@ -34,7 +34,7 @@ from lsst.images.convolution_kernels import ImageBasisConvolutionKernel
 from lsst.ip.diffim.utils import (evaluateMeanPsfFwhm, getPsfFwhm,
                                   computeDifferenceImageMetrics, computePSFNoiseEquivalentArea,
                                   checkMask, record_from_obs_info, setSourceFootprints,
-                                  get_difference_image_provenance)
+                                  get_difference_image_provenance, checkTemplateIsSufficient)
 from lsst.meas.algorithms import ScaleVarianceTask, ScienceSourceSelectorTask
 import lsst.pex.config
 import lsst.pipe.base
@@ -749,10 +749,12 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         except (RuntimeError, lsst.pex.exceptions.Exception) as e:
             self.log.warning("Failed to match template. Checking coverage")
             #  Raise NoWorkFound if template fraction is insufficient
-            checkTemplateIsSufficient(template[science.getBBox()], science, self.log,
-                                      self.config.minTemplateFractionForExpectedSuccess,
-                                      exceptionMessage="Template coverage lower than expected to succeed."
-                                      f" Failure is tolerable: {e}")
+            checkTemplateIsSufficient(
+                template[science.getBBox()], self.log, scienceExposure=science,
+                requiredTemplateFraction=self.config.minTemplateFractionForExpectedSuccess,
+                exceptionMessage="Template coverage lower than expected to succeed."
+                f" Failure is tolerable: {e}"
+            )
             #  checkTemplateIsSufficient did not raise NoWorkFound, so raise original exception
             raise e
 
@@ -1192,7 +1194,7 @@ class AlardLuptonSubtractTask(lsst.pipe.base.PipelineTask):
         if visitSummary is not None:
             self._applyExternalCalibrations(science, visitSummary=visitSummary)
         templateCoverageFraction = checkTemplateIsSufficient(
-            template[science.getBBox()], science, self.log,
+            template[science.getBBox()], self.log, scienceExposure=science,
             requiredTemplateFraction=self.config.requiredTemplateFraction,
             exceptionMessage="Not attempting subtraction. To force subtraction,"
             " set config requiredTemplateFraction=0"
@@ -1432,10 +1434,12 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
         except (RuntimeError, lsst.pex.exceptions.Exception) as e:
             self.log.warning("Failed to match template. Checking coverage")
             #  Raise NoWorkFound if template fraction is insufficient
-            checkTemplateIsSufficient(template[science.getBBox()], science, self.log,
-                                      self.config.minTemplateFractionForExpectedSuccess,
-                                      exceptionMessage="Template coverage lower than expected to succeed."
-                                      f" Failure is tolerable: {e}")
+            checkTemplateIsSufficient(
+                template[science.getBBox()], self.log, scienceExposure=science,
+                requiredTemplateFraction=self.config.minTemplateFractionForExpectedSuccess,
+                exceptionMessage="Template coverage lower than expected to succeed."
+                f" Failure is tolerable: {e}"
+            )
             #  checkTemplateIsSufficient did not raise NoWorkFound, so raise original exception
             raise e
 
@@ -1581,53 +1585,6 @@ class AlardLuptonPreconvolveSubtractTask(AlardLuptonSubtractTask):
                                      backgroundModel=kernelResult.backgroundModel,
                                      psfMatchingKernel=kernelResult.psfMatchingKernel,
                                      kernelSources=kernelSources)
-
-
-def checkTemplateIsSufficient(templateExposure, scienceExposure, logger, requiredTemplateFraction=0.,
-                              exceptionMessage=""):
-    """Raise NoWorkFound if template coverage < requiredTemplateFraction
-
-    Parameters
-    ----------
-    templateExposure : `lsst.afw.image.ExposureF`
-        The template exposure to check
-    logger : `logging.Logger`
-        Logger for printing output.
-    requiredTemplateFraction : `float`, optional
-        Fraction of pixels of the science image required to have coverage
-        in the template.
-    exceptionMessage : `str`, optional
-        Message to include in the exception raised if the template coverage
-        is insufficient.
-
-    Returns
-    -------
-    templateCoverageFraction: `float`
-        Fraction of pixels in the template with data.
-
-    Raises
-    ------
-    lsst.pipe.base.NoWorkFound
-        Raised if fraction of good pixels, defined as not having NO_DATA
-        set, is less than the requiredTemplateFraction
-    """
-    # Count the number of pixels with the NO_DATA mask bit set
-    # counting NaN pixels is insufficient because pixels without data are often intepolated over)
-    noTemplate = templateExposure.mask.array & templateExposure.mask.getPlaneBitMask('NO_DATA')
-    # Also need to account for missing data in the science image,
-    # because template coverage there doesn't help
-    noScience = scienceExposure.mask.array & scienceExposure.mask.getPlaneBitMask('NO_DATA')
-    pixNoData = np.count_nonzero(noTemplate | noScience)
-    pixGood = templateExposure.getBBox().getArea() - pixNoData
-    templateCoverageFraction = pixGood/templateExposure.getBBox().getArea()
-    logger.info("template has %d good pixels (%.1f%%)", pixGood, 100*templateCoverageFraction)
-
-    if templateCoverageFraction < requiredTemplateFraction:
-        message = ("Insufficient Template Coverage. (%.1f%% < %.1f%%)" % (
-                   100*templateCoverageFraction,
-                   100*requiredTemplateFraction))
-        raise lsst.pipe.base.NoWorkFound(message + " " + exceptionMessage)
-    return templateCoverageFraction
 
 
 def _subtractImages(science, template, backgroundModel=None):
