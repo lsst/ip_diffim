@@ -28,9 +28,25 @@ import unittest
 import numpy as np
 
 import lsst.utils.tests
+import lsst.afw.detection as afwDetection
 import lsst.afw.table as afwTable
 from lsst.ip.diffim.dipoleFitTask import (DipoleFitAlgorithm, DipoleFitTask)
 import utils
+
+
+def reversePeaks(footprint):
+    """Reverse the order of the peaks of a footprint.
+
+    Parameters
+    ----------
+    footprint : `lsst.afw.detection.Footprint`
+        Footprint to modify in place.
+    """
+    peaks = footprint.getPeaks()
+    reordered = afwDetection.PeakCatalog(peaks.table)
+    reordered.extend(list(peaks)[::-1])
+    peaks.clear()
+    footprint.setPeakCatalog(reordered)
 
 
 class DipoleTestImage:
@@ -92,17 +108,43 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
         Test that the resulting fluxes/centroids are very close to the
         input values for both dipoles in the image.
         """
-        # Display (plot) the output dipole thumbnails with matplotlib.
-        display = False
-        # Be verbose during fitting, including the lmfit internal details.
-        verbose = False
-
         dipoleTestImage = DipoleTestImage()
         catalog = dipoleTestImage.testImage.detectDipoleSources(minBinSize=32)
 
         for s in catalog:
             fp = s.getFootprint()
             self.assertTrue(len(fp.getPeaks()) == 2)
+
+        self._checkAlgorithmOutput(dipoleTestImage, catalog)
+
+    def testDipoleAlgorithmNegativePeakFirst(self):
+        """Test that the fit is the same when the negative peak of each dipole
+        comes before the positive peak.
+        """
+        dipoleTestImage = DipoleTestImage()
+        catalog = dipoleTestImage.testImage.detectDipoleSources(minBinSize=32)
+
+        for s in catalog:
+            reversePeaks(s.getFootprint())
+            self.assertLess(s.getFootprint().getPeaks()[0].getPeakValue(), 0)
+
+        self._checkAlgorithmOutput(dipoleTestImage, catalog)
+
+    def _checkAlgorithmOutput(self, dipoleTestImage, catalog):
+        """Fit each dipole in ``catalog`` and compare the resulting
+        fluxes/centroids with the input values.
+
+        Parameters
+        ----------
+        dipoleTestImage : `DipoleTestImage`
+            Image that was generated for the test.
+        catalog : `lsst.afw.table.SourceCatalog`
+            Sources detected on the test image.
+        """
+        # Display (plot) the output dipole thumbnails with matplotlib.
+        display = False
+        # Be verbose during fitting, including the lmfit internal details.
+        verbose = False
 
         rtol = dipoleTestImage.rtol
         offsets = dipoleTestImage.offsets
@@ -120,11 +162,13 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
             self.assertFloatsAlmostEqual(result.negCentroid.x, dipoleTestImage.xc[i] - offsets[i], rtol=rtol)
             self.assertFloatsAlmostEqual(result.negCentroid.y, dipoleTestImage.yc[i] - offsets[i], rtol=rtol)
 
-    def _runDetection(self, dipoleTestImage, maxFootprintArea=None):
+    def _runDetection(self, dipoleTestImage, maxFootprintArea=None, editFootprint=None):
         """Run 'diaSource' detection on the diffim, including merging of
         positive and negative sources.
 
         Then run DipoleFitTask on the image and return the resulting catalog.
+        If ``editFootprint`` is given, it is called with the footprint of
+        each source before the sources are measured.
         """
         # Create the various tasks and schema -- avoid code reuse.
         testImage = dipoleTestImage.testImage
@@ -143,6 +187,9 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
         fpSet.merge(detectResult.negative, 2, 2, False)
         sources = afwTable.SourceCatalog(table)
         fpSet.makeSources(sources)
+        if editFootprint is not None:
+            for source in sources:
+                editFootprint(source.getFootprint())
 
         measureTask.run(sources, testImage.diffim, testImage.posImage, testImage.negImage)
         return sources
@@ -252,6 +299,25 @@ class DipoleFitTest(lsst.utils.tests.TestCase):
         dipoleTestImage = DipoleTestImage()
         sources = self._runDetection(dipoleTestImage)
         self._checkTaskOutput(dipoleTestImage, sources)
+
+    def testDipoleTaskExtraPeak(self):
+        """Test that a dipole is fit when a faint positive peak comes after
+        the peaks of its two lobes.
+        """
+        def addFaintPeak(footprint):
+            peak = footprint.getPeaks()[0]
+            footprint.addPeak(peak.getFx() + 1, peak.getFy(), 0.01*peak.getPeakValue())
+
+        dipoleTestImage = DipoleTestImage()
+        sources = self._runDetection(dipoleTestImage, editFootprint=addFaintPeak)
+
+        for i, record in enumerate(sources):
+            peakValues = [peak.getPeakValue() for peak in record.getFootprint().getPeaks()]
+            self.assertEqual(list(np.sign(peakValues)), [1, -1, 1])
+            self.assertFloatsAlmostEqual((record['ip_diffim_DipoleFit_pos_instFlux']
+                                          + abs(record['ip_diffim_DipoleFit_neg_instFlux']))/2.,
+                                         dipoleTestImage.flux[i], rtol=dipoleTestImage.rtol)
+            self.assertTrue(record['ip_diffim_DipoleFit_classification'])
 
     def testDipoleTaskNoPosImage(self):
         """Test the dipole fitting singleFramePlugin in the case where no
