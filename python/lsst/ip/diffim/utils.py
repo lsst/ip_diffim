@@ -266,7 +266,7 @@ def evaluateMeanPsfFwhm(exposure: afwImage.Exposure,
 
     Raises
     ------
-    ValueError
+    lsst.afw.detection.InvalidPsfError
         Raised if the PSF cannot be computed at any of the grid points.
 
     See Also
@@ -298,7 +298,7 @@ def evaluateMeanPsfFwhm(exposure: afwImage.Exposure,
         width.append(fwhm)
 
     if not width:
-        raise ValueError("Unable to compute PSF FWHM at any position on the exposure.")
+        raise afwDetection.InvalidPsfError("Unable to compute PSF FWHM at any position on the exposure.")
 
     return np.nanmean(width)
 
