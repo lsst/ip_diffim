@@ -26,6 +26,7 @@ __all__ = ["DeblendDifferenceFootprintsConfig", "DeblendDifferenceFootprintsTask
 
 import dataclasses
 import functools
+import itertools
 
 from astropy.stats import gaussian_sigma_to_fwhm
 import numpy as np
@@ -46,6 +47,9 @@ import lsst.pipe.base as pipeBase
 # Per-peak flag set by `FootprintMergeList` marking an individual peak as
 # originating from the negative-polarity detection footprint set.
 _NEGATIVE_PEAK_FLAG = "merge_peak_negative"
+# Measurement fields read when merging the pieces of a trailed source.
+_TRAIL_MEASUREMENT = "ext_trailedSources_Naive"
+_DIPOLE_FLAG = "ip_diffim_DipoleFit_classification"
 
 
 @dataclasses.dataclass
@@ -263,7 +267,8 @@ def _merge_trail_clusters(clusters, positions, negative, find_lines, connected, 
     position, while every peak of a wider cluster is a point. A trail starts
     from at least ``min_points`` points on one line, and is kept if it holds
     more than one cluster. A trail never spans a gap in the footprint, but it
-    may cross other clusters in the same footprint.
+    may cross other clusters in the same footprint. Trails may end up split,
+    but these are recovered after source measurement.
 
     Parameters
     ----------
@@ -417,6 +422,41 @@ def _merge_clusters(clusters, contamination, n_peaks, max_contamination, negativ
                 break
         if not merged:
             return clusters
+
+
+def _group_trail_pieces(ends, tolerance, connected):
+    """Group measured trails that lie end to end along one line.
+
+    Parameters
+    ----------
+    ends : `numpy.ndarray`
+        ``(n, 2, 2)`` array of the ``(x, y)`` positions of the two ends of
+        each measured trail.
+    tolerance : `float`
+        Largest distance of any end of a group's trails from the line fit to
+        all of them, in the units of ``ends``.
+    connected : callable
+        ``connected(start, end)`` returns whether the straight path between
+        two points stays on the footprints the trails were deblended from.
+
+    Returns
+    -------
+    groups : `list` [`list` [`int`]]
+        Rows of ``ends`` of each group of two or more trails.
+    """
+    groups = [[row] for row in range(len(ends))]
+    merged = True
+    while merged:
+        merged = False
+        for first, second in itertools.combinations(range(len(groups)), 2):
+            points = ends[groups[first] + groups[second]].reshape(-1, 2)
+            line = fit_line(points[:, 0], points[:, 1])
+            centers = [ends[groups[index]].mean(axis=(0, 1)) for index in (first, second)]
+            if np.max(line.distance(points[:, 0], points[:, 1])) <= tolerance and connected(*centers):
+                groups[first] += groups.pop(second)
+                merged = True
+                break
+    return [group for group in groups if len(group) > 1]
 
 
 def _spans_to_bool(span_set, bbox):
@@ -769,6 +809,97 @@ class DeblendDifferenceFootprintsTask(pipeBase.Task):
                       "(%d skipped, %d trailed sources kept together)",
                       nFootprints, nChildren, nSkipped, nTrails)
         return pipeBase.Struct(diaSources=diaSources)
+
+    def mergeTrails(self, diaSources, difference):
+        """Merge measured diaSources that are pieces of one trailed source.
+
+        Deblended, positive diaSources with a measured trail at least
+        ``compactClusterSpan`` long are merged when the ends of their trails
+        lie within ``findTrails.threshold`` of one line, and the path between
+        them stays on deblended footprints.
+
+        Parameters
+        ----------
+        diaSources : `lsst.afw.table.SourceCatalog`
+            The measured diaSources.
+        difference : `lsst.afw.image.ExposureF`
+            Difference image the diaSources were measured on.  The
+            ``NOT_DEBLENDED`` plane of its mask is set for a merged trailed
+            source that no other deblended footprint touches.
+
+        Returns
+        -------
+        result : `lsst.pipe.base.Struct`
+            Results as a struct with attributes:
+
+            ``diaSources``
+                The diaSources that were not merged
+                (`lsst.afw.table.SourceCatalog`).
+            ``merged``
+                One new, unmeasured record per merged trailed source, holding
+                the footprints and peaks of its pieces
+                (`lsst.afw.table.SourceCatalog`).
+        """
+        sigma = difference.psf.computeShape(difference.psf.getAveragePosition()).getDeterminantRadius()
+        fwhm = sigma*gaussian_sigma_to_fwhm
+        bbox = difference.getBBox()
+        covered = lsst.afw.image.Mask(bbox)
+        rows = []
+        ends = []
+        for row, source in enumerate(diaSources):
+            if not source["is_deblended"]:
+                continue
+            source.getFootprint().getSpans().setMask(covered, 1)
+            trail = [[source[f"{_TRAIL_MEASUREMENT}_x{end}"], source[f"{_TRAIL_MEASUREMENT}_y{end}"]]
+                     for end in (0, 1)]
+            if (not source["is_negative"] and not source[_DIPOLE_FLAG]
+                    and not source[f"{_TRAIL_MEASUREMENT}_flag"] and np.all(np.isfinite(trail))
+                    and bbox.contains(lsst.geom.Point2I(lsst.geom.Point2D(*np.mean(trail, axis=0))))
+                    and source[f"{_TRAIL_MEASUREMENT}_length"] >= self.config.compactClusterSpan*fwhm):
+                rows.append(row)
+                ends.append(trail)
+        coveredPixels = covered.array > 0
+        origin = np.array([bbox.getMinX(), bbox.getMinY()])
+        connected = functools.partial(_segment_on_mask, coveredPixels, origin, fwhm)
+        ends = np.array(ends).reshape(-1, 2, 2)
+        groups = []
+        if len(rows) > 1:
+            # Trails can only be joined across deblended footprints, so
+            # compare the trails of one connected region at a time.
+            regions, _ = ndimage.label(coveredPixels, structure=np.ones((3, 3)))
+            centers = np.rint(ends.mean(axis=1) - origin).astype(int)
+            region = regions[centers[:, 1], centers[:, 0]]
+            for label in np.unique(region[region > 0]):
+                members = np.nonzero(region == label)[0]
+                groups += [[members[index] for index in group] for group in
+                           _group_trail_pieces(ends[members]/fwhm, self.findTrails.config.threshold,
+                                               connected)]
+
+        merged = lsst.afw.table.SourceCatalog(diaSources.table)
+        keep = np.ones(len(diaSources), dtype=bool)
+        for group in groups:
+            pieces = [diaSources[rows[index]] for index in group]
+            keep[[rows[index] for index in group]] = False
+            footprint = pieces[0].getFootprint()
+            for piece in pieces[1:]:
+                footprint = lsst.afw.detection.mergeFootprints(footprint, piece.getFootprint())
+            footprint.setRegion(pieces[0].getFootprint().getRegion())
+            record = merged.addNew()
+            record.setFootprint(footprint)
+            for name in ("merge_footprint_positive", "merge_footprint_negative"):
+                record[name] = any(piece[name] for piece in pieces)
+            # The trailed source is still deblended if another deblended
+            # footprint touches it.
+            spans = footprint.getSpans()
+            border = spans.dilated(1, lsst.afw.geom.Stencil.BOX).intersectNot(spans).clippedTo(bbox)
+            record["is_deblended"] = border.intersect(covered, 1).getArea() > 0
+            if not record["is_deblended"]:
+                spans.setMask(difference.mask, difference.mask.getPlaneBitMask("NOT_DEBLENDED"))
+        self.metadata["nMergedTrails"] = len(groups)
+        self.metadata["nMergedTrailPieces"] = int(np.count_nonzero(~keep))
+        self.log.info("Merged %d measured diaSources into %d trailed sources",
+                      np.count_nonzero(~keep), len(groups))
+        return pipeBase.Struct(diaSources=diaSources[keep], merged=merged)
 
     def _findLines(self, positions):
         """Find lines of points with the ``findTrails`` subtask.

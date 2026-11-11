@@ -911,6 +911,134 @@ class TrailTestCase(lsst.utils.tests.TestCase):
                          [100.0, 50.0, 20.0])
 
 
+class MergeTrailsTestCase(lsst.utils.tests.TestCase):
+    """Tests of merging measured diaSources that are pieces of one trailed
+    source.
+
+    With a 2 pixel Gaussian PSF the FWHM is ~4.7 pixels, so a measured trail
+    must be at least ~7.1 pixels long and its ends within ~1.6 pixels of the
+    line.
+    """
+
+    def setUp(self):
+        self.schema, self.peakSchema = makeSchemas()
+        for name in ("x0", "y0", "x1", "y1", "length"):
+            self.schema.addField(f"ext_trailedSources_Naive_{name}", type="D", doc="Measured trail.")
+        self.schema.addField("ext_trailedSources_Naive_flag", type="Flag", doc="Trail was not measured.")
+        self.schema.addField("ip_diffim_DipoleFit_classification", type="Flag", doc="Source is a dipole.")
+        self.catalog = afwTable.SourceCatalog(self.schema)
+        self.difference = afwImage.ExposureF(geom.Box2I(geom.Point2I(0, 0), geom.Extent2I(64, 64)))
+        self.difference.setPsf(afwDetection.GaussianPsf(21, 21, 2.0))
+        self.difference.mask.addMaskPlane("NOT_DEBLENDED")
+        self.task = DeblendDifferenceFootprintsTask()
+
+    def addSource(self, minX, maxX, y=32, **fields):
+        """Add a deblended diaSource that covers columns ``minX`` to ``maxX``
+        of 9 rows, with a trail measured along the middle row.
+        """
+        box = geom.Box2I(geom.Point2I(minX, y - 4), geom.Point2I(maxX, y + 4))
+        footprint = afwDetection.Footprint(afwGeom.SpanSet(box), self.peakSchema)
+        peak = footprint.addPeak((minX + maxX)//2, y, 20.0)
+        peak["merge_peak_positive"] = True
+        peak["significance"] = float(len(self.catalog))
+        record = self.catalog.addNew()
+        record.setFootprint(footprint)
+        values = dict(is_deblended=True, merge_footprint_positive=True, ext_trailedSources_Naive_x0=minX,
+                      ext_trailedSources_Naive_y0=y, ext_trailedSources_Naive_x1=maxX,
+                      ext_trailedSources_Naive_y1=y, ext_trailedSources_Naive_length=maxX - minX)
+        for name, value in dict(values, **fields).items():
+            record[name] = value
+        return record
+
+    def test_pieces_on_a_line_are_merged(self):
+        """Three pieces end to end become one diaSource with all of their
+        pixels and peaks, and other diaSources are left as they are.
+        """
+        for minX in (4, 20, 36):
+            self.addSource(minX, minX + 15)
+        other = self.addSource(4, 40, y=50, is_deblended=False)
+
+        result = self.task.mergeTrails(self.catalog, self.difference)
+
+        self.assertEqual([record.getId() for record in result.diaSources], [other.getId()])
+        self.assertEqual(len(result.merged), 1)
+        footprint = result.merged[0].getFootprint()
+        self.assertEqual(footprint.getBBox(), geom.Box2I(geom.Point2I(4, 28), geom.Point2I(51, 36)))
+        self.assertEqual(footprint.getArea(), 48*9)
+        self.assertEqual(sorted(peak.getIx() for peak in footprint.getPeaks()), [11, 27, 43])
+        # No other deblended footprint touches the trailed source.
+        self.assertFalse(result.merged[0]["is_deblended"])
+        notDeblended = self.difference.mask.array & self.difference.mask.getPlaneBitMask("NOT_DEBLENDED") != 0
+        self.assertEqual(np.count_nonzero(notDeblended), 48*9)
+        self.assertTrue(result.merged[0]["merge_footprint_positive"])
+        self.assertFalse(result.merged[0]["merge_footprint_negative"])
+        self.assertEqual(self.task.metadata["nMergedTrails"], 1)
+        self.assertEqual(self.task.metadata["nMergedTrailPieces"], 3)
+
+    def test_piece_off_the_line_stays_separate(self):
+        """A piece 6 pixels (1.3 FWHM) to the side of the other is not
+        merged with it.
+        """
+        self.addSource(4, 27)
+        self.addSource(28, 51, y=38)
+
+        result = self.task.mergeTrails(self.catalog, self.difference)
+
+        self.assertEqual(len(result.diaSources), 2)
+        self.assertEqual(len(result.merged), 0)
+
+    def test_only_measured_positive_trails_are_merged(self):
+        """A diaSource on the line of a trail is not merged with it if it is
+        too short, negative, a dipole, not deblended, or has no measured
+        trail.
+        """
+        self.addSource(4, 27)
+        second = self.addSource(28, 51)
+        for name, value in (("ext_trailedSources_Naive_length", 5.0), ("is_negative", True),
+                            ("ip_diffim_DipoleFit_classification", True), ("is_deblended", False),
+                            ("ext_trailedSources_Naive_flag", True), ("ext_trailedSources_Naive_x1", np.nan)):
+            with self.subTest(name=name):
+                original = second[name]
+                second[name] = value
+                result = self.task.mergeTrails(self.catalog, self.difference)
+                self.assertEqual(len(result.diaSources), 2)
+                self.assertEqual(len(result.merged), 0)
+                second[name] = original
+        self.assertEqual(len(self.task.mergeTrails(self.catalog, self.difference).merged), 1)
+
+    def test_gap_between_footprints(self):
+        """Pieces on one line are merged across another deblended diaSource,
+        but not across pixels that belong to no deblended footprint.
+        """
+        self.addSource(4, 20)
+        self.addSource(40, 56)
+        self.assertEqual(len(self.task.mergeTrails(self.catalog, self.difference).merged), 0)
+
+        between = self.addSource(21, 39, is_negative=True)
+        result = self.task.mergeTrails(self.catalog, self.difference)
+
+        self.assertEqual([record.getId() for record in result.diaSources], [between.getId()])
+        self.assertEqual(len(result.merged), 1)
+        self.assertEqual(len(result.merged[0].getFootprint().getSpans().split()), 2)
+        self.assertTrue(result.merged[0]["is_deblended"])
+
+    def test_trails_in_separate_regions(self):
+        """Two trailed sources on one line, with pixels between them that
+        belong to no deblended footprint, are each merged from their own
+        pieces.
+        """
+        for minX in (2, 14, 38, 50):
+            self.addSource(minX, minX + 11)
+
+        result = self.task.mergeTrails(self.catalog, self.difference)
+
+        self.assertEqual(len(result.diaSources), 0)
+        peaks = sorted(sorted(peak.getIx() for peak in record.getFootprint().getPeaks())
+                       for record in result.merged)
+        self.assertEqual(peaks, [[7, 19], [43, 55]])
+        self.assertEqual(self.task.metadata["nMergedTrailPieces"], 4)
+
+
 class MemoryTester(lsst.utils.tests.MemoryTestCase):
     pass
 

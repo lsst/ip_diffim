@@ -246,6 +246,50 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         self.assertEqual(len(output.diaSources), 1)
         self.assertEqual(detectionTask.deblend.metadata["nTrailedDiaSources"], 1)
 
+    def test_split_trailed_source_is_merged(self):
+        """A short trailed source that is deblended into two diaSources should
+        be merged into one after measurement, and measured again.
+        """
+        noiseLevel = 1.
+        psfSize = 2.4
+        length = 36.
+        kwargs = {"seed": 1, "psfSize": psfSize, "x0": 0, "y0": 0, "xSize": 256, "ySize": 256, "nSrc": 1}
+        science, _ = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
+        science.getInfo().setVisitInfo(makeVisitInfo())
+        matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
+        difference = science.clone()
+        difference.maskedImage -= matchedTemplate.maskedImage
+        # A vertical line of uniform brightness, convolved with the PSF. With
+        # this noise it has two peaks, too far apart to cluster and too few
+        # to find a line through.
+        y, x = np.mgrid[0:256, 0:256] - 128.
+        root = np.sqrt(2)*psfSize
+        ends = (erf((y + length/2)/root) - erf((y - length/2)/root))/2
+        trail = (10*noiseLevel*np.exp(-x**2/(2*psfSize**2))*ends).astype(np.float32)
+        science.image.array += trail
+        difference.image.array += trail
+
+        for doMergeTrails, nExpected in ((False, 2), (True, 1)):
+            with self.subTest(doMergeTrails=doMergeTrails):
+                detectionTask = self._setup_detection(doSkySources=False, badSubtractionRatioThreshold=1.,
+                                                      doMergeTrails=doMergeTrails)
+                measurement = detectionTask.measurement
+                with mock.patch.object(measurement, "run", wraps=measurement.run) as run:
+                    output = detectionTask.run(science, matchedTemplate, difference.clone(),
+                                               idFactory=self.idGenerator.make_table_id_factory())
+
+                self.assertEqual(len(output.diaSources), nExpected)
+                nPeaks = [len(source.getFootprint().getPeaks()) for source in output.diaSources]
+                self.assertEqual(sum(nPeaks), 2)
+                # Only the merged diaSource is measured the second time.
+                nMeasured = [len(call.args[0]) for call in run.call_args_list]
+                self.assertEqual(nMeasured, [2, 1] if doMergeTrails else [2])
+                if doMergeTrails:
+                    self.assertEqual(detectionTask.deblend.metadata["nMergedTrails"], 1)
+                    self.assertEqual(detectionTask.deblend.metadata["nMergedTrailPieces"], 2)
+                    self.assertTrue(np.isfinite(output.diaSources[0]["base_PsfFlux_instFlux"]))
+                    self.assertTrue(np.isfinite(output.diaSources[0]["slot_Centroid_x"]))
+
     def test_measurement_noise_seed(self):
         """The noise that replaces neighboring sources during measurement
         should be seeded with the ID of the image being measured.
@@ -298,6 +342,17 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         replaced = set(run.call_args_list[0].kwargs["footprints"])
         self.assertLess(measured, replaced)
         self.assertEqual(len(replaced - measured), 1)
+
+    def test_merge_trails_requires_trail_measurement(self):
+        """Merging trailed sources should not be configurable without the
+        measurement of their trails.
+        """
+        config = self.detectionTask.ConfigClass()
+        config.measurement.plugins.names.remove("ext_trailedSources_Naive")
+        with self.assertRaises(pexConfig.FieldValidationError):
+            config.validate()
+        config.doMergeTrails = False
+        config.validate()
 
     def test_deblended_measurement_limited_to_footprint(self):
         """Deblended sources should be measured from only their own footprint

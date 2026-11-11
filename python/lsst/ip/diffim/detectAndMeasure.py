@@ -278,6 +278,13 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
             "extracting each cluster into its own diaSource? Only used if "
             "``doMerge`` is set."
     )
+    doMergeTrails = pexConfig.Field(
+        dtype=bool,
+        default=True,
+        doc="After measurement, check trailed sources and recombine trails "
+            "that may have been split during deblending? Only used if "
+            "``doDeblend`` is set."
+    )
     growFootprint = pexConfig.Field(
         dtype=int,
         default=2,
@@ -533,6 +540,11 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
                 raise pexConfig.FieldValidationError(DetectAndMeasureConfig.run_sattle, self,
                                                      "Sattle requested but SATTLE_URI_BASE "
                                                      "environment variable not set.")
+        if (self.doMerge and self.doDeblend and self.doMergeTrails
+                and "ext_trailedSources_Naive" not in self.measurement.plugins.names):
+            raise pexConfig.FieldValidationError(DetectAndMeasureConfig.doMergeTrails, self,
+                                                 "Merging trailed sources requires the "
+                                                 "ext_trailedSources_Naive measurement plugin.")
 
 
 class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
@@ -1051,6 +1063,9 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
 
         self.measureDiaSources(initialDiaSources, science, difference, matchedTemplate,
                                footprints=footprints)
+        if self.config.doMerge and self.config.doDeblend and self.config.doMergeTrails:
+            initialDiaSources = self._mergeTrails(initialDiaSources, science, difference, matchedTemplate,
+                                                  footprints)
 
         # Remove unphysical diaSources per config.badSourceFlags
         diaSources = self._removeBadSources(initialDiaSources)
@@ -1116,6 +1131,48 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             newPeaks.extend(ordered)
             peaks.clear()
             source.getFootprint().setPeakCatalog(newPeaks)
+
+    def _mergeTrails(self, diaSources, science, difference, matchedTemplate, footprints):
+        """Merge measured diaSources that are pieces of one trailed source that
+        split during deblending, and measure the merged diaSources.
+
+        Parameters
+        ----------
+        diaSources : `lsst.afw.table.SourceCatalog`
+            The measured diaSources.
+        science : `lsst.afw.image.ExposureF`
+            Science exposure that the template was subtracted from.
+        difference : `lsst.afw.image.ExposureF`
+            Result of subtracting template from the science image.
+        matchedTemplate : `lsst.afw.image.ExposureF`
+            Warped and PSF-matched template that was used produce the
+            difference image.
+        footprints : `dict`
+            Footprints that were replaced with noise while ``diaSources``
+            were measured; see
+            `lsst.meas.base.SingleFrameMeasurementTask.run`.
+
+        Returns
+        -------
+        diaSources : `lsst.afw.table.SourceCatalog`
+            The diaSources that were not merged, followed by the merged ones.
+        """
+        result = self.deblend.mergeTrails(diaSources, difference)
+        if len(result.merged) == 0:
+            return diaSources
+        self._reorderPeaksBySignificance(result.merged)
+        # Build a set of footprints including the newly-merged diaSources, and
+        # all other detected footprints on the image replaced with noise.
+        pieces = ({source.getId() for source in diaSources}
+                  - {source.getId() for source in result.diaSources})
+        footprints = {sourceId: footprint for sourceId, footprint in footprints.items()
+                      if sourceId not in pieces}
+        footprints.update(self.measurement.getFootprintsFromCatalog(result.merged))
+        self.measureDiaSources(result.merged, science, difference, matchedTemplate, footprints=footprints)
+        mergedDiaSources = afwTable.SourceCatalog(diaSources.table)
+        mergedDiaSources.extend(result.diaSources)
+        mergedDiaSources.extend(result.merged)
+        return mergedDiaSources.copy(deep=True)
 
     def _rejectBadMaskedDetections(self, initialDiaSources, mask):
         """Remove detections whose footprint peak lies on a bad-masked pixel.
