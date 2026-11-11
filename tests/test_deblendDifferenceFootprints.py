@@ -193,6 +193,16 @@ class DeblendFootprintTestCase(lsst.utils.tests.TestCase):
         self.assertEqual(len(result.parent.getPeaks()), 1)
         self.assertEqual(len(result.children[0].getPeaks()), 1)
 
+    def test_pixels_far_from_every_peak(self):
+        """Pixels far from every peak go to the nearest of two equal peaks."""
+        # With a 0.5 pixel sigma the Gaussian influence of a peak is too small
+        # to represent beyond about 19 pixels, which is most of the footprint.
+        footprint, _, result = self._deblend([(5, 32, False, 100.0), (58, 32, False, 100.0)], sigma=0.5)
+        child = result.children[0]
+        self.assertEqual(result.parent.getBBox().getMaxX(), 31)
+        self.assertEqual(child.getBBox().getMinX(), 32)
+        self.assertEqual(result.parent.getArea() + child.getArea(), footprint.getArea())
+
     def test_within_radius_blend_stays(self):
         """Two peaks within the linking radius are one cluster: no split."""
         footprint, clusters, result = self._deblend([(20, 20, False, 100.0), (22, 20, False, 100.0)])

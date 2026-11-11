@@ -472,17 +472,22 @@ def _deblend_footprint(footprint, clusters, sigma, max_contamination=0.05, trail
         return None
 
     # Assign every footprint pixel to the cluster of highest influence.
+    # Influences are compared as logarithms, which stay finite at any
+    # distance from the peaks, and only at the pixels of the footprint.
     bbox = footprint.getBBox()
     min_x, min_y = bbox.getMinX(), bbox.getMinY()
     footprint_mask = _spans_to_bool(footprint.getSpans(), bbox)
-    xx, yy = np.meshgrid(np.arange(min_x, bbox.getMaxX() + 1),
-                         np.arange(min_y, bbox.getMaxY() + 1))
-    influence = np.empty((len(clusters), bbox.getHeight(), bbox.getWidth()), dtype=float)
-    for index, cluster in enumerate(clusters):
-        accumulator = np.zeros(footprint_mask.shape, dtype=float)
+    rows_y, rows_x = np.nonzero(footprint_mask)
+    with np.errstate(divide="ignore"):
+        log_amplitudes = np.log(amplitudes)
+
+    def log_influence(index, x, y):
+        """Logarithm of a cluster's influence at the pixels ``(x, y)``."""
+        cluster = clusters[index]
+        value = np.full(len(x), -np.inf)
         for peak in cluster:
-            r_sq = (xx - positions[peak, 0])**2 + (yy - positions[peak, 1])**2
-            accumulator += amplitudes[peak]*np.exp(-r_sq*inv_two_sigma_sq)
+            r_sq = (x - positions[peak, 0])**2 + (y - positions[peak, 1])**2
+            np.logaddexp(value, log_amplitudes[peak] - r_sq*inv_two_sigma_sq, out=value)
         if trails[index]:
             # Spread a trail's influence along the segment between its end
             # peaks, so that a neighbor beside a gap between its crests does
@@ -490,21 +495,33 @@ def _deblend_footprint(footprint, clusters, sigma, max_contamination=0.05, trail
             rows = [peak for peak in cluster if peak in trail_peaks]
             line = fit_line(positions[rows, 0], positions[rows, 1])
             along = (positions[rows] - line.center) @ line.direction
-            dx = xx - line.center[0]
-            dy = yy - line.center[1]
+            dx = x - line.center[0]
+            dy = y - line.center[1]
             t = np.clip(dx*line.direction[0] + dy*line.direction[1], along.min(), along.max())
             d_sq = (dx - t*line.direction[0])**2 + (dy - t*line.direction[1])**2
-            accumulator = np.maximum(accumulator,
-                                     np.median(amplitudes[rows])*np.exp(-d_sq*inv_two_sigma_sq))
-        influence[index] = accumulator
-    labels = np.argmax(influence, axis=0)
+            np.maximum(value, np.log(np.median(amplitudes[rows])) - d_sq*inv_two_sigma_sq, out=value)
+        return value
+
+    def assign(x, y, exclude=None):
+        """Most influential cluster at each pixel, skipping ``exclude``."""
+        candidates = [index for index in range(len(clusters)) if index != exclude]
+        best = np.full(len(x), -np.inf)
+        owner = np.full(len(x), candidates[0])
+        for index in candidates:
+            value = log_influence(index, x, y)
+            better = value > best
+            owner[better] = index
+            best[better] = value[better]
+        return owner
+
+    labels = np.full(footprint_mask.shape, -1)
+    labels[rows_y, rows_x] = assign(rows_x + min_x, rows_y + min_y)
     # Guarantee each cluster owns its own peak
     for index, cluster in enumerate(clusters):
         for peak in cluster:
             labels[positions[peak, 1] - min_y, positions[peak, 0] - min_x] = index
-    # Far from every peak the influences are tiny and can cross over, leaving
-    # a trail stray pixels cut off from its line.  Give any piece of a trail
-    # holding none of its peaks to the next most influential cluster.
+    # Give any piece of a trail holding none of its peaks to the next most
+    # influential cluster.
     for index, cluster in enumerate(clusters):
         if not trails[index]:
             continue
@@ -512,8 +529,8 @@ def _deblend_footprint(footprint, clusters, sigma, max_contamination=0.05, trail
         held = [pieces[positions[peak, 1] - min_y, positions[peak, 0] - min_x] for peak in cluster]
         stray = (pieces > 0) & ~np.isin(pieces, held)
         if np.any(stray):
-            influence[index][stray] = -np.inf
-            labels[stray] = np.argmax(influence[:, stray], axis=0)
+            stray_y, stray_x = np.nonzero(stray)
+            labels[stray_y, stray_x] = assign(stray_x + min_x, stray_y + min_y, exclude=index)
 
     # One footprint per cluster, carrying that cluster's peaks.
     region = footprint.getRegion()
