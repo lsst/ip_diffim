@@ -768,7 +768,8 @@ class TrailTestCase(lsst.utils.tests.TestCase):
 
         clusters, trails = _merge_trail_clusters([[index] for index in range(8)], positions,
                                                  np.zeros(8, dtype=bool), findLines, connected,
-                                                 min_points=3, tolerance=0.25, compact_span=1.5)
+                                                 min_points=3, tolerance=0.25, compact_span=1.5,
+                                                 linking_radius=2.0)
 
         self.assertEqual(sorted(peak for cluster in clusters for peak in cluster), list(range(8)))
         self.assertEqual(sum(trails), 1)
@@ -791,7 +792,8 @@ class TrailTestCase(lsst.utils.tests.TestCase):
 
         clusters, trails = _merge_trail_clusters([[0, 1, 2], [3], [4], [5]], positions,
                                                  np.zeros(6, dtype=bool), findLines, connected,
-                                                 min_points=3, tolerance=0.25, compact_span=1.5)
+                                                 min_points=3, tolerance=0.25, compact_span=1.5,
+                                                 linking_radius=2.0)
 
         flags = {tuple(sorted(cluster)): trail for cluster, trail in zip(clusters, trails)}
         self.assertEqual(flags, {(0, 1, 2, 3, 4): True, (5,): False})
@@ -829,6 +831,72 @@ class TrailTestCase(lsst.utils.tests.TestCase):
         self.assertPeakCounts(diaSources, [1, 4])
         self.assertTrue(all(record["is_deblended"] for record in diaSources))
         self.assertFalse(np.any(self.notDeblendedPixels()))
+
+    def test_trail_crossing_a_dipole(self):
+        """A trail that crosses a dipole stays one diaSource, and the dipole
+        is deblended from it with only the trail peak that is within the
+        linking radius of its negative lobe.
+        """
+        # Trail peaks 10 pixels apart along y=32. The dipole's lobes are 6
+        # pixels (1.3 FWHM) apart across the trail, at the peak at x=32.
+        trail = [(x, 32) for x in range(2, 63, 10)]
+        dipole = [(32, 29, False, 50.0), (32, 35, True, 50.0)]
+        diaSources = self.runTask(trail + dipole)
+
+        self.assertPeakCounts(diaSources, [3, 6])
+        self.assertEqual(self.task.metadata["nTrailedDiaSources"], 1)
+        trailSource = max(diaSources, key=lambda record: len(record.getFootprint().getPeaks()))
+        self.assertFalse(trailSource["merge_footprint_negative"])
+        # The dipole cuts the footprint of the trail in two.
+        spans = trailSource.getFootprint().getSpans()
+        self.assertEqual(len(spans.split()), 2)
+
+    def test_trail_linked_to_a_dipole(self):
+        """A trail whose peaks are all linked to a dipole's cluster is still
+        found, and deblended from the dipole.
+        """
+        # Trail peaks 7 pixels apart are within the linking radius of each
+        # other and of the dipole, so all the peaks start as one cluster. The
+        # two trail peaks within 2 FWHM of the negative lobe stay with it.
+        trail = [(x, 32) for x in range(2, 63, 7)]
+        dipole = [(34, 29, False, 50.0), (34, 35, True, 50.0)]
+        diaSources = self.runTask(trail + dipole)
+
+        self.assertPeakCounts(diaSources, [4, 7])
+        self.assertEqual(self.task.metadata["nTrailedDiaSources"], 1)
+        self.assertTrue(all(record["is_deblended"] for record in diaSources))
+
+    def test_bright_dipole_does_not_absorb_a_trail(self):
+        """A trail is not merged into a much brighter dipole that it crosses.
+        """
+        trail = [(x, 32) for x in range(2, 63, 10)]
+        dipole = [(32, 29, False, 6000.0), (32, 35, True, 6000.0)]
+        diaSources = self.runTask(trail + dipole)
+
+        self.assertPeakCounts(diaSources, [3, 6])
+        self.assertEqual(self.task.metadata["nTrailedDiaSources"], 1)
+
+    def test_positive_peaks_off_a_line_stay_with_dipole(self):
+        """Positive peaks linked to a dipole that are not on a line stay in
+        its cluster.
+        """
+        peaks = [(30, 29, False, 50.0), (30, 35, True, 50.0), (23, 39), (37, 39), (30, 43)]
+        diaSources = self.runTask(peaks)
+
+        self.assertPeakCounts(diaSources, [5])
+        self.assertEqual(self.task.metadata["nTrailedDiaSources"], 0)
+
+    def test_dipole_lobe_on_a_trail_stays_with_dipole(self):
+        """A dipole whose positive lobe lies on the line of a trail keeps
+        that lobe.
+        """
+        # The dipole's lobes are 6 pixels (1.3 FWHM) apart along the trail.
+        peaks = [(2, 32), (12, 32), (22, 32), (32, 32, False, 50.0), (38, 32, True, 50.0), (52, 32), (62, 32)]
+        diaSources = self.runTask(peaks)
+
+        dipole = [record for record in diaSources if record["merge_footprint_negative"]]
+        self.assertEqual(len(dipole), 1)
+        self.assertTrue(dipole[0]["merge_footprint_positive"])
 
     def test_trail_peaks_keep_their_order(self):
         """The peaks of a trail deblended from a neighbor stay in the order of

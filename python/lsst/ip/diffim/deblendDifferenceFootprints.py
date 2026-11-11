@@ -253,7 +253,7 @@ def _grow_trail(members, points, absorbed, positive, tolerance, connected):
 
 
 def _merge_trail_clusters(clusters, positions, negative, find_lines, connected, min_points, tolerance,
-                          compact_span):
+                          compact_span, linking_radius):
     """Merge clusters of positive peaks that lie along one line.
 
     Find lines among all the peaks of the positive clusters in the footprint,
@@ -262,8 +262,8 @@ def _merge_trail_clusters(clusters, positions, negative, find_lines, connected, 
     peaks span less than ``compact_span`` counts as a single point at its mean
     position, while every peak of a wider cluster is a point. A trail starts
     from at least ``min_points`` points on one line, and is kept if it holds
-    more than one cluster. Clusters with a negative peak are never part of a
-    trail, and a trail never spans a gap in the footprint.
+    more than one cluster. A trail never spans a gap in the footprint, but it
+    may cross other clusters in the same footprint.
 
     Parameters
     ----------
@@ -288,6 +288,9 @@ def _merge_trail_clusters(clusters, positions, negative, find_lines, connected, 
     compact_span : `float`
         Clusters whose peaks span less than this distance (in PSF FWHM) will
         be considered as a single point for line fitting.
+    linking_radius : `float`
+        Maximum distance, in PSF FWHM, between two peaks for them to be
+        clustered together.
 
     Returns
     -------
@@ -297,6 +300,19 @@ def _merge_trail_clusters(clusters, positions, negative, find_lines, connected, 
         Whether each returned cluster was merged as a trailed source.
     """
     clusters = [list(cluster) for cluster in clusters]
+    # Make a cluster of each positive peak that may be removed from a cluster
+    # with negative peaks to join a trail. Record the cluster it came from.
+    origins = {}
+    for index, cluster in enumerate(list(clusters)):
+        lobes = positions[[peak for peak in cluster if negative[peak]]]
+        if len(lobes) == 0:
+            continue
+        free = [peak for peak in cluster
+                if not negative[peak] and np.min(np.hypot(*(lobes - positions[peak]).T)) > linking_radius]
+        clusters[index] = [peak for peak in cluster if peak not in free]
+        for peak in free:
+            origins[len(clusters)] = index
+            clusters.append([peak])
     positive = [not np.any(negative[cluster]) for cluster in clusters]
     absorbed = [False]*len(clusters)
     trails = [False]*len(clusters)
@@ -332,17 +348,25 @@ def _merge_trail_clusters(clusters, positions, negative, find_lines, connected, 
                     if len(members) > 1:
                         join(members)
 
+    # Peaks that joined no trail go back to the clusters they came from.
+    for index, origin in origins.items():
+        if not absorbed[index] and not trails[index]:
+            clusters[origin] = clusters[origin] + clusters[index]
+            absorbed[index] = True
+
     keep = [index for index in range(len(clusters)) if not absorbed[index]]
     return [clusters[index] for index in keep], [trails[index] for index in keep]
 
 
-def _merge_clusters(clusters, contamination, n_peaks, max_contamination):
+def _merge_clusters(clusters, contamination, n_peaks, max_contamination, negative, trail):
     """Merge clusters whose mutual PSF-flux contamination exceeds the limit.
 
     Two clusters are merged when, at one cluster's peak, the summed
     contamination from the other cluster exceeds a ``max_contamination``
     fraction of that peak's own PSF flux.  Merging repeats until every
-    surviving cluster's peaks are contaminated by less than the limit.
+    surviving cluster's peaks are contaminated by less than the limit.  A
+    trailed source and a cluster that holds a negative peak are never merged
+    with each other, so that a trail crossing a dipole is preserved.
 
     Parameters
     ----------
@@ -356,6 +380,10 @@ def _merge_clusters(clusters, contamination, n_peaks, max_contamination):
     max_contamination : `float`
         Maximum fractional contamination a peak may receive from another
         cluster before the two clusters are merged.
+    negative : `numpy.ndarray` [`bool`]
+        Whether each peak is negative.
+    trail : `numpy.ndarray` [`bool`]
+        Whether each peak belongs to a trailed source.
 
     Returns
     -------
@@ -368,12 +396,18 @@ def _merge_clusters(clusters, contamination, n_peaks, max_contamination):
         for index, cluster in enumerate(clusters):
             for peak in cluster:
                 owner[peak] = index
+        is_trail = np.array([np.any(trail[cluster]) for cluster in clusters])
+        has_negative = np.array([np.any(negative[cluster]) for cluster in clusters])
         merged = False
         for j in range(n_peaks):
             # Total contamination of peak j from each cluster; a peak is not
             # contaminated by its own cluster.
             received = np.array([contamination[cluster, j].sum() for cluster in clusters])
             received[owner[j]] = 0.0
+            if is_trail[owner[j]]:
+                received[has_negative] = 0.0
+            if has_negative[owner[j]]:
+                received[is_trail] = 0.0
             worst = int(np.argmax(received))
             if received[worst] > max_contamination:
                 low, high = sorted((owner[j], worst))
@@ -414,7 +448,8 @@ def _deblend_footprint(footprint, clusters, sigma, max_contamination=0.05, trail
     detection significance (``peak['significance']``), used as a proxy for
     relative flux.  A peak whose significance is not positive and finite is
     given the smallest usable significance in the footprint.  A cluster that
-    absorbs a trailed source is itself a trailed source.
+    absorbs a trailed source becomes a trailed source, and can never hold a
+    negative peak.
 
     Parameters
     ----------
@@ -450,6 +485,7 @@ def _deblend_footprint(footprint, clusters, sigma, max_contamination=0.05, trail
 
     positions = np.array([(peak.getIx(), peak.getIy()) for peak in peaks], dtype=int)
     amplitudes = np.array([peak["significance"] for peak in peaks], dtype=float)
+    negative = np.array([peak[_NEGATIVE_PEAK_FLAG] for peak in peaks], dtype=bool)
     # Detection sets every significance to zero for the "value" and
     # "variance" threshold types, and a peak on a pixel of bad variance has
     # none either.
@@ -467,7 +503,8 @@ def _deblend_footprint(footprint, clusters, sigma, max_contamination=0.05, trail
     # the Gaussian-PSF flux overlap scaled by the significance (flux) ratio.
     contamination = (amplitudes[:, np.newaxis]/amplitudes[np.newaxis, :])*np.exp(-dist_sq*inv_four_sigma_sq)
 
-    clusters = _merge_clusters(clusters, contamination, n_peaks, max_contamination)
+    clusters = _merge_clusters(clusters, contamination, n_peaks, max_contamination, negative,
+                               np.isin(np.arange(n_peaks), list(trail_peaks)))
     trails = [any(peak in trail_peaks for peak in cluster) for cluster in clusters]
 
     # Extract every cluster into its own source; skip footprints that did not
@@ -625,7 +662,9 @@ class DeblendDifferenceFootprintsTask(pipeBase.Task):
 
     Clusters of positive peaks lying along one line are merged first, so that
     a trailed source is not split into several diaSources: the trailed source
-    measurement handles them as long as their peaks share one footprint.
+    measurement handles them as long as their peaks share one footprint.  A
+    trailed source that crosses a dipole is kept apart from it, and its
+    footprint may then be in more than one piece.
     """
 
     ConfigClass = DeblendDifferenceFootprintsConfig
@@ -683,8 +722,12 @@ class DeblendDifferenceFootprintsTask(pipeBase.Task):
             footprint = source.getFootprint()
             if footprint is None or len(footprint.getPeaks()) < 2:
                 continue
-            clusters = _cluster_peak_indices(footprint.getPeaks(), linkingRadius)
-            if len(clusters) < 2:
+            peaks = footprint.getPeaks()
+            negative = np.array([peak[_NEGATIVE_PEAK_FLAG] for peak in peaks], dtype=bool)
+            clusters = _cluster_peak_indices(peaks, linkingRadius)
+            # A trail can still be extracted from a single cluster with
+            # negative peaks.
+            if len(clusters) < 2 and not np.any(negative):
                 continue
             # Leave very large footprints un-deblended
             if (footprint.getArea() > self.config.maxFootprintArea
@@ -696,17 +739,15 @@ class DeblendDifferenceFootprintsTask(pipeBase.Task):
                                len(footprint.getPeaks()))
                 footprint.getSpans().setMask(difference.mask, notDeblendedBitmask)
                 continue
-            peaks = footprint.getPeaks()
-            negativeKey = peaks.getSchema().find(_NEGATIVE_PEAK_FLAG).key
             positions = np.array([(peak.getIx(), peak.getIy()) for peak in peaks], dtype=float)/fwhm
-            negative = np.array([peak.get(negativeKey) for peak in peaks], dtype=bool)
             bbox = footprint.getBBox()
             connected = functools.partial(_segment_on_mask, _spans_to_bool(footprint.getSpans(), bbox),
                                           np.array([bbox.getMinX(), bbox.getMinY()]), fwhm)
             clusters, trails = _merge_trail_clusters(clusters, positions, negative, self._findLines,
                                                      connected, self.findTrails.config.min_points,
                                                      self.findTrails.config.threshold,
-                                                     self.config.compactClusterSpan)
+                                                     self.config.compactClusterSpan,
+                                                     self.config.clusterRadius)
             result = _deblend_footprint(footprint, clusters, sigma, self.config.maxContamination, trails)
             if result is None:
                 continue
