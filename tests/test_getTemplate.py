@@ -403,6 +403,30 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         self.assertFloatsAlmostEqual(psf.getSigma(), expected)
         self.assertFloatsAlmostEqual(task.metadata["templatePsfSigma"], expected)
 
+    @lsst.utils.tests.methodParameters(
+        minFraction=[0.1, 0.9],
+        expected=[lsst.afw.detection.InvalidPsfError, pipeBase.NoWorkFound],
+    )
+    def testGaussianPsfFailure(self, minFraction=None, expected=None):
+        """A template PSF that cannot be evaluated raises NoWorkFound if the
+        template coverage is below the configured minimum, and the PSF error
+        otherwise.
+        """
+        # Drop a patch so that only about half of the template has data.
+        self.patches[0].pop(1)
+        box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
+        config = self._makeConfig()
+        config.minTemplateFractionForExpectedSuccess = minFraction
+        task = lsst.ip.diffim.GetTemplateTask(config=config)
+        error = lsst.afw.detection.InvalidPsfError("Unable to compute PSF FWHM.")
+        with unittest.mock.patch.object(task, "_makeGaussianPsf", side_effect=error):
+            with self.assertRaisesRegex(expected, "Unable to compute PSF FWHM"):
+                task.run(coaddExposureHandles=self.patches,
+                         bbox=box,
+                         wcs=self.exposure.wcs,
+                         dataIds=self.dataIds,
+                         physical_filter="a_test")
+
     def testRunNoTemplate(self):
         """A bounding box that doesn't overlap the patches will raise.
         """

@@ -53,7 +53,12 @@ from lsst.images import (
 )
 from lsst.skymap import BaseSkyMap
 from lsst.ip.diffim.dcrModel import DcrModel
-from lsst.ip.diffim.utils import evaluateMeanPsfFwhm, getPsfFwhm, record_from_obs_info
+from lsst.ip.diffim.utils import (
+    checkTemplateIsSufficient,
+    evaluateMeanPsfFwhm,
+    getPsfFwhm,
+    record_from_obs_info,
+)
 from lsst.meas.algorithms import CoaddPsf, CoaddPsfConfig, SubtractBackgroundTask, ScaleVarianceTask
 from lsst.utils.timer import timeMethod
 
@@ -339,6 +344,12 @@ class GetTemplateConfig(
             " of grid to compute average PSF FWHM in an exposure",
         dtype=float,
         default=0.05,
+    )
+    minTemplateFractionForExpectedSuccess = pexConfig.Field(
+        doc="Raise NoWorkFound if the template PSF cannot be evaluated and less than this fraction"
+            " of the template pixels have data. With more coverage, the PSF error is raised.",
+        dtype=float,
+        default=0.1,
     )
     varianceBackground = pexConfig.ConfigurableField(
         target=SubtractBackgroundTask,
@@ -732,7 +743,12 @@ class GetTemplateTask(pipeBase.PipelineTask):
         Raises
         ------
         NoWorkFound
-            If no coadds are found with sufficient un-masked pixels.
+            If no coadds are found with sufficient un-masked pixels, or if the
+            template PSF cannot be evaluated and too few of the template pixels
+            have data.
+        lsst.afw.detection.InvalidPsfError
+            If the template PSF cannot be evaluated and the template has
+            enough coverage that it was expected to succeed.
         RuntimeError
             If the template is not known to be from the science image's
             instrument and no coadd records the plate scale of its input
@@ -841,7 +857,19 @@ class GetTemplateTask(pipeBase.PipelineTask):
             photoCalib = identity
         template.setPhotoCalib(photoCalib)
         template.setPsf(self._makePsf(template, catalog, wcs))
-        template.setPsf(self._makeGaussianPsf(template))
+        try:
+            template.setPsf(self._makeGaussianPsf(template))
+        except afwDetection.InvalidPsfError as e:
+            # Raise NoWorkFound if the template coverage is insufficient.
+            checkTemplateIsSufficient(
+                template, self.log,
+                requiredTemplateFraction=self.config.minTemplateFractionForExpectedSuccess,
+                exceptionMessage="Template coverage lower than expected to succeed."
+                f" Failure is tolerable: {e}"
+            )
+            # checkTemplateIsSufficient did not raise NoWorkFound, so raise
+            # the original exception.
+            raise
 
         # Record the input coadd patches as the template's coadd inputs.
         coaddInputs = afwImage.CoaddInputs(afwTable.ExposureTable.makeMinimalSchema(), self.schema)
@@ -1304,7 +1332,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
 
         Raises
         ------
-        ValueError
+        lsst.afw.detection.InvalidPsfError
             Raised if the PSF cannot be evaluated at any grid position.
         """
         # The CoaddPsf is not defined where the template has no inputs, which
