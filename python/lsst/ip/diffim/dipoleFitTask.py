@@ -643,10 +643,12 @@ class DipoleFitAlgorithm:
 
         pks = fp.getPeaks()
 
+        # If individual (merged) peaks were detected, start the lobes at the
+        # highest and the lowest peak. The peaks may be in any order.
         if len(pks) >= 1:
-            cenPos = pks[0].getF()    # if individual (merged) peaks were detected, use those
-        if len(pks) >= 2:    # peaks are already sorted by centroid flux so take the most negative one
-            cenNeg = pks[-1].getF()
+            cenPos = max(pks, key=lambda peak: peak.getPeakValue()).getF()
+        if len(pks) >= 2:
+            cenNeg = min(pks, key=lambda peak: peak.getPeakValue()).getF()
 
         # For close/faint dipoles the starting locs (min/max) might be way off, let's help them a bit.
         # First assume dipole is not separated by more than 5*psfSigma.
@@ -656,7 +658,7 @@ class DipoleFitAlgorithm:
         if np.sum(np.sqrt((np.array(cenPos) - fpCentroid)**2.)) > maxSep:
             cenPos = fpCentroid
         if np.sum(np.sqrt((np.array(cenNeg) - fpCentroid)**2.)) > maxSep:
-            cenPos = fpCentroid
+            cenNeg = fpCentroid
 
         # parameter hints/constraints: https://lmfit.github.io/lmfit-py/model.html#model-param-hints-section
         # might make sense to not use bounds -- see http://lmfit.github.io/lmfit-py/bounds.html
@@ -1130,16 +1132,14 @@ class DipoleFitPlugin(measBase.SingleFramePlugin):
         testing (@see `tests/testDipoleFitter.py`)
         """
         result = None
-        pks = measRecord.getFootprint().getPeaks()
+        peakValues = [peak.getPeakValue() for peak in measRecord.getFootprint().getPeaks()]
 
         # Check if the footprint consists of a putative dipole - else don't fit it.
         if (
-                # One peak in the footprint (not a dipole)
-                ((nPeaks := len(pks)) <= 1)
-                # Peaks are the same sign (not a dipole); peaks are ordered
-                # from highest to lowest.
-                or (nPeaks > 1 and (np.sign(pks[0].getPeakValue())
-                    == np.sign(pks[-1].getPeakValue())))
+                # One peak in the footprint (not a dipole).
+                len(peakValues) <= 1
+                # Peaks are the same sign (not a dipole).
+                or np.sign(max(peakValues)) == np.sign(min(peakValues))
         ):
             if not self.config.fitAllDiaSources:
                 # Non-dipoles fall back on the centroid slot for positions,
