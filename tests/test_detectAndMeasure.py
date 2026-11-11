@@ -272,6 +272,33 @@ class DetectAndMeasureTest(DetectAndMeasureTestBase, lsst.utils.tests.TestCase):
         self.assertEqual([call.kwargs["exposureId"] for call in run.call_args_list], [103])
         self.assertEqual([call.kwargs["exposureId"] for call in forcedRun.call_args_list], [101, 102])
 
+    def test_rejected_detection_replaced_with_noise(self):
+        """A detection rejected for a peak on a bad pixel should still be
+        replaced with noise while the diaSources are measured.
+        """
+        noiseLevel = 1.
+        kwargs = {"seed": 1, "psfSize": 2.4, "fluxLevel": 500}
+        science, sources = makeTestImage(noiseLevel=noiseLevel, noiseSeed=6, **kwargs)
+        science.getInfo().setVisitInfo(makeVisitInfo())
+        matchedTemplate, _ = makeTestImage(noiseLevel=noiseLevel/4, noiseSeed=7, **kwargs)
+        difference = science.clone()
+        x0, y0 = difference.getXY0()
+        x = int(sources[0].getX()) - x0
+        y = int(sources[0].getY()) - y0
+        difference.mask.array[y - 2:y + 3, x - 2:x + 3] |= difference.mask.getPlaneBitMask("BAD")
+        detectionTask = self._setup_detection(badSubtractionRatioThreshold=1., doSkySources=False)
+
+        measurement = detectionTask.measurement
+        with mock.patch.object(measurement, "run", wraps=measurement.run) as run:
+            detectionTask.run(science, matchedTemplate, difference, sources,
+                              idFactory=self.idGenerator.make_table_id_factory())
+
+        self.assertEqual(detectionTask.metadata["nRejectedBadMaskPlanes"], 1)
+        measured = {source.getId() for source in run.call_args_list[0].args[0]}
+        replaced = set(run.call_args_list[0].kwargs["footprints"])
+        self.assertLess(measured, replaced)
+        self.assertEqual(len(replaced - measured), 1)
+
     def test_deblended_measurement_limited_to_footprint(self):
         """Deblended sources should be measured from only their own footprint
         pixels: with neighbor pixels replaced by noise, a source's aperture

@@ -1037,6 +1037,10 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         if self.config.doSkySources:
             self.addSkySources(initialDiaSources, difference.mask, difference.info.id)
 
+        # A rejected detection may share its detected footprint with a
+        # deblended diaSource, so it is still replaced with noise while the
+        # diaSources are measured.
+        footprints = self.measurement.getFootprintsFromCatalog(initialDiaSources)
         if self.config.doRejectBadMaskPlaneDetections:
             # Save time by rejecting peaks on bad mask planes prior to
             # measurement.
@@ -1045,7 +1049,8 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         if not initialDiaSources.isContiguous():
             initialDiaSources = initialDiaSources.copy(deep=True)
 
-        self.measureDiaSources(initialDiaSources, science, difference, matchedTemplate)
+        self.measureDiaSources(initialDiaSources, science, difference, matchedTemplate,
+                               footprints=footprints)
 
         # Remove unphysical diaSources per config.badSourceFlags
         diaSources = self._removeBadSources(initialDiaSources)
@@ -1332,7 +1337,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         skySourceFootprints = subtask.run(mask=mask, seed=seed, catalog=diaSources)
         self.metadata[f"n_{subtask.getName()}"] = len(skySourceFootprints)
 
-    def measureDiaSources(self, diaSources, science, difference, matchedTemplate):
+    def measureDiaSources(self, diaSources, science, difference, matchedTemplate, footprints=None):
         """Use (matched) template and science image to constrain dipole fitting.
 
         Parameters
@@ -1346,6 +1351,10 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         matchedTemplate : `lsst.afw.image.ExposureF`
             Warped and PSF-matched template that was used produce the
             difference image.
+        footprints : `dict`, optional
+            Footprints to replace with noise while measuring, keyed by source
+            ID, in place of those of ``diaSources``; see
+            `lsst.meas.base.SingleFrameMeasurementTask.run`.
         """
         # Ensure that the required mask planes are present
         for mp in self.config.measurement.plugins["base_PixelFlags"].masksFpAnywhere:
@@ -1354,7 +1363,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         # In the future we may wish to persist the matchedScience image.
         # The exposure ID seeds the noise that replaces neighboring sources.
         self.measurement.run(diaSources, difference, science, matchedTemplate,
-                             exposureId=difference.info.id)
+                             exposureId=difference.info.id, footprints=footprints)
         if self.config.doApCorr:
             apCorrMap = difference.getInfo().getApCorrMap()
             if apCorrMap is None:
