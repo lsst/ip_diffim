@@ -450,6 +450,13 @@ class GetTemplateConfig(
         " plane from the output instead."
         " Only used with output_image_type='future'.",
     )
+    doCheckPsfDiscontinuity = pexConfig.Field(
+        dtype=bool,
+        default=False,
+        doc="If True, raise AlgorithmError when buildTemplate encounters a"
+        " template coadd with a discontinuously varying PSF. Difference"
+        " imaging will not proceed."
+    )
     psfDiscontinuityGrid = pexConfig.RangeField(
         dtype=int,
         default=17,
@@ -926,10 +933,12 @@ class GetTemplateTask(pipeBase.PipelineTask):
         if visit is not None:
             template.getInfo().setVisitInfo(VisitInfo(id=visit))
         template.setPsf(self._makePsf(template, catalog, wcs))
-        # Reject templates whose PSF varies discontinuously: those leave
-        # structured residuals along input-warp boundaries that PSF matching
-        # cannot absorb, generating many junk diaSources.
-        self.checkPsfDiscontinuity(template)
+
+        if self.config.doCheckPsfDiscontinuity:
+            # Reject templates whose PSF varies discontinuously: those leave
+            # structured residuals along input-warp boundaries that PSF matching
+            # cannot absorb, generating many junk diaSources.
+            self.checkPsfDiscontinuity(template)
         template.setFilter(afwImage.FilterLabel(band, physical_filter))
         identity = afwImage.PhotoCalib(1.0)
         if photoCalib is not None and photoCalib != identity:
