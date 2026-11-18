@@ -20,14 +20,23 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 
+import logging
 import requests
 from unittest import mock
 
 import lsst.afw.cameraGeom.testUtils
+import lsst.afw.detection
 import lsst.daf.butler
 from lsst.images import obs_info_from_legacy
 from lsst.images.tests import get_dp2_exposure_record
-from lsst.ip.diffim.utils import populate_sattle_visit_cache, record_from_obs_info
+from lsst.ip.diffim.utils import (
+    checkTemplateIsSufficient,
+    evaluateMeanPsfFwhm,
+    populate_sattle_visit_cache,
+    record_from_obs_info,
+)
+from lsst.pex.exceptions import InvalidParameterError
+import lsst.pipe.base
 import lsst.utils.tests
 
 from test_detectAndMeasure import makeVisitInfo, MockResponse
@@ -100,3 +109,29 @@ class UtilsTest(lsst.utils.tests.TestCase):
     def test_raise_on_even_kernel(self):
         with self.assertRaises(ValueError):
             makeTestImage(kernelSize=32)
+
+    def test_evaluateMeanPsfFwhm_raises(self):
+        """A PSF that cannot be evaluated at any grid point is invalid."""
+        exposure, _ = makeTestImage(nSrc=1, xSize=64, ySize=64)
+        error = InvalidParameterError("No inputs at this position.")
+        with mock.patch("lsst.ip.diffim.utils.getPsfFwhm", side_effect=error):
+            with self.assertRaisesRegex(lsst.afw.detection.InvalidPsfError, "at any position"):
+                evaluateMeanPsfFwhm(exposure, fwhmExposureBuffer=0.05, fwhmExposureGrid=3)
+
+    def test_checkTemplateIsSufficient(self):
+        """The coverage is the fraction of pixels with data in the template
+        and, if supplied, also in the science image.
+        """
+        template, _ = makeTestImage(nSrc=1, xSize=64, ySize=64, clearEdgeMask=True)
+        science = template.clone()
+        noData = template.mask.getPlaneBitMask("NO_DATA")
+        template.mask.array[:32, :] |= noData
+        science.mask.array[:, :32] |= noData
+        logger = logging.getLogger(__name__)
+
+        self.assertEqual(checkTemplateIsSufficient(template, logger), 0.5)
+        self.assertEqual(checkTemplateIsSufficient(template, logger, scienceExposure=science), 0.25)
+        self.assertEqual(checkTemplateIsSufficient(template, logger, requiredTemplateFraction=0.5), 0.5)
+        with self.assertRaisesRegex(lsst.pipe.base.NoWorkFound, "Insufficient Template Coverage"):
+            checkTemplateIsSufficient(template, logger, scienceExposure=science,
+                                      requiredTemplateFraction=0.5)

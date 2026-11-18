@@ -25,7 +25,7 @@
 __all__ = ["evaluateMeanPsfFwhm", "getPsfFwhm", "getKernelCenterDisplacement",
            "computeDifferenceImageMetrics", "checkMask", "setSourceFootprints",
            "record_from_obs_info", "get_difference_image_provenance",
-           ]
+           "checkTemplateIsSufficient"]
 
 import itertools
 import os
@@ -266,7 +266,7 @@ def evaluateMeanPsfFwhm(exposure: afwImage.Exposure,
 
     Raises
     ------
-    ValueError
+    lsst.afw.detection.InvalidPsfError
         Raised if the PSF cannot be computed at any of the grid points.
 
     See Also
@@ -298,7 +298,7 @@ def evaluateMeanPsfFwhm(exposure: afwImage.Exposure,
         width.append(fwhm)
 
     if not width:
-        raise ValueError("Unable to compute PSF FWHM at any position on the exposure.")
+        raise afwDetection.InvalidPsfError("Unable to compute PSF FWHM at any position on the exposure.")
 
     return np.nanmean(width)
 
@@ -633,3 +633,55 @@ def setSourceFootprints(sources, kernelSize):
         boxFootprint.addPeak(peak.getFx(), peak.getFy(), peak.getPeakValue())
         source.setFootprint(boxFootprint)
     return sources
+
+
+def checkTemplateIsSufficient(templateExposure, logger, scienceExposure=None, requiredTemplateFraction=0.,
+                              exceptionMessage=""):
+    """Raise NoWorkFound if template coverage < requiredTemplateFraction
+
+    Parameters
+    ----------
+    templateExposure : `lsst.afw.image.ExposureF`
+        The template exposure to check
+    logger : `logging.Logger`
+        Logger for printing output.
+    scienceExposure : `lsst.afw.image.ExposureF`, optional
+        The science image, used to constrain the template pixels.
+    requiredTemplateFraction : `float`, optional
+        Fraction of pixels of the science image required to have coverage
+        in the template.
+    exceptionMessage : `str`, optional
+        Message to include in the exception raised if the template coverage
+        is insufficient.
+
+    Returns
+    -------
+    templateCoverageFraction: `float`
+        Fraction of pixels in the template with data.
+
+    Raises
+    ------
+    lsst.pipe.base.NoWorkFound
+        Raised if fraction of good pixels, defined as not having NO_DATA
+        set, is less than the requiredTemplateFraction
+    """
+    # Count the pixels with the NO_DATA mask bit set. Counting NaN pixels is
+    # insufficient because pixels without data are often interpolated over.
+    noTemplate = templateExposure.mask.array & templateExposure.mask.getPlaneBitMask('NO_DATA')
+    # Also need to account for missing data in the science image,
+    # because template coverage there doesn't help
+    if scienceExposure is not None:
+        noScience = scienceExposure.mask.array & scienceExposure.mask.getPlaneBitMask('NO_DATA')
+    else:
+        noScience = False
+    pixNoData = np.count_nonzero(noTemplate | noScience)
+    pixGood = templateExposure.getBBox().getArea() - pixNoData
+    templateCoverageFraction = pixGood/templateExposure.getBBox().getArea()
+    logger.info("template has %d good pixels (%.1f%%)", pixGood, 100*templateCoverageFraction)
+
+    if templateCoverageFraction < requiredTemplateFraction:
+        message = ("Insufficient Template Coverage. (%.1f%% < %.1f%%)" % (
+                   100*templateCoverageFraction,
+                   100*requiredTemplateFraction))
+        raise lsst.pipe.base.NoWorkFound(message + " " + exceptionMessage)
+    return templateCoverageFraction
