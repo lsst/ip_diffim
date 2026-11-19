@@ -932,20 +932,14 @@ class GetTemplateTask(pipeBase.PipelineTask):
         self.checkHighVariance(template)
         if visit is not None:
             template.getInfo().setVisitInfo(VisitInfo(id=visit))
-        template.setPsf(self._makePsf(template, catalog, wcs))
-
-        if self.config.doCheckPsfDiscontinuity:
-            # Reject templates whose PSF varies discontinuously: those leave
-            # structured residuals along input-warp boundaries that PSF matching
-            # cannot absorb, generating many junk diaSources.
-            self.checkPsfDiscontinuity(template)
         template.setFilter(afwImage.FilterLabel(band, physical_filter))
         identity = afwImage.PhotoCalib(1.0)
         if photoCalib is not None and photoCalib != identity:
             template.maskedImage = photoCalib.calibrateImage(template.maskedImage)
             photoCalib = identity
         template.setPhotoCalib(photoCalib)
-        template.setPsf(self._makePsf(template, catalog, wcs))
+        coaddPsf = self._makePsf(template, catalog, wcs)
+        template.setPsf(coaddPsf)
         try:
             template.setPsf(self._makeGaussianPsf(template))
         except afwDetection.InvalidPsfError as e:
@@ -959,6 +953,14 @@ class GetTemplateTask(pipeBase.PipelineTask):
             # checkTemplateIsSufficient did not raise NoWorkFound, so raise
             # the original exception.
             raise
+
+        if self.config.doCheckPsfDiscontinuity:
+            # Reject templates whose PSF varies discontinuously: those leave
+            # structured residuals along input-warp boundaries that PSF
+            # matching cannot absorb, generating many junk diaSources. This
+            # runs last so that templates rejected for insufficient coverage
+            # raise NoWorkFound instead.
+            self.checkPsfDiscontinuity(coaddPsf, template.getBBox())
 
         # Record the input coadd patches as the template's coadd inputs.
         coaddInputs = afwImage.CoaddInputs(afwTable.ExposureTable.makeMinimalSchema(), self.schema)
@@ -1144,7 +1146,7 @@ class GetTemplateTask(pipeBase.PipelineTask):
             highVariancePix = varianceBackground > threshold
             template.mask.array[highVariancePix] |= 2**highVarianceMaskPlaneBit
 
-    def checkPsfDiscontinuity(self, template):
+    def checkPsfDiscontinuity(self, psf, bbox):
         """Reject templates whose PSF varies discontinuously.
 
         Samples the template PSF determinant radius on a grid, subtracts a
@@ -1162,8 +1164,11 @@ class GetTemplateTask(pipeBase.PipelineTask):
 
         Parameters
         ----------
-        template : `lsst.afw.image.Exposure`
-            The assembled template, with PSF already set.
+        psf : `lsst.meas.algorithms.CoaddPsf`
+            PSF of the assembled template, built from its inputs.
+        bbox : `lsst.geom.Box2I`
+            Bounding box of the template, including the border of
+            ``templateBorderSize`` pixels.
 
         Raises
         ------
@@ -1172,8 +1177,6 @@ class GetTemplateTask(pipeBase.PipelineTask):
             median radius, exceeds
             ``self.config.psfDiscontinuityMaxThreshold``.
         """
-        psf = template.getPsf()
-        bbox = template.getBBox()
         n = self.config.psfDiscontinuityGrid
         border = self.config.templateBorderSize
 

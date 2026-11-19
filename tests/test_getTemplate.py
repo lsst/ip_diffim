@@ -427,6 +427,74 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
                          dataIds=self.dataIds,
                          physical_filter="a_test")
 
+    def testPsfDiscontinuityCheckUsesCoaddPsf(self):
+        """The discontinuity check samples the CoaddPsf over the full template
+        bounding box, while the output template keeps the Gaussian PSF.
+        """
+        box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
+        config = self._makeConfig()
+        config.doCheckPsfDiscontinuity = True
+        task = lsst.ip.diffim.GetTemplateTask(config=config)
+        with unittest.mock.patch.object(task, "checkPsfDiscontinuity",
+                                        wraps=task.checkPsfDiscontinuity) as check:
+            result = task.run(coaddExposureHandles={0: self.patches[0]},
+                              bbox=box,
+                              wcs=self.exposure.wcs,
+                              dataIds={0: self.dataIds[0]},
+                              physical_filter="a_test")
+
+        check.assert_called_once()
+        psf, bbox = check.call_args.args
+        self.assertIsInstance(psf, lsst.meas.algorithms.CoaddPsf)
+        expectedBox = lsst.geom.Box2I(box)
+        expectedBox.grow(config.templateBorderSize)
+        self.assertEqual(bbox, expectedBox)
+        self.assertIsInstance(result.template.psf, lsst.afw.detection.GaussianPsf)
+
+    def testPsfDiscontinuityErrorRaised(self):
+        """A template that fails the discontinuity check raises
+        PsfDiscontinuityError from run.
+        """
+        box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
+        config = self._makeConfig()
+        config.doCheckPsfDiscontinuity = True
+        task = lsst.ip.diffim.GetTemplateTask(config=config)
+        error = lsst.ip.diffim.PsfDiscontinuityError(maxResidualFrac=0.1, rmsResidualFrac=0.02,
+                                                     threshold=0.05, medianRadius=2.0)
+        with unittest.mock.patch.object(task, "checkPsfDiscontinuity", side_effect=error):
+            with self.assertRaises(lsst.ip.diffim.PsfDiscontinuityError):
+                task.run(coaddExposureHandles={0: self.patches[0]},
+                         bbox=box,
+                         wcs=self.exposure.wcs,
+                         dataIds={0: self.dataIds[0]},
+                         physical_filter="a_test")
+
+    def testPsfDiscontinuityCheckAfterCoverageCheck(self):
+        """A template with too little coverage raises NoWorkFound before the
+        discontinuity check runs.
+        """
+        # Drop a patch so that only about half of the template has data.
+        self.patches[0].pop(1)
+        box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
+        config = self._makeConfig()
+        config.doCheckPsfDiscontinuity = True
+        config.minTemplateFractionForExpectedSuccess = 0.9
+        task = lsst.ip.diffim.GetTemplateTask(config=config)
+        psfError = lsst.afw.detection.InvalidPsfError("Unable to compute PSF FWHM.")
+        discontinuityError = lsst.ip.diffim.PsfDiscontinuityError(
+            maxResidualFrac=0.1, rmsResidualFrac=0.02, threshold=0.05, medianRadius=2.0
+        )
+        with unittest.mock.patch.object(task, "_makeGaussianPsf", side_effect=psfError), \
+                unittest.mock.patch.object(task, "checkPsfDiscontinuity",
+                                           side_effect=discontinuityError) as check:
+            with self.assertRaises(pipeBase.NoWorkFound):
+                task.run(coaddExposureHandles=self.patches,
+                         bbox=box,
+                         wcs=self.exposure.wcs,
+                         dataIds=self.dataIds,
+                         physical_filter="a_test")
+        check.assert_not_called()
+
     def testRunNoTemplate(self):
         """A bounding box that doesn't overlap the patches will raise.
         """
