@@ -58,6 +58,7 @@ from lsst.ip.diffim.utils import (
     evaluateMeanPsfFwhm,
     getPsfFwhm,
     record_from_obs_info,
+    sampleCoaddPsfMoments,
 )
 from lsst.meas.algorithms import CoaddPsf, CoaddPsfConfig, SubtractBackgroundTask, ScaleVarianceTask
 from lsst.utils.timer import timeMethod
@@ -1149,23 +1150,28 @@ class GetTemplateTask(pipeBase.PipelineTask):
     def checkPsfDiscontinuity(self, psf, bbox):
         """Reject templates whose PSF varies discontinuously.
 
-        Samples the template PSF determinant radius on a grid, subtracts a
+        Estimates the template PSF determinant radius on a grid, subtracts a
         smooth 2D polynomial of the same order as the AL PSF matching
-        spatial kernel, and raises if the maximum absolute residual --
-        expressed as a fraction of the median radius -- exceeds the
-        configured threshold. This catches templates where the set of
-        input warps changes across the detector (typically along coadd
-        patch or input-CCD boundaries), which produces step
-        discontinuities that PSF matching cannot absorb and which generate
-        large numbers of junk diaSources downstream.
+        spatial kernel, and raises if the maximum absolute residual, as a
+        fraction of the median radius, exceeds the configured threshold.
+        This catches templates where the set of input images changes across
+        the detector (typically along coadd patch or input-CCD boundaries),
+        which produces step discontinuities that PSF matching cannot absorb
+        and which generate large numbers of junk diaSources downstream.
 
-        If too few grid points yield a valid PSF shape (e.g. mostly
-        NO_DATA), the check is skipped with an info-level log message.
+        The radius is estimated by
+        `~lsst.ip.diffim.utils.sampleCoaddPsfMoments` from the moments of the
+        input PSFs rather than from images of the CoaddPsf, which would be
+        much slower.
+
+        If too few grid points have a PSF estimate (e.g. mostly NO_DATA), the
+        check is skipped with an info-level log message.
 
         Parameters
         ----------
         psf : `lsst.meas.algorithms.CoaddPsf`
-            PSF of the assembled template, built from its inputs.
+            PSF of the assembled template, built from its inputs. Its coadd
+            WCS is the template WCS.
         bbox : `lsst.geom.Box2I`
             Bounding box of the template, including the border of
             ``templateBorderSize`` pixels.
@@ -1184,15 +1190,14 @@ class GetTemplateTask(pipeBase.PipelineTask):
         # within the bbox the science image actually covers.
         xs = np.linspace(bbox.minX + border, bbox.maxX - border, n)
         ys = np.linspace(bbox.minY + border, bbox.maxY - border, n)
-        radius = np.full((n, n), np.nan)
-        for i, y in enumerate(ys):
-            for j, x in enumerate(xs):
-                try:
-                    radius[i, j] = psf.computeShape(
-                        geom.Point2D(x, y)).getDeterminantRadius()
-                except pexExceptions.Exception:
-                    # NO_DATA region or pathological PSF; leave as NaN.
-                    continue
+        xg, yg = np.meshgrid(xs, ys)
+        coaddWcs = psf.getCoaddWcs()
+        ra, dec = coaddWcs.pixelToSkyArray(xg.ravel(), yg.ravel())
+        # psf.computeShape images, warps and sums every input PSF at each grid
+        # point, taking seconds per template. Combining input moments
+        # evaluates each input once and leaves only array arithmetic per point.
+        ixx, iyy, ixy = sampleCoaddPsfMoments(psf, ra, dec, coaddWcs)
+        radius = ((ixx*iyy - ixy**2)**0.25).reshape(n, n)
 
         good = np.isfinite(radius)
         order = self.config.psfDiscontinuityPolyOrder
@@ -1209,7 +1214,6 @@ class GetTemplateTask(pipeBase.PipelineTask):
 
         # Fit a 2D polynomial in coordinates normalized to [-1, 1] for
         # numerical stability of the least-squares solve.
-        xg, yg = np.meshgrid(xs, ys)
         xn = 2*(xg - bbox.minX)/bbox.width - 1
         yn = 2*(yg - bbox.minY)/bbox.height - 1
         basis = np.stack(

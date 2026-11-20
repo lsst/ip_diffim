@@ -25,7 +25,7 @@
 __all__ = ["evaluateMeanPsfFwhm", "getPsfFwhm", "getKernelCenterDisplacement",
            "computeDifferenceImageMetrics", "checkMask", "setSourceFootprints",
            "record_from_obs_info", "get_difference_image_provenance",
-           "checkTemplateIsSufficient"]
+           "checkTemplateIsSufficient", "sampleCoaddPsfMoments"]
 
 import itertools
 import os
@@ -36,10 +36,13 @@ import astropy.units as u
 import numpy as np
 
 import lsst.afw.detection as afwDetection
+import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 from lsst.daf.butler import Timespan
 import lsst.geom as geom
+from lsst.meas.algorithms import CoaddPsf
+import lsst.pex.exceptions
 from lsst.pex.exceptions import InvalidParameterError, RangeError
 import lsst.pipe.base
 from lsst.utils.logging import getLogger
@@ -685,3 +688,116 @@ def checkTemplateIsSufficient(templateExposure, logger, scienceExposure=None, re
                    100*requiredTemplateFraction))
         raise lsst.pipe.base.NoWorkFound(message + " " + exceptionMessage)
     return templateCoverageFraction
+
+
+def sampleCoaddPsfMoments(psf, ra, dec, targetWcs):
+    """Estimate the second moments of a CoaddPsf at a set of positions.
+
+    At each position, the moments are the weighted mean of the moments of
+    the components that contain it, using the CoaddPsf weights.
+    Components that are themselves CoaddPsfs are sampled the same way.
+    Each other component is evaluated once, near the middle of the
+    positions it covers, and its moments are transformed to the pixels of
+    ``targetWcs``. This ignores the spatial variation of each input PSF
+    and treats the moments of a sum of PSF images as the weighted mean of
+    their moments, which is exact for unweighted moments but not for the
+    adaptive moments of `~lsst.afw.detection.Psf.computeShape`.
+
+    An input shared by several nested CoaddPsfs, such as a visit-detector
+    in overlapping patches, is evaluated only in the first one where it is
+    found, and has those moments in all of them. Evaluating it separately
+    in each, at a different position, would put steps between the patches
+    that are not in the PSF.
+
+    Parameters
+    ----------
+    psf : `lsst.meas.algorithms.CoaddPsf`
+        PSF to sample.
+    ra, dec : `numpy.ndarray`
+        Positions to sample, in radians.
+    targetWcs : `lsst.afw.geom.SkyWcs`
+        WCS whose pixels the moments are expressed in.
+
+    Returns
+    -------
+    ixx, iyy, ixy : `numpy.ndarray`
+        Moments at each position, in ``targetWcs`` pixels; NaN where no
+        component covers the position.
+    """
+    return _sampleCoaddPsfMoments(psf, ra, dec, targetWcs, {})
+
+
+def _sampleCoaddPsfMoments(psf, ra, dec, targetWcs, shapeCache):
+    """Estimate the second moments of a CoaddPsf at a set of positions, as
+    described in `sampleCoaddPsfMoments`.
+
+    Parameters
+    ----------
+    psf : `lsst.meas.algorithms.CoaddPsf`
+        PSF to sample.
+    ra, dec : `numpy.ndarray`
+        Positions to sample, in radians.
+    targetWcs : `lsst.afw.geom.SkyWcs`
+        WCS whose pixels the moments are expressed in.
+    shapeCache : `dict` [`int`, `tuple` [`float`, `float`, `float`] or `None`]
+        Moments of the components that are not CoaddPsfs, keyed on component
+        id, or `None` if a component cannot be evaluated. Shared by the
+        nested calls and updated in place. Components with id 0, the id of a
+        record that was never given one, are not cached.
+
+    Returns
+    -------
+    ixx, iyy, ixy : `numpy.ndarray`
+        Moments at each position, in ``targetWcs`` pixels; NaN where no
+        component covers the position.
+    """
+    sums = np.zeros((3, len(ra)))
+    weights = np.zeros(len(ra))
+    for i in range(psf.getComponentCount()):
+        componentWcs = psf.getWcs(i)
+        x, y = componentWcs.skyToPixelArray(ra, dec)
+        # The same test as CoaddPsf: inside the bounding box and, if there
+        # is one, the valid polygon.
+        inside = geom.Box2D(psf.getBBox(i)).contains(x, y)
+        polygon = psf.getValidPolygon(i)
+        if polygon is not None:
+            inside &= polygon.contains(x, y)
+        covered = np.flatnonzero(inside)
+        if covered.size == 0:
+            continue
+        component = psf.getPsf(i)
+        if isinstance(component, CoaddPsf):
+            # A nested CoaddPsf, such as a patch of the template: recurse
+            # into its own inputs at the covered positions, and drop the
+            # positions none of them cover, which come back as NaN.
+            moments = np.stack(_sampleCoaddPsfMoments(component, ra[covered], dec[covered], targetWcs,
+                                                      shapeCache))
+            measured = np.isfinite(moments[0])
+            covered = covered[measured]
+            moments = moments[:, measured]
+        else:
+            key = psf.getId(i)
+            if key == 0 or key not in shapeCache:
+                position = geom.Point2D(np.median(x[covered]), np.median(y[covered]))
+                try:
+                    shape = component.computeShape(position)
+                except lsst.pex.exceptions.Exception:
+                    value = None
+                else:
+                    toTarget = afwGeom.makeWcsPairTransform(componentWcs, targetWcs)
+                    shape.transformInPlace(afwGeom.linearizeTransform(toTarget, position).getLinear())
+                    value = (shape.getIxx(), shape.getIyy(), shape.getIxy())
+                if key != 0:
+                    shapeCache[key] = value
+            else:
+                value = shapeCache[key]
+            if value is None:
+                continue
+            moments = np.array(value)[:, np.newaxis]
+        weight = psf.getWeight(i)
+        sums[:, covered] += weight*moments
+        weights[covered] += weight
+
+    with np.errstate(invalid="ignore", divide="ignore"):
+        ixx, iyy, ixy = np.where(weights > 0, sums/weights, np.nan)
+    return ixx, iyy, ixy

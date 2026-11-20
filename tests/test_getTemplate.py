@@ -1483,6 +1483,111 @@ class WarpCorrelationFactorTestCase(lsst.utils.tests.TestCase):
         self.assertLess(pixelStd, planeStdAfter)
 
 
+class PsfDiscontinuityTestCase(lsst.utils.tests.TestCase):
+    """Test the template PSF discontinuity check on CoaddPsfs made from
+    Gaussian inputs that share the template WCS.
+    """
+    def setUp(self):
+        self.bbox = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Extent2I(1000, 1000))
+        self.wcs = lsst.afw.geom.makeSkyWcs(
+            lsst.geom.Point2D(500, 500),
+            lsst.geom.SpherePoint(30, -20, lsst.geom.degrees),
+            lsst.afw.geom.makeCdMatrix(0.2*lsst.geom.arcseconds),
+        )
+        self.task = lsst.ip.diffim.GetTemplateTask()
+        self.nextId = 1
+
+    def _makeCoaddPsf(self, inputs, setIds=True):
+        """Make a CoaddPsf on ``self.wcs``.
+
+        Parameters
+        ----------
+        inputs : `list` [`tuple`]
+            ``(psf, box, weight)`` of each input, where ``psf`` is a
+            `~lsst.afw.detection.Psf` or a float Gaussian sigma and ``box`` is
+            the `lsst.geom.Box2D` the input covers.
+        setIds : `bool`, optional
+            Give each input a unique id; otherwise all their ids are 0, as
+            for the patch records of a template.
+        """
+        schema = lsst.afw.table.ExposureTable.makeMinimalSchema()
+        schema.addField("weight", type="D", doc="Coadd weight")
+        catalog = lsst.afw.table.ExposureCatalog(schema)
+        for psf, box, weight in inputs:
+            if not isinstance(psf, lsst.afw.detection.Psf):
+                psf = lsst.afw.detection.GaussianPsf(41, 41, psf)
+            record = catalog.addNew()
+            if setIds:
+                record.setId(self.nextId)
+                self.nextId += 1
+            record.setPsf(psf)
+            record.setWcs(self.wcs)
+            record.setBBox(lsst.geom.Box2I(box))
+            record.setValidPolygon(lsst.afw.geom.Polygon(box))
+            record["weight"] = weight
+        # GaussianPsf reports an average position of (0, 0), which need not
+        # be inside any input.
+        return lsst.meas.algorithms.CoaddPsf(catalog, self.wcs, inputs[0][1].getCenter(), "lanczos3", 100)
+
+    def _sample(self, psf, points):
+        ra, dec = self.wcs.pixelToSkyArray(np.array([p[0] for p in points], dtype=float),
+                                           np.array([p[1] for p in points], dtype=float))
+        return lsst.ip.diffim.utils.sampleCoaddPsfMoments(psf, ra, dec, self.wcs)
+
+    def testSampleMomentsWeightedMean(self):
+        """Moments are the weighted mean over the inputs covering each point,
+        including inputs of a nested CoaddPsf, and NaN where none covers.
+        """
+        full = lsst.geom.Box2D(self.bbox)
+        left = lsst.geom.Box2D(lsst.geom.Point2D(0, 0), lsst.geom.Point2D(500, 1000))
+        inner = self._makeCoaddPsf([(2.0, full, 1.0), (4.0, left, 3.0)])
+        outer = self._makeCoaddPsf([(inner, full, 1.0)])
+        ixx, iyy, ixy = self._sample(outer, [(250, 500), (750, 500), (2000, 500)])
+        self.assertFloatsAlmostEqual(ixx[:2], np.array([(4 + 3*16)/4, 4]), rtol=1e-6)
+        self.assertFloatsAlmostEqual(iyy[:2], ixx[:2], rtol=1e-6)
+        self.assertFloatsAlmostEqual(ixy[:2], np.zeros(2), atol=1e-6)
+        self.assertTrue(np.isnan(ixx[2]))
+
+    def testSmoothPsfPasses(self):
+        """A template whose inputs all cover the detector passes."""
+        full = lsst.geom.Box2D(self.bbox)
+        psf = self._makeCoaddPsf([(2.0, full, 1.0), (3.0, full, 1.0)])
+        with self.assertLogs(self.task.log.name, level="INFO") as cm:
+            self.task.checkPsfDiscontinuity(psf, self.bbox)
+        self.assertIn("max residual = 0.0000", "\n".join(cm.output))
+
+    def testPsfStepRaises(self):
+        """An input that covers half the detector makes a step in the PSF
+        size that the check rejects.
+        """
+        full = lsst.geom.Box2D(self.bbox)
+        left = lsst.geom.Box2D(lsst.geom.Point2D(0, 0), lsst.geom.Point2D(500, 1000))
+        psf = self._makeCoaddPsf([(2.0, full, 1.0), (3.0, left, 1.0)])
+        with self.assertRaises(lsst.ip.diffim.PsfDiscontinuityError) as cm:
+            self.task.checkPsfDiscontinuity(psf, self.bbox)
+        self.assertGreater(cm.exception.maxResidualFrac, self.task.config.psfDiscontinuityMaxThreshold)
+
+    def testPsfStepWithUnsetIdsRaises(self):
+        """Inputs that all have id 0 are each evaluated, so a step between
+        them is still rejected.
+        """
+        left = lsst.geom.Box2D(lsst.geom.Point2D(0, 0), lsst.geom.Point2D(500, 1000))
+        right = lsst.geom.Box2D(lsst.geom.Point2D(500, 0), lsst.geom.Point2D(1000, 1000))
+        psf = self._makeCoaddPsf([(2.0, left, 1.0), (3.0, right, 1.0)], setIds=False)
+        with self.assertRaises(lsst.ip.diffim.PsfDiscontinuityError):
+            self.task.checkPsfDiscontinuity(psf, self.bbox)
+
+    def testFewPointsSkips(self):
+        """The check is skipped when the PSF covers too little of the
+        detector.
+        """
+        corner = lsst.geom.Box2D(lsst.geom.Point2D(0, 0), lsst.geom.Point2D(200, 200))
+        psf = self._makeCoaddPsf([(2.0, corner, 1.0), (4.0, corner, 1.0)])
+        with self.assertLogs(self.task.log.name, level="INFO") as cm:
+            self.task.checkPsfDiscontinuity(psf, self.bbox)
+        self.assertIn("Skipping PSF discontinuity check", "\n".join(cm.output))
+
+
 class GetTemplateConnectionsTestCase(lsst.utils.tests.TestCase):
     """Test the connections that ``output_image_type`` switches on.
 
