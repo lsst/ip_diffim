@@ -223,6 +223,25 @@ def _warpKernelSumSq(kernelName, nPhase=100):
     return (total/nPhase)**2
 
 
+@dataclasses.dataclass
+class _PatchPsf:
+    """PSF shape and coverage of one coadd patch over the template region."""
+
+    tract: int
+    """Tract id of the patch."""
+
+    patch: int
+    """Patch id."""
+
+    area: int
+    """Number of patch pixels that overlap the template."""
+
+    moments: np.ndarray
+    """Second moments of the PSF at the center of the region where the patch
+    overlaps the template, in science image pixels, as the 2x2 matrix
+    [[ixx, ixy], [ixy, iyy]]."""
+
+
 class PsfDiscontinuityError(pipeBase.AlgorithmError):
     """Raised when the assembled template PSF varies discontinuously across
     the bounding box, in a way that cannot be absorbed by the smooth
@@ -484,6 +503,24 @@ class GetTemplateConfig(
         " subtracting a smooth polynomial of order"
         " psfDiscontinuityPolyOrder. Templates exceeding this threshold"
         " raise PsfDiscontinuityError.",
+    )
+    doExcludePsfOutlierPatches = pexConfig.Field(
+        dtype=bool,
+        default=False,
+        doc="Exclude coadd patches whose PSF shape differs from the others."
+        " Patches whose PSF differs from the typical PSF of the patches"
+        " (their weighted medoid) by patchPsfMaxDeviation or more are"
+        " dropped. Nothing is dropped from fewer than three patches. Pixels"
+        " covered only by an excluded patch have no data in the template.",
+    )
+    patchPsfMaxDeviation = pexConfig.RangeField(
+        dtype=float,
+        default=0.1,
+        min=0.0,
+        inclusiveMin=False,
+        doc="Maximum fractional difference in PSF width, along any direction,"
+        " between a patch and the typical PSF of the patches in the"
+        " template, if doExcludePsfOutlierPatches is set.",
     )
 
     def setDefaults(self):
@@ -780,7 +817,10 @@ class GetTemplateTask(pipeBase.PipelineTask):
         image's ``instrument`` if any coadd was made from it, and otherwise the
         one that most of the coadds were made from. Coadds made from another
         instrument are dropped, and so are coadds that record no instrument
-        unless none of the coadds records one.
+        unless none of the coadds records one. If
+        ``config.doExcludePsfOutlierPatches`` is set, coadd patches whose PSF
+        shape differs from the others are also dropped, before their pixels
+        are read.
 
         Parameters
         ----------
@@ -837,7 +877,9 @@ class GetTemplateTask(pipeBase.PipelineTask):
             instrument and no coadd records the plate scale of its input
             images, so the template variance cannot be corrected.
         """
-        band, photoCalib, templateInstrument = self._checkInputs(dataIds, coaddExposureHandles, instrument)
+        band, photoCalib, templateInstrument, coaddInstruments = self._checkInputs(
+            dataIds, coaddExposureHandles, instrument
+        )
 
         scienceBBox = bbox
         bbox = geom.Box2I(bbox)
@@ -847,6 +889,22 @@ class GetTemplateTask(pipeBase.PipelineTask):
         catalogs = []
         inputs = []
         plateScaleFactor = 1.0 if instrument == templateInstrument else None
+
+        if self.config.doExcludePsfOutlierPatches:
+            # Drop the coadd patches whose PSF differs from the others before
+            # reading their pixels.
+            # Coadds made from another instrument are dropped from the
+            # template anyway, so they are left out of the comparison.
+            compared = {key for key, coaddInstrument in coaddInstruments.items()
+                        if coaddInstrument == templateInstrument}
+            patchPsfs = self._measurePatchPsfs(coaddExposureHandles, dataIds, compared, bbox, wcs)
+            excluded = {(p.tract, p.patch) for p in self._excludePsfOutlierPatches(patchPsfs)}
+            kept = {tract: [(handle, dataId) for handle, dataId in zip(handles, dataIds[tract])
+                            if (tract, dataId["patch"]) not in excluded]
+                    for tract, handles in coaddExposureHandles.items()}
+            coaddExposureHandles = {tract: [handle for handle, _ in pairs]
+                                    for tract, pairs in kept.items() if pairs}
+            dataIds = {tract: [dataId for _, dataId in pairs] for tract, pairs in kept.items() if pairs}
 
         for tract in coaddExposureHandles:
             maskedImages, catalog, totalBox, coaddInputs = self._makeExposureCatalog(
@@ -1253,6 +1311,174 @@ class GetTemplateTask(pipeBase.PipelineTask):
                 medianRadius=medianRadius,
             )
 
+    def _measurePatchPsfs(self, coaddExposureHandles, dataIds, patches, bbox, wcs):
+        """Measure the PSF shape of each coadd patch where it overlaps the
+        template, without reading its pixels.
+
+        Parameters
+        ----------
+        coaddExposureHandles : `dict` [`int`, \
+                `list` [`lsst.daf.butler.DeferredDatasetHandle`]]
+            Coadds that may go into the template, indexed on tract id.
+        dataIds : `dict` [`int`, `list` [`lsst.daf.butler.DataCoordinate`]]
+            Data ids of ``coaddExposureHandles``, indexed on tract id.
+        patches : `set` [`tuple` [`int`, `int`]]
+            Tract and patch of the coadds to measure; the others are skipped.
+        bbox : `lsst.geom.Box2I`
+            Bounding box of the template, in science image pixels.
+        wcs : `lsst.afw.geom.SkyWcs`
+            WCS of the science image.
+
+        Returns
+        -------
+        patchPsfs : `list` [`_PatchPsf`]
+            PSF shape and overlap area of each patch that overlaps the
+            template and whose PSF can be evaluated there.
+        """
+        patchPsfs = []
+        for tract, handles in coaddExposureHandles.items():
+            measured = [(handle, dataId) for handle, dataId in zip(handles, dataIds[tract])
+                        if (tract, dataId["patch"]) in patches]
+            if not measured:
+                continue
+            # All the patches of a tract share its WCS.
+            tractWcs = measured[0][0].get(component="wcs")
+            # The same region of the tract as the patches are merged over.
+            region = computeWarpedBBox(tractWcs, bbox, wcs)
+            region.grow(5)
+            toScience = afwGeom.makeWcsPairTransform(tractWcs, wcs)
+            for handle, dataId in measured:
+                overlap = handle.get(component="bbox")
+                overlap.clip(region)
+                if overlap.isEmpty():
+                    continue
+                center = geom.Box2D(overlap).getCenter()
+                try:
+                    shape = handle.get(component="psf").computeShape(center)
+                except pexExceptions.Exception as e:
+                    self.log.info("Not comparing the PSF of tract %d patch %d to the other patches: %s",
+                                  tract, dataId["patch"], e)
+                    continue
+                shape.transformInPlace(afwGeom.linearizeTransform(toScience, center).getLinear())
+                moments = np.array([[shape.getIxx(), shape.getIxy()], [shape.getIxy(), shape.getIyy()]])
+                patchPsfs.append(_PatchPsf(tract=tract, patch=dataId["patch"], area=overlap.getArea(),
+                                           moments=moments))
+        return patchPsfs
+
+    def _excludePsfOutlierPatches(self, patchPsfs):
+        """Find the patches to drop so that the PSF shapes of the rest agree.
+
+        Parameters
+        ----------
+        patchPsfs : `list` [`_PatchPsf`]
+            PSF shape and coverage of each patch that may go into the
+            template.
+
+        Returns
+        -------
+        excluded : `list` [`_PatchPsf`]
+            Patches to drop from the template.
+        """
+        self.metadata["numPsfOutlierPatches"] = 0
+        if not patchPsfs:
+            return []
+        moments = np.array([p.moments for p in patchPsfs])
+        weights = np.array([p.area for p in patchPsfs], dtype=float)
+        maxDeviation = self.config.patchPsfMaxDeviation
+        kept = self._selectConsistentPatches(moments, weights, maxDeviation)
+        deviations = self._psfShapeDeviation(moments, self._weightedMedoid(moments, weights))
+        excluded = []
+        for i, patchPsf in enumerate(patchPsfs):
+            if i not in kept:
+                self.log.info("Excluding template coadd tract %d patch %d: its PSF width differs from the"
+                              " typical PSF of the %d patches by up to %.1f%%, more than %.1f%%.",
+                              patchPsf.tract, patchPsf.patch, len(patchPsfs), 100*deviations[i],
+                              100*maxDeviation)
+                excluded.append(patchPsf)
+        self.metadata["numPsfOutlierPatches"] = len(excluded)
+        return excluded
+
+    @staticmethod
+    def _selectConsistentPatches(moments, weights, maxDeviation):
+        """Find the patches whose PSF shapes agree with the typical shape.
+
+        The typical shape is the weighted medoid of all the patches (see
+        `_weightedMedoid`), which outliers cannot pull toward themselves.
+        Nothing is dropped from fewer than three patches, since with two
+        patches there is no way to tell which one is the outlier.
+
+        Parameters
+        ----------
+        moments : `numpy.ndarray`, (N, 2, 2)
+            PSF second moments of each patch.
+        weights : `numpy.ndarray`, (N,)
+            Weight of each patch, such as its area of overlap with the
+            template.
+        maxDeviation : `float`
+            Largest allowed value of `_psfShapeDeviation` from the typical
+            shape.
+
+        Returns
+        -------
+        kept : `list` [`int`]
+            Indices of the patches to keep.
+        """
+        if len(weights) < 3:
+            return list(range(len(weights)))
+        reference = GetTemplateTask._weightedMedoid(moments, weights)
+        deviations = GetTemplateTask._psfShapeDeviation(moments, reference)
+        return [int(i) for i in np.flatnonzero(deviations < maxDeviation)]
+
+    @staticmethod
+    def _weightedMedoid(moments, weights):
+        """Return the PSF shape with the smallest weighted sum of deviations
+        from the others.
+
+        This is a median for PSF shapes, and is always one of the measured
+        shapes.
+
+        Parameters
+        ----------
+        moments : `numpy.ndarray`, (N, 2, 2)
+            PSF second moments.
+        weights : `numpy.ndarray`, (N,)
+            Weight of each PSF.
+
+        Returns
+        -------
+        medoid : `numpy.ndarray`, (2, 2)
+            The moments in ``moments`` with the smallest weighted sum of
+            `_psfShapeDeviation` from all of ``moments``.
+        """
+        costs = [np.sum(weights*GetTemplateTask._psfShapeDeviation(moments, reference))
+                 for reference in moments]
+        return moments[int(np.argmin(costs))]
+
+    @staticmethod
+    def _psfShapeDeviation(moments, reference):
+        """Return the largest fractional difference in PSF width, along any
+        direction, between PSFs and a reference PSF.
+
+        Parameters
+        ----------
+        moments : `numpy.ndarray`, (N, 2, 2)
+            Second moments of the PSFs.
+        reference : `numpy.ndarray`, (2, 2)
+            Second moments of the reference PSF.
+
+        Returns
+        -------
+        deviation : `numpy.ndarray`, (N,)
+            Largest value of ``|width/referenceWidth - 1|`` over all
+            directions, for each PSF.
+        """
+        # In coordinates where the reference PSF is circular with unit width,
+        # the eigenvalues of each PSF's moments are its squared widths along
+        # its principal axes, relative to the reference.
+        whiten = np.linalg.inv(np.linalg.cholesky(reference))
+        ratios = np.linalg.eigvalsh(whiten @ moments @ whiten.T)
+        return np.max(np.abs(np.sqrt(ratios) - 1), axis=-1)
+
     @staticmethod
     def _checkInputs(dataIds, coaddExposures, scienceInstrument=None):
         """Check that the all the dataIds are from the same band and that
@@ -1282,6 +1508,9 @@ class GetTemplateTask(pipeBase.PipelineTask):
             instrument that the most coadds were made from, or ``"UNKNOWN"`` if
             no coadd records one. A tie goes to the instrument whose name sorts
             first.
+        coaddInstruments : `dict` [`tuple` [`int`, `int`], `str`]
+            Instrument of each coadd, or ``"UNKNOWN"`` if it records none,
+            keyed by tract and patch.
 
         Raises
         ------
@@ -1294,25 +1523,28 @@ class GetTemplateTask(pipeBase.PipelineTask):
             raise RuntimeError(f"GetTemplateTask called with multiple bands: {bands}")
         band = bands.pop()
         photoCalibs = []
-        instrumentCounts = collections.Counter()
-        for exposures in coaddExposures.values():
-            for exposure in exposures:
+        coaddInstruments = {}
+        for tract, exposures in coaddExposures.items():
+            for exposure, dataId in zip(exposures, dataIds[tract]):
                 # Read both components of a coadd in turn, so a butler cache
                 # can serve the second read from the first download.
                 photoCalibs.append(exposure.get(component="photoCalib"))
-                instrumentCounts[GetTemplateTask._getInstrument(exposure.get(component="coaddInputs"))] += 1
+                coaddInstruments[tract, dataId["patch"]] = GetTemplateTask._getInstrument(
+                    exposure.get(component="coaddInputs")
+                )
         if not all([photoCalibs[0] == x for x in photoCalibs]):
             msg = f"GetTemplateTask called with exposures with different photoCalibs: {photoCalibs}"
             raise RuntimeError(msg)
         photoCalib = photoCalibs[0]
+        instrumentCounts = collections.Counter(coaddInstruments.values())
         # Coadds that record no instrument do not count toward the choice.
         del instrumentCounts[_UNKNOWN_INSTRUMENT]
         if scienceInstrument in instrumentCounts:
-            return band, photoCalib, scienceInstrument
+            return band, photoCalib, scienceInstrument, coaddInstruments
         if not instrumentCounts:
-            return band, photoCalib, _UNKNOWN_INSTRUMENT
+            return band, photoCalib, _UNKNOWN_INSTRUMENT, coaddInstruments
         instrument = max(sorted(instrumentCounts), key=instrumentCounts.get)
-        return band, photoCalib, instrument
+        return band, photoCalib, instrument, coaddInstruments
 
     @staticmethod
     def _getInstrument(coaddInputs):

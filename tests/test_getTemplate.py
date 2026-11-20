@@ -495,6 +495,61 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
                          physical_filter="a_test")
         check.assert_not_called()
 
+    def _widenPatchPsf(self, tract, index, sigma=6.0):
+        """Replace one test patch with a copy that has a wide Gaussian PSF.
+        """
+        handle = self.patches[tract][index]
+        coadd = handle.get()
+        size = 2*int(np.ceil(5*sigma)) + 1
+        coadd.setPsf(lsst.afw.detection.GaussianPsf(size, size, sigma))
+        self.patches[tract][index] = pipeBase.InMemoryDatasetHandle(coadd, storageClass="ExposureF",
+                                                                    copy=True, dataId=handle.dataId)
+
+    @lsst.utils.tests.methodParameters(doExclude=[False, True], nPsfs=[9, 8])
+    def testExcludePsfOutlierPatch(self, doExclude=None, nPsfs=None):
+        """A patch whose PSF is much wider than the others is dropped from
+        the template, without reading its pixels, only if
+        doExcludePsfOutlierPatches is set. The region only it covers then has
+        no data, while the kept patch of the same tract that overlaps it keeps
+        its data there.
+        """
+        self._widenPatchPsf(3, 0)
+        box = lsst.geom.Box2I(lsst.geom.Point2I(200, 200), lsst.geom.Point2I(600, 600))
+        # A point covered only by tract 3 patch 0, more than 15 pixels from
+        # the edges of tract 2 patch 2 and tract 3 patch 2.
+        onlyPatch = lsst.geom.Point2I(455, 560)
+        # A point covered only by tract 3 patches 0 and 2, more than 15 pixels
+        # from the edges of their overlap.
+        overlap = lsst.geom.Point2I(488, 560)
+        config = self._makeConfig()
+        config.doExcludePsfOutlierPatches = doExclude
+        # The widened patch would fail the discontinuity check.
+        config.doCheckPsfDiscontinuity = False
+        task = lsst.ip.diffim.GetTemplateTask(config=config)
+        # Record the reads of the widened patch.
+        widened = unittest.mock.Mock(wraps=self.patches[3][0])
+        self.patches[3][0] = widened
+        result = task.run(coaddExposureHandles=self.patches,
+                          bbox=box,
+                          wcs=self.exposure.wcs,
+                          dataIds=self.dataIds,
+                          physical_filter="a_test")
+        imageReads = [call for call in widened.get.call_args_list if "component" not in call.kwargs]
+        self.assertEqual(len(imageReads), 0 if doExclude else 1)
+
+        self._checkMetadata(result.template, task.config, box, self.exposure.wcs, nPsfs)
+        inputPatches = [(record["tract"], record["patch"])
+                        for record in result.template.getInfo().getCoaddInputs().ccds]
+        self.assertEqual((3, 0) in inputPatches, not doExclude)
+        noData = result.template.mask.getPlaneBitMask("NO_DATA")
+        self.assertEqual(bool(result.template.mask[onlyPatch] & noData), doExclude)
+        self.assertFalse(result.template.mask[overlap] & noData)
+        self.assertGreater(result.template.variance[overlap], 0)
+        if doExclude:
+            self.assertEqual(task.metadata["numPsfOutlierPatches"], 1)
+        else:
+            self.assertNotIn("numPsfOutlierPatches", task.metadata)
+
     def testRunNoTemplate(self):
         """A bounding box that doesn't overlap the patches will raise.
         """
@@ -994,6 +1049,26 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         self.assertIn(str(self.dataIds[0][3]), dropped[0])
         self.assertIn("made from OtherCam", dropped[0])
 
+    def testExcludePsfOutlierPatchesSkipsOtherInstrument(self):
+        """Only coadds made from the template's instrument are compared for
+        PSF outliers.
+        """
+        records = [(self.exposure.wcs, self.exposure.getBBox())]
+        handles = (self._patchHandles(0, records)[:3]
+                   + self._patchHandles(0, records, instrument="OtherCam")[3:])
+        box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
+        config = self._makeConfig()
+        config.doExcludePsfOutlierPatches = True
+        task = lsst.ip.diffim.GetTemplateTask(config=config)
+        with unittest.mock.patch.object(task, "_measurePatchPsfs", wraps=task._measurePatchPsfs) as measure:
+            task.run(coaddExposureHandles={0: handles},
+                     bbox=box,
+                     wcs=self.exposure.wcs,
+                     dataIds={0: self.dataIds[0]},
+                     physical_filter="a_test")
+        measure.assert_called_once()
+        self.assertEqual(measure.call_args.args[2], {(0, 0), (0, 1), (0, 2)})
+
     def testRunPrefersScienceInstrument(self):
         """Coadds made from the science image's instrument are used even when
         they are in the minority; otherwise the majority instrument is used.
@@ -1481,6 +1556,65 @@ class WarpCorrelationFactorTestCase(lsst.utils.tests.TestCase):
         self.assertLess(pixelStd, 0.9*originalStd)
         self.assertGreater(pixelStd, planeStdBefore)
         self.assertLess(pixelStd, planeStdAfter)
+
+
+class PsfOutlierPatchTestCase(lsst.utils.tests.TestCase):
+    """Test the selection of coadd patches with consistent PSF shapes."""
+
+    @staticmethod
+    def _moments(sigmaX, sigmaY=None):
+        sigmaY = sigmaX if sigmaY is None else sigmaY
+        return np.array([[sigmaX**2, 0.0], [0.0, sigmaY**2]])
+
+    def testShapeDeviation(self):
+        """The deviation is the largest fractional width difference along any
+        direction.
+        """
+        reference = self._moments(2.0)
+        moments = np.array([self._moments(2.0), self._moments(2.2), self._moments(2.0, 1.6)])
+        deviation = lsst.ip.diffim.GetTemplateTask._psfShapeDeviation(moments, reference)
+        self.assertFloatsAlmostEqual(deviation, np.array([0.0, 0.1, 0.2]), atol=1e-12)
+
+    def testSelectAllConsistent(self):
+        moments = np.array([self._moments(2.0), self._moments(2.02), self._moments(1.98)])
+        kept = lsst.ip.diffim.GetTemplateTask._selectConsistentPatches(moments, np.ones(3), 0.05)
+        self.assertEqual(kept, [0, 1, 2])
+
+    def testSelectDropsOutlier(self):
+        """An outlier is dropped, even if it has the largest weight of any
+        single patch.
+        """
+        moments = np.array([self._moments(2.0), self._moments(3.0), self._moments(2.02),
+                            self._moments(1.98)])
+        weights = np.array([1.0, 1.5, 1.0, 1.0])
+        kept = lsst.ip.diffim.GetTemplateTask._selectConsistentPatches(moments, weights, 0.05)
+        self.assertEqual(kept, [0, 2, 3])
+
+    def testSelectDropsOutliersOnBothSides(self):
+        """Outliers wider and narrower than the typical PSF are both dropped,
+        and do not shift the typical PSF.
+        """
+        moments = np.array([self._moments(1.5), self._moments(2.0), self._moments(2.02),
+                            self._moments(1.98), self._moments(2.5)])
+        weights = np.array([2.0, 1.0, 1.0, 1.0, 2.0])
+        kept = lsst.ip.diffim.GetTemplateTask._selectConsistentPatches(moments, weights, 0.05)
+        self.assertEqual(kept, [1, 2, 3])
+
+    def testSelectHeavyPatchSetsTypicalPsf(self):
+        """A patch with most of the weight sets the typical PSF."""
+        moments = np.array([self._moments(2.0), self._moments(3.0), self._moments(2.02),
+                            self._moments(1.98)])
+        weights = np.array([1.0, 10.0, 1.0, 1.0])
+        kept = lsst.ip.diffim.GetTemplateTask._selectConsistentPatches(moments, weights, 0.05)
+        self.assertEqual(kept, [1])
+
+    def testSelectNeedsThreePatches(self):
+        """Nothing is dropped from two patches, since the outlier cannot be
+        identified.
+        """
+        moments = np.array([self._moments(2.0), self._moments(3.0)])
+        kept = lsst.ip.diffim.GetTemplateTask._selectConsistentPatches(moments, np.array([1.0, 2.0]), 0.05)
+        self.assertEqual(kept, [0, 1])
 
 
 class PsfDiscontinuityTestCase(lsst.utils.tests.TestCase):
