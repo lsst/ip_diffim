@@ -472,7 +472,7 @@ class GetTemplateConfig(
     )
     doCheckPsfDiscontinuity = pexConfig.Field(
         dtype=bool,
-        default=False,
+        default=True,
         doc="If True, raise AlgorithmError when buildTemplate encounters a"
         " template coadd with a discontinuously varying PSF. Difference"
         " imaging will not proceed."
@@ -486,17 +486,17 @@ class GetTemplateConfig(
     )
     psfDiscontinuityPolyOrder = pexConfig.RangeField(
         dtype=int,
-        default=2,
+        default=1,
         min=0,
         doc="Total order of the 2D polynomial subtracted from the"
         " template PSF determinant-radius grid before measuring the"
         " residual. Should match the spatialKernelOrder of the downstream"
-        " AL PSF matching task (default 2) so that the residual reflects"
+        " AL PSF matching task (default 1) so that the residual reflects"
         " variation that PSF matching cannot absorb.",
     )
     psfDiscontinuityMaxThreshold = pexConfig.RangeField(
         dtype=float,
-        default=0.05,
+        default=0.1,
         min=0.0,
         doc="Maximum allowed value of the template PSF discontinuity"
         " metric: max(|residual|) / median(determinant radius), after"
@@ -506,7 +506,7 @@ class GetTemplateConfig(
     )
     doExcludePsfOutlierPatches = pexConfig.Field(
         dtype=bool,
-        default=False,
+        default=True,
         doc="Exclude coadd patches whose PSF shape differs from the others."
         " Patches whose PSF differs from the typical PSF of the patches"
         " (their weighted medoid) by patchPsfMaxDeviation or more are"
