@@ -53,6 +53,7 @@ from lsst.images import (
 )
 from lsst.skymap import BaseSkyMap
 from lsst.ip.diffim.dcrModel import DcrModel
+from lsst.ip.diffim.homogenizePsf import HomogenizePsfTask
 from lsst.ip.diffim.utils import (
     checkTemplateIsSufficient,
     evaluateMeanPsfFwhm,
@@ -510,8 +511,10 @@ class GetTemplateConfig(
         doc="Exclude coadd patches whose PSF shape differs from the others."
         " Patches whose PSF differs from the typical PSF of the patches"
         " (their weighted medoid) by patchPsfMaxDeviation or more are"
-        " dropped. Nothing is dropped from fewer than three patches. Pixels"
-        " covered only by an excluded patch have no data in the template.",
+        " dropped. If doHomogenizePsf is set, only patches whose PSF is wider"
+        " are dropped, since homogenization broadens the narrower ones."
+        " Nothing is dropped from fewer than three patches. Pixels covered"
+        " only by an excluded patch have no data in the template.",
     )
     patchPsfMaxDeviation = pexConfig.RangeField(
         dtype=float,
@@ -521,6 +524,20 @@ class GetTemplateConfig(
         doc="Maximum fractional difference in PSF width, along any direction,"
         " between a patch and the typical PSF of the patches in the"
         " template, if doExcludePsfOutlierPatches is set.",
+    )
+    doHomogenizePsf = pexConfig.Field(
+        dtype=bool,
+        default=True,
+        doc="Broaden the PSF of each part of the template to a common width, so"
+        " that the template PSF is the same everywhere, and drop the parts"
+        " whose PSF is too wide to reach it by setting NO_DATA there, with the"
+        " homogenizePsf subtask. This removes the PSF steps between regions"
+        " with different inputs, which PSF matching cannot follow. The"
+        " discontinuity check is skipped for a homogenized template.",
+    )
+    homogenizePsf = pexConfig.ConfigurableField(
+        target=HomogenizePsfTask,
+        doc="Task to homogenize the template PSF, if doHomogenizePsf is set.",
     )
 
     def setDefaults(self):
@@ -578,6 +595,8 @@ class GetTemplateTask(pipeBase.PipelineTask):
             doc="Instrument whose observations were coadded to make the template, or UNKNOWN.",
         )
         self.makeSubtask("varianceBackground")
+        if self.config.doHomogenizePsf:
+            self.makeSubtask("homogenizePsf")
 
     def runQuantum(self, butlerQC, inputRefs, outputRefs):
         inputs = butlerQC.get(inputRefs)
@@ -1013,12 +1032,24 @@ class GetTemplateTask(pipeBase.PipelineTask):
             # the original exception.
             raise
 
-        if self.config.doCheckPsfDiscontinuity:
+        # Piecewise PSF-matching of the template. Regions of the template with
+        # PSFs much wider than the rest are dropped rather than pulling the PSF
+        # of the full template wider.
+        homogenizedSigma = None
+        if self.config.doHomogenizePsf:
+            homogenizedSigma = self.homogenizePsf.run(template, coaddPsf).psfSigma
+            if homogenizedSigma is not None:
+                size = 2*int(np.ceil(_PSF_STAMP_SIGMAS*homogenizedSigma)) + 1
+                template.setPsf(afwDetection.GaussianPsf(size, size, homogenizedSigma))
+                self.metadata["templatePsfSigma"] = homogenizedSigma
+
+        if self.config.doCheckPsfDiscontinuity and homogenizedSigma is None:
             # Reject templates whose PSF varies discontinuously: those leave
             # structured residuals along input-warp boundaries that PSF
             # matching cannot absorb, generating many junk diaSources. This
             # runs last so that templates rejected for insufficient coverage
-            # raise NoWorkFound instead.
+            # raise NoWorkFound instead. A homogenized template has no such
+            # steps left to check.
             self.checkPsfDiscontinuity(coaddPsf, template.getBBox())
 
         # Record the input coadd patches as the template's coadd inputs.
@@ -1385,21 +1416,26 @@ class GetTemplateTask(pipeBase.PipelineTask):
         moments = np.array([p.moments for p in patchPsfs])
         weights = np.array([p.area for p in patchPsfs], dtype=float)
         maxDeviation = self.config.patchPsfMaxDeviation
-        kept = self._selectConsistentPatches(moments, weights, maxDeviation)
-        deviations = self._psfShapeDeviation(moments, self._weightedMedoid(moments, weights))
+        # Homogenization broadens narrower patches, so only wider ones need
+        # to be dropped.
+        wideOnly = self.config.doHomogenizePsf
+        kept = self._selectConsistentPatches(moments, weights, maxDeviation, wideOnly=wideOnly)
+        ratios = self._psfWidthRatios(moments, self._weightedMedoid(moments, weights))
+        deviations = np.max(ratios - 1 if wideOnly else np.abs(ratios - 1), axis=-1)
         excluded = []
         for i, patchPsf in enumerate(patchPsfs):
             if i not in kept:
-                self.log.info("Excluding template coadd tract %d patch %d: its PSF width differs from the"
-                              " typical PSF of the %d patches by up to %.1f%%, more than %.1f%%.",
-                              patchPsf.tract, patchPsf.patch, len(patchPsfs), 100*deviations[i],
+                self.log.info("Excluding template coadd tract %d patch %d: its PSF is %.1f%% %s than the"
+                              " typical PSF of the %d patches along some direction, more than %.1f%%.",
+                              patchPsf.tract, patchPsf.patch, 100*deviations[i],
+                              "wider" if wideOnly else "wider or narrower", len(patchPsfs),
                               100*maxDeviation)
                 excluded.append(patchPsf)
         self.metadata["numPsfOutlierPatches"] = len(excluded)
         return excluded
 
     @staticmethod
-    def _selectConsistentPatches(moments, weights, maxDeviation):
+    def _selectConsistentPatches(moments, weights, maxDeviation, wideOnly=False):
         """Find the patches whose PSF shapes agree with the typical shape.
 
         The typical shape is the weighted medoid of all the patches (see
@@ -1415,8 +1451,11 @@ class GetTemplateTask(pipeBase.PipelineTask):
             Weight of each patch, such as its area of overlap with the
             template.
         maxDeviation : `float`
-            Largest allowed value of `_psfShapeDeviation` from the typical
-            shape.
+            Largest allowed fractional difference in PSF width, along any
+            direction, from the typical shape.
+        wideOnly : `bool`, optional
+            Only drop patches whose PSF is wider than the typical shape along
+            some direction, and keep narrower ones.
 
         Returns
         -------
@@ -1426,7 +1465,8 @@ class GetTemplateTask(pipeBase.PipelineTask):
         if len(weights) < 3:
             return list(range(len(weights)))
         reference = GetTemplateTask._weightedMedoid(moments, weights)
-        deviations = GetTemplateTask._psfShapeDeviation(moments, reference)
+        ratios = GetTemplateTask._psfWidthRatios(moments, reference)
+        deviations = np.max(ratios - 1 if wideOnly else np.abs(ratios - 1), axis=-1)
         return [int(i) for i in np.flatnonzero(deviations < maxDeviation)]
 
     @staticmethod
@@ -1472,12 +1512,30 @@ class GetTemplateTask(pipeBase.PipelineTask):
             Largest value of ``|width/referenceWidth - 1|`` over all
             directions, for each PSF.
         """
+        return np.max(np.abs(GetTemplateTask._psfWidthRatios(moments, reference) - 1), axis=-1)
+
+    @staticmethod
+    def _psfWidthRatios(moments, reference):
+        """Return the extreme ratios of PSF width to the width of a reference
+        PSF, over all directions.
+
+        Parameters
+        ----------
+        moments : `numpy.ndarray`, (N, 2, 2)
+            Second moments of the PSFs.
+        reference : `numpy.ndarray`, (2, 2)
+            Second moments of the reference PSF.
+
+        Returns
+        -------
+        ratios : `numpy.ndarray`, (N, 2)
+            Smallest and largest ``width/referenceWidth`` of each PSF.
+        """
         # In coordinates where the reference PSF is circular with unit width,
         # the eigenvalues of each PSF's moments are its squared widths along
         # its principal axes, relative to the reference.
         whiten = np.linalg.inv(np.linalg.cholesky(reference))
-        ratios = np.linalg.eigvalsh(whiten @ moments @ whiten.T)
-        return np.max(np.abs(np.sqrt(ratios) - 1), axis=-1)
+        return np.sqrt(np.linalg.eigvalsh(whiten @ moments @ whiten.T))
 
     @staticmethod
     def _checkInputs(dataIds, coaddExposures, scienceInstrument=None):

@@ -300,7 +300,10 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         tract input correctly.
         """
         box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
-        task = lsst.ip.diffim.GetTemplateTask(config=self._makeConfig())
+        config = self._makeConfig()
+        # The checks below expect the template as built, before homogenization.
+        config.doHomogenizePsf = False
+        task = lsst.ip.diffim.GetTemplateTask(config=config)
         # Restrict to tract 0, since the box fits in just that tract.
         result = task.run(coaddExposureHandles={0: self.patches[0]},
                           bbox=box,
@@ -318,7 +321,10 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         mostly NaN after warping are merged correctly in the output.
         """
         box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
-        task = lsst.ip.diffim.GetTemplateTask(config=self._makeConfig())
+        config = self._makeConfig()
+        # The checks below expect the template as built, before homogenization.
+        config.doHomogenizePsf = False
+        task = lsst.ip.diffim.GetTemplateTask(config=config)
         result = task.run(coaddExposureHandles=self.patches,
                           bbox=box,
                           wcs=self.exposure.wcs,
@@ -333,7 +339,10 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         """Test a bounding box that crosses tract boundaries.
         """
         box = lsst.geom.Box2I(lsst.geom.Point2I(200, 200), lsst.geom.Point2I(600, 600))
-        task = lsst.ip.diffim.GetTemplateTask(config=self._makeConfig())
+        config = self._makeConfig()
+        # The checks below expect the template as built, before homogenization.
+        config.doHomogenizePsf = False
+        task = lsst.ip.diffim.GetTemplateTask(config=config)
         result = task.run(coaddExposureHandles=self.patches,
                           bbox=box,
                           wcs=self.exposure.wcs,
@@ -427,6 +436,30 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
                          dataIds=self.dataIds,
                          physical_filter="a_test")
 
+    def testHomogenizePsfInRun(self):
+        """A homogenized template gets a Gaussian PSF of the homogenized width
+        and skips the discontinuity check.
+        """
+        box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
+        config = self._makeConfig()
+        config.doHomogenizePsf = True
+        config.doCheckPsfDiscontinuity = True
+        task = lsst.ip.diffim.GetTemplateTask(config=config)
+        with unittest.mock.patch.object(task, "checkPsfDiscontinuity") as check, \
+                unittest.mock.patch.object(task.homogenizePsf, "run",
+                                           return_value=pipeBase.Struct(psfSigma=2.5)) as homogenize:
+            result = task.run(coaddExposureHandles={0: self.patches[0]},
+                              bbox=box,
+                              wcs=self.exposure.wcs,
+                              dataIds={0: self.dataIds[0]},
+                              physical_filter="a_test")
+        homogenize.assert_called_once()
+        self.assertIsInstance(homogenize.call_args.args[1], lsst.meas.algorithms.CoaddPsf)
+        check.assert_not_called()
+        self.assertIsInstance(result.template.psf, lsst.afw.detection.GaussianPsf)
+        self.assertEqual(result.template.psf.getSigma(), 2.5)
+        self.assertEqual(task.metadata["templatePsfSigma"], 2.5)
+
     def testPsfDiscontinuityCheckUsesCoaddPsf(self):
         """The discontinuity check samples the CoaddPsf over the full template
         bounding box, while the output template keeps the Gaussian PSF.
@@ -434,6 +467,8 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
         config = self._makeConfig()
         config.doCheckPsfDiscontinuity = True
+        # A homogenized template skips the discontinuity check.
+        config.doHomogenizePsf = False
         task = lsst.ip.diffim.GetTemplateTask(config=config)
         with unittest.mock.patch.object(task, "checkPsfDiscontinuity",
                                         wraps=task.checkPsfDiscontinuity) as check:
@@ -458,6 +493,8 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
         config = self._makeConfig()
         config.doCheckPsfDiscontinuity = True
+        # A homogenized template skips the discontinuity check.
+        config.doHomogenizePsf = False
         task = lsst.ip.diffim.GetTemplateTask(config=config)
         error = lsst.ip.diffim.PsfDiscontinuityError(maxResidualFrac=0.1, rmsResidualFrac=0.02,
                                                      threshold=0.05, medianRadius=2.0)
@@ -495,8 +532,9 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
                          physical_filter="a_test")
         check.assert_not_called()
 
-    def _widenPatchPsf(self, tract, index, sigma=6.0):
-        """Replace one test patch with a copy that has a wide Gaussian PSF.
+    def _setPatchPsf(self, tract, index, sigma):
+        """Replace one test patch with a copy that has a Gaussian PSF of
+        ``sigma``. The other test patches have PSF sigmas near 2.
         """
         handle = self.patches[tract][index]
         coadd = handle.get()
@@ -513,7 +551,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         no data, while the kept patch of the same tract that overlaps it keeps
         its data there.
         """
-        self._widenPatchPsf(3, 0)
+        self._setPatchPsf(3, 0, sigma=6.0)
         box = lsst.geom.Box2I(lsst.geom.Point2I(200, 200), lsst.geom.Point2I(600, 600))
         # A point covered only by tract 3 patch 0, more than 15 pixels from
         # the edges of tract 2 patch 2 and tract 3 patch 2.
@@ -525,6 +563,8 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         config.doExcludePsfOutlierPatches = doExclude
         # The widened patch would fail the discontinuity check.
         config.doCheckPsfDiscontinuity = False
+        # The checks below expect the template as built, before homogenization.
+        config.doHomogenizePsf = False
         task = lsst.ip.diffim.GetTemplateTask(config=config)
         # Record the reads of the widened patch.
         widened = unittest.mock.Mock(wraps=self.patches[3][0])
@@ -571,7 +611,10 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         # tract=0, patch=1 is the lower-left corner, as displayed in DS9.
         self.patches[0].pop(1)
         box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
-        task = lsst.ip.diffim.GetTemplateTask(config=self._makeConfig())
+        config = self._makeConfig()
+        # The checks below expect the template as built, before homogenization.
+        config.doHomogenizePsf = False
+        task = lsst.ip.diffim.GetTemplateTask(config=config)
         result = task.run(coaddExposureHandles=self.patches,
                           bbox=box,
                           wcs=self.exposure.wcs,
@@ -602,7 +645,10 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
                 patchCoadd.variance[bbox].array *= np.nan
 
         box = lsst.geom.Box2I(lsst.geom.Point2I(200, 200), lsst.geom.Point2I(600, 600))
-        task = lsst.ip.diffim.GetTemplateTask(config=self._makeConfig())
+        config = self._makeConfig()
+        # The checks below expect the template as built, before homogenization.
+        config.doHomogenizePsf = False
+        task = lsst.ip.diffim.GetTemplateTask(config=config)
         result = task.run(coaddExposureHandles=self.patches,
                           bbox=box,
                           wcs=self.exposure.wcs,
@@ -617,17 +663,20 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
 
     def _runCorrection(self, doCorrectVarianceWarpCorrelation=False, doScaleVariance=False,
                        handles=None, instrument="SciCam", coaddWarpKernel=None,
-                       templateWarpKernel="lanczos3"):
+                       templateWarpKernel="lanczos3", doHomogenizePsf=None):
         """Run the task on tract 0, with a science image from ``instrument``.
 
         The plate scale correction is applied only when ``instrument`` is not
         the instrument of the template coadds, which is ``"TestCam"`` unless
         ``handles`` says otherwise. ``coaddWarpKernel`` defaults to the kernel
         the patches were made with, so the reconstructed factors are exact.
+        ``doHomogenizePsf`` overrides the config default if given.
         """
         config = self._makeConfig()
         config.doCorrectVarianceWarpCorrelation = doCorrectVarianceWarpCorrelation
         config.doScaleVariance = doScaleVariance
+        if doHomogenizePsf is not None:
+            config.doHomogenizePsf = doHomogenizePsf
         if coaddWarpKernel is not None:
             config.coaddWarpKernel = coaddWarpKernel
         config.warp.warpingKernelName = templateWarpKernel
@@ -776,8 +825,11 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         handles = self._patchHandles(0, [(self._makeScaledWcs(plateScale), self.exposure.getBBox())])
         # A science image from the coadds' instrument applies no correction
         # at all; one from another instrument applies both.
-        _, off = self._runCorrection(handles=handles, instrument="TestCam")
-        task, on = self._runCorrection(doCorrectVarianceWarpCorrelation=True, handles=handles)
+        # The variance plane comparison expects the template as built, before
+        # homogenization.
+        _, off = self._runCorrection(handles=handles, instrument="TestCam", doHomogenizePsf=False)
+        task, on = self._runCorrection(doCorrectVarianceWarpCorrelation=True, handles=handles,
+                                       doHomogenizePsf=False)
 
         # Both together is exactly the product of the two factors.
         self.assertFloatsAlmostEqual(task.metadata["variancePlateScaleFactor"], plateScale**2, rtol=1e-6)
@@ -1048,6 +1100,29 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         self.assertEqual(len(dropped), 1)
         self.assertIn(str(self.dataIds[0][3]), dropped[0])
         self.assertIn("made from OtherCam", dropped[0])
+
+    @lsst.utils.tests.methodParameters(doHomogenize=[False, True])
+    def testExcludeNarrowPatchOnlyWithoutHomogenization(self, doHomogenize=None):
+        """A patch whose PSF is much narrower than the others is dropped,
+        unless the template is homogenized, which broadens it instead.
+        """
+        self._setPatchPsf(3, 0, sigma=1.0)
+        box = lsst.geom.Box2I(lsst.geom.Point2I(200, 200), lsst.geom.Point2I(600, 600))
+        config = self._makeConfig()
+        config.doExcludePsfOutlierPatches = True
+        config.doHomogenizePsf = doHomogenize
+        # The narrow patch would fail the discontinuity check.
+        config.doCheckPsfDiscontinuity = False
+        task = lsst.ip.diffim.GetTemplateTask(config=config)
+        result = task.run(coaddExposureHandles=self.patches,
+                          bbox=box,
+                          wcs=self.exposure.wcs,
+                          dataIds=self.dataIds,
+                          physical_filter="a_test")
+        inputPatches = [(record["tract"], record["patch"])
+                        for record in result.template.getInfo().getCoaddInputs().ccds]
+        self.assertEqual((3, 0) in inputPatches, doHomogenize)
+        self.assertEqual(task.metadata["numPsfOutlierPatches"], 0 if doHomogenize else 1)
 
     def testExcludePsfOutlierPatchesSkipsOtherInstrument(self):
         """Only coadds made from the template's instrument are compared for
@@ -1608,6 +1683,16 @@ class PsfOutlierPatchTestCase(lsst.utils.tests.TestCase):
         kept = lsst.ip.diffim.GetTemplateTask._selectConsistentPatches(moments, weights, 0.05)
         self.assertEqual(kept, [1])
 
+    def testSelectWideOnlyKeepsNarrowOutlier(self):
+        """With wideOnly, an outlier narrower than the typical PSF is kept and
+        a wider one is still dropped.
+        """
+        moments = np.array([self._moments(1.5), self._moments(2.0), self._moments(2.02),
+                            self._moments(1.98), self._moments(2.5)])
+        weights = np.array([2.0, 1.0, 1.0, 1.0, 2.0])
+        kept = lsst.ip.diffim.GetTemplateTask._selectConsistentPatches(moments, weights, 0.05, wideOnly=True)
+        self.assertEqual(kept, [0, 1, 2, 3])
+
     def testSelectNeedsThreePatches(self):
         """Nothing is dropped from two patches, since the outlier cannot be
         identified.
@@ -1720,6 +1805,131 @@ class PsfDiscontinuityTestCase(lsst.utils.tests.TestCase):
         with self.assertLogs(self.task.log.name, level="INFO") as cm:
             self.task.checkPsfDiscontinuity(psf, self.bbox)
         self.assertIn("Skipping PSF discontinuity check", "\n".join(cm.output))
+
+    def _makeStarTemplate(self, regions):
+        """Make a template of stars on a grid, with the matching CoaddPsf.
+
+        Parameters
+        ----------
+        regions : `list` [`tuple` [`int`, `float`]]
+            ``(xMax, sigma)`` of each region, left to right: the PSF is a
+            Gaussian of ``sigma`` from the previous ``xMax`` (or 0) up to
+            ``xMax``.
+        """
+        template = lsst.afw.image.ExposureF(self.bbox, self.wcs)
+        template.variance.array[:] = 1.0
+        self.starPositions = [(x, y) for x in range(50, 1000, 100) for y in range(50, 1000, 100)]
+        self.starSigmas = []
+        for x, y in self.starPositions:
+            sigma = next(sigma for xMax, sigma in regions if x < xMax)
+            self.starSigmas.append(sigma)
+            star = lsst.afw.detection.GaussianPsf(41, 41, sigma).computeImage(lsst.geom.Point2D(x, y))
+            template.image[star.getBBox()].array += 1000*star.array
+        inputs = []
+        xMin = 0
+        for xMax, sigma in regions:
+            box = lsst.geom.Box2D(lsst.geom.Point2D(xMin, 0), lsst.geom.Point2D(xMax, 1000))
+            inputs.append((sigma, box, 1.0))
+            xMin = xMax
+        return template, self._makeCoaddPsf(inputs)
+
+    def _measureStarSigmas(self, template, keep=None):
+        """Return the unweighted second-moment sigma of each star, or of the
+        stars selected by ``keep``.
+        """
+        sigmas = []
+        dy, dx = np.mgrid[-20:21, -20:21]
+        keep = np.ones(len(self.starPositions), dtype=bool) if keep is None else keep
+        for (x, y), isKept in zip(self.starPositions, keep):
+            if not isKept:
+                continue
+            stamp = template.image[lsst.geom.Box2I(lsst.geom.Point2I(x - 20, y - 20),
+                                                   lsst.geom.Extent2I(41, 41))].array
+            sigmas.append(np.sqrt(((dx**2 + dy**2)*stamp).sum()/stamp.sum()/2))
+        return np.array(sigmas)
+
+    def testHomogenizePsfBroadenAndDrop(self):
+        """Parts narrower than the common width are broadened to it, and the
+        part that is too wide is dropped.
+        """
+        # With 32 pixel blocks, 19, 10 and 3 of the 32 columns of blocks (the
+        # last one is partial), so the 0.8 quantile is in the middle region.
+        template, psf = self._makeStarTemplate([(600, 2.0), (940, 2.2), (1000, 2.6)])
+        originalMask = template.mask.array.copy()
+        config = lsst.ip.diffim.HomogenizePsfTask.ConfigClass()
+        config.gridStep = 32
+        task = lsst.ip.diffim.HomogenizePsfTask(config=config)
+        sigma = task.run(template, psf).psfSigma
+        self.assertFloatsAlmostEqual(sigma, 2.2, rtol=1e-6)
+        kept = np.array(self.starSigmas) < 2.5
+        self.assertFloatsAlmostEqual(self._measureStarSigmas(template, kept), np.full(kept.sum(), 2.2),
+                                     rtol=0.01)
+        noData = template.mask.getPlaneBitMask("NO_DATA")
+        for (x, y), isKept in zip(self.starPositions, kept):
+            self.assertEqual(bool(template.mask[lsst.geom.Point2I(x, y)] & noData), not isKept)
+        # The variance plane keeps its level, except in the dropped blocks,
+        # which are also the only mask change.
+        dropped = (template.mask.array & noData) != 0
+        np.testing.assert_array_equal(template.variance.array[~dropped], 1.0)
+        np.testing.assert_array_equal(template.variance.array[dropped], 0.0)
+        np.testing.assert_array_equal(template.mask.array[~dropped], originalMask[~dropped])
+        self.assertFloatsAlmostEqual(task.metadata["broadenMax"], 2.2**2 - 2.0**2, rtol=1e-6)
+        self.assertFloatsAlmostEqual(task.metadata["droppedFraction"], 3/32, rtol=1e-6)
+
+    @lsst.utils.tests.methodParameters(badMaskPlanes=[None, []])
+    def testHomogenizePsfBadPixelsNotSmeared(self, badMaskPlanes=None):
+        """A bad pixel in a broadened region keeps its value without spreading
+        into its neighbors, unless its mask plane is not in badMaskPlanes.
+        """
+        template, psf = self._makeStarTemplate([(600, 2.0), (940, 2.2), (1000, 2.6)])
+        # Midway between stars, in the broadened region.
+        point = lsst.geom.Point2I(300, 300)
+        template.image[point] = 1e6
+        template.mask[point] |= template.mask.getPlaneBitMask("BAD")
+        config = lsst.ip.diffim.HomogenizePsfTask.ConfigClass()
+        if badMaskPlanes is not None:
+            config.badMaskPlanes = badMaskPlanes
+        lsst.ip.diffim.HomogenizePsfTask(config=config).run(template, psf)
+        neighbor = template.image[lsst.geom.Point2I(301, 300)]
+        if badMaskPlanes is None:
+            self.assertEqual(template.image[point], 1e6)
+            self.assertLess(abs(neighbor), 1.0)
+        else:
+            self.assertGreater(neighbor, 1e3)
+
+    def testHomogenizePsfQuantileOne(self):
+        """With a quantile of 1, everything is broadened to the widest PSF
+        and nothing is dropped.
+        """
+        template, psf = self._makeStarTemplate([(600, 2.0), (940, 2.2), (1000, 2.6)])
+        config = lsst.ip.diffim.HomogenizePsfTask.ConfigClass()
+        config.quantile = 1.0
+        task = lsst.ip.diffim.HomogenizePsfTask(config=config)
+        sigma = task.run(template, psf).psfSigma
+        self.assertFloatsAlmostEqual(sigma, 2.6, rtol=1e-6)
+        sigmas = self._measureStarSigmas(template)
+        self.assertFloatsAlmostEqual(sigmas, np.full(len(sigmas), 2.6), rtol=0.01)
+        self.assertEqual(task.metadata["droppedFraction"], 0.0)
+
+    def testHomogenizePsfWithinTolerance(self):
+        """A part only slightly wider than the common width is kept as it
+        is.
+        """
+        template, psf = self._makeStarTemplate([(940, 2.0), (1000, 2.05)])
+        original = template.image.array.copy()
+        task = lsst.ip.diffim.HomogenizePsfTask()
+        sigma = task.run(template, psf).psfSigma
+        self.assertFloatsAlmostEqual(sigma, 2.0, rtol=1e-6)
+        np.testing.assert_array_equal(template.image.array, original)
+        self.assertEqual(task.metadata["droppedFraction"], 0.0)
+
+    def testHomogenizePsfUniform(self):
+        """A template whose PSF is the same everywhere is left unchanged."""
+        template, psf = self._makeStarTemplate([(1000, 2.0)])
+        original = template.image.array.copy()
+        sigma = lsst.ip.diffim.HomogenizePsfTask().run(template, psf).psfSigma
+        self.assertFloatsAlmostEqual(sigma, 2.0, rtol=1e-6)
+        np.testing.assert_array_equal(template.image.array, original)
 
 
 class GetTemplateConnectionsTestCase(lsst.utils.tests.TestCase):

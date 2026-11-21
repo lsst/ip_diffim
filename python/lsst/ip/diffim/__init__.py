@@ -32,6 +32,7 @@ from .modelPsfMatch import *
 from .makeKernel import *
 from .makeKernelBasisList import *
 from .dipoleMeasurement import *
+from .homogenizePsf import *
 from .getTemplate import *
 from .dipoleFitTask import *
 from .detectAndMeasure import *

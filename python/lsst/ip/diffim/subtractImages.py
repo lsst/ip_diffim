@@ -31,7 +31,7 @@ import lsst.afw.math
 import lsst.geom
 from lsst.images import DifferenceImage
 from lsst.images.convolution_kernels import ImageBasisConvolutionKernel
-from lsst.ip.diffim.utils import (evaluateMeanPsfFwhm, getPsfFwhm,
+from lsst.ip.diffim.utils import (_interpolateImage, evaluateMeanPsfFwhm, getPsfFwhm,
                                   computeDifferenceImageMetrics, computePSFNoiseEquivalentArea,
                                   checkMask, record_from_obs_info, setSourceFootprints,
                                   get_difference_image_provenance, checkTemplateIsSufficient)
@@ -1745,35 +1745,3 @@ class SimplifiedSubtractTask(AlardLuptonSubtractTask):
         if kernelSources is not None:
             subtractResults.kernelSources = kernelSources
         return subtractResults
-
-
-def _interpolateImage(maskedImage, badMaskPlanes, fallbackValue=None):
-    """Replace masked image pixels with interpolated values.
-
-    Parameters
-    ----------
-    maskedImage : `lsst.afw.image.MaskedImage`
-        Image on which to perform interpolation.
-    badMaskPlanes : `list` of `str`
-        List of mask planes to interpolate over.
-    fallbackValue : `float`, optional
-        Value to set when interpolation fails.
-
-    Returns
-    -------
-    result: `float`
-        The number of masked pixels that were replaced.
-    """
-    imgBadMaskPlanes = [
-        maskPlane for maskPlane in badMaskPlanes if maskPlane in maskedImage.mask.getMaskPlaneDict()
-    ]
-
-    image = maskedImage.image.array
-    badPixels = (maskedImage.mask.array & maskedImage.mask.getPlaneBitMask(imgBadMaskPlanes)) > 0
-    image[badPixels] = np.nan
-    if fallbackValue is None:
-        fallbackValue = np.nanmedian(image)
-    # For this initial implementation, skip the interpolation and just fill with
-    # the median value.
-    image[badPixels] = fallbackValue
-    return np.sum(badPixels)

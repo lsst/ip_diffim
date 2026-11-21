@@ -690,6 +690,38 @@ def checkTemplateIsSufficient(templateExposure, logger, scienceExposure=None, re
     return templateCoverageFraction
 
 
+def _interpolateImage(maskedImage, badMaskPlanes, fallbackValue=None):
+    """Replace masked image pixels with interpolated values.
+
+    Parameters
+    ----------
+    maskedImage : `lsst.afw.image.MaskedImage`
+        Image on which to perform interpolation.
+    badMaskPlanes : `list` of `str`
+        List of mask planes to interpolate over.
+    fallbackValue : `float`, optional
+        Value to set when interpolation fails.
+
+    Returns
+    -------
+    result: `float`
+        The number of masked pixels that were replaced.
+    """
+    imgBadMaskPlanes = [
+        maskPlane for maskPlane in badMaskPlanes if maskPlane in maskedImage.mask.getMaskPlaneDict()
+    ]
+
+    image = maskedImage.image.array
+    badPixels = (maskedImage.mask.array & maskedImage.mask.getPlaneBitMask(imgBadMaskPlanes)) > 0
+    image[badPixels] = np.nan
+    if fallbackValue is None:
+        fallbackValue = np.nanmedian(image)
+    # For this initial implementation, skip the interpolation and just fill with
+    # the median value.
+    image[badPixels] = fallbackValue
+    return np.sum(badPixels)
+
+
 def sampleCoaddPsfMoments(psf, ra, dec, targetWcs):
     """Estimate the second moments of a CoaddPsf at a set of positions.
 
@@ -724,10 +756,11 @@ def sampleCoaddPsfMoments(psf, ra, dec, targetWcs):
         Moments at each position, in ``targetWcs`` pixels; NaN where no
         component covers the position.
     """
-    return _sampleCoaddPsfMoments(psf, ra, dec, targetWcs, {})
+    targetX, targetY = targetWcs.skyToPixelArray(ra, dec)
+    return _sampleCoaddPsfMoments(psf, ra, dec, targetX, targetY, targetWcs, {})
 
 
-def _sampleCoaddPsfMoments(psf, ra, dec, targetWcs, shapeCache):
+def _sampleCoaddPsfMoments(psf, ra, dec, targetX, targetY, targetWcs, shapeCache):
     """Estimate the second moments of a CoaddPsf at a set of positions, as
     described in `sampleCoaddPsfMoments`.
 
@@ -737,6 +770,8 @@ def _sampleCoaddPsfMoments(psf, ra, dec, targetWcs, shapeCache):
         PSF to sample.
     ra, dec : `numpy.ndarray`
         Positions to sample, in radians.
+    targetX, targetY : `numpy.ndarray`
+        The same positions in ``targetWcs`` pixels.
     targetWcs : `lsst.afw.geom.SkyWcs`
         WCS whose pixels the moments are expressed in.
     shapeCache : `dict` [`int`, `tuple` [`float`, `float`, `float`] or `None`]
@@ -755,14 +790,29 @@ def _sampleCoaddPsfMoments(psf, ra, dec, targetWcs, shapeCache):
     weights = np.zeros(len(ra))
     for i in range(psf.getComponentCount()):
         componentWcs = psf.getWcs(i)
-        x, y = componentWcs.skyToPixelArray(ra, dec)
+        componentBox = geom.Box2D(psf.getBBox(i))
+        # Transforming every position to the pixels of every component is the
+        # bulk of the cost, so first keep the positions inside the component's
+        # bounding box projected to target pixels. The padding allows for its
+        # edges curving between the corners.
+        corners = targetWcs.skyToPixel(componentWcs.pixelToSky(componentBox.getCorners()))
+        cornerX = [corner.getX() for corner in corners]
+        cornerY = [corner.getY() for corner in corners]
+        pad = 2 + 0.01*max(np.ptp(cornerX), np.ptp(cornerY))
+        candidates = np.flatnonzero((targetX >= min(cornerX) - pad) & (targetX <= max(cornerX) + pad)
+                                    & (targetY >= min(cornerY) - pad) & (targetY <= max(cornerY) + pad))
+        if candidates.size == 0:
+            continue
+        x, y = componentWcs.skyToPixelArray(ra[candidates], dec[candidates])
         # The same test as CoaddPsf: inside the bounding box and, if there
         # is one, the valid polygon.
-        inside = geom.Box2D(psf.getBBox(i)).contains(x, y)
+        inside = componentBox.contains(x, y)
         polygon = psf.getValidPolygon(i)
         if polygon is not None:
             inside &= polygon.contains(x, y)
-        covered = np.flatnonzero(inside)
+        covered = candidates[inside]
+        x = x[inside]
+        y = y[inside]
         if covered.size == 0:
             continue
         component = psf.getPsf(i)
@@ -770,15 +820,15 @@ def _sampleCoaddPsfMoments(psf, ra, dec, targetWcs, shapeCache):
             # A nested CoaddPsf, such as a patch of the template: recurse
             # into its own inputs at the covered positions, and drop the
             # positions none of them cover, which come back as NaN.
-            moments = np.stack(_sampleCoaddPsfMoments(component, ra[covered], dec[covered], targetWcs,
-                                                      shapeCache))
+            moments = np.stack(_sampleCoaddPsfMoments(component, ra[covered], dec[covered], targetX[covered],
+                                                      targetY[covered], targetWcs, shapeCache))
             measured = np.isfinite(moments[0])
             covered = covered[measured]
             moments = moments[:, measured]
         else:
             key = psf.getId(i)
             if key == 0 or key not in shapeCache:
-                position = geom.Point2D(np.median(x[covered]), np.median(y[covered]))
+                position = geom.Point2D(np.median(x), np.median(y))
                 try:
                     shape = component.computeShape(position)
                 except lsst.pex.exceptions.Exception:
