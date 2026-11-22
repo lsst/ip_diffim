@@ -39,6 +39,7 @@ from .imageDecorrelation import *
 from .imageMapReduce import *
 from .subtractImages import *
 from .version import *
+from .nightly import *
 
 # automatically register ip_diffim Algorithms;
 # CENTROID_ORDER=0.0, FLUX_ORDER==2.0
