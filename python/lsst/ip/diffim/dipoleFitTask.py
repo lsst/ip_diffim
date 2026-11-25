@@ -174,8 +174,10 @@ class DipoleFitTask(measBase.SingleFrameMeasurementTask):
         **kwargs
             Additional keyword arguments for `lsst.meas.base.sfm.SingleFrameMeasurementTask`.
         """
-        # Run plugins in a very specific order, so DipoleFitPlugin has a
-        # centroid to fall back on.
+        # Run plugins in a specific order, so DipoleFitPlugin has a
+        # centroid to fall back on. Start from the configured centroid slot,
+        # which an earlier run on sources of the same table may have changed.
+        sources.schema.getAliasMap().set("slot_Centroid", self.config.slots.centroid)
         self.plugins = self.plugins_pre
         super().run(sources, exposure, **kwargs)
 

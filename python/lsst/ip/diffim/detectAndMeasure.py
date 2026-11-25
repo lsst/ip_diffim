@@ -39,7 +39,6 @@ from lsst.ip.diffim.utils import (evaluateMaskFraction, computeDifferenceImageMe
 from lsst.meas.algorithms import SkyObjectsTask, SourceDetectionTask, SetPrimaryFlagsTask, MaskStreaksTask
 from lsst.meas.algorithms import FindGlintTrailsTask, FindCosmicRaysConfig, findCosmicRays
 from lsst.meas.base import ForcedMeasurementTask, ApplyApCorrTask, DetectorVisitIdGeneratorConfig
-import lsst.meas.deblender
 import lsst.meas.extensions.trailedSources  # noqa: F401
 import lsst.meas.extensions.shapeHSM
 import lsst.pex.config as pexConfig
@@ -49,6 +48,7 @@ import lsst.utils
 from lsst.utils.timer import timeMethod
 
 from . import DipoleFitTask
+from .deblendDifferenceFootprints import DeblendDifferenceFootprintsTask
 
 __all__ = ["DetectAndMeasureConfig", "DetectAndMeasureTask",
            "DetectAndMeasureScoreConfig", "DetectAndMeasureScoreTask"]
@@ -273,12 +273,27 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
     )
     doDeblend = pexConfig.Field(
         dtype=bool,
-        default=False,
-        doc="Deblend DIASources after detection?"
+        default=True,
+        doc="Deblend merged footprints by clustering their peaks and "
+            "extracting each cluster into its own diaSource? Only used if "
+            "``doMerge`` is set."
+    )
+    doMergeTrails = pexConfig.Field(
+        dtype=bool,
+        default=True,
+        doc="After measurement, check trailed sources and recombine trails "
+            "that may have been split during deblending? Only used if "
+            "``doDeblend`` is set."
+    )
+    growFootprint = pexConfig.Field(
+        dtype=int,
+        default=2,
+        doc="Grow positive and negative footprints by this many pixels before merging"
     )
     deblend = pexConfig.ConfigurableField(
-        target=lsst.meas.deblender.SourceDeblendTask,
-        doc="Task to split blended sources into their components."
+        target=DeblendDifferenceFootprintsTask,
+        doc="Task to deblend merged footprints by clustering their peaks. "
+            "Only used if doDeblend=True."
     )
     measurement = pexConfig.ConfigurableField(
         target=DipoleFitTask,
@@ -296,11 +311,6 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
     forcedMeasurement = pexConfig.ConfigurableField(
         target=ForcedMeasurementTask,
         doc="Task to force photometer science image at diaSource locations.",
-    )
-    growFootprint = pexConfig.Field(
-        dtype=int,
-        default=2,
-        doc="Grow positive and negative footprints by this many pixels before merging"
     )
     diaSourceMatchRadius = pexConfig.Field(
         dtype=float,
@@ -503,6 +513,12 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
         self.measurement.slots.psfShape = "ext_shapeHSM_HsmPsfMoments"
         self.measurement.slots.shape = "ext_shapeHSM_HsmSourceMoments"
         self.measurement.plugins["base_SdssCentroid"].maxDistToPeak = 5.0
+        # Replace neighboring sources with noise while measuring each diaSource.
+        # Important when deblending so that the deblended diaSource flux
+        # measurements are unbiased. Note that this deblending merely divides
+        # the diaSource footprints - it does not fit fractional flux from
+        # overlapping diaSources in contaminated pixels.
+        self.measurement.doReplaceWithNoise = True
         self.forcedMeasurement.plugins = ["base_TransformedCentroid", "base_PsfFlux"]
         self.forcedMeasurement.copyColumns = {
             "id": "objectId", "parent": "parentObjectId", "coord_ra": "coord_ra", "coord_dec": "coord_dec"}
@@ -524,6 +540,11 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
                 raise pexConfig.FieldValidationError(DetectAndMeasureConfig.run_sattle, self,
                                                      "Sattle requested but SATTLE_URI_BASE "
                                                      "environment variable not set.")
+        if (self.doMerge and self.doDeblend and self.doMergeTrails
+                and "ext_trailedSources_Naive" not in self.measurement.plugins.names):
+            raise pexConfig.FieldValidationError(DetectAndMeasureConfig.doMergeTrails, self,
+                                                 "Merging trailed sources requires the "
+                                                 "ext_trailedSources_Naive measurement plugin.")
 
 
 class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
@@ -541,8 +562,6 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             self.makeSubtask("subtractInitialBackground")
             self.makeSubtask("subtractFinalBackground")
         self.makeSubtask("detection", schema=self.schema)
-        if self.config.doDeblend:
-            self.makeSubtask("deblend", schema=self.schema)
         self.makeSubtask("setPrimaryFlags", schema=self.schema, isSingleFrame=True)
         self.makeSubtask("measurement", schema=self.schema,
                          algMetadata=self.algMetadata)
@@ -604,6 +623,11 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             self.makeSubtask("streakDetection")
         self.makeSubtask("findGlints")
         self.schema.addField("glint_trail", "Flag", "DiaSource is part of a glint trail.")
+        self.schema.addField("is_deblended", "Flag",
+                             "The original detected footprint was deblended, producing multiple diaSources. "
+                             "The deblended diaSources split the original footprint.")
+        if self.config.doDeblend:
+            self.makeSubtask("deblend")
         self.schema.addField("reliability", type="F", doc="Reliability score of the DiaSource")
         self.schema.addField("reliabilityVersion", type=str, size=7, doc="Version of the reliability model")
         self.schema.addField("templateMjdMean", type="D", units="d",
@@ -820,17 +844,11 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         )
         measurementResults.differenceBackground = background
 
-        if self.config.doDeblend:
-            sources, positives, negatives = self._deblend(difference,
-                                                          results.positive,
-                                                          results.negative)
-
-        else:
-            positives = afwTable.SourceCatalog(self.schema)
-            results.positive.makeSources(positives)
-            negatives = afwTable.SourceCatalog(self.schema)
-            results.negative.makeSources(negatives)
-            sources = results.sources
+        positives = afwTable.SourceCatalog(self.schema)
+        results.positive.makeSources(positives)
+        negatives = afwTable.SourceCatalog(self.schema)
+        results.negative.makeSources(negatives)
+        sources = results.sources
 
         self.processResults(science, matchedTemplate, difference,
                             sources, idFactory, kernelSources,
@@ -1009,6 +1027,9 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             # All positive peaks were added before any negative peaks, so
             # re-order the peaks in each footprint by significance.
             self._reorderPeaksBySignificance(initialDiaSources)
+
+            if self.config.doDeblend:
+                initialDiaSources = self.deblend.run(initialDiaSources, difference).diaSources
         else:
             initialDiaSources = sources
 
@@ -1028,6 +1049,10 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         if self.config.doSkySources:
             self.addSkySources(initialDiaSources, difference.mask, difference.info.id)
 
+        # A rejected detection may share its detected footprint with a
+        # deblended diaSource, so it is still replaced with noise while the
+        # diaSources are measured.
+        footprints = self.measurement.getFootprintsFromCatalog(initialDiaSources)
         if self.config.doRejectBadMaskPlaneDetections:
             # Save time by rejecting peaks on bad mask planes prior to
             # measurement.
@@ -1036,7 +1061,11 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         if not initialDiaSources.isContiguous():
             initialDiaSources = initialDiaSources.copy(deep=True)
 
-        self.measureDiaSources(initialDiaSources, science, difference, matchedTemplate)
+        self.measureDiaSources(initialDiaSources, science, difference, matchedTemplate,
+                               footprints=footprints)
+        if self.config.doMerge and self.config.doDeblend and self.config.doMergeTrails:
+            initialDiaSources = self._mergeTrails(initialDiaSources, science, difference, matchedTemplate,
+                                                  footprints)
 
         # Remove unphysical diaSources per config.badSourceFlags
         diaSources = self._removeBadSources(initialDiaSources)
@@ -1103,73 +1132,47 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
             peaks.clear()
             source.getFootprint().setPeakCatalog(newPeaks)
 
-    def _deblend(self, difference, positiveFootprints, negativeFootprints):
-        """Deblend the positive and negative footprints and return a catalog
-        containing just the children, and the deblended footprints.
+    def _mergeTrails(self, diaSources, science, difference, matchedTemplate, footprints):
+        """Merge measured diaSources that are pieces of one trailed source that
+        split during deblending, and measure the merged diaSources.
 
         Parameters
         ----------
-        difference : `lsst.afw.image.Exposure`
+        diaSources : `lsst.afw.table.SourceCatalog`
+            The measured diaSources.
+        science : `lsst.afw.image.ExposureF`
+            Science exposure that the template was subtracted from.
+        difference : `lsst.afw.image.ExposureF`
             Result of subtracting template from the science image.
-        positiveFootprints, negativeFootprints : `lsst.afw.detection.FootprintSet`
-            Positive and negative polarity footprints measured on
-            ``difference`` to be deblended separately.
+        matchedTemplate : `lsst.afw.image.ExposureF`
+            Warped and PSF-matched template that was used produce the
+            difference image.
+        footprints : `dict`
+            Footprints that were replaced with noise while ``diaSources``
+            were measured; see
+            `lsst.meas.base.SingleFrameMeasurementTask.run`.
 
         Returns
         -------
-        sources : `lsst.afw.table.SourceCatalog`
-            Positive and negative deblended children.
-        positives, negatives : `lsst.afw.table.SourceCatalog`
-            Deblended positive and negative polarity sources with footprints
-            detected on ``difference``.
+        diaSources : `lsst.afw.table.SourceCatalog`
+            The diaSources that were not merged, followed by the merged ones.
         """
-
-        def deblend(footprints, negative=False):
-            """Deblend a positive or negative footprint set,
-            and return the deblended children.
-
-            Parameters
-            ----------
-            footprints : `lsst.afw.detection.FootprintSet`
-            negative : `bool`
-                Set True if the footprints contain negative fluxes
-
-            Returns
-            -------
-            sources : `lsst.afw.table.SourceCatalog`
-            """
-            sources = afwTable.SourceCatalog(self.schema)
-            footprints.makeSources(sources)
-            if negative:
-                # Invert the image so the deblender can run on positive peaks
-                difference_inverted = difference.clone()
-                difference_inverted.image *= -1
-                self.deblend.run(exposure=difference_inverted, sources=sources)
-                children = sources[sources["parent"] != 0]
-                # Set the heavy footprint pixel values back to reality
-                for child in children:
-                    footprint = child.getFootprint()
-                    array = footprint.getImageArray()
-                    array *= -1
-            else:
-                self.deblend.run(exposure=difference, sources=sources)
-            self.setPrimaryFlags.run(sources)
-            children = sources["detect_isDeblendedSource"] == 1
-            sources = sources[children].copy(deep=True)
-            # Clear parents, so that measurement plugins behave correctly.
-            sources['parent'] = 0
-            return sources.copy(deep=True)
-
-        positives = deblend(positiveFootprints)
-        negatives = deblend(negativeFootprints, negative=True)
-
-        sources = afwTable.SourceCatalog(self.schema)
-        sources.reserve(len(positives) + len(negatives))
-        sources.extend(positives, deep=True)
-        sources.extend(negatives, deep=True)
-        if len(negatives) > 0:
-            sources[-len(negatives):]["is_negative"] = True
-        return sources, positives, negatives
+        result = self.deblend.mergeTrails(diaSources, difference)
+        if len(result.merged) == 0:
+            return diaSources
+        self._reorderPeaksBySignificance(result.merged)
+        # Build a set of footprints including the newly-merged diaSources, and
+        # all other detected footprints on the image replaced with noise.
+        pieces = ({source.getId() for source in diaSources}
+                  - {source.getId() for source in result.diaSources})
+        footprints = {sourceId: footprint for sourceId, footprint in footprints.items()
+                      if sourceId not in pieces}
+        footprints.update(self.measurement.getFootprintsFromCatalog(result.merged))
+        self.measureDiaSources(result.merged, science, difference, matchedTemplate, footprints=footprints)
+        mergedDiaSources = afwTable.SourceCatalog(diaSources.table)
+        mergedDiaSources.extend(result.diaSources)
+        mergedDiaSources.extend(result.merged)
+        return mergedDiaSources.copy(deep=True)
 
     def _rejectBadMaskedDetections(self, initialDiaSources, mask):
         """Remove detections whose footprint peak lies on a bad-masked pixel.
@@ -1391,7 +1394,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         skySourceFootprints = subtask.run(mask=mask, seed=seed, catalog=diaSources)
         self.metadata[f"n_{subtask.getName()}"] = len(skySourceFootprints)
 
-    def measureDiaSources(self, diaSources, science, difference, matchedTemplate):
+    def measureDiaSources(self, diaSources, science, difference, matchedTemplate, footprints=None):
         """Use (matched) template and science image to constrain dipole fitting.
 
         Parameters
@@ -1405,13 +1408,19 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         matchedTemplate : `lsst.afw.image.ExposureF`
             Warped and PSF-matched template that was used produce the
             difference image.
+        footprints : `dict`, optional
+            Footprints to replace with noise while measuring, keyed by source
+            ID, in place of those of ``diaSources``; see
+            `lsst.meas.base.SingleFrameMeasurementTask.run`.
         """
         # Ensure that the required mask planes are present
         for mp in self.config.measurement.plugins["base_PixelFlags"].masksFpAnywhere:
             difference.mask.addMaskPlane(mp)
         # Note that this may not be correct if we convolved the science image.
         # In the future we may wish to persist the matchedScience image.
-        self.measurement.run(diaSources, difference, science, matchedTemplate)
+        # The exposure ID seeds the noise that replaces neighboring sources.
+        self.measurement.run(diaSources, difference, science, matchedTemplate,
+                             exposureId=difference.info.id, footprints=footprints)
         if self.config.doApCorr:
             apCorrMap = difference.getInfo().getApCorrMap()
             if apCorrMap is None:
@@ -1439,7 +1448,7 @@ class DetectAndMeasureTask(lsst.pipe.base.PipelineTask):
         # Run forced psf photometry on the image at the diaSource locations.
         # Copy the measured flux and error into the diaSource.
         forcedSources = self.forcedMeasurement.generateMeasCat(image, diaSources, wcs)
-        self.forcedMeasurement.run(forcedSources, image, diaSources, wcs)
+        self.forcedMeasurement.run(forcedSources, image, diaSources, wcs, exposureId=image.info.id)
 
         if template:
             base_key = 'ip_diffim_forced_template_PsfFlux'
@@ -1841,27 +1850,14 @@ class DetectAndMeasureScoreTask(DetectAndMeasureTask):
         edgePix = scoreExposure.mask.array & edgeBit > 0
         difference.mask.array[edgePix] |= edgeBit
 
-        if self.config.doDeblend:
-            sources, positives, negatives = self._deblend(difference,
-                                                          detectResults.positive,
-                                                          detectResults.negative)
-
-            self.processResults(science, matchedTemplate, difference,
-                                sources, idFactory, kernelSources,
-                                positives=positives,
-                                negatives=negatives,
-                                measurementResults=measurementResults,
-                                templateInfo=templateInfo)
-
-        else:
-            positives = afwTable.SourceCatalog(self.schema)
-            detectResults.positive.makeSources(positives)
-            negatives = afwTable.SourceCatalog(self.schema)
-            detectResults.negative.makeSources(negatives)
-            self.processResults(science, matchedTemplate, difference,
-                                detectResults.sources, idFactory, kernelSources,
-                                positives=positives,
-                                negatives=negatives,
-                                measurementResults=measurementResults,
-                                templateInfo=templateInfo)
+        positives = afwTable.SourceCatalog(self.schema)
+        detectResults.positive.makeSources(positives)
+        negatives = afwTable.SourceCatalog(self.schema)
+        detectResults.negative.makeSources(negatives)
+        self.processResults(science, matchedTemplate, difference,
+                            detectResults.sources, idFactory, kernelSources,
+                            positives=positives,
+                            negatives=negatives,
+                            measurementResults=measurementResults,
+                            templateInfo=templateInfo)
         return measurementResults
