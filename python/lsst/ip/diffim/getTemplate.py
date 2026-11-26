@@ -57,7 +57,10 @@ from lsst.ip.diffim.utils import (
     checkTemplateIsSufficient,
     evaluateMeanPsfFwhm,
     getPsfFwhm,
+    psfShapeDeviation,
     record_from_obs_info,
+    sampleCoaddPsfMoments,
+    splitMaskedRegions,
 )
 from lsst.meas.algorithms import CoaddPsf, CoaddPsfConfig, SubtractBackgroundTask, ScaleVarianceTask
 from lsst.utils.timer import timeMethod
@@ -401,6 +404,48 @@ class GetTemplateConfig(
         " `lsst.images` does not map? If False, log a warning and drop that"
         " plane from the output instead."
         " Only used with output_image_type='future'.",
+    )
+    doMaskPsfDiscontinuities = pexConfig.Field(
+        dtype=bool,
+        default=True,
+        doc="Check the template PSF for discontinuities that the PSF-matching"
+        " kernel can't fit, and mask DETECTED regions in those locations?"
+        " These regions will have the mask REJECTED_TEMPLATE set, which will"
+        " prevent sources landing in them from being used to compute the"
+        " matching kernel and allows affected diaSources to be filtered.",
+    )
+    psfDiscontinuityGridStep = pexConfig.RangeField(
+        dtype=int,
+        default=300,
+        min=1,
+        doc="Spacing in pixels to sample the template PSF, to build the"
+        " spatial model.",
+    )
+    psfDiscontinuitySubregionSize = pexConfig.RangeField(
+        dtype=int,
+        default=32,
+        min=1,
+        doc="Size in pixels to divide DETECTED regions of the template into"
+        " for testing whether their PSF can be fit by the spatial model."
+        " Subregions that fail have REJECTED_TEMPLATE set.",
+    )
+    psfDiscontinuityPolyOrder = pexConfig.RangeField(
+        dtype=int,
+        default=1,
+        min=0,
+        doc="Total order of the 2D polynomial fit to each second moment of the"
+        " template PSF across the template, excluding outliers. Should match"
+        " the spatialKernelOrder of the downstream AL PSF matching task"
+        " (1 by default), so that the fit follows the PSF variation that"
+        " PSF matching can absorb.",
+    )
+    psfDiscontinuityMaxDeviation = pexConfig.RangeField(
+        dtype=float,
+        default=0.05,
+        min=0.0,
+        inclusiveMin=False,
+        doc="Largest fractional difference in PSF width allowed between a"
+        " DETECTED subregion of the template and the spatial fit.",
     )
 
     def setDefaults(self):
@@ -856,7 +901,8 @@ class GetTemplateTask(pipeBase.PipelineTask):
             template.maskedImage = photoCalib.calibrateImage(template.maskedImage)
             photoCalib = identity
         template.setPhotoCalib(photoCalib)
-        template.setPsf(self._makePsf(template, catalog, wcs))
+        coaddPsf = self._makePsf(template, catalog, wcs)
+        template.setPsf(coaddPsf)
         try:
             template.setPsf(self._makeGaussianPsf(template))
         except afwDetection.InvalidPsfError as e:
@@ -870,6 +916,11 @@ class GetTemplateTask(pipeBase.PipelineTask):
             # checkTemplateIsSufficient did not raise NoWorkFound, so raise
             # the original exception.
             raise
+
+        # Check the template for regions likely to generate false diaSource
+        # detections, based on the PSF.
+        if self.config.doMaskPsfDiscontinuities:
+            self.maskPsfDiscontinuities(template, coaddPsf)
 
         # Record the input coadd patches as the template's coadd inputs.
         coaddInputs = afwImage.CoaddInputs(afwTable.ExposureTable.makeMinimalSchema(), self.schema)
@@ -1054,6 +1105,115 @@ class GetTemplateTask(pipeBase.PipelineTask):
             threshold = self.config.highVarianceThreshold*np.nanmedian(varianceBackground)
             highVariancePix = varianceBackground > threshold
             template.mask.array[highVariancePix] |= 2**highVarianceMaskPlaneBit
+
+    def maskPsfDiscontinuities(self, template, psf):
+        """Mask the sources where the template PSF differs from a smooth model
+        of the PSF.
+
+        PSF matching fits a matching kernel that varies across the image as a
+        polynomial of order ``config.psfDiscontinuityPolyOrder``. In regions
+        where the template PSF changes discontinuously the PSF matching
+        kernel may not be able to fit the change and the image subtraction
+        quality may be poor. Check DETECTED regions of the template to see
+        whether they are well fit by the overall spatial model, and mask any
+        that fail as REJECTED_TEMPLATE. Only check DETECTED regions, since
+        empty regions of the template will not cause subtraction artifacts and
+        a transient can still be safely detected.
+
+        Parameters
+        ----------
+        template : `lsst.afw.image.Exposure`
+            Template whose mask is modified in place.
+        psf : `lsst.meas.algorithms.CoaddPsf`
+            PSF of the template, built from its inputs. Its coadd WCS is the
+            template WCS.
+        """
+        bbox = template.getBBox()
+        coaddWcs = psf.getCoaddWcs()
+        order = self.config.psfDiscontinuityPolyOrder
+        maxDeviation = self.config.psfDiscontinuityMaxDeviation
+
+        def measureLocalPsfMoments(x, y):
+            """Return the (N, 3) PSF moments ixx, iyy, ixy at the given
+            positions.
+            """
+            ra, dec = coaddWcs.pixelToSkyArray(x, y)
+            return np.stack(sampleCoaddPsfMoments(psf, ra, dec, coaddWcs), axis=-1)
+
+        def extractPolynomialTermsFromModel(x, y):
+            """Return the (N, nCoeffs) polynomial terms of the spatial model
+            at the given positions.
+            """
+            # Coordinates scaled to [-1, 1] for a well-conditioned fit.
+            xn = 2*(x - bbox.minX)/bbox.width - 1
+            yn = 2*(y - bbox.minY)/bbox.height - 1
+            return np.stack([xn**p*yn**q for p in range(order + 1) for q in range(order + 1 - p)], axis=-1)
+
+        def deviationFromFit(x, y, moments, coeffs):
+            """Return the fractional shape deviation of the PSF moments from the
+            spatial model at the given positions.
+            """
+            fit = extractPolynomialTermsFromModel(x, y) @ coeffs
+            # A fit that is not a valid PSF shape cannot match the PSF there.
+            deviation = np.full(len(x), np.inf)
+            valid = (fit[:, 0] > 0) & (fit[:, 0]*fit[:, 1] > fit[:, 2]**2)
+            deviation[valid] = psfShapeDeviation(moments[valid], fit[valid])
+            return deviation
+
+        # Fit the smooth model to the PSF at the center of each block.
+        step = self.config.psfDiscontinuityGridStep
+        xc = np.minimum(bbox.minX + step*(np.arange(-(-bbox.width//step)) + 0.5), bbox.maxX)
+        yc = np.minimum(bbox.minY + step*(np.arange(-(-bbox.height//step)) + 0.5), bbox.maxY)
+        xb, yb = (grid.ravel() for grid in np.meshgrid(xc, yc))
+        blockMoments = measureLocalPsfMoments(xb, yb)
+        good = np.isfinite(blockMoments[:, 0])
+        nCoeffs = (order + 1)*(order + 2)//2
+        minGood = max(2*nCoeffs, good.size//4)
+        if good.sum() < minGood:
+            self.log.info("Not masking template PSF discontinuities: only %d of %d blocks have a PSF"
+                          " (need at least %d).", good.sum(), good.size, minGood)
+            return
+        xb, yb, blockMoments = xb[good], yb[good], blockMoments[good]
+        terms = extractPolynomialTermsFromModel(xb, yb)
+        # Iteratively refit the spatial model, dropping outliers until the
+        # model stops changing. This is fast, but cap at a reasonable number of
+        # maximum iterations.
+        inliers = np.ones(len(xb), dtype=bool)
+        for _ in range(10):
+            coeffs, *_ = np.linalg.lstsq(terms[inliers], blockMoments[inliers], rcond=None)
+            modelDeviation = deviationFromFit(xb, yb, blockMoments, coeffs)
+            newInliers = modelDeviation <= maxDeviation
+            if np.array_equal(newInliers, inliers) or newInliers.sum() < minGood:
+                break
+            inliers = newInliers
+
+        # Compare the PSF of each DETECTED subregion to the model.
+        mask = template.mask
+        mask.addMaskPlane("REJECTED_TEMPLATE")
+        rows, cols, subregion, sampleRows, sampleCols = splitMaskedRegions(
+            mask, self.config.psfDiscontinuitySubregionSize, maskName="DETECTED")
+        rejected = np.zeros(len(sampleRows), dtype=bool)
+        deviation = np.zeros(0)
+        if len(sampleRows) > 0:
+            xs = (sampleCols + bbox.minX).astype(float)
+            ys = (sampleRows + bbox.minY).astype(float)
+            moments = measureLocalPsfMoments(xs, ys)
+            # Subregions that no input covers have no PSF to compare.
+            covered = np.isfinite(moments[:, 0])
+            deviation = deviationFromFit(xs[covered], ys[covered], moments[covered], coeffs)
+            rejected[covered] = deviation > maxDeviation
+        masked = rejected[subregion]
+        mask.array[rows[masked], cols[masked]] |= mask.getPlaneBitMask("REJECTED_TEMPLATE")
+
+        maxFound = float(deviation.max()) if deviation.size > 0 else 0.0
+        self.metadata["WorstSurvivingSpatialModelFit"] = float(modelDeviation[inliers].max())
+        self.metadata["WorstFootprintSpatialModelFit"] = maxFound
+        self.metadata["nRejectedFootprints"] = int(rejected.sum())
+        self.metadata["nRejectedMaskedPixels"] = int(masked.sum())
+        self.log.info("The PSF of %d DETECTED subregions of the template differs from its polynomial fit by"
+                      " up to %.1f%% in width; the %d pixels of the %d that differ by more than %.1f%% were"
+                      " set REJECTED_TEMPLATE.", len(rejected), 100*maxFound, masked.sum(),
+                      rejected.sum(), 100*maxDeviation)
 
     @staticmethod
     def _checkInputs(dataIds, coaddExposures, scienceInstrument=None):

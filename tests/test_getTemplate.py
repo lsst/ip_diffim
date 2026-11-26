@@ -427,6 +427,88 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
                          dataIds=self.dataIds,
                          physical_filter="a_test")
 
+    def testMaskPsfDiscontinuitiesUsesCoaddPsf(self):
+        """Sources are masked using the CoaddPsf of the template, while the
+        output template keeps the Gaussian PSF.
+        """
+        box = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Point2I(180, 180))
+        config = self._makeConfig()
+        task = lsst.ip.diffim.GetTemplateTask(config=config)
+        with unittest.mock.patch.object(task, "maskPsfDiscontinuities",
+                                        wraps=task.maskPsfDiscontinuities) as check:
+            result = task.run(coaddExposureHandles={0: self.patches[0]},
+                              bbox=box,
+                              wcs=self.exposure.wcs,
+                              dataIds={0: self.dataIds[0]},
+                              physical_filter="a_test")
+
+        check.assert_called_once()
+        template, psf = check.call_args.args
+        self.assertIs(template, result.template)
+        self.assertIsInstance(psf, lsst.meas.algorithms.CoaddPsf)
+        self.assertIsInstance(result.template.psf, lsst.afw.detection.GaussianPsf)
+
+    def _widenPatchPsf(self, tract, index, sigma):
+        """Replace one test patch with a copy that has a wider Gaussian PSF.
+        """
+        handle = self.patches[tract][index]
+        coadd = handle.get()
+        size = 2*int(np.ceil(5*sigma)) + 1
+        coadd.setPsf(lsst.afw.detection.GaussianPsf(size, size, sigma))
+        self.patches[tract][index] = pipeBase.InMemoryDatasetHandle(coadd, storageClass="ExposureF",
+                                                                    copy=True, dataId=handle.dataId)
+
+    def _setDetected(self):
+        """Replace the test patches with copies whose pixels are all
+        DETECTED.
+        """
+        for tract, handles in self.patches.items():
+            for i, handle in enumerate(handles):
+                coadd = handle.get()
+                coadd.mask.array |= coadd.mask.getPlaneBitMask("DETECTED")
+                handles[i] = pipeBase.InMemoryDatasetHandle(coadd, storageClass="ExposureF",
+                                                            copy=True, dataId=handle.dataId)
+
+    @lsst.utils.tests.methodParameters(doMask=[False, True])
+    def testMaskPsfDiscontinuities(self, doMask=None):
+        """A patch whose PSF is wider than the others is kept in the template,
+        and the sources in the region only it covers are masked
+        REJECTED_TEMPLATE if doMaskPsfDiscontinuities is set.
+        """
+        self._setDetected()
+        self._widenPatchPsf(3, 0, sigma=2.4)
+        box = lsst.geom.Box2I(lsst.geom.Point2I(200, 200), lsst.geom.Point2I(600, 600))
+        # A point covered only by tract 3 patch 0.
+        onlyPatch = lsst.geom.Point2I(455, 560)
+        # A point far from tract 3 patch 0.
+        far = lsst.geom.Point2I(300, 300)
+        config = self._makeConfig()
+        config.doMaskPsfDiscontinuities = doMask
+        # Enough blocks in this small template to fit the smooth model.
+        config.psfDiscontinuityGridStep = 100
+        task = lsst.ip.diffim.GetTemplateTask(config=config)
+        result = task.run(coaddExposureHandles=self.patches,
+                          bbox=box,
+                          wcs=self.exposure.wcs,
+                          dataIds=self.dataIds,
+                          physical_filter="a_test")
+
+        self._checkMetadata(result.template, task.config, box, self.exposure.wcs, 9)
+        inputPatches = [(record["tract"], record["patch"])
+                        for record in result.template.getInfo().getCoaddInputs().ccds]
+        self.assertIn((3, 0), inputPatches)
+        mask = result.template.mask
+        self.assertFalse(mask[onlyPatch] & mask.getPlaneBitMask("NO_DATA"))
+        # The plane is only added when the task masks pixels.
+        mask.addMaskPlane("REJECTED_TEMPLATE")
+        rejected = mask.getPlaneBitMask("REJECTED_TEMPLATE")
+        self.assertEqual(bool(mask[onlyPatch] & rejected), doMask)
+        self.assertFalse(mask[far] & rejected)
+        if doMask:
+            self.assertGreater(task.metadata["nRejectedMaskedPixels"], 0)
+        else:
+            self.assertNotIn("nRejectedMaskedPixels", task.metadata)
+
     def testRunNoTemplate(self):
         """A bounding box that doesn't overlap the patches will raise.
         """
@@ -1181,7 +1263,7 @@ class GetTemplateTaskTestCase(lsst.utils.tests.TestCase):
         """
         detector = list(lsst.afw.cameraGeom.testUtils.CameraWrapper().camera)[0]
         planes = ("CLIPPED", "REJECTED", "INEXACT_PSF", "SENSOR_EDGE", "HIGH_VARIANCE",
-                  "INJECTED", "INJECTED_CORE")
+                  "REJECTED_TEMPLATE", "INJECTED", "INJECTED_CORE")
         result, _ = self._runLegacyForFuture()
         mask = result.template.mask
         for n, plane in enumerate(planes):
@@ -1413,6 +1495,187 @@ class WarpCorrelationFactorTestCase(lsst.utils.tests.TestCase):
         self.assertLess(pixelStd, 0.9*originalStd)
         self.assertGreater(pixelStd, planeStdBefore)
         self.assertLess(pixelStd, planeStdAfter)
+
+
+class PsfShapeDeviationTestCase(lsst.utils.tests.TestCase):
+    """Test the comparison of PSF shapes."""
+
+    @staticmethod
+    def _moments(sigmaX, sigmaY=None):
+        sigmaY = sigmaX if sigmaY is None else sigmaY
+        return np.array([sigmaX**2, sigmaY**2, 0.0])
+
+    def testShapeDeviation(self):
+        """The deviation is the largest fractional width difference along any
+        direction between each PSF and its own reference.
+        """
+        # The last PSF is elongated along the diagonal, with squared widths
+        # of 8 and 2 against a reference of 4.
+        references = np.array([self._moments(2.0), self._moments(2.0), self._moments(4.0),
+                               self._moments(2.0)])
+        moments = np.array([self._moments(2.0), self._moments(2.2), self._moments(4.0, 3.2),
+                            [5.0, 5.0, 3.0]])
+        deviation = lsst.ip.diffim.utils.psfShapeDeviation(moments, references)
+        self.assertFloatsAlmostEqual(deviation, np.array([0.0, 0.1, 0.2, np.sqrt(2) - 1]), atol=1e-12)
+
+
+class PsfDiscontinuityTestCase(lsst.utils.tests.TestCase):
+    """Test the masking of template PSF discontinuities on CoaddPsfs made
+    from Gaussian inputs that share the template WCS.
+    """
+    def setUp(self):
+        self.bbox = lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Extent2I(1000, 1000))
+        self.wcs = lsst.afw.geom.makeSkyWcs(
+            lsst.geom.Point2D(500, 500),
+            lsst.geom.SpherePoint(30, -20, lsst.geom.degrees),
+            lsst.afw.geom.makeCdMatrix(0.2*lsst.geom.arcseconds),
+        )
+        self.task = lsst.ip.diffim.GetTemplateTask()
+        self.nextId = 1
+
+    def _makeCoaddPsf(self, inputs, setIds=True):
+        """Make a CoaddPsf on ``self.wcs``.
+
+        Parameters
+        ----------
+        inputs : `list` [`tuple`]
+            ``(psf, box, weight)`` of each input, where ``psf`` is a
+            `~lsst.afw.detection.Psf` or a float Gaussian sigma and ``box`` is
+            the `lsst.geom.Box2D` the input covers.
+        setIds : `bool`, optional
+            Give each input a unique id; otherwise all their ids are 0, as
+            for the patch records of a template.
+        """
+        schema = lsst.afw.table.ExposureTable.makeMinimalSchema()
+        schema.addField("weight", type="D", doc="Coadd weight")
+        catalog = lsst.afw.table.ExposureCatalog(schema)
+        for psf, box, weight in inputs:
+            if not isinstance(psf, lsst.afw.detection.Psf):
+                psf = lsst.afw.detection.GaussianPsf(41, 41, psf)
+            record = catalog.addNew()
+            if setIds:
+                record.setId(self.nextId)
+                self.nextId += 1
+            record.setPsf(psf)
+            record.setWcs(self.wcs)
+            record.setBBox(lsst.geom.Box2I(box))
+            record.setValidPolygon(lsst.afw.geom.Polygon(box))
+            record["weight"] = weight
+        # GaussianPsf reports an average position of (0, 0), which need not
+        # be inside any input.
+        return lsst.meas.algorithms.CoaddPsf(catalog, self.wcs, inputs[0][1].getCenter(), "lanczos3", 100)
+
+    def _sample(self, psf, points):
+        ra, dec = self.wcs.pixelToSkyArray(np.array([p[0] for p in points], dtype=float),
+                                           np.array([p[1] for p in points], dtype=float))
+        return lsst.ip.diffim.utils.sampleCoaddPsfMoments(psf, ra, dec, self.wcs)
+
+    def testSampleMomentsWeightedMean(self):
+        """Moments are the weighted mean over the inputs covering each point,
+        including inputs of a nested CoaddPsf, and NaN where none covers.
+        """
+        full = lsst.geom.Box2D(self.bbox)
+        left = lsst.geom.Box2D(lsst.geom.Point2D(0, 0), lsst.geom.Point2D(500, 1000))
+        inner = self._makeCoaddPsf([(2.0, full, 1.0), (4.0, left, 3.0)])
+        outer = self._makeCoaddPsf([(inner, full, 1.0)])
+        ixx, iyy, ixy = self._sample(outer, [(250, 500), (750, 500), (2000, 500)])
+        self.assertFloatsAlmostEqual(ixx[:2], np.array([(4 + 3*16)/4, 4]), rtol=1e-6)
+        self.assertFloatsAlmostEqual(iyy[:2], ixx[:2], rtol=1e-6)
+        self.assertFloatsAlmostEqual(ixy[:2], np.zeros(2), atol=1e-6)
+        self.assertTrue(np.isnan(ixx[2]))
+
+    def _makeTemplate(self, detected):
+        """Make a blank template on ``self.wcs`` whose pixels in the
+        `lsst.geom.Box2I` boxes ``detected`` are DETECTED.
+        """
+        template = lsst.afw.image.ExposureF(self.bbox, self.wcs)
+        for box in detected:
+            template[box].mask.array |= template.mask.getPlaneBitMask("DETECTED")
+        return template
+
+    def testSmoothPsfMasksNothing(self):
+        """A template whose inputs all cover the detector has no sources
+        masked.
+        """
+        full = lsst.geom.Box2D(self.bbox)
+        psf = self._makeCoaddPsf([(2.0, full, 1.0), (3.0, full, 1.0)])
+        template = self._makeTemplate([self.bbox])
+        self.task.maskPsfDiscontinuities(template, psf)
+        self.assertFalse(np.any(template.mask.array & template.mask.getPlaneBitMask("REJECTED_TEMPLATE")))
+        self.assertFloatsAlmostEqual(self.task.metadata["WorstFootprintSpatialModelFit"], 0.0, atol=1e-6)
+
+    @lsst.utils.tests.methodParametersProduct(setIds=[True, False], cornerSigma=[2.4, 3.0])
+    def testPsfStepMasksSubregions(self, setIds=None, cornerSigma=None):
+        """An input that covers the corner x, y < 200 of the detector makes a
+        step of 10% or 27% in the PSF width. Only the DETECTED subregions
+        sampled in that corner are masked, each one completely. Inputs that
+        all have id 0 are each evaluated, so the step is still found.
+        """
+        full = lsst.geom.Box2D(self.bbox)
+        corner = lsst.geom.Box2D(lsst.geom.Point2D(0, 0), lsst.geom.Point2D(200, 200))
+        psf = self._makeCoaddPsf([(2.0, full, 1.0), (cornerSigma, corner, 1.0)], setIds=setIds)
+        inCorner = lsst.geom.Box2I(lsst.geom.Point2I(50, 50), lsst.geom.Extent2I(50, 50))
+        farAway = lsst.geom.Box2I(lsst.geom.Point2I(700, 700), lsst.geom.Extent2I(50, 50))
+        # A large region across the step at x = 200, split into 10 tiles of
+        # 30 pixels with a boundary at the step.
+        large = lsst.geom.Box2I(lsst.geom.Point2I(110, 50), lsst.geom.Extent2I(300, 100))
+        # A small region across the step, sampled on the corner side of it.
+        smallAcross = lsst.geom.Box2I(lsst.geom.Point2I(186, 170), lsst.geom.Extent2I(20, 20))
+        # A small region next to the corner, outside it.
+        smallOutside = lsst.geom.Box2I(lsst.geom.Point2I(186, 300), lsst.geom.Extent2I(20, 20))
+        template = self._makeTemplate([inCorner, farAway, large, smallAcross, smallOutside])
+        self.task.maskPsfDiscontinuities(template, psf)
+
+        rejected = (template.mask.array & template.mask.getPlaneBitMask("REJECTED_TEMPLATE")) != 0
+        largeInCorner = lsst.geom.Box2I(large.getMin(), lsst.geom.Point2I(199, large.maxY))
+        expected = np.zeros_like(rejected)
+        for box in (inCorner, largeInCorner, smallAcross):
+            expected[box.minY:box.maxY + 1, box.minX:box.maxX + 1] = True
+        np.testing.assert_array_equal(rejected, expected)
+        self.assertGreater(self.task.metadata["WorstFootprintSpatialModelFit"],
+                           self.task.config.psfDiscontinuityMaxDeviation)
+        self.assertEqual(self.task.metadata["nRejectedMaskedPixels"], expected.sum())
+        # 2x2 tiles of inCorner, 3x4 of large, and smallAcross.
+        self.assertEqual(self.task.metadata["nRejectedFootprints"], 17)
+
+    def testSplitMaskedRegions(self):
+        """Regions of a mask plane are 4-connected, and are split into
+        subregions no larger than the given size, each sampled at one of its
+        own pixels.
+        """
+        mask = lsst.afw.image.Mask(lsst.geom.Box2I(lsst.geom.Point2I(0, 0), lsst.geom.Extent2I(100, 50)))
+        detected = mask.getPlaneBitMask("DETECTED")
+        # Two pixels that touch only at a corner.
+        mask.array[2, 2] = detected
+        mask.array[3, 3] = detected
+        # A 70x10 bar, split into 3 tiles.
+        mask.array[20:30, 10:80] = detected
+        rows, cols, subregion, sampleRows, sampleCols = lsst.ip.diffim.utils.splitMaskedRegions(
+            mask, 32, maskName="DETECTED")
+
+        self.assertEqual(len(rows), 2 + 700)
+        self.assertEqual(len(sampleRows), 2 + 3)
+        pixelSubregion = np.full(mask.array.shape, -1)
+        pixelSubregion[rows, cols] = subregion
+        np.testing.assert_array_equal(pixelSubregion[sampleRows, sampleCols], np.arange(len(sampleRows)))
+        for i in range(len(sampleRows)):
+            pieceRows, pieceCols = np.nonzero(pixelSubregion == i)
+            self.assertLessEqual(np.ptp(pieceRows) + 1, 32)
+            self.assertLessEqual(np.ptp(pieceCols) + 1, 32)
+
+    def testFewBlocksSkips(self):
+        """Nothing is masked when the PSF covers too little of the
+        detector.
+        """
+        corner = lsst.geom.Box2D(lsst.geom.Point2D(0, 0), lsst.geom.Point2D(200, 200))
+        psf = self._makeCoaddPsf([(2.0, corner, 1.0), (4.0, corner, 1.0)])
+        template = self._makeTemplate([self.bbox])
+        with self.assertLogs(self.task.log.name, level="INFO") as cm:
+            self.task.maskPsfDiscontinuities(template, psf)
+        self.assertIn("Not masking template PSF discontinuities", "\n".join(cm.output))
+        # The plane is only added when the task masks pixels.
+        template.mask.addMaskPlane("REJECTED_TEMPLATE")
+        self.assertFalse(np.any(template.mask.array & template.mask.getPlaneBitMask("REJECTED_TEMPLATE")))
 
 
 class GetTemplateConnectionsTestCase(lsst.utils.tests.TestCase):

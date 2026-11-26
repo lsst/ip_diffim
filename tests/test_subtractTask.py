@@ -206,6 +206,33 @@ class AlardLuptonSubtractTest(AlardLuptonSubtractTestBase, lsst.utils.tests.Test
             else:
                 self.assertTrue(diffimSum >= scienceSum)
 
+    @lsst.utils.tests.methodParameters(preserve=[True, False])
+    def test_rejected_template_mask_not_dilated(self, preserve=None):
+        """The REJECTED_TEMPLATE template pixels reach the difference image
+        unchanged by the template convolution, unless REJECTED_TEMPLATE is
+        removed from preserveMaskPlanes.
+        """
+        science, sources = makeTestImage(psfSize=self.midPsfSize)
+        template, _ = makeTestImage(psfSize=self.goodPsfSize, templateBorderSize=20, doApplyCalibration=True)
+        template.mask.addMaskPlane("REJECTED_TEMPLATE")
+        bit = template.mask.getPlaneBitMask("REJECTED_TEMPLATE")
+        box = lsst.geom.Box2I(science.getXY0() + lsst.geom.Extent2I(100, 120), lsst.geom.Extent2I(10, 8))
+        template[box].mask.array |= bit
+        expected = np.zeros_like(science.mask.array, dtype=bool)
+        expected[box.minY - science.getY0():box.maxY + 1 - science.getY0(),
+                 box.minX - science.getX0():box.maxX + 1 - science.getX0()] = True
+
+        config = subtractImages.AlardLuptonSubtractConfig()
+        preserved = [mp for mp in config.preserveMaskPlanes if preserve or mp != "REJECTED_TEMPLATE"]
+        task = self._setup_subtraction(mode="convolveTemplate", preserveMaskPlanes=preserved)
+        output = task.run(template, science, sources)
+        masked = (output.difference.mask.array & bit) > 0
+        if preserve:
+            np.testing.assert_array_equal(masked, expected)
+        else:
+            self.assertTrue(np.all(masked[expected]))
+            self.assertGreater(masked.sum(), expected.sum())
+
     def test_renamed_template_mask_survives_registered_plane(self):
         """A renamed template plane keeps its pixels whether or not the plane
         it is renamed to is already registered.

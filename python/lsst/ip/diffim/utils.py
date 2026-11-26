@@ -25,7 +25,8 @@
 __all__ = ["evaluateMeanPsfFwhm", "getPsfFwhm", "getKernelCenterDisplacement",
            "computeDifferenceImageMetrics", "checkMask", "setSourceFootprints",
            "record_from_obs_info", "get_difference_image_provenance",
-           "checkTemplateIsSufficient"]
+           "checkTemplateIsSufficient", "sampleCoaddPsfMoments", "psfShapeDeviation",
+           "splitMaskedRegions"]
 
 import itertools
 import os
@@ -34,12 +35,16 @@ import requests
 from astropy.stats import gaussian_sigma_to_fwhm
 import astropy.units as u
 import numpy as np
+import scipy.ndimage
 
 import lsst.afw.detection as afwDetection
+import lsst.afw.geom as afwGeom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 from lsst.daf.butler import Timespan
 import lsst.geom as geom
+from lsst.meas.algorithms import CoaddPsf
+import lsst.pex.exceptions
 from lsst.pex.exceptions import InvalidParameterError, RangeError
 import lsst.pipe.base
 from lsst.utils.logging import getLogger
@@ -685,3 +690,212 @@ def checkTemplateIsSufficient(templateExposure, logger, scienceExposure=None, re
                    100*requiredTemplateFraction))
         raise lsst.pipe.base.NoWorkFound(message + " " + exceptionMessage)
     return templateCoverageFraction
+
+
+def sampleCoaddPsfMoments(psf, ra, dec, targetWcs):
+    """Estimate the second moments of a CoaddPsf at a set of positions.
+
+    At each position, the moments are the weighted mean of the moments of
+    the components that contain it, using the CoaddPsf weights. Since
+    the components may themselves be CoaddPsfs, call the estimator recursively
+    until the full depth of the PSF has been probed. Finally, transform the
+    moments to ``targetWcs``. While this appears more complicated than
+    a simple shape computation, it is much faster.
+
+    Parameters
+    ----------
+    psf : `lsst.meas.algorithms.CoaddPsf`
+        PSF to sample.
+    ra, dec : `numpy.ndarray`
+        Positions to sample, in radians.
+    targetWcs : `lsst.afw.geom.SkyWcs`
+        WCS whose pixels the moments are expressed in.
+
+    Returns
+    -------
+    ixx, iyy, ixy : `numpy.ndarray`
+        Moments at each position, in ``targetWcs`` pixels; NaN where no
+        component covers the position.
+    """
+    return _sampleCoaddPsfMoments(psf, ra, dec, targetWcs, {})
+
+
+def _sampleCoaddPsfMoments(psf, ra, dec, targetWcs, shapeCache):
+    """Estimate the second moments of a CoaddPsf at a set of positions, as
+    described in `sampleCoaddPsfMoments`.
+
+    Parameters
+    ----------
+    psf : `lsst.meas.algorithms.CoaddPsf`
+        PSF to sample.
+    ra, dec : `numpy.ndarray`
+        Positions to sample, in radians.
+    targetWcs : `lsst.afw.geom.SkyWcs`
+        WCS of the image to transform the measured moments to.
+    shapeCache : `dict` [`int`, `tuple` [`float`, `float`, `float`] or `None`]
+        Moments of the components that are not CoaddPsfs, keyed on component
+        id, or `None` if a component cannot be evaluated. Shared by the
+        nested calls and updated in place. Components with id 0, the id of a
+        record that was never given one, are not cached.
+
+    Returns
+    -------
+    ixx, iyy, ixy : `numpy.ndarray`
+        Moments at each position, in ``targetWcs`` pixels; NaN where no
+        component covers the position.
+    """
+    sums = np.zeros((3, len(ra)))
+    weights = np.zeros(len(ra))
+    for i in range(psf.getComponentCount()):
+        componentWcs = psf.getWcs(i)
+        x, y = componentWcs.skyToPixelArray(ra, dec)
+        # The same test as CoaddPsf: inside the bounding box and, if there
+        # is one, the valid polygon.
+        inside = geom.Box2D(psf.getBBox(i)).contains(x, y)
+        polygon = psf.getValidPolygon(i)
+        if polygon is not None:
+            inside &= polygon.contains(x, y)
+        covered = np.flatnonzero(inside)
+        if covered.size == 0:
+            continue
+        component = psf.getPsf(i)
+        if isinstance(component, CoaddPsf):
+            # Evaluate components that are themselves CoaddPsfs recursively.
+            # Will return NaN if no component covers the location.
+            moments = np.stack(_sampleCoaddPsfMoments(component, ra[covered], dec[covered], targetWcs,
+                                                      shapeCache))
+            measured = np.isfinite(moments[0])
+            covered = covered[measured]
+            moments = moments[:, measured]
+        else:
+            key = psf.getId(i)
+            if key == 0 or key not in shapeCache:
+                position = geom.Point2D(np.median(x[covered]), np.median(y[covered]))
+                try:
+                    shape = component.computeShape(position)
+                except lsst.pex.exceptions.Exception:
+                    value = None
+                else:
+                    toTarget = afwGeom.makeWcsPairTransform(componentWcs, targetWcs)
+                    shape.transformInPlace(afwGeom.linearizeTransform(toTarget, position).getLinear())
+                    value = (shape.getIxx(), shape.getIyy(), shape.getIxy())
+                if key != 0:
+                    shapeCache[key] = value
+            else:
+                value = shapeCache[key]
+            if value is None:
+                continue
+            moments = np.array(value)[:, np.newaxis]
+        weight = psf.getWeight(i)
+        sums[:, covered] += weight*moments
+        weights[covered] += weight
+
+    with np.errstate(invalid="ignore", divide="ignore"):
+        ixx, iyy, ixy = np.where(weights > 0, sums/weights, np.nan)
+    return ixx, iyy, ixy
+
+
+def psfShapeDeviation(moments, reference):
+    """Return the largest fractional difference in PSF width, along any
+    direction, between each PSF and its reference PSF.
+
+    Parameters
+    ----------
+    moments : `numpy.ndarray`, (N, 3)
+        Second moments ixx, iyy, ixy of the PSFs.
+    reference : `numpy.ndarray`, (N, 3)
+        Second moments ixx, iyy, ixy of the reference PSF of each PSF.
+
+    Returns
+    -------
+    deviation : `numpy.ndarray`, (N,)
+        Largest value of ``|width/referenceWidth - 1|`` over all
+        directions, for each PSF.
+    """
+    def toMatrix(moments):
+        # Reformat the (N, [ixx, iyy, ixy]) input to N 2x2 matrices:
+        # (N, [[ixx,ixy], [ixy, iyy]])
+        return moments[:, [0, 2, 2, 1]].reshape(-1, 2, 2)
+
+    moments = toMatrix(moments)
+    # Write the reference moments as R = L L^T (Cholesky) and let W = L^-1.
+    # W is the change of pixel coordinates that turns the reference PSF into
+    # a circle of unit width: W R W^T = I. Applying the same change to a PSF
+    # gives W M W^T, its moments in units of the reference width. Its
+    # eigenvalues, ``ratios``, are the PSF's squared widths along its two
+    # principal axes in these units, (width/referenceWidth)**2. They are the
+    # smallest and largest values of u^T M u / u^T R u over all directions
+    # u, so the width differs most from the reference along one of them.
+    #
+    # Example: a round reference of width 2 and a PSF stretched along the
+    # diagonal:
+    #     R = [[4, 0],    M = [[5, 3],
+    #          [0, 4]]         [3, 5]]
+    # L = 2 I and W = I/2, so W R W^T = I and
+    #     W M W^T = [[1.25, 0.75],
+    #                [0.75, 1.25]]
+    # whose eigenvectors lie along the diagonals, with ratios = [0.5, 2].
+    # The PSF is sqrt(0.5) = 0.71 times the reference width along one
+    # diagonal and sqrt(2) = 1.41 times along the other, so the deviation is
+    # max(|0.71 - 1|, |1.41 - 1|) = 0.41.
+    whiten = np.linalg.inv(np.linalg.cholesky(toMatrix(reference)))
+    ratios = np.linalg.eigvalsh(whiten @ moments @ np.swapaxes(whiten, -1, -2))
+    return np.max(np.abs(np.sqrt(ratios) - 1), axis=-1)
+
+
+def splitMaskedRegions(mask, size, maskName):
+    """Split the regions of a mask plane into compact subregions.
+
+    Parameters
+    ----------
+    mask : `lsst.afw.image.Mask`
+        Mask with the plane to split.
+    size : `int`
+        Largest width and height of a subregion, in pixels.
+    maskName : `str`
+        Name of the mask plane to split.
+
+    Returns
+    -------
+    rows, cols : `numpy.ndarray` [`int`]
+        Array indices of the pixels of ``mask`` with ``maskName`` set.
+    subregion : `numpy.ndarray` [`int`]
+        Subregion of each of those pixels, numbered from 0.
+    sampleRows, sampleCols : `numpy.ndarray` [`int`]
+        Array indices of the pixel of each subregion closest to its centroid.
+    """
+    # 1. Find the regions and their bounding boxes.
+    masked = (mask.array & mask.getPlaneBitMask(maskName)) != 0
+    # The default structuring element connects pixels along rows and columns.
+    labels, _ = scipy.ndimage.label(masked)
+    slices = scipy.ndimage.find_objects(labels)
+    rows, cols = np.nonzero(masked)
+    region = labels[rows, cols] - 1
+    del labels
+    starts = np.array([(s[0].start, s[1].start) for s in slices], dtype=int).reshape(-1, 2)
+    stops = np.array([(s[0].stop, s[1].stop) for s in slices], dtype=int).reshape(-1, 2)
+    y0, x0 = starts.T
+    height, width = (stops - starts).T
+
+    # 2. Tile each bounding box into nx by ny tiles of nearly equal size.
+    nx = -(-width//size)
+    ny = -(-height//size)
+    tileX = (cols - x0[region])*nx[region]//width[region]
+    tileY = (rows - y0[region])*ny[region]//height[region]
+
+    # 3. Number the subregions.
+    offsets = np.concatenate([[0], np.cumsum(nx*ny)[:-1]])
+    key = offsets[region] + tileY*nx[region] + tileX
+    _, subregion = np.unique(key, return_inverse=True)
+
+    # 4. Pick a pixel in each subregion at the minimum distance to its center.
+    count = np.bincount(subregion)
+    centerRow = np.bincount(subregion, rows)/count
+    centerCol = np.bincount(subregion, cols)/count
+    distance = (rows - centerRow[subregion])**2 + (cols - centerCol[subregion])**2
+    minDistance = np.full(len(count), np.inf)
+    np.minimum.at(minDistance, subregion, distance)
+    candidates = np.flatnonzero(distance == minDistance[subregion])
+    _, first = np.unique(subregion[candidates], return_index=True)
+    closestToCenter = candidates[first]
+    return rows, cols, subregion, rows[closestToCenter], cols[closestToCenter]
