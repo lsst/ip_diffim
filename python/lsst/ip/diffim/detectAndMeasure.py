@@ -511,9 +511,11 @@ class DetectAndMeasureConfig(pipeBase.PipelineTaskConfig,
 
         # Keep track of which footprints contain streaks
         self.measurement.plugins["base_PixelFlags"].masksFpAnywhere = [
-            "STREAK", "INJECTED", "INJECTED_TEMPLATE", "HIGH_VARIANCE", "SAT_TEMPLATE", "SPIKE"]
+            "STREAK", "INJECTED", "INJECTED_TEMPLATE", "HIGH_VARIANCE", "SAT_TEMPLATE", "SPIKE",
+            "REJECTED_TEMPLATE"]
         self.measurement.plugins["base_PixelFlags"].masksFpCenter = [
-            "STREAK", "INJECTED", "INJECTED_TEMPLATE", "HIGH_VARIANCE", "SAT_TEMPLATE", "SPIKE"]
+            "STREAK", "INJECTED", "INJECTED_TEMPLATE", "HIGH_VARIANCE", "SAT_TEMPLATE", "SPIKE",
+            "REJECTED_TEMPLATE"]
         self.skySources.avoidMask = ["DETECTED", "DETECTED_NEGATIVE", "BAD", "NO_DATA", "EDGE"]
 
     def validate(self):
